@@ -1,0 +1,11 @@
+[project]
+name = "fcweb"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "openpyxl>=3.1.5",
+    "tzdata>=2026.3",
+    "uvicorn>=0.52.2",
+]

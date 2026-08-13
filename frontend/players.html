@@ -1,0 +1,98 @@
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>선수 기록 | FC Online Champions League</title>
+
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+
+
+<header>
+    <div class="header-container">
+
+        <!-- 로고 영역 -->
+        <div class="logo">
+            <a href="./index.html">FCL</a>
+        </div>
+
+        <!-- 네비게이션 영역 -->
+        <nav>
+            <ul class="main-menu">
+
+                <!-- 경기 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">경기</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./schedule.html">경기 일정</a></li>
+                        <li><a href="./results.html">경기 결과</a></li>
+                        <li><a href="./rules.html">경기 규칙</a></li>
+                    </ul>
+                </li>
+
+                <!-- 기록 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">기록</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./standings.html">팀 기록</a></li>
+                        <li><a href="./players.html">선수 기록</a></li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="players-page">
+
+    <section class="players-section">
+
+        <div class="players-header">
+            <h1>선수 득점 순위</h1>
+            <p>FC Online Champions League 선수 득점 기록</p>
+        </div>
+
+        <div class="players-table-container">
+
+            <table class="players-table">
+
+                <colgroup>
+                    <col class="player-col-rank">
+                    <col class="player-col-season">
+                    <col class="player-col-name">
+                    <col class="player-col-goals">
+                </colgroup>
+
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>시즌</th>
+                        <th>선수 이름</th>
+                        <th>득점</th>
+                    </tr>
+                </thead>
+
+                <tbody class="players-table-body">
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+<!-- 하단 영역 -->
+<footer>
+    <p>V1.0 FCL made by aria</p>
+</footer>
+
+<script type="module" src="./js/players.js"></script>

@@ -1,0 +1,110 @@
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>팀 순위 | FC Online Champions League</title>
+
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+
+<header>
+    <div class="header-container">
+
+        <!-- 로고 영역 -->
+        <div class="logo">
+            <a href="./index.html">FCL</a>
+        </div>
+
+        <!-- 네비게이션 영역 -->
+        <nav>
+            <ul class="main-menu">
+
+                <!-- 경기 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">경기</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./schedule.html">경기 일정</a></li>
+                        <li><a href="./results.html">경기 결과</a></li>
+                        <li><a href="./rules.html">경기 규칙</a></li>
+                    </ul>
+                </li>
+
+                <!-- 기록 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">기록</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./standings.html">팀 기록</a></li>
+                        <li><a href="./players.html">선수 기록</a></li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+<main class="standings-page">
+
+    <section class="standings-section">
+
+        <div class="standings-header">
+            <h1>팀 순위</h1>
+            <p>FC Online Champions League 정규리그 순위</p>
+        </div>
+
+        <div class="standings-table-container">
+
+            <table class="standings-table">
+
+                <colgroup>
+                    <col class="col-rank">
+                    <col class="col-team">
+                    <col class="col-played">
+
+                    <col class="col-stat">
+                    <col class="col-stat">
+                    <col class="col-stat">
+
+                    <col class="col-stat">
+                    <col class="col-stat">
+
+                    <col class="col-difference">
+                    <col class="col-points">
+                </colgroup>
+
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>팀</th>
+                        <th>경기수</th>
+                        <th>승</th>
+                        <th>무</th>
+                        <th>패</th>
+                        <th>득점</th>
+                        <th>실점</th>
+                        <th>득실차</th>
+                        <th>승점</th>
+                    </tr>
+                </thead>
+
+                <tbody class="standings-table-body">
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+<!-- 하단 영역 -->
+<footer>
+    <p>V1.0 FCL made by aria</p>
+</footer>
+
+<script type="module" src="./js/standings.js"></script>
