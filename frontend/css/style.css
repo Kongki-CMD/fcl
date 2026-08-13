@@ -484,13 +484,12 @@ main {
 ========================= */
 
 .standing-team {
-    display: flex;
+    display: grid;
+    grid-template-columns: 30px 70px;
     align-items: center;
     justify-content: center;
 
-
     gap: 10px;
-
     width: 100%;
 }
 
@@ -498,13 +497,14 @@ main {
     width: 30px;
     height: 30px;
 
-    flex-shrink: 0;
     object-fit: contain;
 }
 
 .standing-team-name {
-    white-space: nowrap;
+    width: 70px;
+
     text-align: left;
+    white-space: nowrap;
 }
 
 
