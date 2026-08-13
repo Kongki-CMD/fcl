@@ -53,16 +53,30 @@
         <!-- 메인 영역 -->
         <main class="schedule-page">
 
-            <section class="schedule-section">
-                <div class="schedule-header">
-                    <h1>경기 일정</h1>
-                    <p>FC Online Champions League 전체 경기 일정</p>
-                </div>
+        <section class="schedule-section">
 
-                <div class="schedule-list">
+            <div class="schedule-header">
+                <h1>리그 일정</h1>
 
+                <div class="schedule-header-bottom">
+                    <p class="schedule-description">
+                        FC Online Champions League 리그 경기 일정
+                    </p>
+
+                    <button
+                        type="button"
+                        id="schedule-view-button"
+                        class="schedule-view-button"
+                    >
+                        플레이오프 일정
+                    </button>
                 </div>
-            </section>
+            </div>
+
+                <div class="match-list"></div>
+                <div class="playoff-match-list"></div>
+
+        </section>
 
         </main>
 

@@ -30,6 +30,7 @@ FRONTEND_DIR = PROJECT_DIR / "frontend"
 EXCEL_PATH = BASE_DIR / "data" / "matches.xlsx"
 RESULTS_PATH = BASE_DIR / "data" / "results.xlsx"
 PLAYER_RANKINGS_PATH = BASE_DIR / "data" / "player_rankings.xlsx"
+PLAYOFFS_PATH = BASE_DIR / "data" / "playoffs.xlsx"
 
 PARTICIPANTS = [
     "문권기",
@@ -295,6 +296,38 @@ def get_player_rankings():
 
     return players
 
+@app.get("/api/playoffs")
+def get_playoffs():
+    workbook = load_workbook(PLAYOFFS_PATH)
+    worksheet = workbook["플레이오프"]
+
+    playoffs = []
+
+    for row in worksheet.iter_rows(
+        min_row=2,
+        values_only=True
+    ):
+        match_date, stage, team_a, team_b = row
+
+        if match_date is None:
+            continue
+
+        if hasattr(match_date, "strftime"):
+            match_date = match_date.strftime("%Y-%m-%d")
+
+        playoffs.append(
+            {
+                "date": str(match_date),
+                "stage": stage,
+                "team_a": team_a,
+                "team_b": team_b,
+            }
+        )
+
+    workbook.close()
+
+    return playoffs
+
 app.mount(
     "/",
     StaticFiles(
@@ -303,3 +336,4 @@ app.mount(
     ),
     name="frontend",
 )
+
