@@ -225,9 +225,17 @@ function renderTeamRanking(standings) {
                 ${team.rank}
             </span>
 
-            <span class="dashboard-team-name">
-                ${team.name}
-            </span>
+            <div class="dashboard-team">
+                <img
+                    src="${getTeamImagePath(team.name)}"
+                    alt=""
+                    class="dashboard-team-image"
+                >
+
+                <span class="dashboard-team-name">
+                    ${team.name}
+                </span>
+            </div>
 
             <span class="dashboard-points">
                 ${team.points}

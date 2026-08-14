@@ -739,6 +739,28 @@ footer p {
    메인화면 팀 순위
 ========================= */
 
+.dashboard-ranking-header,
+.dashboard-ranking-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 70px;
+    align-items: center;
+}
+
+.dashboard-ranking-header {
+    min-height: 40px;
+    padding: 0 15px;
+
+    border-bottom: 1px solid #444;
+
+    text-align: center;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    color: #aaa;
+}
+
+
 .team-ranking-list {
     width: 100%;
 }
@@ -764,8 +786,22 @@ footer p {
     font-weight: bold;
 }
 
+.dashboard-team {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+
+    gap: 10px;
+
+    width: 120px;
+    margin: 0 auto;
+}
+
 .dashboard-team-name {
-    text-align: center;
+    width: 70px;
+
+    text-align: left;
+    white-space: nowrap;
 }
 
 .dashboard-points {
@@ -848,4 +884,126 @@ footer p {
 
 .schedule-card .versus {
     text-align: center;
+}
+
+/* =========================
+   라운드 표시
+========================= */
+
+.match-round {
+    margin-left: 10px;
+
+    padding: 3px 8px;
+
+    border: 1px solid #444;
+    border-radius: 5px;
+
+    color: #ccc;
+
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* =========================
+   세트별 경기 결과
+========================= */
+
+.set-score-list {
+    margin-top: 20px;
+    padding-top: 15px;
+
+    border-top: 1px solid #333;
+}
+
+.set-score-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 1fr;
+
+    align-items: center;
+
+    min-height: 38px;
+}
+
+.set-name {
+    grid-column: 1;
+
+    padding-right: 25px;
+
+    text-align: right;
+
+    font-size: 14px;
+    color: #aaa;
+}
+
+.set-score {
+    grid-column: 2;
+
+    display: grid;
+    grid-template-columns: 60px 15px 60px;
+    align-items: center;
+    justify-content: center;
+
+    text-align: center;
+
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.set-score-side {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+}
+
+.set-result-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 22px;
+    height: 22px;
+
+    border-radius: 5px;
+
+    font-size: 11px;
+    font-weight: bold;
+}
+
+
+/* 승리 */
+
+.set-result-badge.win {
+    background: rgba(63, 104, 145, 0.65);
+    color: #dbeeff;
+}
+
+
+/* 패배 */
+
+.set-result-badge.loss {
+    background: rgba(135, 67, 67, 0.65);
+    color: #ffe0e0;
+}
+
+.set-score-divider {
+    margin: 0 10px;
+
+    color: #888;
+}
+
+.set-result-badge.draw {
+    background: rgba(110, 110, 110, 0.6);
+    color: #e0e0e0;
+}
+
+.dashboard-team-image {
+    width: 30px;
+    height: 30px;
+
+    flex: 0 0 30px;
+
+    object-fit: contain;
+    display: block;
 }

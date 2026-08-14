@@ -58,6 +58,8 @@ PARTICIPANTS = [
     "서종원",
 ]
 
+def get_round_number(match_index):
+    return (match_index // 5) + 1
 
 # =========================
 # 전체 경기 일정
@@ -72,10 +74,12 @@ def get_matches():
 
     matches = []
 
-    for row in worksheet.iter_rows(
-        min_row=2,
-        max_col=3,
-        values_only=True,
+    for match_index, row in enumerate(
+        worksheet.iter_rows(
+            min_row=2,
+            max_col=3,
+            values_only=True,
+        )
     ):
         match_date, team_a, team_b = row
 
@@ -87,7 +91,8 @@ def get_matches():
 
         matches.append(
             {
-                "date": str(match_date),
+                "date": match_date,
+                "round": get_round_number(match_index),
                 "team_a": team_a,
                 "team_b": team_b,
             }
@@ -163,10 +168,12 @@ def get_results():
     # 중요:
     # results.xlsx 오른쪽에 메모가 있어도
     # 실제 경기 데이터인 A~I열까지만 읽음
-    for row in worksheet.iter_rows(
-        min_row=2,
-        max_col=9,
-        values_only=True,
+    for match_index, row in enumerate(
+        worksheet.iter_rows(
+            min_row=2,
+            max_col=9,
+            values_only=True,
+        )
     ):
 
         (
@@ -229,6 +236,7 @@ def get_results():
         results.append(
             {
                 "date": match_date.strftime("%Y-%m-%d"),
+                "round": get_round_number(match_index),
 
                 "team_a": team_a,
                 "team_b": team_b,

@@ -49,6 +49,10 @@ function renderResults(results) {
         resultCardElement.innerHTML = `
             <div class="result-date">
                 ${result.date}
+
+                <span class="match-round">
+                    ${result.round}라운드
+                </span>
             </div>
 
             <div class="result-teams">
@@ -86,9 +90,91 @@ function renderResults(results) {
                         ${result.team_b}
                     </span>
                 </div>
+            </div>
+
+            <div class="set-score-list">
+
+${result.sets.map((setResult) => {
+
+    let teamAResult = "";
+    let teamBResult = "";
+
+    if (setResult.team_a_score > setResult.team_b_score) {
+        teamAResult = `
+            <span class="set-result-badge win">
+                W
+            </span>
+        `;
+
+        teamBResult = `
+            <span class="set-result-badge loss">
+                L
+            </span>
+        `;
+        } else if (setResult.team_a_score < setResult.team_b_score) {
+            teamAResult = `
+                <span class="set-result-badge loss">
+                    L
+                </span>
+            `;
+
+            teamBResult = `
+                <span class="set-result-badge win">
+                    W
+                </span>
+            `;
+        } else {
+            teamAResult = `
+                <span class="set-result-badge draw">
+                    D
+                </span>
+            `;
+
+            teamBResult = `
+                <span class="set-result-badge draw">
+                    D
+                </span>
+            `;
+        }
+
+    return `
+        <div class="set-score-row">
+
+            <span class="set-name">
+                ${setResult.set}세트
+            </span>
+
+            <div class="set-score">
+
+                <span class="set-score-side">
+                    ${teamAResult}
+
+                    <span>
+                        ${setResult.team_a_score}
+                    </span>
+                </span>
+
+                <span class="set-score-divider">
+                    :
+                </span>
+
+                <span class="set-score-side">
+                    <span>
+                        ${setResult.team_b_score}
+                    </span>
+
+                    ${teamBResult}
+                </span>
 
             </div>
-        `;
+
+        </div>
+    `;
+
+}).join("")}
+
+            </div>
+                `;
 
         resultsListElement.appendChild(resultCardElement);
     });

@@ -116,9 +116,28 @@ function renderPlayoffSchedule(matches) {
             "playoff-schedule-card"
         );
 
+        let playoffFormat = "";
+
+        if (
+            match.stage === "준플레이오프" ||
+            match.stage === "플레이오프"
+        ) {
+            playoffFormat = "5판 3선승";
+        } else if (match.stage === "결승 시리즈") {
+            playoffFormat = "7판 4선승";
+        }
+
         playoffCardElement.innerHTML = `
             <div class="match-date">
                 ${match.date}
+
+                    <span class="playoff-divider">
+                        /
+                    </span>
+
+                <span class="playoff-format">
+                    ${playoffFormat}
+                </span>
             </div>
 
             <div class="playoff-stage">
@@ -172,7 +191,12 @@ function renderSchedule(matches) {
         scheduleCardElement.innerHTML = `
             <div class="match-date">
                 ${match.date}
+                <span class="match-round">
+                    ROUND ${match.round}
+                </span>
             </div>
+
+
 
             <div class="match-teams">
 
