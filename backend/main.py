@@ -67,21 +67,24 @@ def get_round_number(match_index):
 
 @app.get("/api/matches")
 def get_matches():
-
     workbook = load_workbook(EXCEL_PATH)
-
     worksheet = workbook["경기일정"]
 
     matches = []
 
-    for match_index, row in enumerate(
-        worksheet.iter_rows(
-            min_row=2,
-            max_col=3,
-            values_only=True,
-        )
+    regular_match_index = 0
+
+    for row in worksheet.iter_rows(
+        min_row=2,
+        max_col=4,
+        values_only=True,
     ):
-        match_date, team_a, team_b = row
+        (
+            match_date,
+            team_a,
+            team_b,
+            match_type,
+        ) = row
 
         if match_date is None:
             continue
@@ -89,10 +92,27 @@ def get_matches():
         if hasattr(match_date, "strftime"):
             match_date = match_date.strftime("%Y-%m-%d")
 
+        match_date = str(match_date)
+
+        # 경기구분이 비어 있으면 정규리그
+        if match_type is None:
+            match_type = "정규리그"
+
+        # 프리시즌은 라운드 계산에서 제외
+        if match_type == "프리시즌":
+            round_number = None
+        else:
+            round_number = get_round_number(
+                regular_match_index
+            )
+
+            regular_match_index += 1
+
         matches.append(
             {
                 "date": match_date,
-                "round": get_round_number(match_index),
+                "round": round_number,
+                "match_type": match_type,
                 "team_a": team_a,
                 "team_b": team_b,
             }
@@ -109,9 +129,7 @@ def get_matches():
 
 @app.get("/api/matches/today")
 def get_today_matches():
-
     workbook = load_workbook(EXCEL_PATH)
-
     worksheet = workbook["경기일정"]
 
     today = datetime.now(
@@ -122,10 +140,15 @@ def get_today_matches():
 
     for row in worksheet.iter_rows(
         min_row=2,
-        max_col=3,
+        max_col=4,
         values_only=True,
     ):
-        match_date, team_a, team_b = row
+        (
+            match_date,
+            team_a,
+            team_b,
+            match_type,
+        ) = row
 
         if match_date is None:
             continue
@@ -133,11 +156,16 @@ def get_today_matches():
         if hasattr(match_date, "date"):
             match_date = match_date.date()
 
-        if match_date == today:
+        if match_type is None:
+            match_type = "정규리그"
 
+        if match_date == today:
             matches.append(
                 {
-                    "date": match_date.strftime("%Y-%m-%d"),
+                    "date": match_date.strftime(
+                        "%Y-%m-%d"
+                    ),
+                    "match_type": match_type,
                     "team_a": team_a,
                     "team_b": team_b,
                 }
@@ -154,9 +182,7 @@ def get_today_matches():
 
 @app.get("/api/results")
 def get_results():
-
     workbook = load_workbook(RESULTS_PATH)
-
     worksheet = workbook["경기결과"]
 
     today = datetime.now(
@@ -165,117 +191,130 @@ def get_results():
 
     results = []
 
-    # 중요:
-    # results.xlsx 오른쪽에 메모가 있어도
-    # 실제 경기 데이터인 A~I열까지만 읽음
-    for match_index, row in enumerate(
-        worksheet.iter_rows(
-            min_row=2,
-            max_col=9,
-            values_only=True,
-        )
-    ):
+    regular_match_index = 0
 
+    for row in worksheet.iter_rows(
+        min_row=2,
+        max_col=10,
+        values_only=True,
+    ):
         (
             match_date,
             team_a,
-            set1_a,
-            set1_b,
-            set2_a,
-            set2_b,
-            set3_a,
-            set3_b,
+            set1_team_a,
+            set1_team_b,
+            set2_team_a,
+            set2_team_b,
+            set3_team_a,
+            set3_team_b,
             team_b,
+            match_type,
         ) = row
+
 
         if match_date is None:
             continue
 
+
+        if match_type is None:
+            match_type = "정규리그"
+
+
+        # ----------------------------------
+        # 라운드 계산
+        # 프리시즌은 라운드 계산에서 제외
+        # ----------------------------------
+
+        if match_type == "프리시즌":
+            round_number = None
+
+        else:
+            round_number = get_round_number(
+                regular_match_index
+            )
+
+            regular_match_index += 1
+
+
         if hasattr(match_date, "date"):
             match_date = match_date.date()
 
-        # 경기 결과 페이지는 전날까지
+
+        # 오늘 경기와 미래 경기는 결과에서 제외
         if match_date >= today:
             continue
 
+
         scores = [
-            set1_a,
-            set1_b,
-            set2_a,
-            set2_b,
-            set3_a,
-            set3_b,
+            set1_team_a,
+            set1_team_b,
+            set2_team_a,
+            set2_team_b,
+            set3_team_a,
+            set3_team_b,
         ]
 
-        # 3세트 모두 입력되어야 완료 경기
+
+        # 세트 점수가 전부 입력된 경기만 출력
         if any(score is None for score in scores):
             continue
 
-        set1_a = int(set1_a)
-        set1_b = int(set1_b)
 
-        set2_a = int(set2_a)
-        set2_b = int(set2_b)
-
-        set3_a = int(set3_a)
-        set3_b = int(set3_b)
-
-        # 기존 결과 화면과의 호환을 위한 총 득점
         team_a_total_score = (
-            set1_a
-            + set2_a
-            + set3_a
+            set1_team_a
+            + set2_team_a
+            + set3_team_a
         )
 
         team_b_total_score = (
-            set1_b
-            + set2_b
-            + set3_b
+            set1_team_b
+            + set2_team_b
+            + set3_team_b
         )
+
 
         results.append(
             {
-                "date": match_date.strftime("%Y-%m-%d"),
-                "round": get_round_number(match_index),
+                "date": match_date.strftime(
+                    "%Y-%m-%d"
+                ),
+
+                "round": round_number,
+
+                "match_type": match_type,
 
                 "team_a": team_a,
+
                 "team_b": team_b,
 
-                # 기존 JS 호환용
                 "team_a_score": team_a_total_score,
+
                 "team_b_score": team_b_total_score,
 
-                # 새 3세트 데이터
                 "sets": [
                     {
                         "set": 1,
-                        "team_a_score": set1_a,
-                        "team_b_score": set1_b,
+                        "team_a_score": set1_team_a,
+                        "team_b_score": set1_team_b,
                     },
                     {
                         "set": 2,
-                        "team_a_score": set2_a,
-                        "team_b_score": set2_b,
+                        "team_a_score": set2_team_a,
+                        "team_b_score": set2_team_b,
                     },
                     {
                         "set": 3,
-                        "team_a_score": set3_a,
-                        "team_b_score": set3_b,
+                        "team_a_score": set3_team_a,
+                        "team_b_score": set3_team_b,
                     },
                 ],
             }
         )
 
+
     workbook.close()
 
-    # 최신 경기부터
-    results.sort(
-        key=lambda result: result["date"],
-        reverse=True,
-    )
-
     return results
-
 
 # =========================
 # 팀 순위
@@ -285,7 +324,6 @@ def get_results():
 def get_standings():
 
     workbook = load_workbook(RESULTS_PATH)
-
     worksheet = workbook["경기결과"]
 
     today = datetime.now(
@@ -294,13 +332,17 @@ def get_standings():
 
     standings = {}
 
+
+    # =========================
     # 모든 참가자 기본 데이터
+    # =========================
+
     for participant in PARTICIPANTS:
 
         standings[participant] = {
             "name": participant,
 
-            # 실제 매치 수
+            # 실제 정규리그 매치 수
             "played": 0,
 
             # 승/무/패는 세트 기준
@@ -316,30 +358,49 @@ def get_standings():
         }
 
 
-    # A~I열만 읽기
+    # =========================
+    # 경기 결과 읽기
+    # =========================
+
     for row in worksheet.iter_rows(
         min_row=2,
-        max_col=9,
+        max_col=10,
         values_only=True,
     ):
 
         (
             match_date,
             team_a,
-            set1_a,
-            set1_b,
-            set2_a,
-            set2_b,
-            set3_a,
-            set3_b,
+            set1_team_a,
+            set1_team_b,
+            set2_team_a,
+            set2_team_b,
+            set3_team_a,
+            set3_team_b,
             team_b,
+            match_type,
         ) = row
 
 
+        # 완전 빈 행 제외
         if match_date is None:
             continue
 
 
+        # 경기구분이 비어있으면 정규리그
+        if match_type is None:
+            match_type = "정규리그"
+
+
+        # =========================
+        # 프리시즌 제외
+        # =========================
+
+        if match_type == "프리시즌":
+            continue
+
+
+        # 날짜 변환
         if hasattr(match_date, "date"):
             match_date = match_date.date()
 
@@ -349,21 +410,26 @@ def get_standings():
             continue
 
 
+        # =========================
+        # 세트 점수 확인
+        # =========================
+
         scores = [
-            set1_a,
-            set1_b,
-            set2_a,
-            set2_b,
-            set3_a,
-            set3_b,
+            set1_team_a,
+            set1_team_b,
+            set2_team_a,
+            set2_team_b,
+            set3_team_a,
+            set3_team_b,
         ]
 
 
-        # 3세트 모두 입력되어야 순위 계산
+        # 3세트 모두 입력된 경기만 계산
         if any(score is None for score in scores):
             continue
 
 
+        # 등록되지 않은 참가자 제외
         if (
             team_a not in standings
             or team_b not in standings
@@ -376,7 +442,7 @@ def get_standings():
 
 
         # =========================
-        # 매치 수
+        # 경기 수
         # =========================
 
         team_a_record["played"] += 1
@@ -384,21 +450,21 @@ def get_standings():
 
 
         # =========================
-        # 3세트
+        # 세트 데이터
         # =========================
 
         sets = [
             (
-                int(set1_a),
-                int(set1_b),
+                int(set1_team_a),
+                int(set1_team_b),
             ),
             (
-                int(set2_a),
-                int(set2_b),
+                int(set2_team_a),
+                int(set2_team_b),
             ),
             (
-                int(set3_a),
-                int(set3_b),
+                int(set3_team_a),
+                int(set3_team_b),
             ),
         ]
 
@@ -417,10 +483,7 @@ def get_standings():
             team_b_record["goals_against"] += team_a_score
 
 
-            # -------------------------
             # 팀A 승리
-            # -------------------------
-
             if team_a_score > team_b_score:
 
                 team_a_record["wins"] += 1
@@ -429,10 +492,7 @@ def get_standings():
                 team_b_record["losses"] += 1
 
 
-            # -------------------------
             # 팀B 승리
-            # -------------------------
-
             elif team_a_score < team_b_score:
 
                 team_b_record["wins"] += 1
@@ -441,10 +501,7 @@ def get_standings():
                 team_a_record["losses"] += 1
 
 
-            # -------------------------
             # 무승부
-            # -------------------------
-
             else:
 
                 team_a_record["draws"] += 1
@@ -470,12 +527,14 @@ def get_standings():
 
 
     # =========================
-    # 동률 시 기존 참가자 순서
+    # 동률 시 참가자 기본 순서
     # =========================
 
     participant_order = {
         participant: index
-        for index, participant in enumerate(PARTICIPANTS)
+        for index, participant in enumerate(
+            PARTICIPANTS
+        )
     }
 
 
@@ -493,7 +552,9 @@ def get_standings():
             -record["points"],
             -record["goal_difference"],
             -record["goals_for"],
-            participant_order[record["name"]],
+            participant_order[
+                record["name"]
+            ],
         ),
     )
 
@@ -506,6 +567,7 @@ def get_standings():
         sorted_standings,
         start=1,
     ):
+
         record["rank"] = index
 
 

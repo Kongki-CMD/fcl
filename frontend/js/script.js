@@ -4,9 +4,19 @@ import {
 } from "./config.js";
 
 
-const todayMatchListElement = document.querySelector(".match-list");
-const recentResultListElement = document.querySelector(".result-list");
+const todayMatchListElement =
+    document.querySelector(".match-list");
 
+const recentResultListElement =
+    document.querySelector(".result-list");
+
+const teamRankingListElement =
+    document.querySelector(".team-ranking-list");
+
+
+// ======================================================
+// 오늘의 경기
+// ======================================================
 
 async function loadTodayMatches() {
     try {
@@ -15,17 +25,22 @@ async function loadTodayMatches() {
         );
 
         if (!response.ok) {
-            throw new Error("오늘 경기 정보를 불러오지 못했습니다.");
+            throw new Error(
+                "오늘 경기 정보를 불러오지 못했습니다."
+            );
         }
 
         const matchData = await response.json();
 
         renderTodayMatches(matchData);
+
     } catch (error) {
         console.error(error);
 
         todayMatchListElement.innerHTML = `
-            <p>경기 정보를 불러오는 중 오류가 발생했습니다.</p>
+            <p>
+                경기 정보를 불러오는 중 오류가 발생했습니다.
+            </p>
         `;
     }
 }
@@ -42,13 +57,19 @@ function renderTodayMatches(matches) {
         return;
     }
 
-    matches.forEach((match) => {
-        const todayMatchCardElement = document.createElement("div");
 
-        todayMatchCardElement.classList.add("today-match-card");
+    matches.forEach((match) => {
+        const todayMatchCardElement =
+            document.createElement("div");
+
+        todayMatchCardElement.classList.add(
+            "today-match-card"
+        );
+
 
         todayMatchCardElement.innerHTML = `
             <div class="team-box">
+
                 <img
                     src="${getTeamImagePath(match.team_a)}"
                     alt="${match.team_a} 로고"
@@ -58,13 +79,17 @@ function renderTodayMatches(matches) {
                 <span class="today-team">
                     ${match.team_a}
                 </span>
+
             </div>
+
 
             <span class="today-versus">
                 VS
             </span>
 
+
             <div class="team-box">
+
                 <img
                     src="${getTeamImagePath(match.team_b)}"
                     alt="${match.team_b} 로고"
@@ -74,13 +99,21 @@ function renderTodayMatches(matches) {
                 <span class="today-team">
                     ${match.team_b}
                 </span>
+
             </div>
         `;
 
-        todayMatchListElement.appendChild(todayMatchCardElement);
+
+        todayMatchListElement.appendChild(
+            todayMatchCardElement
+        );
     });
 }
 
+
+// ======================================================
+// 이전 경기 결과
+// ======================================================
 
 async function loadRecentResults() {
     try {
@@ -89,17 +122,22 @@ async function loadRecentResults() {
         );
 
         if (!response.ok) {
-            throw new Error("이전 경기 결과를 불러오지 못했습니다.");
+            throw new Error(
+                "이전 경기 결과를 불러오지 못했습니다."
+            );
         }
 
         const resultData = await response.json();
 
         renderRecentResults(resultData);
+
     } catch (error) {
         console.error(error);
 
         recentResultListElement.innerHTML = `
-            <p>경기 결과를 불러오는 중 오류가 발생했습니다.</p>
+            <p>
+                경기 결과를 불러오는 중 오류가 발생했습니다.
+            </p>
         `;
     }
 }
@@ -107,6 +145,7 @@ async function loadRecentResults() {
 
 function renderRecentResults(results) {
     recentResultListElement.innerHTML = "";
+
 
     if (results.length === 0) {
         recentResultListElement.innerHTML = `
@@ -116,8 +155,11 @@ function renderRecentResults(results) {
         return;
     }
 
+
+    // 가장 최근 경기 날짜 찾기
     const latestDate = results.reduce(
         (latestDateValue, result) => {
+
             if (result.date > latestDateValue) {
                 return result.date;
             }
@@ -127,23 +169,162 @@ function renderRecentResults(results) {
         results[0].date
     );
 
+
+    // 가장 최근 날짜에 열린 경기만 표시
     const latestResults = results.filter(
         (result) => result.date === latestDate
     );
 
-    latestResults.forEach((result) => {
-        const recentResultCardElement = document.createElement("div");
 
-        recentResultCardElement.classList.add("result-card");
+    latestResults.forEach((result) => {
+
+        const recentResultCardElement =
+            document.createElement("div");
+
+        recentResultCardElement.classList.add(
+            "result-card"
+        );
+
+
+        // 프리시즌 / 정규리그 표시
+        let resultLabel = "";
+
+        if (result.match_type === "프리시즌") {
+
+            resultLabel = `
+                <span class="match-preseason">
+                    PRE-SEASON
+                </span>
+            `;
+
+        } else if (result.round) {
+
+            resultLabel = `
+                <span class="match-round">
+                    ROUND ${result.round}
+                </span>
+            `;
+        }
+
+
+        // 세트별 결과 HTML 생성
+        const setScoreHtml = (result.sets ?? [])
+            .map((setResult) => {
+
+                let teamAResult = "";
+                let teamBResult = "";
+
+
+                if (
+                    setResult.team_a_score >
+                    setResult.team_b_score
+                ) {
+
+                    teamAResult = `
+                        <span class="set-result-badge win">
+                            W
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge loss">
+                            L
+                        </span>
+                    `;
+
+                } else if (
+                    setResult.team_a_score <
+                    setResult.team_b_score
+                ) {
+
+                    teamAResult = `
+                        <span class="set-result-badge loss">
+                            L
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge win">
+                            W
+                        </span>
+                    `;
+
+                } else {
+
+                    teamAResult = `
+                        <span class="set-result-badge draw">
+                            D
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge draw">
+                            D
+                        </span>
+                    `;
+                }
+
+
+                return `
+                    <div class="set-score-row">
+
+                        <span class="set-name">
+                            ${setResult.set}세트
+                        </span>
+
+
+                        <div class="set-score">
+
+                            <span class="set-score-side">
+
+                                ${teamAResult}
+
+                                <span>
+                                    ${setResult.team_a_score}
+                                </span>
+
+                            </span>
+
+
+                            <span class="set-score-divider">
+                                :
+                            </span>
+
+
+                            <span class="set-score-side">
+
+                                <span>
+                                    ${setResult.team_b_score}
+                                </span>
+
+                                ${teamBResult}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
+
 
         recentResultCardElement.innerHTML = `
+
             <div class="result-date">
+
                 ${result.date}
+
+                ${resultLabel}
+
             </div>
+
 
             <div class="result-teams">
 
+
                 <div class="result-team-box">
+
                     <img
                         src="${getTeamImagePath(result.team_a)}"
                         alt="${result.team_a} 로고"
@@ -153,19 +334,29 @@ function renderRecentResults(results) {
                     <span class="result-team-name">
                         ${result.team_a}
                     </span>
+
                 </div>
 
+
                 <div class="result-score">
-                    <span>${result.team_a_score}</span>
+
+                    <span>
+                        ${result.team_a_score}
+                    </span>
 
                     <span class="score-divider">
                         :
                     </span>
 
-                    <span>${result.team_b_score}</span>
+                    <span>
+                        ${result.team_b_score}
+                    </span>
+
                 </div>
 
+
                 <div class="result-team-box">
+
                     <img
                         src="${getTeamImagePath(result.team_b)}"
                         alt="${result.team_b} 로고"
@@ -175,19 +366,30 @@ function renderRecentResults(results) {
                     <span class="result-team-name">
                         ${result.team_b}
                     </span>
+
                 </div>
+
+            </div>
+
+
+            <div class="set-score-list">
+
+                ${setScoreHtml}
 
             </div>
         `;
 
-        recentResultListElement.appendChild(recentResultCardElement);
+
+        recentResultListElement.appendChild(
+            recentResultCardElement
+        );
     });
 }
 
-const teamRankingListElement = document.querySelector(
-    ".team-ranking-list"
-);
 
+// ======================================================
+// 팀 순위
+// ======================================================
 
 async function loadTeamRanking() {
     try {
@@ -196,17 +398,25 @@ async function loadTeamRanking() {
         );
 
         if (!response.ok) {
-            throw new Error("팀 순위를 불러오지 못했습니다.");
+            throw new Error(
+                "팀 순위를 불러오지 못했습니다."
+            );
         }
 
-        const standingsData = await response.json();
+        const standingsData =
+            await response.json();
 
-        renderTeamRanking(standingsData);
+        renderTeamRanking(
+            standingsData
+        );
+
     } catch (error) {
         console.error(error);
 
         teamRankingListElement.innerHTML = `
-            <p>팀 순위를 불러오는 중 오류가 발생했습니다.</p>
+            <p>
+                팀 순위를 불러오는 중 오류가 발생했습니다.
+            </p>
         `;
     }
 }
@@ -215,32 +425,44 @@ async function loadTeamRanking() {
 function renderTeamRanking(standings) {
     teamRankingListElement.innerHTML = "";
 
-    standings.forEach((team) => {
-        const rankingRowElement = document.createElement("div");
 
-        rankingRowElement.classList.add("dashboard-ranking-row");
+    standings.forEach((team) => {
+
+        const rankingRowElement =
+            document.createElement("div");
+
+        rankingRowElement.classList.add(
+            "dashboard-ranking-row"
+        );
+
 
         rankingRowElement.innerHTML = `
+
             <span class="dashboard-rank">
                 ${team.rank}
             </span>
 
+
             <div class="dashboard-team">
+
                 <img
                     src="${getTeamImagePath(team.name)}"
-                    alt=""
+                    alt="${team.name} 로고"
                     class="dashboard-team-image"
                 >
 
                 <span class="dashboard-team-name">
                     ${team.name}
                 </span>
+
             </div>
+
 
             <span class="dashboard-points">
                 ${team.points}
             </span>
         `;
+
 
         teamRankingListElement.appendChild(
             rankingRowElement
@@ -248,6 +470,13 @@ function renderTeamRanking(standings) {
     });
 }
 
-loadTeamRanking();
+
+// ======================================================
+// 페이지 로딩
+// ======================================================
+
 loadTodayMatches();
+
 loadRecentResults();
+
+loadTeamRanking();

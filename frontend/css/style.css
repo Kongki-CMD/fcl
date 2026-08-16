@@ -1048,3 +1048,23 @@ footer p {
     object-fit: contain;
     display: block;
 }
+
+.match-preseason {
+    margin-left: 10px;
+    padding: 3px 8px;
+
+    border: 1px solid #5f6f63;
+    border-radius: 5px;
+
+    background: rgba(70, 95, 75, 0.25);
+
+    color: #b9c9bc;
+
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.recent-results .set-score-list {
+    max-width: 400px;
+    margin: 20px auto 0;
+}

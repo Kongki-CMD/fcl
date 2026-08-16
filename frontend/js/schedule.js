@@ -183,24 +183,146 @@ function renderSchedule(matches) {
         return;
     }
 
-    matches.forEach((match) => {
-        const scheduleCardElement = document.createElement("div");
 
-        scheduleCardElement.classList.add("schedule-card");
+    // =========================================
+    // 오늘 날짜 YYYY-MM-DD 만들기
+    // =========================================
 
-        scheduleCardElement.innerHTML = `
-            <div class="match-date">
-                ${match.date}
+    const today = new Date();
+
+    const todayString = [
+        today.getFullYear(),
+        String(
+            today.getMonth() + 1
+        ).padStart(2, "0"),
+        String(
+            today.getDate()
+        ).padStart(2, "0"),
+    ].join("-");
+
+
+    // =========================================
+    // 일정 정렬
+    //
+    // 1. 오늘 / 미래 경기
+    // 2. 지난 경기
+    //
+    // 각 그룹 안에서는 날짜순
+    // =========================================
+
+    const sortedMatches = [...matches].sort(
+        (matchA, matchB) => {
+
+            const matchAIsPast =
+                matchA.date < todayString;
+
+            const matchBIsPast =
+                matchB.date < todayString;
+
+
+            // A만 지난 경기
+            // → A를 아래로
+            if (
+                matchAIsPast &&
+                !matchBIsPast
+            ) {
+                return 1;
+            }
+
+
+            // B만 지난 경기
+            // → B를 아래로
+            if (
+                !matchAIsPast &&
+                matchBIsPast
+            ) {
+                return -1;
+            }
+
+
+            // 둘 다 미래거나
+            // 둘 다 과거면 날짜순
+            return matchA.date.localeCompare(
+                matchB.date
+            );
+        }
+    );
+
+
+    // =========================================
+    // 카드 출력
+    // =========================================
+
+    sortedMatches.forEach((match) => {
+
+        const scheduleCardElement =
+            document.createElement("div");
+
+        scheduleCardElement.classList.add(
+            "schedule-card"
+        );
+
+
+        // =====================================
+        // 프리시즌 / 정규리그 표시
+        // =====================================
+
+        let matchLabel = "";
+
+
+        if (match.match_type === "프리시즌") {
+
+            matchLabel = `
+                <span class="match-preseason">
+                    PRE-SEASON
+                </span>
+            `;
+
+        } else {
+
+            matchLabel = `
                 <span class="match-round">
                     ROUND ${match.round}
                 </span>
-            </div>
+            `;
+        }
 
+
+        // =====================================
+        // 지난 경기 여부
+        // =====================================
+
+        const isPastMatch =
+            match.date < todayString;
+
+
+        if (isPastMatch) {
+            scheduleCardElement.classList.add(
+                "past-match"
+            );
+        }
+
+
+        // =====================================
+        // HTML
+        // =====================================
+
+        scheduleCardElement.innerHTML = `
+
+            <div class="match-date">
+
+                ${match.date}
+
+                ${matchLabel}
+
+            </div>
 
 
             <div class="match-teams">
 
+
                 <div class="team-box">
+
                     <img
                         src="${getTeamImagePath(match.team_a)}"
                         alt="${match.team_a} 로고"
@@ -210,13 +332,17 @@ function renderSchedule(matches) {
                     <span class="team-name">
                         ${match.team_a}
                     </span>
+
                 </div>
+
 
                 <span class="versus">
                     VS
                 </span>
 
+
                 <div class="team-box">
+
                     <img
                         src="${getTeamImagePath(match.team_b)}"
                         alt="${match.team_b} 로고"
@@ -226,12 +352,17 @@ function renderSchedule(matches) {
                     <span class="team-name">
                         ${match.team_b}
                     </span>
+
                 </div>
+
 
             </div>
         `;
 
-        scheduleListElement.appendChild(scheduleCardElement);
+
+        scheduleListElement.appendChild(
+            scheduleCardElement
+        );
     });
 }
 

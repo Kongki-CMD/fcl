@@ -4,8 +4,13 @@ import {
 } from "./config.js";
 
 
-const resultsListElement = document.querySelector(".results-list");
+const resultsListElement =
+    document.querySelector(".results-list");
 
+
+// =========================================
+// 경기 결과 불러오기
+// =========================================
 
 async function loadResults() {
     try {
@@ -14,50 +19,214 @@ async function loadResults() {
         );
 
         if (!response.ok) {
-            throw new Error("경기 결과를 불러오지 못했습니다.");
+            throw new Error(
+                "경기 결과를 불러오지 못했습니다."
+            );
         }
 
-        const resultData = await response.json();
+        const resultData =
+            await response.json();
 
         renderResults(resultData);
+
     } catch (error) {
         console.error(error);
 
         resultsListElement.innerHTML = `
-            <p>경기 결과를 불러오는 중 오류가 발생했습니다.</p>
+            <p>
+                경기 결과를 불러오는 중
+                오류가 발생했습니다.
+            </p>
         `;
     }
 }
 
 
+// =========================================
+// 경기 결과 출력
+// =========================================
+
 function renderResults(results) {
     resultsListElement.innerHTML = "";
 
+
     if (results.length === 0) {
         resultsListElement.innerHTML = `
-            <p>등록된 경기 결과가 없습니다.</p>
+            <p>
+                등록된 경기 결과가 없습니다.
+            </p>
         `;
 
         return;
     }
 
-    results.forEach((result) => {
-        const resultCardElement = document.createElement("div");
 
-        resultCardElement.classList.add("result-card");
+    results.forEach((result) => {
+
+        const resultCardElement =
+            document.createElement("div");
+
+        resultCardElement.classList.add(
+            "result-card"
+        );
+
+
+        // =====================================
+        // 프리시즌 / 정규리그 표시
+        // =====================================
+
+        let resultLabel = "";
+
+
+        if (result.match_type === "프리시즌") {
+
+            resultLabel = `
+                <span class="match-preseason">
+                    PRE-SEASON
+                </span>
+            `;
+
+        } else if (result.round) {
+
+            resultLabel = `
+                <span class="match-round">
+                    ROUND ${result.round}
+                </span>
+            `;
+
+        }
+
+
+        // =====================================
+        // 세트별 결과
+        // =====================================
+
+        const setScoreHtml = (result.sets ?? [])
+            .map((setResult) => {
+
+                let teamAResult = "";
+                let teamBResult = "";
+
+
+                // 팀A 승리
+                if (
+                    setResult.team_a_score >
+                    setResult.team_b_score
+                ) {
+
+                    teamAResult = `
+                        <span class="set-result-badge win">
+                            W
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge loss">
+                            L
+                        </span>
+                    `;
+
+
+                // 팀B 승리
+                } else if (
+                    setResult.team_a_score <
+                    setResult.team_b_score
+                ) {
+
+                    teamAResult = `
+                        <span class="set-result-badge loss">
+                            L
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge win">
+                            W
+                        </span>
+                    `;
+
+
+                // 무승부
+                } else {
+
+                    teamAResult = `
+                        <span class="set-result-badge draw">
+                            D
+                        </span>
+                    `;
+
+                    teamBResult = `
+                        <span class="set-result-badge draw">
+                            D
+                        </span>
+                    `;
+                }
+
+
+                return `
+                    <div class="set-score-row">
+
+                        <span class="set-name">
+                            ${setResult.set}세트
+                        </span>
+
+
+                        <div class="set-score">
+
+                            <span class="set-score-side">
+
+                                ${teamAResult}
+
+                                <span>
+                                    ${setResult.team_a_score}
+                                </span>
+
+                            </span>
+
+
+                            <span class="set-score-divider">
+                                :
+                            </span>
+
+
+                            <span class="set-score-side">
+
+                                <span>
+                                    ${setResult.team_b_score}
+                                </span>
+
+                                ${teamBResult}
+
+                            </span>
+
+                        </div>
+
+                    </div>
+                `;
+            })
+            .join("");
+
+
+        // =====================================
+        // 경기 결과 카드
+        // =====================================
 
         resultCardElement.innerHTML = `
+
             <div class="result-date">
+
                 ${result.date}
 
-                <span class="match-round">
-                    ${result.round}라운드
-                </span>
+                ${resultLabel}
+
             </div>
+
 
             <div class="result-teams">
 
+
                 <div class="result-team-box">
+
                     <img
                         src="${getTeamImagePath(result.team_a)}"
                         alt="${result.team_a} 로고"
@@ -67,19 +236,29 @@ function renderResults(results) {
                     <span class="result-team-name">
                         ${result.team_a}
                     </span>
+
                 </div>
 
+
                 <div class="result-score">
-                    <span>${result.team_a_score}</span>
+
+                    <span>
+                        ${result.team_a_score}
+                    </span>
 
                     <span class="score-divider">
                         :
                     </span>
 
-                    <span>${result.team_b_score}</span>
+                    <span>
+                        ${result.team_b_score}
+                    </span>
+
                 </div>
 
+
                 <div class="result-team-box">
+
                     <img
                         src="${getTeamImagePath(result.team_b)}"
                         alt="${result.team_b} 로고"
@@ -89,96 +268,30 @@ function renderResults(results) {
                     <span class="result-team-name">
                         ${result.team_b}
                     </span>
+
                 </div>
+
+
             </div>
+
 
             <div class="set-score-list">
 
-${result.sets.map((setResult) => {
-
-    let teamAResult = "";
-    let teamBResult = "";
-
-    if (setResult.team_a_score > setResult.team_b_score) {
-        teamAResult = `
-            <span class="set-result-badge win">
-                W
-            </span>
-        `;
-
-        teamBResult = `
-            <span class="set-result-badge loss">
-                L
-            </span>
-        `;
-        } else if (setResult.team_a_score < setResult.team_b_score) {
-            teamAResult = `
-                <span class="set-result-badge loss">
-                    L
-                </span>
-            `;
-
-            teamBResult = `
-                <span class="set-result-badge win">
-                    W
-                </span>
-            `;
-        } else {
-            teamAResult = `
-                <span class="set-result-badge draw">
-                    D
-                </span>
-            `;
-
-            teamBResult = `
-                <span class="set-result-badge draw">
-                    D
-                </span>
-            `;
-        }
-
-    return `
-        <div class="set-score-row">
-
-            <span class="set-name">
-                ${setResult.set}세트
-            </span>
-
-            <div class="set-score">
-
-                <span class="set-score-side">
-                    ${teamAResult}
-
-                    <span>
-                        ${setResult.team_a_score}
-                    </span>
-                </span>
-
-                <span class="set-score-divider">
-                    :
-                </span>
-
-                <span class="set-score-side">
-                    <span>
-                        ${setResult.team_b_score}
-                    </span>
-
-                    ${teamBResult}
-                </span>
+                ${setScoreHtml}
 
             </div>
+        `;
 
-        </div>
-    `;
 
-}).join("")}
-
-            </div>
-                `;
-
-        resultsListElement.appendChild(resultCardElement);
+        resultsListElement.appendChild(
+            resultCardElement
+        );
     });
 }
 
+
+// =========================================
+// 실행
+// =========================================
 
 loadResults();
