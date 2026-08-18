@@ -116,23 +116,141 @@ function renderTodayMatches(matches) {
 // ======================================================
 
 async function loadRecentResults() {
+
     try {
-        const response = await fetch(
+
+        // =====================================
+        // 기존 Excel 경기 결과
+        // =====================================
+
+        const excelResponse = await fetch(
             `${apiBaseUrl}/api/results`
         );
 
-        if (!response.ok) {
+
+        if (!excelResponse.ok) {
+
             throw new Error(
                 "이전 경기 결과를 불러오지 못했습니다."
             );
         }
 
-        const resultData = await response.json();
 
-        renderRecentResults(resultData);
+        const excelResults =
+            await excelResponse.json();
+
+
+        // =====================================
+        // Neon DB 완료 SERIES 결과
+        // 자동 완료 / 수동 완료 / 과거 경기 등록
+        // =====================================
+
+        let databaseResults = [];
+
+
+        try {
+
+            const databaseResponse =
+                await fetch(
+                    `${apiBaseUrl}/api/fconline/series/completed-results`
+                );
+
+
+            if (databaseResponse.ok) {
+
+                databaseResults =
+                    await databaseResponse.json();
+
+            } else {
+
+                console.error(
+                    "DB 경기 결과를 불러오지 못했습니다."
+                );
+            }
+
+
+        } catch (databaseError) {
+
+            console.error(
+                "DB 경기 결과 조회 오류",
+                databaseError
+            );
+        }
+
+
+        // =====================================
+        // 중복 제거
+        //
+        // 같은 날짜
+        // 같은 경기 종류
+        // 같은 두 참가자
+        //
+        // DB 데이터가 있으면 DB 우선
+        // =====================================
+
+        const resultMap =
+            new Map();
+
+
+        function makeResultKey(result) {
+
+            const teams = [
+                result.team_a,
+                result.team_b,
+            ].sort();
+
+
+            return [
+                result.date,
+                result.match_type,
+                teams[0],
+                teams[1],
+            ].join("|");
+        }
+
+
+        // Excel 먼저
+        excelResults.forEach(
+            (result) => {
+
+                resultMap.set(
+                    makeResultKey(result),
+                    result
+                );
+
+            }
+        );
+
+
+        // DB 나중
+        // → 같은 경기면 DB 데이터가 덮어씀
+        databaseResults.forEach(
+            (result) => {
+
+                resultMap.set(
+                    makeResultKey(result),
+                    result
+                );
+
+            }
+        );
+
+
+        const mergedResults =
+            Array.from(
+                resultMap.values()
+            );
+
+
+        renderRecentResults(
+            mergedResults
+        );
+
 
     } catch (error) {
+
         console.error(error);
+
 
         recentResultListElement.innerHTML = `
             <p>

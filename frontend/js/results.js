@@ -7,30 +7,163 @@ import {
 const resultsListElement =
     document.querySelector(".results-list");
 
+// =========================================
+// Excel / DB 중복 판별용 키
+// =========================================
+
+function createResultKey(result) {
+
+    const teams = [
+        result.team_a,
+        result.team_b,
+    ].sort();
+
+
+    return [
+        result.date,
+        result.match_type,
+        teams[0],
+        teams[1],
+    ].join("|");
+}
 
 // =========================================
 // 경기 결과 불러오기
 // =========================================
 
 async function loadResults() {
-    try {
-        const response = await fetch(
-            `${apiBaseUrl}/api/results`
-        );
 
-        if (!response.ok) {
+    try {
+
+        // ================================
+        // Excel 결과 + Neon 결과
+        // ================================
+
+        const [
+            excelResponse,
+            databaseResponse,
+        ] = await Promise.all([
+            fetch(
+                `${apiBaseUrl}/api/results`
+            ),
+
+            fetch(
+                `${apiBaseUrl}/api/fconline/series/completed-results`
+            ),
+        ]);
+
+
+        // ================================
+        // Excel 결과
+        // ================================
+
+        if (!excelResponse.ok) {
+
             throw new Error(
                 "경기 결과를 불러오지 못했습니다."
             );
+
         }
 
-        const resultData =
-            await response.json();
 
-        renderResults(resultData);
+        const excelResults =
+            await excelResponse.json();
+
+
+        // ================================
+        // Neon 결과
+        // ================================
+
+        let databaseResults = [];
+
+
+        if (databaseResponse.ok) {
+
+            databaseResults =
+                await databaseResponse.json();
+
+        } else {
+
+            console.error(
+                "DB 경기 결과를 불러오지 못했습니다."
+            );
+
+        }
+
+
+        // ================================
+        // DB와 중복되는 기존 Excel 결과 제거
+        //
+        // DB 결과를 우선 사용
+        // ================================
+
+        const databaseResultKeys =
+            new Set(
+                databaseResults.map(
+                    createResultKey
+                )
+            );
+
+
+        const filteredExcelResults =
+            excelResults.filter(
+                result =>
+                    !databaseResultKeys.has(
+                        createResultKey(
+                            result
+                        )
+                    )
+            );
+
+
+        // ================================
+        // 결과 합치기
+        // ================================
+
+        const combinedResults = [
+            ...databaseResults,
+            ...filteredExcelResults,
+        ];
+
+
+        // 최신 경기 우선
+        combinedResults.sort(
+            (resultA, resultB) => {
+
+                const dateCompare =
+                    resultB.date.localeCompare(
+                        resultA.date
+                    );
+
+
+                if (dateCompare !== 0) {
+
+                    return dateCompare;
+
+                }
+
+
+                return (
+                    (resultB.series_id ?? 0)
+                    -
+                    (resultA.series_id ?? 0)
+                );
+
+            }
+        );
+
+
+        renderResults(
+            combinedResults
+        );
+
 
     } catch (error) {
-        console.error(error);
+
+        console.error(
+            error
+        );
+
 
         resultsListElement.innerHTML = `
             <p>
@@ -38,7 +171,9 @@ async function loadResults() {
                 오류가 발생했습니다.
             </p>
         `;
+
     }
+
 }
 
 
@@ -46,11 +181,15 @@ async function loadResults() {
 // 경기 결과 출력
 // =========================================
 
-function renderResults(results) {
+function renderResults(
+    results
+) {
+
     resultsListElement.innerHTML = "";
 
 
     if (results.length === 0) {
+
         resultsListElement.innerHTML = `
             <p>
                 등록된 경기 결과가 없습니다.
@@ -160,6 +299,7 @@ function renderResults(results) {
                             D
                         </span>
                     `;
+
                 }
 
 
@@ -205,6 +345,90 @@ function renderResults(results) {
                 `;
             })
             .join("");
+
+
+        // =====================================
+        // MVP
+        // Neon SERIES 결과에 저장된 MVP 사용
+        // =====================================
+
+        let mvpHtml = "";
+
+
+        const mvp =
+            result.mvp;
+
+
+        if (mvp) {
+
+            mvpHtml = `
+                <div class="match-mvp">
+
+                    <div class="match-mvp-title">
+                        ★ MATCH MVP
+                    </div>
+
+
+                    <div class="match-mvp-content">
+
+                        <img
+                            src="${mvp.image_url}"
+                            alt="${mvp.player_name}"
+                            class="match-mvp-image"
+                        >
+
+
+                        <div class="match-mvp-info">
+
+                            <strong class="match-mvp-name">
+                                ${mvp.player_name}
+                            </strong>
+
+
+                            <span class="match-mvp-owner">
+                                ${mvp.fcl_name}
+                                (${mvp.nickname})
+                            </span>
+
+
+                            <div class="match-mvp-stats">
+
+                                <span>
+                                    합산 평점
+                                    <strong>
+                                        ${mvp.rating_total}
+                                    </strong>
+                                </span>
+
+
+                                <span>
+                                    평균
+                                    <strong>
+                                        ${mvp.average_rating}
+                                    </strong>
+                                </span>
+
+
+                                <span>
+                                    ${mvp.goals}골
+                                    ${mvp.assists}도움
+                                </span>
+
+
+                                <span>
+                                    ${mvp.sets_played}세트 출전
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
 
 
         // =====================================
@@ -280,13 +504,18 @@ function renderResults(results) {
                 ${setScoreHtml}
 
             </div>
+
+
+            ${mvpHtml}
         `;
 
 
         resultsListElement.appendChild(
             resultCardElement
         );
+
     });
+
 }
 
 

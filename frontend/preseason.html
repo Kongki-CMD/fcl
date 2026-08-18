@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL PRE-SEASON</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+       <header>
+    <div class="header-container">
+
+        <!-- 로고 영역 -->
+        <div class="logo">
+            <a href="./index.html">
+                <span class="logo-title">FCL</span>
+
+                <span class="logo-bottom">
+                    <span class="logo-line"></span>
+                    <span class="logo-season">SEASON 1</span>
+                    <span class="logo-line"></span>
+                </span>
+            </a>
+        </div>
+        <!-- 네비게이션 영역 -->
+        <nav>
+            <ul class="main-menu">
+
+                <!-- 경기 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">경기</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./schedule.html">경기 일정</a></li>
+                        <li><a href="./results.html">경기 결과</a></li>
+                        <li><a href="./rules.html">경기 규칙</a></li>
+                    </ul>
+                </li>
+
+                <!-- 기록 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">기록</a>
+
+                    <ul class="sub-menu">
+                        <li><a href="./standings.html">팀 기록</a></li>
+                        <li><a href="./players.html">선수 기록</a></li>
+                    </ul>
+                </li>
+
+                <!-- 커뮤니티 메뉴 -->
+                <li class="menu-item">
+                    <a href="#">커뮤니티</a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+    <main class="preseason-page">
+
+        <section class="preseason-header">
+
+            <h1>
+                PRE-SEASON
+            </h1>
+
+            <p>
+                참가자와 경기 날짜를 선택하여 친선전을 예약합니다.
+            </p>
+
+        </section>
+
+
+        <!-- ========================= -->
+        <!-- SERIES 생성 -->
+        <!-- ========================= -->
+
+        <section
+            class="preseason-start-card"
+            id="preseason-start-card"
+        >
+
+            <div class="preseason-title-row">
+
+                <h2>
+                    PRE-SEASON 예약
+                </h2>
+
+
+                <button
+                    type="button"
+                    id="reservation-rule-button"
+                    class="reservation-rule-button"
+                >
+                    예약 규칙
+                </button>
+
+            </div>
+
+
+            <div
+                id="reservation-rule-panel"
+                class="reservation-rule-panel hidden"
+            >
+
+                <h3>
+                    친선전 예약 규칙
+                </h3>
+
+                <ul>
+
+                    <li>
+                        지난 날짜로는 친선전을 예약할 수 없습니다.
+                    </li>
+
+                    <li>
+                        PLAYER A와 PLAYER B는
+                        서로 다른 참가자를 선택해야 합니다.
+                    </li>
+
+                    <li>
+                        참가자와 경기 날짜를 선택한 뒤
+                        친선전을 예약합니다.
+                    </li>
+
+                    <li>
+                        예약된 경기는 경기 일정에
+                        PRE-SEASON으로 표시됩니다.
+                    </li>
+
+                    <li>
+                        실제 경기 진행은 예약한 당일에
+                        경기 시작 버튼을 눌러 시작합니다.
+                    </li>
+
+                    <li>
+                        경기 시작 이후부터 진행된
+                        FC Online 경기를 SERIES 기록으로 인식합니다.
+                    </li>
+
+                    <li>
+                        SERIES는 총 3세트로 진행됩니다.
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <div class="preseason-player-select">
+
+                <div class="preseason-player">
+
+                    <label for="team-a-select">
+                        PLAYER A
+                    </label>
+
+                    <select id="team-a-select">
+
+                        <option value="">
+                            참가자 선택
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="preseason-vs">
+                    VS
+                </div>
+
+
+                <div class="preseason-player">
+
+                    <label for="team-b-select">
+                        PLAYER B
+                    </label>
+
+                    <select id="team-b-select">
+
+                        <option value="">
+                            참가자 선택
+                        </option>
+
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div class="preseason-match-date">
+
+                <label for="preseason-date-input">
+                    MATCH DATE
+                </label>
+
+                <input
+                    type="date"
+                    id="preseason-date-input"
+                >
+
+            </div>
+
+
+            <button
+                type="button"
+                id="series-start-button"
+                class="series-start-button"
+            >
+                친선전 예약
+            </button>
+
+            <div class="history-action-container">
+
+                <button
+                    type="button"
+                    id="history-import-button"
+                    class="history-import-button"
+                >
+                    과거 경기 등록
+                </button>
+
+
+                <button
+                    type="button"
+                    id="history-rule-button"
+                    class="history-rule-button"
+                >
+                    등록 규칙
+                </button>
+
+            </div>
+
+
+            <div
+                id="history-rule-panel"
+                class="history-rule-panel hidden"
+            >
+
+                <h3>
+                    과거 경기 등록 규칙
+                </h3>
+
+                <ul>
+
+                    <li>
+                        이미 종료된 날짜의 경기만 등록할 수 있습니다.
+                    </li>
+
+                    <li>
+                        PLAYER A와 PLAYER B가 실제로 진행한
+                        FC Online 1vs1 경기만 조회합니다.
+                    </li>
+
+                    <li>
+                        선택한 날짜에 두 참가자의 맞대결이
+                        정확히 3경기 있어야 등록됩니다.
+                    </li>
+
+                    <li>
+                        3경기 미만이거나 4경기 이상이면
+                        자동 등록되지 않습니다.
+                    </li>
+
+                    <li>
+                        이미 등록된 경기 또는 사용된 Match ID는
+                        중복 등록할 수 없습니다.
+                    </li>
+
+                    <li>
+                        경기 점수는 FC Online 기록에서
+                        자동으로 불러옵니다.
+                    </li>
+
+                    <li>
+                        선수 평점, 득점, 도움 기록을 분석하여
+                        MATCH MVP를 자동 선정합니다.
+                    </li>
+
+                    <li>
+                        등록이 완료되면 경기 결과 페이지에
+                        PRE-SEASON 경기로 즉시 표시됩니다.
+                    </li>
+
+                </ul>
+
+            </div>
+
+
+            <p
+                id="preseason-message"
+                class="preseason-message"
+            ></p>
+
+        </section>
+
+
+        <!-- ========================= -->
+        <!-- 진행 중 SERIES -->
+        <!-- ========================= -->
+
+        <section
+            class="series-status-card hidden"
+            id="series-status-card"
+        >
+
+            <div class="series-status-header">
+
+                <div>
+
+                    <span
+                        id="series-status-badge"
+                        class="series-status-badge"
+                    >
+                        LIVE
+                    </span>
+
+                    <h2 id="series-title">
+                        PLAYER A VS PLAYER B
+                    </h2>
+
+                </div>
+
+
+                <div
+                    id="series-progress"
+                    class="series-progress"
+                >
+                    0 / 3
+                </div>
+
+            </div>
+
+
+            <div
+                id="series-set-list"
+                class="series-set-list"
+            >
+            </div>
+
+
+            <div
+                id="series-total-score"
+                class="series-total-score hidden"
+            >
+            </div>
+
+
+            <div
+                id="series-mvp"
+                class="series-mvp hidden"
+            >
+            </div>
+
+            <!-- ========================= -->
+<!-- SERIES 운영 버튼 -->
+<!-- ========================= -->
+
+<div
+    id="series-action-buttons"
+    class="series-action-buttons"
+>
+
+    <button
+        type="button"
+        id="manual-result-button"
+        class="series-action-button"
+    >
+        수동 결과 입력
+    </button>
+
+
+    <button
+        type="button"
+        id="series-cancel-button"
+        class="series-action-button danger"
+    >
+        경기 취소
+    </button>
+
+</div>
+
+
+<!-- ========================= -->
+<!-- 수동 결과 입력 -->
+<!-- ========================= -->
+
+<div
+    id="manual-result-panel"
+    class="manual-result-panel hidden"
+>
+
+    <h3>
+        수동 결과 입력
+    </h3>
+
+
+    <div class="manual-result-team-header">
+
+        <span id="manual-team-a-name">
+            PLAYER A
+        </span>
+
+        <span>
+            SCORE
+        </span>
+
+        <span id="manual-team-b-name">
+            PLAYER B
+        </span>
+
+    </div>
+
+
+    <div class="manual-result-row">
+
+        <span>
+            1 SET
+        </span>
+
+        <div class="manual-score-inputs">
+
+            <input
+                type="number"
+                id="manual-set1-team-a"
+                min="0"
+            >
+
+            <span>:</span>
+
+            <input
+                type="number"
+                id="manual-set1-team-b"
+                min="0"
+            >
+
+        </div>
+
+    </div>
+
+
+    <div class="manual-result-row">
+
+        <span>
+            2 SET
+        </span>
+
+        <div class="manual-score-inputs">
+
+            <input
+                type="number"
+                id="manual-set2-team-a"
+                min="0"
+            >
+
+            <span>:</span>
+
+            <input
+                type="number"
+                id="manual-set2-team-b"
+                min="0"
+            >
+
+        </div>
+
+    </div>
+
+
+    <div class="manual-result-row">
+
+        <span>
+            3 SET
+        </span>
+
+        <div class="manual-score-inputs">
+
+            <input
+                type="number"
+                id="manual-set3-team-a"
+                min="0"
+            >
+
+            <span>:</span>
+
+            <input
+                type="number"
+                id="manual-set3-team-b"
+                min="0"
+            >
+
+        </div>
+
+    </div>
+
+
+    <div class="manual-result-actions">
+
+        <button
+            type="button"
+            id="manual-back-button"
+        >
+            돌아가기
+        </button>
+
+
+        <button
+            type="button"
+            id="manual-complete-button"
+        >
+            결과 완료
+        </button>
+
+    </div>
+
+
+    <p
+        id="manual-result-message"
+        class="preseason-message"
+    ></p>
+
+</div>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+        V1.0 FCL made by aria
+    </footer>
+
+
+    <script
+        type="module"
+        src="./js/preseason.js"
+    ></script>
+
+</body>
+
+</html>

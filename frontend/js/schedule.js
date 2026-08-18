@@ -46,6 +46,58 @@ scheduleViewButtonElement.addEventListener("click", () => {
     }
 });
 
+scheduleListElement.addEventListener(
+    "click",
+    (event) => {
+
+        const regularButtonElement =
+            event.target.closest(
+                ".regular-series-start-button"
+            );
+
+
+        if (regularButtonElement) {
+
+            startRegularSeries(
+                regularButtonElement
+            );
+
+            return;
+        }
+
+
+        const preseasonStartButtonElement =
+            event.target.closest(
+                ".preseason-series-start-button"
+            );
+
+
+        if (preseasonStartButtonElement) {
+
+            startPreseasonSeries(
+                preseasonStartButtonElement
+            );
+
+            return;
+        }
+
+
+        const preseasonViewButtonElement =
+            event.target.closest(
+                ".preseason-series-view-button"
+            );
+
+
+        if (preseasonViewButtonElement) {
+
+            openPreseasonSeries(
+                preseasonViewButtonElement
+            );
+        }
+
+    }
+);
+
 
 async function loadSchedule() {
     try {
@@ -94,6 +146,234 @@ async function loadPlayoffSchedule() {
             </p>
         `;
     }
+}
+
+// =========================================
+// 정규리그 SERIES START
+// =========================================
+
+async function startRegularSeries(
+    buttonElement
+) {
+
+    const teamA =
+        buttonElement.dataset.teamA;
+
+    const teamB =
+        buttonElement.dataset.teamB;
+
+    const matchDate =
+        buttonElement.dataset.matchDate;
+
+    const roundNumber =
+        Number(
+            buttonElement.dataset.round
+        );
+
+
+    const originalText =
+        buttonElement.textContent;
+
+
+    buttonElement.disabled =
+        true;
+
+    buttonElement.textContent =
+        "STARTING...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/start`,
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body: JSON.stringify({
+                    team_a: teamA,
+                    team_b: teamB,
+
+                    series_type:
+                        "정규리그",
+
+                    scheduled_date:
+                        matchDate,
+
+                    round_number:
+                        roundNumber,
+                }),
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "SERIES 시작에 실패했습니다."
+            );
+
+        }
+
+
+        // 진행 화면에서 사용할 SERIES ID
+        localStorage.setItem(
+            "fclCurrentSeriesId",
+            data.series_id
+        );
+
+
+        // 기존 SERIES 진행 화면으로 이동
+        window.location.href =
+            "./preseason.html";
+
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+
+
+        buttonElement.disabled =
+            false;
+
+        buttonElement.textContent =
+            originalText;
+
+    }
+
+}
+
+// =========================================
+// PRE-SEASON SERIES START
+// 예약 친선전 실제 경기 시작
+// =========================================
+
+async function startPreseasonSeries(
+    buttonElement
+) {
+
+    const seriesId =
+        Number(
+            buttonElement.dataset.seriesId
+        );
+
+
+    if (!seriesId) {
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "지금부터 친선전 경기 감지를 시작하시겠습니까?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const originalText =
+        buttonElement.textContent;
+
+
+    buttonElement.disabled =
+        true;
+
+    buttonElement.textContent =
+        "시작 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/${seriesId}/activate`,
+            {
+                method: "POST"
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "친선전 시작에 실패했습니다."
+            );
+        }
+
+
+        localStorage.setItem(
+            "fclCurrentSeriesId",
+            data.series_id
+        );
+
+
+        window.location.href =
+            "./preseason.html";
+
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+
+
+        buttonElement.disabled =
+            false;
+
+        buttonElement.textContent =
+            originalText;
+    }
+}
+
+
+// =========================================
+// 진행 중 PRE-SEASON 보기
+// =========================================
+
+function openPreseasonSeries(
+    buttonElement
+) {
+
+    const seriesId =
+        Number(
+            buttonElement.dataset.seriesId
+        );
+
+
+    if (!seriesId) {
+        return;
+    }
+
+
+    localStorage.setItem(
+        "fclCurrentSeriesId",
+        seriesId
+    );
+
+
+    window.location.href =
+        "./preseason.html";
 }
 
 function renderPlayoffSchedule(matches) {
@@ -210,43 +490,13 @@ function renderSchedule(matches) {
     // 각 그룹 안에서는 날짜순
     // =========================================
 
-    const sortedMatches = [...matches].sort(
-        (matchA, matchB) => {
-
-            const matchAIsPast =
-                matchA.date < todayString;
-
-            const matchBIsPast =
-                matchB.date < todayString;
-
-
-            // A만 지난 경기
-            // → A를 아래로
-            if (
-                matchAIsPast &&
-                !matchBIsPast
-            ) {
-                return 1;
-            }
-
-
-            // B만 지난 경기
-            // → B를 아래로
-            if (
-                !matchAIsPast &&
-                matchBIsPast
-            ) {
-                return -1;
-            }
-
-
-            // 둘 다 미래거나
-            // 둘 다 과거면 날짜순
-            return matchA.date.localeCompare(
-                matchB.date
-            );
-        }
-    );
+    const sortedMatches =
+        [...matches].sort(
+            (matchA, matchB) =>
+                matchA.date.localeCompare(
+                    matchB.date
+                )
+        );
 
 
     // =========================================
@@ -268,6 +518,7 @@ function renderSchedule(matches) {
         // =====================================
 
         let matchLabel = "";
+        let matchStatusLabel = "";
 
 
         if (match.match_type === "프리시즌") {
@@ -287,6 +538,55 @@ function renderSchedule(matches) {
             `;
         }
 
+                // =====================================
+        // PRE-SEASON 상태
+        // =====================================
+
+        const isDatabasePreseason =
+            match.match_type
+                === "프리시즌"
+            &&
+            match.series_id
+                !== null;
+
+
+        if (isDatabasePreseason) {
+
+            if (
+                match.status
+                === "scheduled"
+            ) {
+
+                matchStatusLabel = `
+                    <span class="match-status scheduled">
+                        예약됨
+                    </span>
+                `;
+
+            } else if (
+                match.status
+                === "active"
+            ) {
+
+                matchStatusLabel = `
+                    <span class="match-status active">
+                        진행 중
+                    </span>
+                `;
+
+            } else if (
+                match.status
+                === "completed"
+            ) {
+
+                matchStatusLabel = `
+                    <span class="match-status completed">
+                        완료
+                    </span>
+                `;
+            }
+        }
+
 
         // =====================================
         // 지난 경기 여부
@@ -294,6 +594,121 @@ function renderSchedule(matches) {
 
         const isPastMatch =
             match.date < todayString;
+
+        const isTodayMatch =
+            match.date === todayString;
+
+
+        const isRegularMatch =
+            match.match_type
+            === "정규리그";
+
+
+        const isPreseasonMatch =
+            match.match_type
+            === "프리시즌";
+
+
+        let seriesStartHtml = "";
+
+
+        // =====================================
+        // 정규리그
+        // 당일 SERIES START
+        // =====================================
+
+        if (
+            isTodayMatch
+            &&
+            isRegularMatch
+        ) {
+
+            seriesStartHtml = `
+                <div class="schedule-series-control">
+
+                    <button
+                        type="button"
+                        class="regular-series-start-button"
+
+                        data-team-a="${match.team_a}"
+                        data-team-b="${match.team_b}"
+
+                        data-match-date="${match.date}"
+
+                        data-round="${match.round}"
+                    >
+                        SERIES START
+                    </button>
+
+                </div>
+            `;
+        }
+
+
+        // =====================================
+        // PRE-SEASON
+        // 예약됨 + 경기 당일
+        // =====================================
+
+        if (
+            isPreseasonMatch
+            &&
+            match.series_id
+            !== null
+            &&
+            match.status
+            === "scheduled"
+            &&
+            isTodayMatch
+        ) {
+
+            seriesStartHtml = `
+                <div class="schedule-series-control">
+
+                    <button
+                        type="button"
+                        class="preseason-series-start-button"
+
+                        data-series-id="${match.series_id}"
+                    >
+                        경기 시작
+                    </button>
+
+                </div>
+            `;
+        }
+
+
+        // =====================================
+        // PRE-SEASON
+        // 이미 진행 중
+        // =====================================
+
+        if (
+            isPreseasonMatch
+            &&
+            match.series_id
+            !== null
+            &&
+            match.status
+            === "active"
+        ) {
+
+            seriesStartHtml = `
+                <div class="schedule-series-control">
+
+                    <button
+                        type="button"
+                        class="preseason-series-view-button"
+
+                        data-series-id="${match.series_id}"
+                    >
+                        경기 진행 보기
+                    </button>
+
+                </div>
+            `;
+        }
 
 
         if (isPastMatch) {
@@ -315,11 +730,11 @@ function renderSchedule(matches) {
 
                 ${matchLabel}
 
+                ${matchStatusLabel}
+
             </div>
 
-
             <div class="match-teams">
-
 
                 <div class="team-box">
 
@@ -355,8 +770,10 @@ function renderSchedule(matches) {
 
                 </div>
 
-
             </div>
+
+
+            ${seriesStartHtml}
         `;
 
 
