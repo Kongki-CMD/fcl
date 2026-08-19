@@ -183,6 +183,11 @@ const reservationRulePanelElement =
         "#reservation-rule-panel"
     );
 
+const seriesSyncButtonElement =
+    document.querySelector(
+        "#series-sync-button"
+    );
+
 
 let currentSeriesId = null;
 
@@ -542,6 +547,75 @@ async function importHistorySeries() {
 /* =========================
    STATUS 조회
 ========================= */
+
+async function syncSeriesStatus() {
+
+    if (!currentSeriesId) {
+        return;
+    }
+
+    const originalText =
+        seriesSyncButtonElement.textContent;
+
+    seriesSyncButtonElement.disabled =
+        true;
+
+    seriesSyncButtonElement.textContent =
+        "NEXON 확인 중...";
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/${currentSeriesId}/sync`,
+            {
+                method: "POST"
+            }
+        );
+
+        const data =
+            await response.json();
+
+        if (!response.ok) {
+
+            if (response.status === 429) {
+
+                throw new Error(
+                    "Nexon API 호출 제한 중입니다. 잠시 후 다시 확인해주세요."
+                );
+            }
+
+            throw new Error(
+                data.detail
+                ?? "NEXON 기록 확인에 실패했습니다."
+            );
+        }
+
+        renderSeriesStatus(
+            data
+        );
+
+        preseasonMessageElement.textContent =
+            "NEXON 경기 기록을 확인했습니다.";
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+        preseasonMessageElement.textContent =
+            error.message;
+
+    } finally {
+
+        seriesSyncButtonElement.disabled =
+            false;
+
+        seriesSyncButtonElement.textContent =
+            originalText;
+    }
+}
+
 
 async function loadSeriesStatus() {
 
@@ -1241,12 +1315,6 @@ function startStatusPolling() {
 
     loadSeriesStatus();
 
-
-    statusTimer = setInterval(
-        loadSeriesStatus,
-        10000
-    );
-
 }
 
 
@@ -1435,6 +1503,11 @@ document.addEventListener(
         }
 
     }
+);
+
+seriesSyncButtonElement.addEventListener(
+    "click",
+    syncSeriesStatus
 );
 
 

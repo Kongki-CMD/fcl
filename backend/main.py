@@ -1,4 +1,5 @@
 import os
+import time
 
 from pathlib import Path
 from datetime import datetime
@@ -4836,13 +4837,257 @@ def manual_complete_fcl_series(
 
 # =========================
 # FCL SERIES STATUS
-# NEXON 탐색 + DB 저장
+# DB 조회 전용
+# NEXON API 호출 없음
 # =========================
 
 @app.get(
     "/api/fconline/series/{series_id}/status"
 )
 def get_fcl_series_status(
+    series_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.series_type,
+                    s.match_type,
+                    s.scheduled_date,
+                    s.started_at,
+                    s.completed_at,
+                    s.status,
+
+                    team_a.fcl_name
+                        AS team_a_name,
+
+                    team_a.fc_nickname
+                        AS nickname_a,
+
+                    team_b.fcl_name
+                        AS team_b_name,
+
+                    team_b.fc_nickname
+                        AS nickname_b
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE s.id = %s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            series = cursor.fetchone()
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="SERIES를 찾을 수 없습니다.",
+                )
+
+            # =========================
+            # 저장된 SET
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    set_number,
+                    nexon_match_id,
+                    played_at,
+                    team_a_score,
+                    team_b_score
+
+                FROM series_sets
+
+                WHERE series_id = %s
+
+                ORDER BY set_number
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            saved_sets = cursor.fetchall()
+
+            # =========================
+            # 저장된 MVP
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.fcl_name,
+                    p.fc_nickname
+                        AS nickname,
+
+                    sm.sp_id,
+                    sm.player_name,
+                    sm.sets_played,
+                    sm.rating_total,
+                    sm.average_rating,
+                    sm.goals,
+                    sm.assists,
+                    sm.image_url
+
+                FROM series_mvp AS sm
+
+                JOIN participants AS p
+                    ON p.id =
+                        sm.participant_id
+
+                WHERE sm.series_id = %s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            mvp = cursor.fetchone()
+
+    sets = []
+
+    for saved_set in saved_sets:
+
+        sets.append(
+            {
+                "set":
+                    saved_set[
+                        "set_number"
+                    ],
+
+                "match_id":
+                    saved_set[
+                        "nexon_match_id"
+                    ],
+
+                "match_date":
+                    (
+                        saved_set[
+                            "played_at"
+                        ].isoformat()
+
+                        if saved_set[
+                            "played_at"
+                        ]
+
+                        else None
+                    ),
+
+                "team_a_score":
+                    saved_set[
+                        "team_a_score"
+                    ],
+
+                "team_b_score":
+                    saved_set[
+                        "team_b_score"
+                    ],
+            }
+        )
+
+    if mvp:
+
+        mvp["rating_total"] = float(
+            mvp["rating_total"]
+        )
+
+        mvp["average_rating"] = float(
+            mvp["average_rating"]
+        )
+
+    return {
+        "series": {
+            "series_id":
+                series_id,
+
+            "series_type":
+                series["series_type"],
+
+            "team_a":
+                series["team_a_name"],
+
+            "team_b":
+                series["team_b_name"],
+
+            "nickname_a":
+                series["nickname_a"],
+
+            "nickname_b":
+                series["nickname_b"],
+
+            "match_type":
+                series["match_type"],
+
+            "scheduled_date":
+                (
+                    series[
+                        "scheduled_date"
+                    ].isoformat()
+
+                    if series[
+                        "scheduled_date"
+                    ]
+
+                    else None
+                ),
+
+            "started_at":
+                (
+                    series[
+                        "started_at"
+                    ].isoformat()
+
+                    if series[
+                        "started_at"
+                    ]
+
+                    else None
+                ),
+
+            "status":
+                series["status"],
+
+            "set_count":
+                len(sets),
+        },
+
+        "sets": sets,
+
+        "mvp": mvp,
+    }
+
+
+# =========================
+# FCL SERIES STATUS
+# NEXON 탐색 + DB 저장
+# =========================
+
+@app.post(
+    "/api/fconline/series/{series_id}/sync"
+)
+def sync_fcl_series_status(
     series_id: int,
 ):
 
@@ -5045,13 +5290,15 @@ def get_fcl_series_status(
     matches_a = get_user_match_ids(
         ouid_a,
         series["match_type"],
-        limit=50,
+        limit=10,
     )
+
+    time.sleep(0.3)
 
     matches_b = get_user_match_ids(
         ouid_b,
         series["match_type"],
-        limit=50,
+        limit=10,
     )
 
 
@@ -5083,6 +5330,8 @@ def get_fcl_series_status(
     # =========================
 
     for match_id in common_match_ids:
+
+        time.sleep(0.3)
 
         match_data = get_match_detail(
             match_id
@@ -5378,17 +5627,11 @@ def get_fcl_series_status(
         mvp_matches = []
 
 
-        for saved_set in saved_sets[:3]:
-
-            match_data = get_match_detail(
-                saved_set[
-                    "nexon_match_id"
-                ]
-            )
-
-            mvp_matches.append(
-                match_data
-            )
+        mvp_matches = [
+            detected_match["data"]
+            for detected_match
+            in detected_matches[:3]
+        ]
 
 
         mvp_matches.sort(
