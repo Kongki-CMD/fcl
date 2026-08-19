@@ -595,7 +595,8 @@ async function syncSeriesStatus() {
         );
 
         preseasonMessageElement.textContent =
-            "NEXON 경기 기록을 확인했습니다.";
+            data.sync_message
+            ?? "NEXON 경기 기록을 확인했습니다.";
 
     } catch (error) {
 
@@ -644,12 +645,6 @@ async function loadSeriesStatus() {
 
         }
 
-
-        renderSeriesStatus(
-            data
-        );
-
-
         if (
             data.series.status
             === "completed"
@@ -657,7 +652,49 @@ async function loadSeriesStatus() {
 
             stopStatusPolling();
 
+
+            localStorage.removeItem(
+                "fclCurrentSeriesId"
+            );
+
+
+            currentSeriesId = null;
+
+            currentTeamA = "";
+
+            currentTeamB = "";
+
+
+            seriesStatusCardElement.classList.add(
+                "hidden"
+            );
+
+
+            manualResultPanelElement.classList.add(
+                "hidden"
+            );
+
+
+            preseasonStartCardElement.classList.remove(
+                "hidden"
+            );
+
+
+            seriesStartButtonElement.disabled =
+                false;
+
+
+            seriesStartButtonElement.textContent =
+                "친선전 예약";
+
+
+            return;
         }
+
+
+        renderSeriesStatus(
+            data
+        );
 
 
     } catch (error) {
@@ -687,15 +724,22 @@ function renderSeriesStatus(data) {
         data.mvp;
 
 
+    const statsSyncStatus =
+        series.stats_sync_status
+        ?? "pending";
+
+
     seriesStatusCardElement.classList.remove(
         "hidden"
     );
+
 
     currentTeamA =
         series.team_a;
 
     currentTeamB =
         series.team_b;
+
 
     seriesTitleElement.textContent =
         `${series.team_a} VS ${series.team_b}`;
@@ -775,32 +819,27 @@ function renderSeriesStatus(data) {
                     WAITING
                 </span>
             `;
-
         }
 
 
         seriesSetListElement.append(
             setElement
         );
-
     }
 
 
     /* =========================
-       경기 완료
+       완료 SERIES
     ========================= */
 
     if (
         series.status === "completed"
     ) {
 
-        seriesActionButtonsElement.classList.add(
-            "hidden"
-        );
-
         manualResultPanelElement.classList.add(
             "hidden"
         );
+
 
         seriesStatusBadgeElement.textContent =
             "COMPLETE";
@@ -809,6 +848,10 @@ function renderSeriesStatus(data) {
             "complete"
         );
 
+
+        /* =========================
+           최종 스코어
+        ========================= */
 
         const teamATotal =
             sets.reduce(
@@ -861,8 +904,80 @@ function renderSeriesStatus(data) {
         );
 
 
+        /* =========================
+           NEXON 통계 대기
+        ========================= */
+
+        if (
+            statsSyncStatus === "pending"
+            ||
+            statsSyncStatus === "conflict"
+        ) {
+
+            // SERIES 자체는 완료됐지만
+            // Nexon 통계 동기화가 아직 남아있음
+
+            seriesActionButtonsElement.classList.remove(
+                "hidden"
+            );
+
+
+            manualResultButtonElement.classList.add(
+                "hidden"
+            );
+
+
+            seriesCancelButtonElement.classList.add(
+                "hidden"
+            );
+
+
+            seriesSyncButtonElement.classList.remove(
+                "hidden"
+            );
+
+
+            if (
+                statsSyncStatus === "pending"
+            ) {
+
+                preseasonMessageElement.textContent =
+                    (
+                        "경기 결과가 저장되었습니다. "
+                        + "NEXON 기록 반영 후 "
+                        + "기록 확인을 눌러주세요."
+                    );
+
+            } else {
+
+                preseasonMessageElement.textContent =
+                    (
+                        "수동 결과와 NEXON 기록이 "
+                        + "일치하지 않습니다. "
+                        + "기록을 다시 확인해주세요."
+                    );
+            }
+
+
+            // 중요:
+            // currentSeriesId 유지
+            // localStorage 유지
+            return;
+        }
+
+
+        /* =========================
+           NEXON 동기화까지 완료
+        ========================= */
+
+        seriesActionButtonsElement.classList.add(
+            "hidden"
+        );
+
+
         seriesStartButtonElement.disabled =
             false;
+
 
         seriesStartButtonElement.textContent =
             "친선전 예약";
@@ -876,27 +991,55 @@ function renderSeriesStatus(data) {
         currentSeriesId = null;
 
         currentTeamA = "";
+
         currentTeamB = "";
+
 
         preseasonStartCardElement.classList.remove(
             "hidden"
-);
-
-    } else {
-
-        seriesStatusBadgeElement.textContent =
-            "LIVE";
-
-        seriesStatusBadgeElement.classList.remove(
-            "complete"
         );
 
-        seriesActionButtonsElement.classList.remove(
-            "hidden"
-        );
 
+        return;
     }
 
+
+    /* =========================
+       진행 중 SERIES
+    ========================= */
+
+    seriesStatusBadgeElement.textContent =
+        "LIVE";
+
+
+    seriesStatusBadgeElement.classList.remove(
+        "complete"
+    );
+
+
+    seriesTotalScoreElement.classList.add(
+        "hidden"
+    );
+
+
+    seriesActionButtonsElement.classList.remove(
+        "hidden"
+    );
+
+
+    manualResultButtonElement.classList.remove(
+        "hidden"
+    );
+
+
+    seriesCancelButtonElement.classList.remove(
+        "hidden"
+    );
+
+
+    seriesSyncButtonElement.classList.remove(
+        "hidden"
+    );
 }
 
 
@@ -1280,6 +1423,23 @@ async function completeManualResult() {
 
         currentSeriesId = null;
 
+        currentTeamA = "";
+
+        currentTeamB = "";
+
+
+        manualResultMessageElement.textContent =
+            "결과가 저장되었습니다.";
+
+
+        preseasonMessageElement.textContent =
+            (
+                "경기 결과 저장 완료. "
+                + "NEXON 선수 기록은 "
+                + "결과 페이지에서 "
+                + "나중에 동기화할 수 있습니다."
+            );
+
 
         window.location.href =
             "./results.html";
@@ -1358,20 +1518,22 @@ function restoreSeries() {
         );
 
 
-    preseasonStartCardElement.classList.add(
-        "hidden"
-    );
-
-    seriesStatusCardElement.classList.remove(
-        "hidden"
-    );
+        preseasonStartCardElement.classList.remove(
+            "hidden"
+        );
 
 
-    seriesStartButtonElement.disabled =
-        true;
+        seriesStatusCardElement.classList.remove(
+            "hidden"
+        );
 
-    seriesStartButtonElement.textContent =
-        "SERIES 진행 중";
+
+        seriesStartButtonElement.disabled =
+            false;
+
+
+        seriesStartButtonElement.textContent =
+            "친선전 예약";
 
 
     startStatusPolling();

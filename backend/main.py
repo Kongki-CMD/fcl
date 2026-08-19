@@ -141,6 +141,7 @@ def get_player_image_url(sp_id):
 
 def parse_kst_datetime(value):
 
+
     if isinstance(value, datetime):
         parsed = value
 
@@ -151,6 +152,28 @@ def parse_kst_datetime(value):
     if parsed.tzinfo is None:
         parsed = parsed.replace(
             tzinfo=ZoneInfo("Asia/Seoul")
+        )
+
+
+    return parsed.astimezone(
+        ZoneInfo("Asia/Seoul")
+    )
+
+def parse_nexon_datetime(value):
+
+    if isinstance(value, datetime):
+        parsed = value
+
+    else:
+        parsed = datetime.fromisoformat(
+            value
+        )
+
+
+    if parsed.tzinfo is None:
+
+        parsed = parsed.replace(
+            tzinfo=ZoneInfo("UTC")
         )
 
 
@@ -3218,7 +3241,10 @@ def start_fcl_series(
                         scheduled_date = %s
 
                         AND
-                        status <> 'cancelled'
+                        status IN (
+                            'scheduled',
+                            'active'
+                        )
 
                         AND (
                             (
@@ -3724,7 +3750,7 @@ def import_history_series(
 
 
         played_at = (
-            parse_kst_datetime(
+            parse_nexon_datetime(
                 match_data["matchDate"]
             )
         )
@@ -3791,18 +3817,10 @@ def import_history_series(
         )
 
 
-    if len(detected_matches) > 3:
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"{request.match_date} "
-                "맞대결이 "
-                f"{len(detected_matches)}경기입니다. "
-                "3경기를 자동으로 "
-                "선택할 수 없습니다."
-            ),
-        )
+    # 시간순 첫 3경기만 SERIES로 사용
+    detected_matches = (
+        detected_matches[:3]
+    )
 
 
     match_ids = [
@@ -3920,8 +3938,10 @@ def import_history_series(
 
                     started_at,
                     completed_at,
+                    finished_at,
 
-                    status
+                    status,
+                    stats_sync_status
                 )
 
                 VALUES (
@@ -3937,8 +3957,10 @@ def import_history_series(
 
                     %s,
                     %s,
+                    %s,
 
-                    'completed'
+                    'completed',
+                    'synced'
                 )
 
                 RETURNING id
@@ -3950,6 +3972,7 @@ def import_history_series(
                     target_date,
 
                     started_at,
+                    completed_at,
                     completed_at,
                 ),
             )
@@ -4132,6 +4155,9 @@ def import_history_series(
 
         "status":
             "completed",
+
+        "stats_sync_status":
+            "synced",
 
         "match_date":
             target_date.isoformat(),
@@ -4524,18 +4550,14 @@ def manual_complete_fcl_series(
     series_id: int,
     request: ManualSeriesCompleteRequest,
 ):
-
     scores = [
         request.set1_team_a,
         request.set1_team_b,
-
         request.set2_team_a,
         request.set2_team_b,
-
         request.set3_team_a,
         request.set3_team_b,
     ]
-
 
     # =========================
     # 점수 검증
@@ -4545,12 +4567,14 @@ def manual_complete_fcl_series(
         score < 0
         for score in scores
     ):
-
         raise HTTPException(
             status_code=400,
             detail="점수는 0 이상이어야 합니다.",
         )
 
+    finished_at = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    )
 
     with get_db_connection() as connection:
 
@@ -4590,57 +4614,51 @@ def manual_complete_fcl_series(
                 ),
             )
 
-
             series = cursor.fetchone()
 
-
             if not series:
-
                 raise HTTPException(
                     status_code=404,
                     detail="SERIES를 찾을 수 없습니다.",
                 )
 
+            # =========================
+            # 프리시즌 / 정규리그
+            # =========================
+
+            if (
+                series["series_type"]
+                not in (
+                    "프리시즌",
+                    "정규리그",
+                )
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "수동 결과를 입력할 수 없는 "
+                        "SERIES입니다."
+                    ),
+                )
 
             # =========================
-            # 친선전만 수동 완료 허용
+            # 진행 중 SERIES만 완료
             # =========================
 
             if (
                 series["status"]
                 != "active"
             ):
-
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "진행 중인 친선전만 "
+                        "진행 중인 SERIES만 "
                         "수동 완료할 수 있습니다."
                     ),
                 )
 
-
-            if (
-                series["status"]
-                not in (
-                    "scheduled",
-                    "active",
-                )
-            ):
-
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "예약 또는 진행 중인 "
-                        "친선전만 취소할 수 있습니다."
-                    ),
-                )
-
-
             # =========================
-            # 기존 자동 감지 세트 제거
-            #
-            # 수동 입력 결과로 완전히 덮어씀
+            # 기존 세트 제거
             # =========================
 
             cursor.execute(
@@ -4653,6 +4671,9 @@ def manual_complete_fcl_series(
                 ),
             )
 
+            # =========================
+            # 기존 MVP 제거
+            # =========================
 
             cursor.execute(
                 """
@@ -4664,6 +4685,9 @@ def manual_complete_fcl_series(
                 ),
             )
 
+            # =========================
+            # 기존 선수 기록 제거
+            # =========================
 
             cursor.execute(
                 """
@@ -4675,9 +4699,8 @@ def manual_complete_fcl_series(
                 ),
             )
 
-
             # =========================
-            # 수동 세트
+            # 수동 결과
             # =========================
 
             manual_sets = [
@@ -4698,57 +4721,53 @@ def manual_complete_fcl_series(
                 ),
             ]
 
-
-            completed_at = datetime.now(
-                ZoneInfo("Asia/Seoul")
-            )
-
-
             for (
                 set_number,
                 team_a_score,
                 team_b_score,
             ) in manual_sets:
 
-                manual_match_id = (
-                    f"manual-{series_id}-"
-                    f"{set_number}"
-                )
-
-
                 cursor.execute(
                     """
                     INSERT INTO series_sets (
                         series_id,
                         set_number,
+
                         nexon_match_id,
                         played_at,
+
                         team_a_score,
-                        team_b_score
+                        team_b_score,
+
+                        score_source
                     )
 
                     VALUES (
                         %s,
                         %s,
+                        NULL,
                         %s,
                         %s,
                         %s,
-                        %s
+                        'manual'
                     )
                     """,
                     (
                         series_id,
                         set_number,
-                        manual_match_id,
-                        completed_at,
+
+                        finished_at,
+
                         team_a_score,
                         team_b_score,
                     ),
                 )
 
-
             # =========================
-            # SERIES 완료
+            # SERIES 결과 완료
+            #
+            # 점수 결과는 즉시 완료
+            # Nexon 통계는 pending
             # =========================
 
             cursor.execute(
@@ -4757,19 +4776,20 @@ def manual_complete_fcl_series(
 
                 SET
                     status = 'completed',
-                    completed_at = %s
+                    completed_at = %s,
+                    finished_at = %s,
+                    stats_sync_status = 'pending'
 
                 WHERE id = %s
                 """,
                 (
-                    completed_at,
+                    finished_at,
+                    finished_at,
                     series_id,
                 ),
             )
 
-
         connection.commit()
-
 
     team_a_total_score = (
         request.set1_team_a
@@ -4777,21 +4797,24 @@ def manual_complete_fcl_series(
         + request.set3_team_a
     )
 
-
     team_b_total_score = (
         request.set1_team_b
         + request.set2_team_b
         + request.set3_team_b
     )
 
-
     return {
-        "series_id": series_id,
+        "series_id":
+            series_id,
 
-        "status": "completed",
+        "status":
+            "completed",
+
+        "stats_sync_status":
+            "pending",
 
         "series_type":
-            "프리시즌",
+            series["series_type"],
 
         "team_a":
             series["team_a"],
@@ -4804,6 +4827,9 @@ def manual_complete_fcl_series(
 
         "team_b_score":
             team_b_total_score,
+
+        "finished_at":
+            finished_at.isoformat(),
 
         "sets": [
             {
@@ -4829,7 +4855,6 @@ def manual_complete_fcl_series(
             },
         ],
     }
-
 
 # =========================
 # FCL SERIES STATUS
@@ -4865,6 +4890,8 @@ def get_fcl_series_status(
                     s.scheduled_date,
                     s.started_at,
                     s.completed_at,
+                    s.finished_at,
+                    s.stats_sync_status,
                     s.status,
 
                     team_a.fcl_name
@@ -4916,7 +4943,8 @@ def get_fcl_series_status(
                     nexon_match_id,
                     played_at,
                     team_a_score,
-                    team_b_score
+                    team_b_score,
+                    score_source
 
                 FROM series_sets
 
@@ -5004,6 +5032,11 @@ def get_fcl_series_status(
                     saved_set[
                         "team_b_score"
                     ],
+
+                "score_source":
+                    saved_set[
+                        "score_source"
+                    ],
             }
         )
 
@@ -5053,24 +5086,44 @@ def get_fcl_series_status(
                     else None
                 ),
 
-            "started_at":
-                (
+                "started_at":
+                    (
+                        series[
+                            "started_at"
+                        ].isoformat()
+
+                        if series[
+                            "started_at"
+                        ]
+
+                        else None
+                    ),
+
+                "finished_at":
+                    (
+                        series[
+                            "finished_at"
+                        ].isoformat()
+
+                        if series[
+                            "finished_at"
+                        ]
+
+                        else None
+                    ),
+
+                "stats_sync_status":
                     series[
-                        "started_at"
-                    ].isoformat()
+                        "stats_sync_status"
+                    ],
 
-                    if series[
-                        "started_at"
-                    ]
+                "status":
+                    series[
+                        "status"
+                    ],
 
-                    else None
-                ),
-
-            "status":
-                series["status"],
-
-            "set_count":
-                len(sets),
+                "set_count":
+                    len(sets),
         },
 
         "sets": sets,
@@ -5083,14 +5136,12 @@ def get_fcl_series_status(
 # FCL SERIES STATUS
 # NEXON 탐색 + DB 저장
 # =========================
-
 @app.post(
     "/api/fconline/series/{series_id}/sync"
 )
 def sync_fcl_series_status(
     series_id: int,
 ):
-
     # =========================
     # SERIES + 참가자 조회
     # =========================
@@ -5106,8 +5157,11 @@ def sync_fcl_series_status(
                     s.series_type,
                     s.match_type,
                     s.scheduled_date,
+
                     s.started_at,
                     s.completed_at,
+                    s.finished_at,
+                    s.stats_sync_status,
                     s.status,
 
                     team_a.id
@@ -5151,7 +5205,6 @@ def sync_fcl_series_status(
                 ),
             )
 
-
             series = cursor.fetchone()
 
 
@@ -5161,84 +5214,40 @@ def sync_fcl_series_status(
             status_code=404,
             detail="SERIES를 찾을 수 없습니다.",
         )
-    
+
+
+    # =========================
+    # 현재 SERIES가
+    # 사후 동기화 대상인지 확인
+    # =========================
+
+    is_pending_result_sync = (
+        series["status"] == "completed"
+        and
+        series["stats_sync_status"]
+        in (
+            "pending",
+            "conflict",
+        )
+    )
+
+
+    # active 또는
+    # completed + pending/conflict만
+    # NEXON 동기화 가능
     if (
-        series["status"]
-        != "active"
+        series["status"] != "active"
+        and
+        not is_pending_result_sync
     ):
 
-        return {
-            "series": {
-                "series_id":
-                    series_id,
-
-                "series_type":
-                    series["series_type"],
-
-                "team_a":
-                    series[
-                        "team_a_name"
-                    ],
-
-                "team_b":
-                    series[
-                        "team_b_name"
-                    ],
-
-                "nickname_a":
-                    series[
-                        "nickname_a"
-                    ],
-
-                "nickname_b":
-                    series[
-                        "nickname_b"
-                    ],
-
-                "match_type":
-                    series[
-                        "match_type"
-                    ],
-
-                "scheduled_date":
-                    (
-                        series[
-                            "scheduled_date"
-                        ].isoformat()
-
-                        if series[
-                            "scheduled_date"
-                        ]
-
-                        else None
-                    ),
-
-                "started_at":
-                    (
-                        series[
-                            "started_at"
-                        ].isoformat()
-
-                        if series[
-                            "started_at"
-                        ]
-
-                        else None
-                    ),
-
-                "status":
-                    series[
-                        "status"
-                    ],
-
-                "set_count":
-                    0,
-            },
-
-            "sets": [],
-
-            "mvp": None,
-        }
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "NEXON 기록을 동기화할 수 없는 "
+                "SERIES입니다."
+            ),
+        )
 
 
     nickname_a = series[
@@ -5293,7 +5302,11 @@ def sync_fcl_series_status(
         limit=10,
     )
 
+
+    # 개발/서비스 키 모두
+    # 순간 호출 몰림 방지
     time.sleep(0.3)
+
 
     matches_b = get_user_match_ids(
         ouid_b,
@@ -5310,23 +5323,39 @@ def sync_fcl_series_status(
     common_match_ids = [
         match_id
 
-        for match_id in matches_a
+        for match_id
+        in matches_a
 
-        if match_id in matches_b_set
+        if match_id
+        in matches_b_set
     ]
 
+
+    # =========================
+    # SERIES 시간 범위
+    # =========================
 
     started_at = parse_kst_datetime(
         series["started_at"]
     )
 
 
+    finished_at = None
+
+
+    if series["finished_at"]:
+
+        finished_at = parse_kst_datetime(
+            series["finished_at"]
+        )
+
+
     detected_matches = []
+    debug_matches = []
 
 
     # =========================
-    # SERIES START 이후
-    # 실제 맞대결만 탐색
+    # 실제 맞대결 탐색
     # =========================
 
     for match_id in common_match_ids:
@@ -5338,50 +5367,99 @@ def sync_fcl_series_status(
         )
 
 
-        match_date = parse_kst_datetime(
+        match_date = parse_nexon_datetime(
             match_data["matchDate"]
         )
 
 
-        # START 이전 경기
-        if match_date < started_at:
-            continue
-
-
-        # 다른 경기 타입
-        if (
-            match_data["matchType"]
-            != series["match_type"]
-        ):
-            continue
-
-
         match_nicknames = {
             match_info["nickname"]
-
             for match_info
             in match_data["matchInfo"]
         }
 
 
-        # 정확히 두 참가자 경기인지 확인
-        if match_nicknames != {
+        reject_reason = None
+
+
+        if match_date < started_at:
+
+            reject_reason = (
+                "before_started_at"
+            )
+
+
+        elif (
+            finished_at is not None
+            and
+            match_date > finished_at
+        ):
+
+            reject_reason = (
+                "after_finished_at"
+            )
+
+
+        elif (
+            match_data["matchType"]
+            != series["match_type"]
+        ):
+
+            reject_reason = (
+                "match_type_mismatch"
+            )
+
+
+        elif match_nicknames != {
             nickname_a,
             nickname_b,
         }:
+
+            reject_reason = (
+                "nickname_mismatch"
+            )
+
+
+        debug_matches.append(
+            {
+                "match_id":
+                    match_id,
+
+                "match_date":
+                    match_date.isoformat(),
+
+                "match_type":
+                    match_data[
+                        "matchType"
+                    ],
+
+                "nicknames":
+                    sorted(
+                        match_nicknames
+                    ),
+
+                "reject_reason":
+                    reject_reason,
+            }
+        )
+
+
+        if reject_reason is not None:
             continue
 
 
         detected_matches.append(
             {
-                "data": match_data,
-                "played_at": match_date,
+                "data":
+                    match_data,
+
+                "played_at":
+                    match_date,
             }
         )
 
-
     # =========================
-    # 시간순
+    # 시간순 정렬
     # =========================
 
     detected_matches.sort(
@@ -5390,20 +5468,710 @@ def sync_fcl_series_status(
     )
 
 
+    # 현재 프리시즌/정규리그
     # SERIES는 3세트
     detected_matches = (
         detected_matches[:3]
     )
 
 
-    # =========================
-    # DB에 세트 저장
-    # =========================
+    # ==================================================
+    # A.
+    # 수동 결과 입력 완료 후
+    # NEXON 기록 사후 연결
+    # ==================================================
+
+    if is_pending_result_sync:
+
+        # =========================
+        # 기존 수동 결과 조회
+        # =========================
+
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        set_number,
+                        nexon_match_id,
+                        played_at,
+                        team_a_score,
+                        team_b_score,
+                        score_source
+
+                    FROM series_sets
+
+                    WHERE series_id = %s
+
+                    ORDER BY set_number
+                    """,
+                    (
+                        series_id,
+                    ),
+                )
+
+                manual_sets = (
+                    cursor.fetchall()
+                )
+
+
+        if len(manual_sets) != 3:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "수동 입력된 3세트 결과가 "
+                    "완전하지 않습니다."
+                ),
+            )
+
+
+        # =========================
+        # Nexon 데이터가 아직
+        # 3경기 전부 올라오지 않음
+        # =========================
+
+        if len(detected_matches) < 3:
+
+            return {
+                "series": {
+                    "series_id":
+                        series_id,
+
+                    "series_type":
+                        series[
+                            "series_type"
+                        ],
+
+                    "team_a":
+                        series[
+                            "team_a_name"
+                        ],
+
+                    "team_b":
+                        series[
+                            "team_b_name"
+                        ],
+
+                    "nickname_a":
+                        nickname_a,
+
+                    "nickname_b":
+                        nickname_b,
+
+                    "match_type":
+                        series[
+                            "match_type"
+                        ],
+
+                    "started_at":
+                        started_at.isoformat(),
+
+                    "status":
+                        "completed",
+
+                    "set_count":
+                        3,
+
+                    "stats_sync_status":
+                        "pending",
+                },
+
+                "sets": [
+                    {
+                        "set":
+                            saved_set[
+                                "set_number"
+                            ],
+
+                        "match_id":
+                            saved_set[
+                                "nexon_match_id"
+                            ],
+
+                        "match_date":
+                            (
+                                saved_set[
+                                    "played_at"
+                                ].isoformat()
+
+                                if saved_set[
+                                    "played_at"
+                                ]
+
+                                else None
+                            ),
+
+                        "team_a_score":
+                            saved_set[
+                                "team_a_score"
+                            ],
+
+                        "team_b_score":
+                            saved_set[
+                                "team_b_score"
+                            ],
+                    }
+
+                    for saved_set
+                    in manual_sets
+                ],
+
+                "detected_set_count":
+                    len(detected_matches),
+
+                "common_match_count":
+                    len(common_match_ids),
+
+                "debug": {
+                    "started_at":
+                        started_at.isoformat(),
+
+                    "finished_at":
+                        (
+                            finished_at.isoformat()
+                            if finished_at
+                            else None
+                        ),
+
+                    "matches":
+                        debug_matches,
+                },
+
+                "mvp":
+                    None,
+
+                "sync_message":
+                    (
+                        "NEXON 경기 기록 "
+                        f"{len(detected_matches)}/3경기 감지. "
+                        "아직 3경기 기록이 모두 "
+                        "반영되지 않았습니다."
+                    ),
+            }
+
+
+        # =========================
+        # Nexon 점수 추출
+        # =========================
+
+        nexon_scores = []
+
+
+        for detected_match in (
+            detected_matches
+        ):
+
+            match_data = (
+                detected_match[
+                    "data"
+                ]
+            )
+
+
+            participant_map = {
+                match_info["nickname"]:
+                    match_info
+
+                for match_info
+                in match_data[
+                    "matchInfo"
+                ]
+            }
+
+
+            team_a_info = (
+                participant_map[
+                    nickname_a
+                ]
+            )
+
+
+            team_b_info = (
+                participant_map[
+                    nickname_b
+                ]
+            )
+
+
+            team_a_score = (
+                team_a_info[
+                    "shoot"
+                ][
+                    "goalTotalDisplay"
+                ]
+            )
+
+
+            team_b_score = (
+                team_b_info[
+                    "shoot"
+                ][
+                    "goalTotalDisplay"
+                ]
+            )
+
+
+            nexon_scores.append(
+                (
+                    team_a_score,
+                    team_b_score,
+                )
+            )
+
+
+        # =========================
+        # 수동 점수와
+        # Nexon 점수 비교
+        # =========================
+
+        has_score_conflict = any(
+            (
+                manual_set[
+                    "team_a_score"
+                ]
+                !=
+                nexon_score[0]
+            )
+            or
+            (
+                manual_set[
+                    "team_b_score"
+                ]
+                !=
+                nexon_score[1]
+            )
+
+            for (
+                manual_set,
+                nexon_score,
+            )
+            in zip(
+                manual_sets,
+                nexon_scores,
+            )
+        )
+
+
+        # =========================
+        # 점수 불일치
+        # =========================
+
+        if has_score_conflict:
+
+            with get_db_connection() as connection:
+
+                with connection.cursor() as cursor:
+
+                    cursor.execute(
+                        """
+                        UPDATE series
+
+                        SET
+                            stats_sync_status =
+                                'conflict'
+
+                        WHERE id = %s
+                        """,
+                        (
+                            series_id,
+                        ),
+                    )
+
+                connection.commit()
+
+
+            return {
+                "series": {
+                    "series_id":
+                        series_id,
+
+                    "series_type":
+                        series[
+                            "series_type"
+                        ],
+
+                    "team_a":
+                        series[
+                            "team_a_name"
+                        ],
+
+                    "team_b":
+                        series[
+                            "team_b_name"
+                        ],
+
+                    "status":
+                        "completed",
+
+                    "set_count":
+                        3,
+
+                    "stats_sync_status":
+                        "conflict",
+                },
+
+                "sets": [
+                    {
+                        "set":
+                            saved_set[
+                                "set_number"
+                            ],
+
+                        "team_a_score":
+                            saved_set[
+                                "team_a_score"
+                            ],
+
+                        "team_b_score":
+                            saved_set[
+                                "team_b_score"
+                            ],
+                    }
+
+                    for saved_set
+                    in manual_sets
+                ],
+
+                "detected_sets": [
+                    {
+                        "set":
+                            index,
+
+                        "team_a_score":
+                            score[0],
+
+                        "team_b_score":
+                            score[1],
+                    }
+
+                    for (
+                        index,
+                        score,
+                    )
+                    in enumerate(
+                        nexon_scores,
+                        start=1,
+                    )
+                ],
+
+                "mvp":
+                    None,
+
+                "sync_message":
+                    (
+                        "수동 입력 점수와 "
+                        "NEXON 기록이 "
+                        "일치하지 않습니다."
+                    ),
+            }
+
+
+        # =========================
+        # 점수 일치
+        # 실제 matchId 연결
+        # =========================
+
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                for (
+                    index,
+                    detected_match,
+                ) in enumerate(
+                    detected_matches,
+                    start=1,
+                ):
+
+                    cursor.execute(
+                        """
+                        UPDATE series_sets
+
+                        SET
+                            nexon_match_id = %s,
+                            played_at = %s,
+                            score_source =
+                                'nexon'
+
+                        WHERE
+                            series_id = %s
+
+                            AND
+                            set_number = %s
+                        """,
+                        (
+                            detected_match[
+                                "data"
+                            ][
+                                "matchId"
+                            ],
+
+                            detected_match[
+                                "played_at"
+                            ],
+
+                            series_id,
+                            index,
+                        ),
+                    )
+
+
+                # 혹시 이전 통계가 있었다면
+                # 깨끗하게 다시 계산
+                cursor.execute(
+                    """
+                    DELETE FROM series_mvp
+                    WHERE series_id = %s
+                    """,
+                    (
+                        series_id,
+                    ),
+                )
+
+
+                cursor.execute(
+                    """
+                    DELETE FROM
+                        series_player_stats
+
+                    WHERE series_id = %s
+                    """,
+                    (
+                        series_id,
+                    ),
+                )
+
+
+            connection.commit()
+
+
+        # =========================
+        # 이미 받은 match detail로
+        # MVP / 선수 기록 계산
+        #
+        # 추가 Nexon 호출 없음
+        # =========================
+
+        mvp_matches = [
+            detected_match[
+                "data"
+            ]
+
+            for detected_match
+            in detected_matches
+        ]
+
+
+        (
+            mvp,
+            _,
+            player_stats,
+        ) = calculate_series_mvp_from_matches(
+            mvp_matches
+        )
+
+
+        save_series_player_stats(
+            series_id,
+
+            series[
+                "team_a_id"
+            ],
+            nickname_a,
+
+            series[
+                "team_b_id"
+            ],
+            nickname_b,
+
+            player_stats,
+        )
+
+
+        if mvp:
+
+            if (
+                mvp["nickname"]
+                == nickname_a
+            ):
+
+                mvp_participant_id = (
+                    series[
+                        "team_a_id"
+                    ]
+                )
+
+
+            elif (
+                mvp["nickname"]
+                == nickname_b
+            ):
+
+                mvp_participant_id = (
+                    series[
+                        "team_b_id"
+                    ]
+                )
+
+
+            else:
+
+                mvp_participant_id = None
+
+
+            if mvp_participant_id:
+
+                save_series_mvp(
+                    series_id,
+                    mvp_participant_id,
+                    mvp,
+                )
+
+
+        # =========================
+        # 사후 동기화 완료
+        # =========================
+
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET
+                        stats_sync_status =
+                            'synced'
+
+                    WHERE id = %s
+                    """,
+                    (
+                        series_id,
+                    ),
+                )
+
+            connection.commit()
+
+
+        sets = []
+
+
+        for (
+            index,
+            detected_match,
+        ) in enumerate(
+            detected_matches,
+            start=1,
+        ):
+
+            manual_set = (
+                manual_sets[
+                    index - 1
+                ]
+            )
+
+
+            sets.append(
+                {
+                    "set":
+                        index,
+
+                    "match_id":
+                        detected_match[
+                            "data"
+                        ][
+                            "matchId"
+                        ],
+
+                    "match_date":
+                        detected_match[
+                            "played_at"
+                        ].isoformat(),
+
+                    "team_a_score":
+                        manual_set[
+                            "team_a_score"
+                        ],
+
+                    "team_b_score":
+                        manual_set[
+                            "team_b_score"
+                        ],
+                }
+            )
+
+
+        return {
+            "series": {
+                "series_id":
+                    series_id,
+
+                "series_type":
+                    series[
+                        "series_type"
+                    ],
+
+                "team_a":
+                    series[
+                        "team_a_name"
+                    ],
+
+                "team_b":
+                    series[
+                        "team_b_name"
+                    ],
+
+                "nickname_a":
+                    nickname_a,
+
+                "nickname_b":
+                    nickname_b,
+
+                "match_type":
+                    series[
+                        "match_type"
+                    ],
+
+                "started_at":
+                    started_at.isoformat(),
+
+                "status":
+                    "completed",
+
+                "set_count":
+                    3,
+
+                "stats_sync_status":
+                    "synced",
+            },
+
+            "sets":
+                sets,
+
+            "mvp":
+                mvp,
+
+            "sync_message":
+                (
+                    "NEXON 기록 동기화가 "
+                    "완료되었습니다."
+                ),
+        }
+
+
+    # ==================================================
+    # B.
+    # 아직 active 상태에서
+    # 직접 NEXON 기록 확인
+    # ==================================================
 
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
-
 
             for (
                 index,
@@ -5414,8 +6182,11 @@ def sync_fcl_series_status(
             ):
 
                 match_data = (
-                    detected_match["data"]
+                    detected_match[
+                        "data"
+                    ]
                 )
+
 
                 played_at = (
                     detected_match[
@@ -5429,33 +6200,27 @@ def sync_fcl_series_status(
                         match_info
 
                     for match_info
-                    in match_data["matchInfo"]
+                    in match_data[
+                        "matchInfo"
+                    ]
                 }
 
 
-                team_a_info = (
+                team_a_score = (
                     participant_map[
                         nickname_a
-                    ]
-                )
-
-                team_b_info = (
-                    participant_map[
-                        nickname_b
-                    ]
-                )
-
-
-                team_a_score = (
-                    team_a_info[
+                    ][
                         "shoot"
                     ][
                         "goalTotalDisplay"
                     ]
                 )
 
+
                 team_b_score = (
-                    team_b_info[
+                    participant_map[
+                        nickname_b
+                    ][
                         "shoot"
                     ][
                         "goalTotalDisplay"
@@ -5467,15 +6232,12 @@ def sync_fcl_series_status(
                     """
                     INSERT INTO series_sets (
                         series_id,
-
                         set_number,
-
                         nexon_match_id,
-
                         played_at,
-
                         team_a_score,
-                        team_b_score
+                        team_b_score,
+                        score_source
                     )
 
                     VALUES (
@@ -5484,7 +6246,8 @@ def sync_fcl_series_status(
                         %s,
                         %s,
                         %s,
-                        %s
+                        %s,
+                        'nexon'
                     )
 
                     ON CONFLICT (
@@ -5493,7 +6256,6 @@ def sync_fcl_series_status(
                     )
 
                     DO UPDATE SET
-
                         nexon_match_id =
                             EXCLUDED.nexon_match_id,
 
@@ -5504,11 +6266,13 @@ def sync_fcl_series_status(
                             EXCLUDED.team_a_score,
 
                         team_b_score =
-                            EXCLUDED.team_b_score
+                            EXCLUDED.team_b_score,
+
+                        score_source =
+                            'nexon'
                     """,
                     (
                         series_id,
-
                         index,
 
                         match_data[
@@ -5524,7 +6288,7 @@ def sync_fcl_series_status(
 
 
             # =========================
-            # 실제 저장된 세트 조회
+            # 저장된 세트 조회
             # =========================
 
             cursor.execute(
@@ -5534,7 +6298,8 @@ def sync_fcl_series_status(
                     nexon_match_id,
                     played_at,
                     team_a_score,
-                    team_b_score
+                    team_b_score,
+                    score_source
 
                 FROM series_sets
 
@@ -5559,7 +6324,7 @@ def sync_fcl_series_status(
 
 
             # =========================
-            # 3세트 완료 처리
+            # 3세트 감지 완료
             # =========================
 
             if set_count >= 3:
@@ -5576,12 +6341,24 @@ def sync_fcl_series_status(
                     UPDATE series
 
                     SET
-                        status = 'completed',
-                        completed_at = %s
+                        status =
+                            'completed',
+
+                        completed_at = %s,
+
+                        finished_at =
+                            COALESCE(
+                                finished_at,
+                                %s
+                            ),
+
+                        stats_sync_status =
+                            'pending'
 
                     WHERE id = %s
                     """,
                     (
+                        completed_at,
                         completed_at,
                         series_id,
                     ),
@@ -5590,6 +6367,7 @@ def sync_fcl_series_status(
 
                 status = "completed"
 
+
             else:
 
                 status = "active"
@@ -5597,47 +6375,35 @@ def sync_fcl_series_status(
 
         connection.commit()
 
+
     # =========================
-    # 3세트 완료 시 MVP 계산
+    # MVP
     # =========================
 
     mvp = None
 
 
-    is_manual_result = any(
-        str(
-            saved_set[
-                "nexon_match_id"
-            ]
-        ).startswith(
-            "manual-"
-        )
-
-        for saved_set
-        in saved_sets[:3]
+    final_stats_sync_status = (
+        series[
+            "stats_sync_status"
+        ]
     )
 
 
     if (
         len(saved_sets) >= 3
         and
-        not is_manual_result
+        len(detected_matches) >= 3
     ):
 
-        mvp_matches = []
-
-
         mvp_matches = [
-            detected_match["data"]
+            detected_match[
+                "data"
+            ]
+
             for detected_match
             in detected_matches[:3]
         ]
-
-
-        mvp_matches.sort(
-            key=lambda match:
-                match["matchDate"]
-        )
 
 
         (
@@ -5648,17 +6414,18 @@ def sync_fcl_series_status(
             mvp_matches
         )
 
-        # =========================
-        # 전체 선수 기록 DB 저장
-        # =========================
 
         save_series_player_stats(
             series_id,
 
-            series["team_a_id"],
+            series[
+                "team_a_id"
+            ],
             nickname_a,
 
-            series["team_b_id"],
+            series[
+                "team_b_id"
+            ],
             nickname_b,
 
             player_stats,
@@ -5673,7 +6440,9 @@ def sync_fcl_series_status(
             ):
 
                 mvp_participant_id = (
-                    series["team_a_id"]
+                    series[
+                        "team_a_id"
+                    ]
                 )
 
 
@@ -5683,7 +6452,9 @@ def sync_fcl_series_status(
             ):
 
                 mvp_participant_id = (
-                    series["team_b_id"]
+                    series[
+                        "team_b_id"
+                    ]
                 )
 
 
@@ -5701,8 +6472,35 @@ def sync_fcl_series_status(
                 )
 
 
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET
+                        stats_sync_status =
+                            'synced'
+
+                    WHERE id = %s
+                    """,
+                    (
+                        series_id,
+                    ),
+                )
+
+            connection.commit()
+
+
+        final_stats_sync_status = (
+            "synced"
+        )
+
+
     # =========================
-    # API 응답용 세트
+    # 응답용 세트
     # =========================
 
     sets = []
@@ -5723,9 +6521,17 @@ def sync_fcl_series_status(
                     ],
 
                 "match_date":
-                    saved_set[
-                        "played_at"
-                    ].isoformat(),
+                    (
+                        saved_set[
+                            "played_at"
+                        ].isoformat()
+
+                        if saved_set[
+                            "played_at"
+                        ]
+
+                        else None
+                    ),
 
                 "team_a_score":
                     saved_set[
@@ -5746,13 +6552,19 @@ def sync_fcl_series_status(
                 series_id,
 
             "series_type":
-                series["series_type"],
+                series[
+                    "series_type"
+                ],
 
             "team_a":
-                series["team_a_name"],
+                series[
+                    "team_a_name"
+                ],
 
             "team_b":
-                series["team_b_name"],
+                series[
+                    "team_b_name"
+                ],
 
             "nickname_a":
                 nickname_a,
@@ -5761,7 +6573,9 @@ def sync_fcl_series_status(
                 nickname_b,
 
             "match_type":
-                series["match_type"],
+                series[
+                    "match_type"
+                ],
 
             "started_at":
                 started_at.isoformat(),
@@ -5771,12 +6585,18 @@ def sync_fcl_series_status(
 
             "set_count":
                 len(sets),
+
+            "stats_sync_status":
+                final_stats_sync_status,
         },
 
-        "sets": sets,
+        "sets":
+            sets,
 
-        "mvp": mvp,
+        "mvp":
+            mvp,
     }
+
 
 # =========================
 # SERIES MVP DB 조회
@@ -5882,6 +6702,7 @@ def get_completed_series_results():
                     s.scheduled_date,
                     s.started_at,
                     s.completed_at,
+                    s.stats_sync_status,
 
                     team_a.fcl_name
                         AS team_a,
@@ -6132,6 +6953,11 @@ def get_completed_series_results():
 
                         "source":
                             "database",
+
+                        "stats_sync_status":
+                            series_row[
+                                "stats_sync_status"
+                            ],
 
                         "date":
                             result_date.strftime(

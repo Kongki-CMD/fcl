@@ -176,6 +176,161 @@ async function loadResults() {
 
 }
 
+// =========================================
+// 완료 SERIES NEXON 기록 동기화
+// =========================================
+
+async function syncCompletedSeries(
+    seriesId,
+    buttonElement,
+    messageElement
+) {
+
+    if (!seriesId) {
+        return;
+    }
+
+
+    const originalText =
+        buttonElement.textContent;
+
+
+    buttonElement.disabled =
+        true;
+
+
+    buttonElement.textContent =
+        "NEXON 확인 중...";
+
+
+    if (messageElement) {
+
+        messageElement.textContent =
+            "";
+    }
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/${seriesId}/sync`,
+            {
+                method: "POST"
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            if (
+                response.status === 429
+            ) {
+
+                throw new Error(
+                    "NEXON API 호출 제한 중입니다. 잠시 후 다시 확인해주세요."
+                );
+            }
+
+
+            throw new Error(
+                data.detail
+                ??
+                "NEXON 기록 확인에 실패했습니다."
+            );
+        }
+
+
+        const statsSyncStatus =
+            data.series
+                ?.stats_sync_status;
+
+
+        if (messageElement) {
+
+            messageElement.textContent =
+                data.sync_message
+                ??
+                "NEXON 경기 기록을 확인했습니다.";
+        }
+
+
+        // =============================
+        // 동기화 완료
+        // 결과 목록 다시 불러오기
+        // MVP도 새로 표시됨
+        // =============================
+
+        if (
+            statsSyncStatus
+            === "synced"
+        ) {
+
+            await loadResults();
+
+            return;
+        }
+
+
+        // =============================
+        // 점수 충돌
+        // =============================
+
+        if (
+            statsSyncStatus
+            === "conflict"
+        ) {
+
+            buttonElement.disabled =
+                false;
+
+
+            buttonElement.textContent =
+                "NEXON 기록 다시 확인";
+
+
+            return;
+        }
+
+
+        // =============================
+        // 아직 NEXON 반영 대기
+        // =============================
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            "NEXON 기록 확인";
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        if (messageElement) {
+
+            messageElement.textContent =
+                error.message;
+        }
+
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            originalText;
+    }
+}
+
 
 // =========================================
 // 경기 결과 출력
@@ -430,6 +585,68 @@ function renderResults(
 
         }
 
+        // =====================================
+// NEXON 기록 동기화
+// =====================================
+
+let syncHtml = "";
+
+
+const statsSyncStatus =
+    result.stats_sync_status;
+
+
+const canSyncNexon =
+    result.source === "database"
+    &&
+    result.series_id
+    &&
+    (
+        statsSyncStatus === "pending"
+        ||
+        statsSyncStatus === "conflict"
+    );
+
+
+if (canSyncNexon) {
+
+    const syncButtonText =
+        statsSyncStatus === "conflict"
+            ? "NEXON 기록 다시 확인"
+            : "NEXON 기록 확인";
+
+
+    const syncStatusText =
+        statsSyncStatus === "conflict"
+            ? "수동 점수와 NEXON 기록 확인 필요"
+            : "NEXON 선수 기록 반영 대기 중";
+
+
+    syncHtml = `
+        <div class="result-sync-panel">
+
+            <div class="result-sync-status">
+                ${syncStatusText}
+            </div>
+
+            <button
+                type="button"
+                class="result-sync-button"
+                data-series-sync-button
+                data-series-id="${result.series_id}"
+            >
+                ${syncButtonText}
+            </button>
+
+            <div
+                class="result-sync-message"
+                data-series-sync-message
+            ></div>
+
+        </div>
+    `;
+}
+
 
         // =====================================
         // 경기 결과 카드
@@ -505,6 +722,7 @@ function renderResults(
 
             </div>
 
+            ${syncHtml}
 
             ${mvpHtml}
         `;
@@ -518,9 +736,57 @@ function renderResults(
 
 }
 
+// =========================================
+// NEXON 기록 확인 버튼
+// =========================================
+
+resultsListElement.addEventListener(
+    "click",
+    (event) => {
+
+        const syncButtonElement =
+            event.target.closest(
+                "[data-series-sync-button]"
+            );
+
+
+        if (!syncButtonElement) {
+            return;
+        }
+
+
+        const seriesId =
+            Number(
+                syncButtonElement.dataset
+                    .seriesId
+            );
+
+
+        const resultCardElement =
+            syncButtonElement.closest(
+                ".result-card"
+            );
+
+
+        const syncMessageElement =
+            resultCardElement
+                ?.querySelector(
+                    "[data-series-sync-message]"
+                );
+
+
+        syncCompletedSeries(
+            seriesId,
+            syncButtonElement,
+            syncMessageElement
+        );
+    }
+);
+
 
 // =========================================
 // 실행
 // =========================================
 
 loadResults();
+
