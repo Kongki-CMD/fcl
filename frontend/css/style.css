@@ -1868,6 +1868,10 @@ footer p {
    PRE-SEASON SERIES ACTION
 ========================= */
 
+#series-sync-button {
+    display: none !important;
+}
+
 .series-action-buttons {
     display: flex;
     justify-content: center;
@@ -1917,8 +1921,12 @@ footer p {
 
 .manual-result-team-header {
     display: grid;
-    grid-template-columns: 1fr 120px 1fr;
+    grid-template-columns:
+        1fr
+        60px
+        1fr;
 
+    margin-left: 100px;
     margin-bottom: 20px;
 
     text-align: center;
@@ -1928,7 +1936,9 @@ footer p {
 
 .manual-result-row {
     display: grid;
-    grid-template-columns: 100px 1fr;
+    grid-template-columns:
+        100px
+        1fr;
 
     align-items: center;
 
@@ -1939,11 +1949,14 @@ footer p {
 
 
 .manual-score-inputs {
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: grid;
+    grid-template-columns:
+        1fr
+        60px
+        1fr;
 
-    gap: 15px;
+    align-items: center;
+    justify-items: center;
 }
 
 
@@ -2980,8 +2993,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .manual-result-team-header {
         grid-template-columns:
             1fr
-            60px
+            40px
             1fr;
+
+        margin-left: 70px;
     }
 
 
@@ -2993,7 +3008,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 
     .manual-score-inputs {
-        gap: 8px;
+        grid-template-columns:
+            1fr
+            40px
+            1fr;
     }
 
 

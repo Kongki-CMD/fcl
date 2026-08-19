@@ -226,14 +226,18 @@ async function startRegularSeries(
         }
 
 
-        // 진행 화면에서 사용할 SERIES ID
         localStorage.setItem(
             "fclCurrentSeriesId",
             data.series_id
         );
 
 
-        // 기존 SERIES 진행 화면으로 이동
+        localStorage.setItem(
+            "fclOpenManualResult",
+            "true"
+        );
+
+
         window.location.href =
             "./preseason.html";
 
@@ -277,7 +281,7 @@ async function startPreseasonSeries(
 
     const confirmed =
         window.confirm(
-            "지금부터 친선전 경기 감지를 시작하시겠습니까?"
+            "친선전 경기를 시작하시겠습니까?"
         );
 
 
@@ -324,6 +328,11 @@ async function startPreseasonSeries(
         localStorage.setItem(
             "fclCurrentSeriesId",
             data.series_id
+        );
+
+        localStorage.setItem(
+            "fclOpenManualResult",
+            "true"
         );
 
 

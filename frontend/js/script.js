@@ -268,9 +268,14 @@ todayMatchListElement.addEventListener(
                 );
 
 
+                localStorage.setItem(
+                    "fclOpenManualResult",
+                    "true"
+                );
+
+
                 window.location.href =
                     "./preseason.html";
-
 
             } catch (error) {
 

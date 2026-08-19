@@ -1499,7 +1499,7 @@ function stopStatusPolling() {
    새로고침 복구
 ========================= */
 
-function restoreSeries() {
+async function restoreSeries() {
 
     const savedSeriesId =
         localStorage.getItem(
@@ -1518,26 +1518,44 @@ function restoreSeries() {
         );
 
 
-        preseasonStartCardElement.classList.remove(
-            "hidden"
+    preseasonStartCardElement.classList.add(
+        "hidden"
+    );
+
+
+    seriesStatusCardElement.classList.remove(
+        "hidden"
+    );
+
+
+    seriesStartButtonElement.disabled =
+        true;
+
+
+    seriesStartButtonElement.textContent =
+        "SERIES 진행 중";
+
+
+    // 먼저 SERIES 정보를 불러와
+    // currentTeamA / currentTeamB 세팅
+    await loadSeriesStatus();
+
+
+    const shouldOpenManualResult =
+        localStorage.getItem(
+            "fclOpenManualResult"
+        ) === "true";
+
+
+    if (shouldOpenManualResult) {
+
+        localStorage.removeItem(
+            "fclOpenManualResult"
         );
 
 
-        seriesStatusCardElement.classList.remove(
-            "hidden"
-        );
-
-
-        seriesStartButtonElement.disabled =
-            false;
-
-
-        seriesStartButtonElement.textContent =
-            "친선전 예약";
-
-
-    startStatusPolling();
-
+        openManualResultPanel();
+    }
 }
 
 
