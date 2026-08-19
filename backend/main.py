@@ -1479,22 +1479,129 @@ def get_today_matches():
 
     today = datetime.now(
         ZoneInfo("Asia/Seoul")
-    ).date().isoformat()
+    ).date()
 
 
-    matches = get_matches()
+    today_string = (
+        today.isoformat()
+    )
 
 
-    return [
+    # 기존 Excel 일정 사용
+    all_matches = get_matches()
+
+
+    matches = [
         match
-
-        for match
-        in matches
-
-        if match["date"]
-        == today
+        for match in all_matches
+        if match["date"] == today_string
     ]
 
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            for match in matches:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        s.id AS series_id,
+                        s.status AS series_status
+
+                    FROM series AS s
+
+                    JOIN participants AS team_a
+                        ON team_a.id =
+                            s.team_a_id
+
+                    JOIN participants AS team_b
+                        ON team_b.id =
+                            s.team_b_id
+
+                    WHERE
+                        s.scheduled_date = %s
+
+                        AND
+                        s.series_type = %s
+
+                        AND
+                        s.status <> 'cancelled'
+
+                        AND (
+                            (
+                                team_a.fcl_name = %s
+                                AND
+                                team_b.fcl_name = %s
+                            )
+
+                            OR
+
+                            (
+                                team_a.fcl_name = %s
+                                AND
+                                team_b.fcl_name = %s
+                            )
+                        )
+
+                    ORDER BY
+                        CASE s.status
+
+                            WHEN 'active'
+                                THEN 1
+
+                            WHEN 'scheduled'
+                                THEN 2
+
+                            WHEN 'completed'
+                                THEN 3
+
+                            ELSE 4
+
+                        END,
+
+                        s.id DESC
+
+                    LIMIT 1
+                    """,
+                    (
+                        today,
+
+                        match["match_type"],
+
+                        match["team_a"],
+                        match["team_b"],
+
+                        match["team_b"],
+                        match["team_a"],
+                    ),
+                )
+
+
+                series = cursor.fetchone()
+
+
+                if series:
+
+                    match["series_id"] = (
+                        series["series_id"]
+                    )
+
+                    match["series_status"] = (
+                        series["series_status"]
+                    )
+
+                else:
+
+                    match["series_id"] = None
+
+                    match["series_status"] = (
+                        "not_started"
+                    )
+
+
+    return matches
 
 # =========================
 # 경기 결과

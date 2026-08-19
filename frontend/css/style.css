@@ -281,6 +281,8 @@ main {
 }
 
 .today-match-card {
+    position: relative;
+
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -291,12 +293,98 @@ main {
     border-radius: 10px;
 }
 
-.today-match-card .team-box:first-child {
+
+.today-match-card
+> .team-box:first-of-type {
     justify-content: flex-end;
 }
 
-.today-match-card .team-box:last-child {
+
+.today-match-card
+> .team-box:nth-of-type(2) {
     justify-content: flex-start;
+}
+
+/* =========================================
+   TODAY MATCH SERIES CONTROL
+========================================= */
+
+.today-series-control {
+    position: absolute;
+
+    top: 50%;
+    right: 24px;
+
+    transform: translateY(-50%);
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.today-series-completed {
+    padding: 7px 12px;
+
+    border: 1px solid #39765a;
+    border-radius: 999px;
+
+    background: rgba(
+        57,
+        118,
+        90,
+        0.12
+    );
+
+    color: #65c58e;
+
+    font-size: 12px;
+    font-weight: 600;
+
+    white-space: nowrap;
+}
+
+
+.today-series-button {
+    min-width: 90px;
+
+    padding: 8px 14px;
+
+    border: 1px solid #b49a5a;
+    border-radius: 6px;
+
+    background: rgba(
+        180,
+        154,
+        90,
+        0.1
+    );
+
+    color: #d7bc78;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+
+.today-series-button:hover {
+    background: rgba(
+        180,
+        154,
+        90,
+        0.22
+    );
+}
+
+
+.today-series-button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .today-team {
@@ -438,10 +526,33 @@ main {
 }
 
 .result-date {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 15px;
+
     margin-bottom: 20px;
 
     font-size: 14px;
     color: #888;
+}
+
+
+.result-date-info {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+}
+
+
+.result-finished-time {
+    color: #777;
+
+    font-size: 12px;
+
+    white-space: nowrap;
 }
 
 .result-teams {
@@ -2313,4 +2424,737 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .reservation-rule-panel li:last-child {
     margin-bottom: 0;
+}
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    /* =====================================
+       GLOBAL
+    ===================================== */
+
+    body {
+        background-attachment: scroll;
+    }
+
+
+    main {
+        padding: 24px 14px;
+    }
+
+
+    /* =====================================
+       HEADER
+    ===================================== */
+
+    .header-container {
+        height: auto;
+
+        padding: 14px 16px;
+
+        flex-direction: column;
+        align-items: flex-start;
+
+        gap: 12px;
+    }
+
+
+    .logo a {
+        font-size: 20px;
+    }
+
+
+    .main-menu {
+        width: 100%;
+
+        flex-wrap: wrap;
+
+        gap: 10px 18px;
+    }
+
+
+    .main-menu a {
+        display: block;
+
+        padding: 6px 0;
+
+        font-size: 14px;
+    }
+
+
+    .sub-menu {
+        z-index: 100;
+    }
+
+
+    /* =====================================
+       DASHBOARD
+    ===================================== */
+
+    .today-matches,
+    .recent-results {
+        margin-bottom: 28px;
+    }
+
+
+    .match-list,
+    .result-list {
+        min-height: 0;
+
+        padding: 10px;
+    }
+
+
+    .today-match-card {
+        grid-template-columns:
+            1fr
+            auto
+            1fr;
+
+        gap: 8px;
+
+        padding:
+            18px
+            12px
+            62px;
+    }
+
+
+    .today-match-card
+    > .team-box:first-of-type {
+        justify-content: flex-end;
+    }
+
+
+    .today-match-card
+    > .team-box:nth-of-type(2) {
+        justify-content: flex-start;
+    }
+
+
+    .today-match-card
+    .team-box {
+        gap: 6px;
+    }
+
+
+    .today-match-card
+    .team-image {
+        width: 26px;
+        height: 26px;
+    }
+
+
+    .today-team {
+        font-size: 16px;
+        white-space: nowrap;
+    }
+
+
+    .today-versus {
+        margin: 0 8px;
+
+        font-size: 12px;
+    }
+
+
+    .today-series-control {
+        top: auto;
+
+        right: 0;
+        bottom: 12px;
+        left: 0;
+
+        transform: none;
+
+        justify-content: center;
+    }
+
+
+    .today-series-button {
+        min-width: 100px;
+    }
+
+
+    .rankings {
+        grid-template-columns: 1fr;
+
+        gap: 16px;
+    }
+
+
+    .team-ranking,
+    .player-ranking {
+        min-height: 0;
+
+        padding: 16px;
+    }
+
+
+    .dashboard-ranking-row {
+        grid-template-columns:
+            40px
+            1fr
+            55px;
+
+        padding: 0 8px;
+    }
+
+
+    /* =====================================
+       SCHEDULE / RESULTS
+    ===================================== */
+
+    .schedule-page,
+    .results-page {
+        width: 100%;
+
+        padding: 28px 14px;
+    }
+
+
+    .schedule-header h1,
+    .results-header h1,
+    .standings-header h1,
+    .players-header h1,
+    .rules-header h1,
+    .preseason-header h1 {
+        font-size: 26px;
+    }
+
+
+    .schedule-header-bottom {
+        flex-direction: column;
+        align-items: flex-start;
+
+        gap: 14px;
+    }
+
+
+    .schedule-view-button {
+        width: 100%;
+    }
+
+
+    .schedule-card,
+    .result-card {
+        padding: 18px 14px;
+    }
+
+
+    .match-teams,
+    .result-teams,
+    .playoff-schedule-card
+    .match-teams {
+        grid-template-columns:
+            1fr
+            auto
+            1fr;
+
+        gap: 10px;
+    }
+
+
+    .team-name,
+    .result-team-name {
+        font-size: 16px;
+        white-space: nowrap;
+    }
+
+
+    .match-teams .team-box,
+    .result-team-box {
+        gap: 6px;
+    }
+
+
+    .match-teams .team-image,
+    .result-team-box .team-image {
+        width: 26px;
+        height: 26px;
+    }
+
+
+    .result-score {
+        gap: 6px;
+
+        font-size: 20px;
+    }
+
+
+    .schedule-series-control {
+        margin-top: 16px;
+    }
+
+
+    .regular-series-start-button {
+        width: 100%;
+        min-width: 0;
+    }
+
+
+    .result-sync-panel {
+        width: 100%;
+
+        margin-top: 18px;
+    }
+
+
+    .result-sync-button {
+        width: 100%;
+        max-width: 240px;
+    }
+
+
+    /* =====================================
+       STANDINGS
+    ===================================== */
+
+    .standings-page {
+        width: 100%;
+
+        padding: 28px 12px;
+    }
+
+
+    .standings-table-container {
+        overflow-x: auto;
+
+        -webkit-overflow-scrolling: touch;
+    }
+
+
+    .standings-table {
+        min-width: 720px;
+    }
+
+
+    .standings-table th,
+    .standings-table td {
+        height: 58px;
+
+        font-size: 13px;
+    }
+
+
+    /* =====================================
+       PLAYERS
+    ===================================== */
+
+    .players-page {
+        width: 100%;
+
+        padding: 28px 12px;
+    }
+
+
+    .players-table-container {
+        overflow-x: auto;
+
+        -webkit-overflow-scrolling: touch;
+    }
+
+
+    .players-table {
+        min-width: 560px;
+    }
+
+
+    .players-table th,
+    .players-table td {
+        height: 60px;
+
+        padding: 0 10px;
+
+        font-size: 14px;
+    }
+
+
+    /* =====================================
+       RULES
+    ===================================== */
+
+    .rules-page {
+        width: 100%;
+
+        padding: 28px 14px;
+    }
+
+
+    .rule-card {
+        padding: 20px 16px;
+    }
+
+
+    /* =====================================
+       PRE-SEASON
+    ===================================== */
+
+    .preseason-page {
+        width: 100%;
+
+        padding: 28px 14px;
+    }
+
+
+    .preseason-start-card,
+    .series-status-card {
+        padding: 20px 14px;
+    }
+
+
+    .preseason-title-row {
+        flex-direction: column;
+
+        gap: 12px;
+
+        margin-bottom: 25px;
+    }
+
+
+    .reservation-rule-button {
+        position: static;
+
+        transform: none;
+    }
+
+
+    .reservation-rule-panel {
+        position: static;
+
+        width: 100%;
+
+        margin-top: 12px;
+    }
+
+
+    .preseason-player-select {
+        flex-direction: column;
+        align-items: stretch;
+
+        gap: 15px;
+    }
+
+
+    .preseason-player {
+        width: 100%;
+    }
+
+
+    .preseason-vs {
+        align-self: center;
+
+        padding-bottom: 0;
+    }
+
+
+    .preseason-match-date {
+        margin: 24px 0;
+    }
+
+
+    .preseason-match-date
+    input[type="date"] {
+        width: 100%;
+    }
+
+
+    .series-start-button {
+        width: 100%;
+        max-width: 280px;
+    }
+
+
+    /* =====================================
+       SERIES STATUS
+    ===================================== */
+
+    .series-status-header {
+        flex-wrap: wrap;
+
+        gap: 12px;
+
+        margin-bottom: 22px;
+    }
+
+
+    .series-progress {
+        font-size: 26px;
+    }
+
+
+    .series-set-row {
+        grid-template-columns:
+            1fr
+            auto
+            1fr;
+
+        padding: 14px 10px;
+    }
+
+
+    .series-set-score {
+        font-size: 18px;
+    }
+
+
+    .series-total-score {
+        grid-template-columns:
+            1fr
+            auto
+            1fr;
+
+        gap: 10px;
+
+        margin-top: 24px;
+        padding: 20px 8px;
+    }
+
+
+    .series-result-team {
+        font-size: 16px;
+    }
+
+
+    .series-result-score {
+        font-size: 30px;
+    }
+
+
+    .series-mvp {
+        padding: 18px 14px;
+    }
+
+
+    .series-mvp-content {
+        flex-direction: column;
+
+        text-align: center;
+
+        gap: 15px;
+    }
+
+
+    .series-mvp-image {
+        width: 100px;
+        height: 100px;
+    }
+
+
+    .series-mvp-info strong {
+        font-size: 22px;
+    }
+
+
+    .series-mvp-record {
+        justify-content: center;
+    }
+
+
+    .series-action-buttons {
+        flex-wrap: wrap;
+
+        gap: 10px;
+    }
+
+
+    .series-action-button {
+        flex: 1 1 140px;
+
+        min-width: 0;
+    }
+
+
+    /* =====================================
+       MANUAL RESULT
+    ===================================== */
+
+    .manual-result-panel {
+        padding: 18px 12px;
+    }
+
+
+    .manual-result-team-header {
+        grid-template-columns:
+            1fr
+            60px
+            1fr;
+    }
+
+
+    .manual-result-row {
+        grid-template-columns:
+            70px
+            1fr;
+    }
+
+
+    .manual-score-inputs {
+        gap: 8px;
+    }
+
+
+    .manual-score-inputs input {
+        width: 58px;
+
+        padding: 9px 5px;
+    }
+
+
+    .manual-result-actions {
+        flex-wrap: wrap;
+
+        gap: 10px;
+    }
+
+
+    .manual-result-actions button {
+        flex: 1 1 120px;
+
+        min-width: 0;
+    }
+
+
+    .history-action-container {
+        flex-wrap: wrap;
+    }
+
+
+    .history-import-button,
+    .history-rule-button {
+        flex: 1 1 150px;
+    }
+
+
+    footer {
+        padding: 16px 10px;
+    }
+}
+
+
+/* =========================================
+   SMALL MOBILE
+========================================= */
+
+@media (max-width: 480px) {
+
+    .header-container {
+        padding: 12px;
+    }
+
+
+    .main-menu {
+        gap: 8px 14px;
+    }
+
+
+    .main-menu a {
+        font-size: 13px;
+    }
+
+
+    main {
+        padding: 20px 10px;
+    }
+
+
+    .today-match-card {
+        padding:
+            16px
+            8px
+            58px;
+    }
+
+
+    .today-match-card
+    .team-image {
+        width: 22px;
+        height: 22px;
+    }
+
+
+    .today-team {
+        font-size: 14px;
+    }
+
+
+    .today-versus {
+        margin: 0 5px;
+    }
+
+
+    .schedule-page,
+    .results-page,
+    .standings-page,
+    .players-page,
+    .rules-page,
+    .preseason-page {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+
+
+    .schedule-card,
+    .result-card {
+        padding: 16px 10px;
+    }
+
+
+    .team-name,
+    .result-team-name {
+        font-size: 14px;
+    }
+
+
+    .match-teams .team-image,
+    .result-team-box .team-image {
+        width: 22px;
+        height: 22px;
+    }
+
+
+    .result-score {
+        font-size: 18px;
+    }
+
+
+    .preseason-start-card,
+    .series-status-card {
+        padding: 18px 10px;
+    }
+
+
+    .manual-score-inputs input {
+        width: 52px;
+    }
+}
+
+.result-sync-guide {
+    display: inline-block;
+
+    margin-top: 5px;
+
+    font-size: 11px;
+    font-weight: 400;
+
+    color: #777;
+}
+
+.result-date {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+}
+
+
+.result-date-info {
+    flex-wrap: wrap;
+}
+
+
+.result-finished-time {
+    font-size: 11px;
 }

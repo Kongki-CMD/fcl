@@ -1,6 +1,7 @@
 import {
     apiBaseUrl,
     getTeamImagePath,
+    formatKstDateTime,
 } from "./config.js";
 
 
@@ -390,6 +391,19 @@ function renderResults(
 
         }
 
+        const finishedTimeHtml =
+            result.completed_at
+                ? `
+                    <span class="result-finished-time">
+                        종료시간 :
+                        ${formatKstDateTime(
+                            result.completed_at
+                        )}
+                        KST
+                    </span>
+                `
+                : "";
+
 
         // =====================================
         // 세트별 결과
@@ -619,7 +633,14 @@ if (canSyncNexon) {
     const syncStatusText =
         statsSyncStatus === "conflict"
             ? "수동 점수와 NEXON 기록 확인 필요"
-            : "NEXON 선수 기록 반영 대기 중";
+            : `
+                MVP 선수 선정 대기 중
+                <br>
+                <span class="result-sync-guide">
+                    경기 후 2시간 뒤 클릭 바랍니다.
+                    (NEXON 데이터 반영 시간)
+                </span>
+            `;
 
 
     syncHtml = `
@@ -656,9 +677,18 @@ if (canSyncNexon) {
 
             <div class="result-date">
 
-                ${result.date}
+                <div class="result-date-info">
 
-                ${resultLabel}
+                    <span>
+                        ${result.date}
+                    </span>
+
+                    ${resultLabel}
+
+                </div>
+
+
+                ${finishedTimeHtml}
 
             </div>
 

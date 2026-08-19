@@ -59,6 +59,66 @@ function renderTodayMatches(matches) {
 
 
     matches.forEach((match) => {
+
+        const seriesStatus =
+            match.series_status
+            ?? match.status;
+
+
+        let seriesControlHtml = "";
+
+
+        if (
+            seriesStatus === "completed"
+        ) {
+
+            seriesControlHtml = `
+                <div class="today-series-control">
+                    <span class="today-series-completed">
+                        경기 완료
+                    </span>
+                </div>
+            `;
+
+        } else if (
+            seriesStatus === "active"
+        ) {
+
+            seriesControlHtml = `
+                <div class="today-series-control">
+
+                    <button
+                        type="button"
+                        class="today-series-button"
+                        data-series-action="view"
+                        data-series-id="${match.series_id}"
+                    >
+                        경기 보기
+                    </button>
+
+                </div>
+            `;
+
+        } else if (
+            seriesStatus === "scheduled"
+        ) {
+
+            seriesControlHtml = `
+                <div class="today-series-control">
+
+                    <button
+                        type="button"
+                        class="today-series-button"
+                        data-series-action="start"
+                        data-series-id="${match.series_id}"
+                    >
+                        경기 시작
+                    </button>
+
+                </div>
+            `;
+        }
+
         const todayMatchCardElement =
             document.createElement("div");
 
@@ -82,6 +142,7 @@ function renderTodayMatches(matches) {
 
             </div>
 
+            ${seriesControlHtml}
 
             <span class="today-versus">
                 VS
@@ -109,6 +170,130 @@ function renderTodayMatches(matches) {
         );
     });
 }
+
+// ======================================================
+// 오늘 경기 SERIES 버튼
+// ======================================================
+
+todayMatchListElement.addEventListener(
+    "click",
+    async (event) => {
+
+        const buttonElement =
+            event.target.closest(
+                "[data-series-action]"
+            );
+
+
+        if (!buttonElement) {
+            return;
+        }
+
+
+        const seriesId =
+            Number(
+                buttonElement.dataset.seriesId
+            );
+
+
+        const action =
+            buttonElement.dataset.seriesAction;
+
+
+        // ================================
+        // 진행 중 경기 보기
+        // ================================
+
+        if (action === "view") {
+
+            localStorage.setItem(
+                "fclCurrentSeriesId",
+                seriesId
+            );
+
+
+            window.location.href =
+                "./preseason.html";
+
+
+            return;
+        }
+
+
+        // ================================
+        // 예약된 경기 시작
+        // ================================
+
+        if (action === "start") {
+
+            const originalText =
+                buttonElement.textContent;
+
+
+            buttonElement.disabled =
+                true;
+
+
+            buttonElement.textContent =
+                "시작 중...";
+
+
+            try {
+
+                const response = await fetch(
+                    `${apiBaseUrl}/api/fconline/series/${seriesId}/activate`,
+                    {
+                        method: "POST"
+                    }
+                );
+
+
+                const data =
+                    await response.json();
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        data.detail
+                        ??
+                        "경기 시작에 실패했습니다."
+                    );
+                }
+
+
+                localStorage.setItem(
+                    "fclCurrentSeriesId",
+                    seriesId
+                );
+
+
+                window.location.href =
+                    "./preseason.html";
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                alert(
+                    error.message
+                );
+
+
+                buttonElement.disabled =
+                    false;
+
+
+                buttonElement.textContent =
+                    originalText;
+            }
+        }
+    }
+);
 
 
 // ======================================================
