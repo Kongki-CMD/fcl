@@ -194,6 +194,8 @@ let currentSeriesId = null;
 let currentTeamA = "";
 let currentTeamB = "";
 
+let currentSeriesType = "";
+
 let statusTimer = null;
 
 
@@ -740,6 +742,9 @@ function renderSeriesStatus(data) {
     currentTeamB =
         series.team_b;
 
+    currentSeriesType =
+        series.series_type;
+
 
     seriesTitleElement.textContent =
         `${series.team_a} VS ${series.team_b}`;
@@ -1032,9 +1037,22 @@ function renderSeriesStatus(data) {
     );
 
 
-    seriesCancelButtonElement.classList.remove(
-        "hidden"
-    );
+    // 프리시즌만 경기 취소 가능
+    if (
+        currentSeriesType
+        === "프리시즌"
+    ) {
+
+        seriesCancelButtonElement.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        seriesCancelButtonElement.classList.add(
+            "hidden"
+        );
+    }
 
 
     seriesSyncButtonElement.classList.remove(
@@ -1347,7 +1365,7 @@ async function completeManualResult() {
 
     const confirmed =
         window.confirm(
-            "입력한 결과로 친선전을 완료하시겠습니까?"
+            "입력한 결과로 경기를 완료하시겠습니까?"
         );
 
 

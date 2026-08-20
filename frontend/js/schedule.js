@@ -50,6 +50,21 @@ scheduleListElement.addEventListener(
     "click",
     (event) => {
 
+        const regularViewButtonElement =
+            event.target.closest(
+                ".regular-series-view-button"
+            );
+
+
+        if (regularViewButtonElement) {
+
+            openPreseasonSeries(
+                regularViewButtonElement
+            );
+
+            return;
+        }
+
         const regularButtonElement =
             event.target.closest(
                 ".regular-series-start-button"
@@ -150,25 +165,22 @@ async function loadPlayoffSchedule() {
 
 // =========================================
 // 정규리그 SERIES START
+// DB에 예약된 SERIES 활성화
 // =========================================
 
 async function startRegularSeries(
     buttonElement
 ) {
 
-    const teamA =
-        buttonElement.dataset.teamA;
-
-    const teamB =
-        buttonElement.dataset.teamB;
-
-    const matchDate =
-        buttonElement.dataset.matchDate;
-
-    const roundNumber =
+    const seriesId =
         Number(
-            buttonElement.dataset.round
+            buttonElement.dataset.seriesId
         );
+
+
+    if (!seriesId) {
+        return;
+    }
 
 
     const originalText =
@@ -185,28 +197,9 @@ async function startRegularSeries(
     try {
 
         const response = await fetch(
-            `${apiBaseUrl}/api/fconline/series/start`,
+            `${apiBaseUrl}/api/fconline/series/${seriesId}/activate`,
             {
-                method: "POST",
-
-                headers: {
-                    "Content-Type":
-                        "application/json",
-                },
-
-                body: JSON.stringify({
-                    team_a: teamA,
-                    team_b: teamB,
-
-                    series_type:
-                        "정규리그",
-
-                    scheduled_date:
-                        matchDate,
-
-                    round_number:
-                        roundNumber,
-                }),
+                method: "POST"
             }
         );
 
@@ -222,7 +215,6 @@ async function startRegularSeries(
                 ??
                 "SERIES 시작에 실패했습니다."
             );
-
         }
 
 
@@ -254,9 +246,7 @@ async function startRegularSeries(
 
         buttonElement.textContent =
             originalText;
-
     }
-
 }
 
 // =========================================
@@ -551,15 +541,12 @@ function renderSchedule(matches) {
         // PRE-SEASON 상태
         // =====================================
 
-        const isDatabasePreseason =
-            match.match_type
-                === "프리시즌"
-            &&
+        const isDatabaseSeries =
             match.series_id
                 !== null;
 
 
-        if (isDatabasePreseason) {
+        if (isDatabaseSeries) {
 
             if (
                 match.status
@@ -623,13 +610,19 @@ function renderSchedule(matches) {
 
         // =====================================
         // 정규리그
-        // 당일 SERIES START
+        // 예약됨 + 경기 당일
         // =====================================
 
         if (
-            isTodayMatch
-            &&
             isRegularMatch
+            &&
+            match.series_id
+                !== null
+            &&
+            match.status
+                === "scheduled"
+            &&
+            isTodayMatch
         ) {
 
             seriesStartHtml = `
@@ -639,14 +632,40 @@ function renderSchedule(matches) {
                         type="button"
                         class="regular-series-start-button"
 
-                        data-team-a="${match.team_a}"
-                        data-team-b="${match.team_b}"
-
-                        data-match-date="${match.date}"
-
-                        data-round="${match.round}"
+                        data-series-id="${match.series_id}"
                     >
                         SERIES START
+                    </button>
+
+                </div>
+            `;
+        }
+
+        // =====================================
+        // 정규리그
+        // 이미 진행 중
+        // =====================================
+
+        if (
+            isRegularMatch
+            &&
+            match.series_id
+                !== null
+            &&
+            match.status
+                === "active"
+        ) {
+
+            seriesStartHtml = `
+                <div class="schedule-series-control">
+
+                    <button
+                        type="button"
+                        class="regular-series-view-button"
+
+                        data-series-id="${match.series_id}"
+                    >
+                        경기 진행 보기
                     </button>
 
                 </div>
