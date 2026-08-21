@@ -480,6 +480,26 @@ function renderRecentResults(results) {
 
     latestResults.forEach((result) => {
 
+        const teamAImagePath =
+            result.team_a_snapshot_logo_path
+            ?? getTeamImagePath(
+                result.team_a
+            );
+
+        const teamBImagePath =
+            result.team_b_snapshot_logo_path
+            ?? getTeamImagePath(
+                result.team_b
+            );
+
+        const teamALogoName =
+            result.team_a_snapshot_name
+            ?? result.team_a;
+
+        const teamBLogoName =
+            result.team_b_snapshot_name
+            ?? result.team_b;
+
         const recentResultCardElement =
             document.createElement("div");
 
@@ -628,8 +648,8 @@ function renderRecentResults(results) {
                 <div class="result-team-box">
 
                     <img
-                        src="${getTeamImagePath(result.team_a)}"
-                        alt="${result.team_a} 로고"
+                        src="${teamAImagePath}"
+                        alt="${teamALogoName} 로고"
                         class="team-image"
                     >
 
@@ -660,8 +680,8 @@ function renderRecentResults(results) {
                 <div class="result-team-box">
 
                     <img
-                        src="${getTeamImagePath(result.team_b)}"
-                        alt="${result.team_b} 로고"
+                        src="${teamBImagePath}"
+                        alt="${teamBLogoName} 로고"
                         class="team-image"
                     >
 

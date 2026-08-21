@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL ADMIN</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="./css/admin.css"
+    >
+</head>
+
+<body>
+
+    <header>
+        <div class="header-container">
+
+            <div class="logo">
+                <a href="./index.html">
+
+                    <span class="logo-title">
+                        FCL
+                    </span>
+
+                    <span class="logo-bottom">
+
+                        <span class="logo-line"></span>
+
+                        <span class="logo-season">
+                            ADMIN
+                        </span>
+
+                        <span class="logo-line"></span>
+
+                    </span>
+
+                </a>
+            </div>
+
+            <a
+                href="./index.html"
+                class="admin-site-link"
+            >
+                사이트로 돌아가기
+            </a>
+
+        </div>
+    </header>
+
+
+    <main class="admin-page">
+
+        <!-- ========================= -->
+        <!-- 로그인 -->
+        <!-- ========================= -->
+
+        <section
+            id="admin-login-section"
+            class="admin-login-section"
+        >
+
+            <div class="admin-login-card">
+
+                <h1>
+                    관리자 로그인
+                </h1>
+
+                <p>
+                    FCL 관리자 비밀번호를 입력해주세요.
+                </p>
+
+                <form id="admin-login-form">
+
+                    <input
+                        type="password"
+                        id="admin-password"
+                        class="admin-password-input"
+                        placeholder="비밀번호"
+                        autocomplete="current-password"
+                    >
+
+                    <button
+                        type="submit"
+                        class="admin-login-button"
+                    >
+                        로그인
+                    </button>
+
+                </form>
+
+                <p
+                    id="admin-login-message"
+                    class="admin-login-message"
+                ></p>
+
+            </div>
+
+        </section>
+
+
+        <!-- ========================= -->
+        <!-- 관리자 화면 -->
+        <!-- ========================= -->
+
+        <section
+            id="admin-dashboard"
+            class="admin-dashboard hidden"
+        >
+
+            <aside class="admin-sidebar">
+
+                <div class="admin-sidebar-header">
+
+                    <strong>
+                        FCL ADMIN
+                    </strong>
+
+                    <button
+                        type="button"
+                        id="admin-logout-button"
+                        class="admin-logout-button"
+                    >
+                        로그아웃
+                    </button>
+
+                </div>
+
+
+                <nav class="admin-menu">
+
+                    <button
+                        type="button"
+                        class="admin-menu-button active"
+                        data-admin-page="dashboard"
+                    >
+                        대시보드
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="participants"
+                    >
+                        참가자 / 현재 팀
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="results"
+                    >
+                        경기 결과 관리
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="schedule"
+                    >
+                        정규리그 일정
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="playoffs"
+                    >
+                        플레이오프
+                    </button>
+
+                </nav>
+
+            </aside>
+
+
+            <div class="admin-content">
+
+                <!-- 대시보드 -->
+
+                <section
+                    class="admin-content-page active"
+                    data-admin-content="dashboard"
+                >
+
+                    <h1>
+                        관리자 대시보드
+                    </h1>
+
+                    <p>
+                        FCL 운영 기능을 관리합니다.
+                    </p>
+
+                </section>
+
+
+                <!-- 참가자 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="participants"
+                >
+
+                    <h1>
+                        참가자 / 현재 팀 관리
+                    </h1>
+
+                    <p>
+                        참가자의 현재 FC 팀과 로고를 관리합니다.
+                    </p>
+
+                    <div
+                        id="admin-participant-list"
+                        class="admin-participant-list"
+                    >
+                    </div>
+
+                </section>
+
+
+                <!-- 경기 결과 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="results"
+                >
+
+                    <h1>
+                        경기 결과 관리
+                    </h1>
+
+                    <p>
+                        완료된 경기의 수정 및 삭제 기능을 관리합니다.
+                    </p>
+
+                    <div
+                        id="admin-result-list"
+                        class="admin-result-list"
+                    >
+                    </div>
+
+                </section>
+
+
+                <!-- 일정 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="schedule"
+                >
+
+                    <h1>
+                        정규리그 일정 관리
+                    </h1>
+
+                    <div class="admin-placeholder">
+                        추후 구현
+                    </div>
+
+                </section>
+
+
+                <!-- 플레이오프 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="playoffs"
+                >
+
+                    <h1>
+                        플레이오프 관리
+                    </h1>
+
+                    <div class="admin-placeholder">
+                        추후 구현
+                    </div>
+
+                </section>
+
+            </div>
+
+        </section>
+
+    <!-- ========================= -->
+    <!-- 경기 결과 수정 팝업 -->
+    <!-- ========================= -->
+
+    <div
+        id="admin-result-edit-modal"
+        class="admin-result-edit-modal hidden"
+    >
+
+        <div class="admin-result-edit-panel">
+
+            <h2>
+                경기 결과 수정
+            </h2>
+
+            <p
+                id="admin-result-edit-title"
+                class="admin-result-edit-title"
+            ></p>
+
+
+            <div class="admin-result-edit-grid">
+
+                <span>1 SET</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set1-a"
+                    min="0"
+                >
+
+                <span>:</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set1-b"
+                    min="0"
+                >
+
+
+                <span>2 SET</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set2-a"
+                    min="0"
+                >
+
+                <span>:</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set2-b"
+                    min="0"
+                >
+
+
+                <span>3 SET</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set3-a"
+                    min="0"
+                >
+
+                <span>:</span>
+
+                <input
+                    type="number"
+                    id="admin-edit-set3-b"
+                    min="0"
+                >
+
+            </div>
+
+
+            <p
+                id="admin-result-edit-message"
+                class="admin-result-edit-message"
+            ></p>
+
+
+            <div class="admin-result-edit-actions">
+
+                <button
+                    type="button"
+                    id="admin-result-edit-cancel"
+                >
+                    취소
+                </button>
+
+                <button
+                    type="button"
+                    id="admin-result-edit-save"
+                >
+                    저장
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    </main>
+
+
+    <script
+        type="module"
+        src="./js/admin.js"
+    ></script>
+
+</body>
+
+</html>

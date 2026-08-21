@@ -1365,6 +1365,12 @@ FCONLINE_NICKNAMES = {
 class AdminLoginRequest(BaseModel):
     password: str
 
+class AdminParticipantTeamUpdateRequest(
+    BaseModel
+):
+    current_team_name: str
+    current_team_logo_path: str
+
 class SeriesStartRequest(BaseModel):
     team_a: str
     team_b: str
@@ -1505,6 +1511,210 @@ def admin_login(
         "expires_in":
             ADMIN_SESSION_SECONDS,
     }
+
+# =========================
+# ADMIN PARTICIPANTS
+# 참가자 / 현재 팀 조회
+# =========================
+
+@app.get(
+    "/api/admin/participants"
+)
+def admin_get_participants(
+    admin_token: str =
+        Depends(
+            require_admin
+        )
+):
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    fcl_name,
+                    fc_nickname,
+
+                    current_team_name,
+                    current_team_logo_path
+
+                FROM participants
+
+                ORDER BY id
+                """
+            )
+
+            participants = (
+                cursor.fetchall()
+            )
+
+    return participants
+
+# =========================
+# ADMIN PARTICIPANT TEAM UPDATE
+# 현재 팀 변경
+# =========================
+
+@app.put(
+    "/api/admin/participants/"
+    "{participant_id}/team"
+)
+def admin_update_participant_team(
+    participant_id: int,
+    request:
+        AdminParticipantTeamUpdateRequest,
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    current_team_name = (
+        request.current_team_name.strip()
+    )
+
+    current_team_logo_path = (
+        request
+            .current_team_logo_path
+            .strip()
+    )
+
+
+    # =========================
+    # 기본 검증
+    # =========================
+
+    if not current_team_name:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "현재 팀 이름을 "
+                "입력해주세요."
+            ),
+        )
+
+
+    if not current_team_logo_path:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "현재 팀 로고 경로를 "
+                "입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 역사 보존용 로고만 허용
+    # =========================
+
+    history_directory = (
+        FRONTEND_DIR
+        / "assets"
+        / "images"
+        / "teams"
+        / "history"
+    ).resolve()
+
+
+    logo_relative_path = Path(
+        current_team_logo_path.removeprefix(
+            "./"
+        )
+    )
+
+
+    logo_file_path = (
+        FRONTEND_DIR
+        / logo_relative_path
+    ).resolve()
+
+
+    if (
+        history_directory
+        not in logo_file_path.parents
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "현재 팀 로고는 "
+                "history 폴더의 파일만 "
+                "사용할 수 있습니다."
+            ),
+        )
+
+
+    if not logo_file_path.is_file():
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지정한 팀 로고 파일을 "
+                "찾을 수 없습니다."
+            ),
+        )
+
+
+    # =========================
+    # 참가자 현재 팀 변경
+    #
+    # series Snapshot은
+    # 절대 수정하지 않음
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE participants
+
+                SET
+                    current_team_name = %s,
+                    current_team_logo_path = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    fcl_name,
+                    fc_nickname,
+                    current_team_name,
+                    current_team_logo_path
+                """,
+                (
+                    current_team_name,
+                    current_team_logo_path,
+                    participant_id,
+                ),
+            )
+
+
+            participant = (
+                cursor.fetchone()
+            )
+
+
+            if not participant:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "참가자를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return participant
 
 
 @app.get(
@@ -1671,10 +1881,18 @@ def admin_delete_series(
 
                     SET
                         status = 'scheduled',
+                        
                         started_at = NULL,
                         completed_at = NULL,
                         finished_at = NULL,
+
                         stats_sync_status = 'pending'
+
+                        team_a_snapshot_name = NULL,
+                        team_a_snapshot_logo_path = NULL,
+
+                        team_b_snapshot_name = NULL,
+                        team_b_snapshot_logo_path = NULL
 
                     WHERE id = %s
                     """,
@@ -5915,8 +6133,20 @@ def manual_complete_fcl_series(
                     team_a.fcl_name
                         AS team_a,
 
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
                     team_b.fcl_name
-                        AS team_b
+                        AS team_b,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path
 
                 FROM series AS s
 
@@ -5970,6 +6200,36 @@ def manual_complete_fcl_series(
                 series["status"]
                 != "active"
             ):
+
+                # =========================
+                # 완료 Snapshot 기준 정보 확인
+                # =========================
+
+                if (
+                    not series[
+                        "team_a_current_team_name"
+                    ]
+                    or
+                    not series[
+                        "team_a_current_team_logo_path"
+                    ]
+                    or
+                    not series[
+                        "team_b_current_team_name"
+                    ]
+                    or
+                    not series[
+                        "team_b_current_team_logo_path"
+                    ]
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "현재 팀 또는 로고 정보가 "
+                            "등록되지 않았습니다."
+                        ),
+                    )
+            
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -6099,17 +6359,37 @@ def manual_complete_fcl_series(
                     status = 'completed',
                     completed_at = %s,
                     finished_at = %s,
-                    stats_sync_status = 'pending'
+                    stats_sync_status = 'pending',
+
+                    team_a_snapshot_name = %s,
+                    team_a_snapshot_logo_path = %s,
+
+                    team_b_snapshot_name = %s,
+                    team_b_snapshot_logo_path = %s
 
                 WHERE id = %s
                 """,
                 (
                     finished_at,
                     finished_at,
+
+                    series[
+                        "team_a_current_team_name"
+                    ],
+                    series[
+                        "team_a_current_team_logo_path"
+                    ],
+
+                    series[
+                        "team_b_current_team_name"
+                    ],
+                    series[
+                        "team_b_current_team_logo_path"
+                    ],
+
                     series_id,
                 ),
             )
-
         connection.commit()
 
     team_a_total_score = (
@@ -6495,6 +6775,12 @@ def sync_fcl_series_status(
                     team_a.fcl_name
                         AS team_a_name,
 
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
                     team_a.fc_nickname
                         AS nickname_a,
 
@@ -6506,6 +6792,12 @@ def sync_fcl_series_status(
 
                     team_b.fcl_name
                         AS team_b_name,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path,
 
                     team_b.fc_nickname
                         AS nickname_b,
@@ -7596,6 +7888,40 @@ def sync_fcl_series_status(
                 ),
         }
 
+    # =========================
+    # 완료 Snapshot 기준 정보 확인
+    #
+    # 이미 completed 상태에서 하는
+    # 사후 sync에는 적용하지 않음
+    # =========================
+
+    if (
+        not series[
+            "team_a_current_team_name"
+        ]
+        or
+        not series[
+            "team_a_current_team_logo_path"
+        ]
+        or
+        not series[
+            "team_b_current_team_name"
+        ]
+        or
+        not series[
+            "team_b_current_team_logo_path"
+        ]
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "현재 팀 또는 로고 정보가 "
+                "등록되지 않았습니다."
+            ),
+        )
+
+
+
 
     # ==================================================
     # B.
@@ -7844,32 +8170,73 @@ def sync_fcl_series_status(
 
 
                 cursor.execute(
-                    """
-                    UPDATE series
+            """
+            UPDATE series
 
-                    SET
-                        status =
-                            'completed',
+            SET
+                status =
+                    'completed',
 
-                        completed_at = %s,
+                completed_at = %s,
 
-                        finished_at =
-                            COALESCE(
-                                finished_at,
-                                %s
-                            ),
-
-                        stats_sync_status =
-                            'pending'
-
-                    WHERE id = %s
-                    """,
-                    (
-                        completed_at,
-                        completed_at,
-                        series_id,
+                finished_at =
+                    COALESCE(
+                        finished_at,
+                        %s
                     ),
-                )
+
+                stats_sync_status =
+                    'pending',
+
+                team_a_snapshot_name =
+                    COALESCE(
+                        team_a_snapshot_name,
+                        %s
+                    ),
+
+                team_a_snapshot_logo_path =
+                    COALESCE(
+                        team_a_snapshot_logo_path,
+                        %s
+                    ),
+
+                team_b_snapshot_name =
+                    COALESCE(
+                        team_b_snapshot_name,
+                        %s
+                    ),
+
+                team_b_snapshot_logo_path =
+                    COALESCE(
+                        team_b_snapshot_logo_path,
+                        %s
+                    )
+
+            WHERE id = %s
+            """,
+            (
+                completed_at,
+                completed_at,
+
+                series[
+                    "team_a_current_team_name"
+                ],
+
+                series[
+                    "team_a_current_team_logo_path"
+                ],
+
+                series[
+                    "team_b_current_team_name"
+                ],
+
+                series[
+                    "team_b_current_team_logo_path"
+                ],
+
+                series_id,
+            ),
+        )
 
 
                 status = "completed"
@@ -8223,6 +8590,12 @@ def get_completed_series_results():
                     s.completed_at,
                     s.stats_sync_status,
 
+                    s.team_a_snapshot_name,
+                    s.team_a_snapshot_logo_path,
+
+                    s.team_b_snapshot_name,
+                    s.team_b_snapshot_logo_path,
+
                     team_a.fcl_name
                         AS team_a,
 
@@ -8514,6 +8887,26 @@ def get_completed_series_results():
                                 "team_b"
                             ],
 
+                        "team_a_snapshot_name":
+                            series_row[
+                                "team_a_snapshot_name"
+                            ],
+
+                        "team_a_snapshot_logo_path":
+                            series_row[
+                                "team_a_snapshot_logo_path"
+                            ],
+
+                        "team_b_snapshot_name":
+                            series_row[
+                                "team_b_snapshot_name"
+                            ],
+
+                        "team_b_snapshot_logo_path":
+                            series_row[
+                                "team_b_snapshot_logo_path"
+                            ],
+
                         "team_a_score":
                             team_a_total_score,
 
@@ -8649,8 +9042,6 @@ def get_database_participants():
 
 
     return participants
-
-
 
 
 # =========================
