@@ -93,7 +93,7 @@ function renderTodayMatches(matches) {
                         data-series-action="view"
                         data-series-id="${match.series_id}"
                     >
-                        경기 보기
+                        경기 결과 입력
                     </button>
 
                 </div>
@@ -213,7 +213,7 @@ todayMatchListElement.addEventListener(
 
 
             window.location.href =
-                "./preseason.html";
+                "./preseason.html?mode=result";
 
 
             return;
@@ -265,12 +265,6 @@ todayMatchListElement.addEventListener(
                 localStorage.setItem(
                     "fclCurrentSeriesId",
                     seriesId
-                );
-
-
-                localStorage.setItem(
-                    "fclOpenManualResult",
-                    "true"
                 );
 
 

@@ -1932,95 +1932,165 @@ footer p {
 }
 
 
-/* =========================
-   수동 결과 입력
-========================= */
+/* =========================================
+   수동 결과 입력 패널
+========================================= */
 
 .manual-result-panel {
-    margin-top: 30px;
-    padding: 25px;
-
-    border: 1px solid #333;
-    border-radius: 10px;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 36px 32px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.28);
+    box-sizing: border-box;
 }
 
-
-.manual-result-panel h3 {
-    margin-bottom: 25px;
-
+.manual-result-title {
+    margin: 0 0 32px;
     text-align: center;
+    font-size: 32px;
+    font-weight: 700;
+    color: white;
 }
 
-
-.manual-result-team-header {
+/* 헤더: 팀명 / SCORE */
+.manual-result-header {
     display: grid;
-    grid-template-columns:
-        1fr
-        60px
-        1fr;
+    grid-template-columns: 110px 110px 40px 110px;
+    justify-content: center;
+    align-items: center;
 
-    margin-left: 100px;
-    margin-bottom: 20px;
+    column-gap: 24px;
 
-    text-align: center;
-    font-weight: bold;
+    width: 100%;
+    max-width: 560px;
+
+    margin: 0 auto 10px;
 }
 
+.manual-result-header .manual-team-name {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+}
 
+.manual-result-header .manual-score-label {
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+}
+
+/* 세트별 행 */
 .manual-result-row {
     display: grid;
-    grid-template-columns:
-        100px
-        1fr;
-
+    grid-template-columns: 110px 110px 40px 110px;
+    justify-content: center;
     align-items: center;
 
-    padding: 12px 0;
+    column-gap: 24px;
 
-    border-bottom: 1px solid #333;
+    width: 100%;
+    max-width: 560px;
+
+    margin: 0 auto;
+    padding: 16px 0;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-
-.manual-score-inputs {
-    display: grid;
-    grid-template-columns:
-        1fr
-        60px
-        1fr;
-
-    align-items: center;
-    justify-items: center;
+.manual-result-row:last-of-type {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.manual-set-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+    text-align: left;
+}
 
-.manual-score-inputs input {
-    width: 70px;
+/* 가운데 : */
+.manual-score-divider {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.85);
+}
 
-    padding: 10px;
+/* 입력칸 */
+.manual-score-input {
+    width: 110px;
+    height: 56px;
+    margin: 0;
+
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 12px;
+
+    background: rgba(255, 255, 255, 0.08);
+
+    color: white;
+
+    font-size: 24px;
+    font-weight: 700;
 
     text-align: center;
 
-    border: 1px solid #555;
-    border-radius: 6px;
+    outline: none;
+    box-sizing: border-box;
 }
 
+.manual-score-input:focus {
+    border-color: rgba(255, 255, 255, 0.55);
+    background: rgba(255, 255, 255, 0.12);
+}
 
+/* 버튼 영역 */
 .manual-result-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 140px);
     justify-content: center;
 
-    gap: 15px;
+    gap: 16px;
 
-    margin-top: 25px;
+    width: 100%;
+    max-width: 560px;
+
+    margin: 28px auto 0;
 }
 
-
 .manual-result-actions button {
-    min-width: 120px;
+    width: 140px;
+    height: 50px;
 
-    padding: 11px 18px;
+    border: none;
+    border-radius: 12px;
+
+    font-size: 16px;
+    font-weight: 700;
 
     cursor: pointer;
+}
+
+/* 돌아가기 */
+#manual-back-button {
+    background: rgba(255, 255, 255, 0.18);
+    color: white;
+}
+
+/* 경기 취소 */
+#series-cancel-button {
+    background: transparent;
+    border: 1px solid rgba(255, 88, 88, 0.75);
+    color: rgb(255, 108, 108);
+}
+
+/* 결과 완료 */
+#manual-complete-button {
+    background: white;
+    color: black;
 }
 
 /* =========================
@@ -2035,6 +2105,53 @@ footer p {
     gap: 10px;
 
     margin: 28px 0 35px;
+}
+
+.preseason-date-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    gap: 10px;
+}
+
+
+.preseason-today-button {
+    padding: 4px 9px;
+
+    border: 1px solid #555;
+    border-radius: 5px;
+
+    background: rgba(
+        255,
+        255,
+        255,
+        0.04
+    );
+
+    color: #aaa;
+
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+
+.preseason-today-button:hover {
+    border-color: #b49a5a;
+
+    color: #d7bc78;
+
+    background: rgba(
+        180,
+        154,
+        90,
+        0.08
+    );
 }
 
 

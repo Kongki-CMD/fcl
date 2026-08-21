@@ -213,9 +213,21 @@
 
             <div class="preseason-match-date">
 
-                <label for="preseason-date-input">
-                    MATCH DATE
-                </label>
+                <div class="preseason-date-label-row">
+
+                    <label for="preseason-date-input">
+                        MATCH DATE
+                    </label>
+
+                    <button
+                        type="button"
+                        id="preseason-today-button"
+                        class="preseason-today-button"
+                    >
+                        TODAY
+                    </button>
+
+                </div>
 
                 <input
                     type="date"
@@ -375,7 +387,7 @@
             >
             </div>
 
-            <!-- ========================= -->
+<!-- ========================= -->
 <!-- SERIES 운영 버튼 -->
 <!-- ========================= -->
 
@@ -390,15 +402,6 @@
         class="series-action-button"
     >
         수동 결과 입력
-    </button>
-
-
-    <button
-        type="button"
-        id="series-cancel-button"
-        class="series-action-button danger"
-    >
-        경기 취소
     </button>
 
     <button
@@ -420,119 +423,64 @@
     id="manual-result-panel"
     class="manual-result-panel hidden"
 >
-
-    <h3>
-        수동 결과 입력
+    <h3 class="manual-result-title">
+        경기 결과 입력
     </h3>
 
+    <div class="manual-result-header">
+        <div></div>
 
-    <div class="manual-result-team-header">
+        <div
+            id="manual-team-a-name"
+            class="manual-team-name"
+        >
+            Player A
+        </div>
 
-        <span id="manual-team-a-name">
-            PLAYER A
-        </span>
-
-        <span>
+        <div class="manual-score-label">
             SCORE
-        </span>
-
-        <span id="manual-team-b-name">
-            PLAYER B
-        </span>
-
-    </div>
-
-
-    <div class="manual-result-row">
-
-        <span>
-            1 SET
-        </span>
-
-        <div class="manual-score-inputs">
-
-            <input
-                type="number"
-                id="manual-set1-team-a"
-                min="0"
-            >
-
-            <span>:</span>
-
-            <input
-                type="number"
-                id="manual-set1-team-b"
-                min="0"
-            >
-
         </div>
 
+        <div
+            id="manual-team-b-name"
+            class="manual-team-name"
+        >
+            Player B
+        </div>
     </div>
-
 
     <div class="manual-result-row">
-
-        <span>
-            2 SET
-        </span>
-
-        <div class="manual-score-inputs">
-
-            <input
-                type="number"
-                id="manual-set2-team-a"
-                min="0"
-            >
-
-            <span>:</span>
-
-            <input
-                type="number"
-                id="manual-set2-team-b"
-                min="0"
-            >
-
-        </div>
-
+        <div class="manual-set-name">1 SET</div>
+        <input type="number" class="manual-score-input">
+        <div class="manual-score-divider">:</div>
+        <input type="number" class="manual-score-input">
     </div>
-
 
     <div class="manual-result-row">
-
-        <span>
-            3 SET
-        </span>
-
-        <div class="manual-score-inputs">
-
-            <input
-                type="number"
-                id="manual-set3-team-a"
-                min="0"
-            >
-
-            <span>:</span>
-
-            <input
-                type="number"
-                id="manual-set3-team-b"
-                min="0"
-            >
-
-        </div>
-
+        <div class="manual-set-name">2 SET</div>
+        <input type="number" class="manual-score-input">
+        <div class="manual-score-divider">:</div>
+        <input type="number" class="manual-score-input">
     </div>
 
+    <div class="manual-result-row">
+        <div class="manual-set-name">3 SET</div>
+        <input type="number" class="manual-score-input">
+        <div class="manual-score-divider">:</div>
+        <input type="number" class="manual-score-input">
+    </div>
 
     <div class="manual-result-actions">
-
-        <button
-            type="button"
-            id="manual-back-button"
-        >
+        <button type="button" id="manual-back-button">
             돌아가기
         </button>
 
+        <button
+            type="button"
+            id="series-cancel-button"
+        >
+            경기 취소
+        </button>
 
         <button
             type="button"
@@ -540,8 +488,8 @@
         >
             결과 완료
         </button>
-
     </div>
+</div>
 
 
     <p

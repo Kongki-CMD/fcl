@@ -163,6 +163,11 @@ const preseasonDateInputElement =
         "#preseason-date-input"
     );
 
+const preseasonTodayButtonElement =
+    document.querySelector(
+        "#preseason-today-button"
+    );
+
 const historyRuleButtonElement =
     document.querySelector(
         "#history-rule-button"
@@ -183,9 +188,9 @@ const reservationRulePanelElement =
         "#reservation-rule-panel"
     );
 
-const seriesSyncButtonElement =
+const seriesStatusHeaderElement =
     document.querySelector(
-        "#series-sync-button"
+        ".series-status-header"
     );
 
 
@@ -546,80 +551,6 @@ async function importHistorySeries() {
 }
 
 
-/* =========================
-   STATUS 조회
-========================= */
-
-async function syncSeriesStatus() {
-
-    if (!currentSeriesId) {
-        return;
-    }
-
-    const originalText =
-        seriesSyncButtonElement.textContent;
-
-    seriesSyncButtonElement.disabled =
-        true;
-
-    seriesSyncButtonElement.textContent =
-        "NEXON 확인 중...";
-
-    try {
-
-        const response = await fetch(
-            `${apiBaseUrl}/api/fconline/series/${currentSeriesId}/sync`,
-            {
-                method: "POST"
-            }
-        );
-
-        const data =
-            await response.json();
-
-        if (!response.ok) {
-
-            if (response.status === 429) {
-
-                throw new Error(
-                    "Nexon API 호출 제한 중입니다. 잠시 후 다시 확인해주세요."
-                );
-            }
-
-            throw new Error(
-                data.detail
-                ?? "NEXON 기록 확인에 실패했습니다."
-            );
-        }
-
-        renderSeriesStatus(
-            data
-        );
-
-        preseasonMessageElement.textContent =
-            data.sync_message
-            ?? "NEXON 경기 기록을 확인했습니다.";
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
-
-        preseasonMessageElement.textContent =
-            error.message;
-
-    } finally {
-
-        seriesSyncButtonElement.disabled =
-            false;
-
-        seriesSyncButtonElement.textContent =
-            originalText;
-    }
-}
-
-
 async function loadSeriesStatus() {
 
     if (!currentSeriesId) {
@@ -937,29 +868,19 @@ function renderSeriesStatus(data) {
             );
 
 
-            seriesSyncButtonElement.classList.remove(
-                "hidden"
-            );
-
-
             if (
                 statsSyncStatus === "pending"
             ) {
 
                 preseasonMessageElement.textContent =
-                    (
-                        "경기 결과가 저장되었습니다. "
-                        + "NEXON 기록 반영 후 "
-                        + "기록 확인을 눌러주세요."
-                    );
+                    "경기 결과가 저장되었습니다.";
 
             } else {
 
                 preseasonMessageElement.textContent =
                     (
                         "수동 결과와 NEXON 기록이 "
-                        + "일치하지 않습니다. "
-                        + "기록을 다시 확인해주세요."
+                        + "일치하지 않습니다."
                     );
             }
 
@@ -1054,10 +975,6 @@ function renderSeriesStatus(data) {
         );
     }
 
-
-    seriesSyncButtonElement.classList.remove(
-        "hidden"
-    );
 }
 
 
@@ -1195,37 +1112,14 @@ async function cancelSeries() {
             "fclCurrentSeriesId"
         );
 
-
         currentSeriesId = null;
 
         currentTeamA = "";
         currentTeamB = "";
 
 
-        seriesStatusCardElement.classList.add(
-            "hidden"
-        );
-
-
-        manualResultPanelElement.classList.add(
-            "hidden"
-        );
-
-
-        preseasonStartCardElement.classList.remove(
-            "hidden"
-        );
-
-
-        seriesStartButtonElement.disabled =
-            false;
-
-        seriesStartButtonElement.textContent =
-            "친선전 예약";
-
-
-        preseasonMessageElement.textContent =
-            "친선전이 취소되었습니다.";
+        window.location.href =
+            "./schedule.html";
 
 
     } catch (error) {
@@ -1269,29 +1163,65 @@ function openManualResultPanel() {
         "";
 
 
-    manualResultPanelElement.classList.remove(
+    // =========================
+    // 자동 감지 진행 화면 숨김
+    // =========================
+
+    seriesStatusHeaderElement.classList.add(
         "hidden"
     );
 
+    seriesSetListElement.classList.add(
+        "hidden"
+    );
+
+    seriesTotalScoreElement.classList.add(
+        "hidden"
+    );
+
+    seriesMvpElement.classList.add(
+        "hidden"
+    );
 
     seriesActionButtonsElement.classList.add(
         "hidden"
     );
 
+    // =========================
+    // 프리시즌만 경기 취소 가능
+    // =========================
+
+    if (
+        currentSeriesType
+        === "프리시즌"
+    ) {
+
+        seriesCancelButtonElement.classList.remove(
+            "hidden"
+        );
+
+    } else {
+
+        seriesCancelButtonElement.classList.add(
+            "hidden"
+        );
+    }
+
+
+    // =========================
+    // 수동 결과 입력만 표시
+    // =========================
+
+    manualResultPanelElement.classList.remove(
+        "hidden"
+    );
 }
 
 
 function closeManualResultPanel() {
 
-    manualResultPanelElement.classList.add(
-        "hidden"
-    );
-
-
-    seriesActionButtonsElement.classList.remove(
-        "hidden"
-    );
-
+    window.location.href =
+        "./schedule.html";
 }
 
 
@@ -1519,6 +1449,27 @@ function stopStatusPolling() {
 
 async function restoreSeries() {
 
+    const urlParams =
+        new URLSearchParams(
+            window.location.search
+        );
+
+
+    const isResultMode =
+        urlParams.get("mode")
+        === "result";
+
+
+    // =========================================
+    // 친선전 예약 메뉴로 직접 들어온 경우
+    // 예약 화면 그대로 출력
+    // =========================================
+
+    if (!isResultMode) {
+        return;
+    }
+
+
     const savedSeriesId =
         localStorage.getItem(
             "fclCurrentSeriesId"
@@ -1526,9 +1477,18 @@ async function restoreSeries() {
 
 
     if (!savedSeriesId) {
+
+        window.location.href =
+            "./schedule.html";
+
         return;
     }
 
+
+    // =========================================
+    // 경기 일정에서
+    // 경기 시작 / 경기 결과 입력으로 들어온 경우
+    // =========================================
 
     currentSeriesId =
         Number(
@@ -1554,28 +1514,55 @@ async function restoreSeries() {
         "SERIES 진행 중";
 
 
-    // 먼저 SERIES 정보를 불러와
-    // currentTeamA / currentTeamB 세팅
+    // SERIES 데이터 조회
     await loadSeriesStatus();
 
 
-    const shouldOpenManualResult =
-        localStorage.getItem(
-            "fclOpenManualResult"
-        ) === "true";
-
-
-    if (shouldOpenManualResult) {
-
-        localStorage.removeItem(
-            "fclOpenManualResult"
-        );
-
+    if (currentSeriesId) {
 
         openManualResultPanel();
     }
 }
 
+function setTodayMatchDate() {
+
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-CA",
+            {
+                timeZone: "Asia/Seoul",
+
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+            }
+        );
+
+
+    const dateParts =
+        Object.fromEntries(
+            formatter
+                .formatToParts(
+                    new Date()
+                )
+                .filter(
+                    part =>
+                        part.type !== "literal"
+                )
+                .map(
+                    part => [
+                        part.type,
+                        part.value,
+                    ]
+                )
+        );
+
+
+    preseasonDateInputElement.value =
+        `${dateParts.year}`
+        + `-${dateParts.month}`
+        + `-${dateParts.day}`;
+}
 
 /* =========================
    이벤트
@@ -1703,10 +1690,11 @@ document.addEventListener(
     }
 );
 
-seriesSyncButtonElement.addEventListener(
+preseasonTodayButtonElement.addEventListener(
     "click",
-    syncSeriesStatus
+    setTodayMatchDate
 );
+
 
 
 /* =========================

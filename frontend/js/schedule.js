@@ -224,14 +224,8 @@ async function startRegularSeries(
         );
 
 
-        localStorage.setItem(
-            "fclOpenManualResult",
-            "true"
-        );
-
-
         window.location.href =
-            "./preseason.html";
+            "./preseason.html?mode=result";
 
 
     } catch (error) {
@@ -320,14 +314,9 @@ async function startPreseasonSeries(
             data.series_id
         );
 
-        localStorage.setItem(
-            "fclOpenManualResult",
-            "true"
-        );
-
 
         window.location.href =
-            "./preseason.html";
+            "./preseason.html?mode=result";
 
 
     } catch (error) {
@@ -372,7 +361,7 @@ function openPreseasonSeries(
 
 
     window.location.href =
-        "./preseason.html";
+        "./preseason.html?mode=result";
 }
 
 function renderPlayoffSchedule(matches) {
@@ -491,10 +480,57 @@ function renderSchedule(matches) {
 
     const sortedMatches =
         [...matches].sort(
-            (matchA, matchB) =>
-                matchA.date.localeCompare(
-                    matchB.date
-                )
+            (matchA, matchB) => {
+
+                const isPastMatchA =
+                    matchA.date < todayString;
+
+                const isPastMatchB =
+                    matchB.date < todayString;
+
+
+                // =====================================
+                // 미래/오늘 경기는 위
+                // 지난 경기는 아래
+                // =====================================
+
+                if (
+                    isPastMatchA
+                    !== isPastMatchB
+                ) {
+
+                    return isPastMatchA
+                        ? 1
+                        : -1;
+                }
+
+
+                // =====================================
+                // 오늘 / 미래 경기
+                // 가까운 날짜부터
+                // =====================================
+
+                if (!isPastMatchA) {
+
+                    return (
+                        matchA.date.localeCompare(
+                            matchB.date
+                        )
+                    );
+                }
+
+
+                // =====================================
+                // 지난 경기
+                // 최근 경기부터
+                // =====================================
+
+                return (
+                    matchB.date.localeCompare(
+                        matchB.date
+                    )
+                );
+            }
         );
 
 
@@ -665,7 +701,7 @@ function renderSchedule(matches) {
 
                         data-series-id="${match.series_id}"
                     >
-                        경기 진행 보기
+                        경기 결과 입력
                     </button>
 
                 </div>
@@ -731,7 +767,7 @@ function renderSchedule(matches) {
 
                         data-series-id="${match.series_id}"
                     >
-                        경기 진행 보기
+                        경기 결과 입력
                     </button>
 
                 </div>
