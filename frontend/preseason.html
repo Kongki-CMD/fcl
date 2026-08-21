@@ -423,12 +423,16 @@
     id="manual-result-panel"
     class="manual-result-panel hidden"
 >
+
     <h3 class="manual-result-title">
         경기 결과 입력
     </h3>
 
+
     <div class="manual-result-header">
+
         <div></div>
+
 
         <div
             id="manual-team-a-name"
@@ -437,9 +441,11 @@
             Player A
         </div>
 
+
         <div class="manual-score-label">
             SCORE
         </div>
+
 
         <div
             id="manual-team-b-name"
@@ -447,33 +453,113 @@
         >
             Player B
         </div>
+
     </div>
 
+
+    <!-- 1 SET -->
     <div class="manual-result-row">
-        <div class="manual-set-name">1 SET</div>
-        <input type="number" class="manual-score-input">
-        <div class="manual-score-divider">:</div>
-        <input type="number" class="manual-score-input">
+
+        <div class="manual-set-name">
+            1 SET
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set1-team-a"
+            class="manual-score-input"
+            min="0"
+        >
+
+
+        <div class="manual-score-divider">
+            :
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set1-team-b"
+            class="manual-score-input"
+            min="0"
+        >
+
     </div>
 
+
+    <!-- 2 SET -->
     <div class="manual-result-row">
-        <div class="manual-set-name">2 SET</div>
-        <input type="number" class="manual-score-input">
-        <div class="manual-score-divider">:</div>
-        <input type="number" class="manual-score-input">
+
+        <div class="manual-set-name">
+            2 SET
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set2-team-a"
+            class="manual-score-input"
+            min="0"
+        >
+
+
+        <div class="manual-score-divider">
+            :
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set2-team-b"
+            class="manual-score-input"
+            min="0"
+        >
+
     </div>
 
+
+    <!-- 3 SET -->
     <div class="manual-result-row">
-        <div class="manual-set-name">3 SET</div>
-        <input type="number" class="manual-score-input">
-        <div class="manual-score-divider">:</div>
-        <input type="number" class="manual-score-input">
+
+        <div class="manual-set-name">
+            3 SET
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set3-team-a"
+            class="manual-score-input"
+            min="0"
+        >
+
+
+        <div class="manual-score-divider">
+            :
+        </div>
+
+
+        <input
+            type="number"
+            id="manual-set3-team-b"
+            class="manual-score-input"
+            min="0"
+        >
+
     </div>
 
+
+    <!-- 버튼 -->
     <div class="manual-result-actions">
-        <button type="button" id="manual-back-button">
+
+        <button
+            type="button"
+            id="manual-back-button"
+        >
             돌아가기
         </button>
+
 
         <button
             type="button"
@@ -482,14 +568,15 @@
             경기 취소
         </button>
 
+
         <button
             type="button"
             id="manual-complete-button"
         >
             결과 완료
         </button>
+
     </div>
-</div>
 
 
     <p
@@ -511,7 +598,7 @@
 
     <script
         type="module"
-        src="./js/preseason.js?v=20260819-1"
+        src="./js/preseason.js?v=20260821-1"
     ></script>
 
 </body>
