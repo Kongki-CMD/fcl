@@ -751,10 +751,10 @@
     ==================================== */
 
     .admin-dashboard {
-    display: block;
+        display: block;
 
-    min-height: 0;
-}
+        min-height: 0;
+    }
 
 
 /* ====================================
@@ -1216,4 +1216,70 @@
 
         font-size: 13px;
     }
+}
+
+/* =========================
+   PLAYOFF TIE WINNER
+========================= */
+
+.admin-result-edit-tie-row {
+    grid-column: 1 / -1;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    gap: 10px;
+
+    margin: 2px 0 12px;
+}
+
+
+.admin-result-edit-tie-row.hidden {
+    display: none;
+}
+
+
+.admin-result-edit-tie-label {
+    white-space: nowrap;
+
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.admin-result-edit-winner-button {
+    padding: 7px 12px;
+
+    border: 1px solid #555;
+    border-radius: 6px;
+
+    background: #222;
+    color: #ccc;
+
+    font-family: inherit;
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+
+.admin-result-edit-winner-button:hover {
+    border-color: #b49a5a;
+    color: #d7bc78;
+}
+
+
+.admin-result-edit-winner-button.selected {
+    border-color: #b49a5a;
+
+    background: rgba(
+        180,
+        154,
+        90,
+        0.18
+    );
+
+    color: #d7bc78;
 }

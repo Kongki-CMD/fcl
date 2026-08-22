@@ -1204,6 +1204,122 @@ footer p {
     text-align: center;
 }
 
+/* =========================
+   PLAYOFF STATUS
+========================= */
+
+.playoff-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    margin-left: 10px;
+    padding: 4px 9px;
+
+    border: 1px solid #555;
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+/* 대진 미정 */
+
+.playoff-status.waiting {
+    border-color: #555;
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
+    color: #888;
+}
+
+
+/* 예정 */
+
+.playoff-status.scheduled {
+    border-color:
+        rgba(210, 170, 70, 0.55);
+
+    background:
+        rgba(210, 170, 70, 0.08);
+
+    color: #d6b65d;
+}
+
+
+/* 진행 중 */
+
+.playoff-status.active {
+    border-color:
+        rgba(80, 180, 120, 0.65);
+
+    background:
+        rgba(80, 180, 120, 0.1);
+
+    color: #6ed399;
+}
+
+
+/* 완료 */
+
+.playoff-status.completed {
+    border-color:
+        rgba(100, 140, 210, 0.6);
+
+    background:
+        rgba(100, 140, 210, 0.1);
+
+    color: #8fb4ef;
+}
+
+
+/* =========================
+   PLAYOFF PROGRESS
+========================= */
+
+.playoff-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    gap: 5px;
+
+    margin-top: 18px;
+    padding-top: 14px;
+
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+}
+
+
+.playoff-progress span {
+    font-size: 24px;
+    font-weight: 800;
+
+    color: white;
+}
+
+
+.playoff-progress small {
+    font-size: 12px;
+    font-weight: 600;
+
+    color: #888;
+}
+
+
+.playoff-progress.completed span {
+    color: #d6b65d;
+}
+
+
+.playoff-progress.completed small {
+    color: #c9a94f;
+}
+
 /* 전체 경기 일정 팀 가운데 정렬 */
 .schedule-card .team-box {
     justify-content: center;

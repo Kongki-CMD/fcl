@@ -463,78 +463,267 @@ function openPreseasonSeries(
 }
 
 function renderPlayoffSchedule(matches) {
-    playoffMatchListElement.innerHTML = "";
+
+    playoffMatchListElement.innerHTML =
+        "";
+
 
     if (matches.length === 0) {
+
         playoffMatchListElement.innerHTML = `
-            <p>등록된 플레이오프 일정이 없습니다.</p>
+            <p>
+                등록된 플레이오프 일정이 없습니다.
+            </p>
         `;
 
         return;
     }
 
-    matches.forEach((match) => {
-        const playoffCardElement =
-            document.createElement("div");
 
-        playoffCardElement.classList.add(
-            "schedule-card",
-            "playoff-schedule-card"
-        );
+    matches.forEach(
+        match => {
 
-        let playoffFormat = "";
+            const playoffCardElement =
+                document.createElement(
+                    "div"
+                );
 
-        if (
-            match.stage === "준플레이오프" ||
-            match.stage === "플레이오프"
-        ) {
-            playoffFormat = "5판 3선승";
-        } else if (match.stage === "결승 시리즈") {
-            playoffFormat = "7판 4선승";
-        }
 
-        playoffCardElement.innerHTML = `
-            <div class="match-date">
-                ${match.date}
+            playoffCardElement.classList.add(
+                "schedule-card",
+                "playoff-schedule-card"
+            );
+
+
+            // =========================
+            // 경기 방식
+            // =========================
+
+            const playoffFormat =
+                (
+                    match.best_of
+                    &&
+                    match.wins_required
+                )
+                    ? (
+                        `${match.best_of}판 `
+                        + `${match.wins_required}선승`
+                    )
+                    : "";
+
+
+            // =========================
+            // 상태
+            // =========================
+
+            let statusText =
+                "대진 대기";
+
+            let statusClass =
+                "waiting";
+
+
+            if (
+                match.status
+                === "scheduled"
+            ) {
+
+                statusText =
+                    "예정";
+
+                statusClass =
+                    "scheduled";
+
+            } else if (
+                match.status
+                === "active"
+            ) {
+
+                statusText =
+                    "진행 중";
+
+                statusClass =
+                    "active";
+
+            } else if (
+                match.status
+                === "completed"
+            ) {
+
+                statusText =
+                    "완료";
+
+                statusClass =
+                    "completed";
+            }
+
+
+            // =========================
+            // 팀 로고
+            // =========================
+
+            const teamALogoHtml =
+                match.team_a_logo_path
+                    ? `
+                        <img
+                            src="${match.team_a_logo_path}"
+                            alt="${match.team_a} 로고"
+                            class="team-image"
+                        >
+                    `
+                    : "";
+
+
+            const teamBLogoHtml =
+                match.team_b_logo_path
+                    ? `
+                        <img
+                            src="${match.team_b_logo_path}"
+                            alt="${match.team_b} 로고"
+                            class="team-image"
+                        >
+                    `
+                    : "";
+
+
+            // =========================
+            // 진행 정보
+            // =========================
+
+            let progressHtml =
+                "";
+
+
+            if (
+                match.status
+                === "active"
+            ) {
+
+                progressHtml = `
+                    <div class="playoff-progress">
+                        <span>
+                            ${match.team_a_wins}
+                            :
+                            ${match.team_b_wins}
+                        </span>
+
+                        <small>
+                            ${match.set_count}
+                            /
+                            ${match.best_of}
+                            SET
+                        </small>
+                    </div>
+                `;
+            }
+
+
+            // =========================
+            // 완료 결과
+            // =========================
+
+            if (
+                match.status
+                === "completed"
+            ) {
+
+                progressHtml = `
+                    <div class="playoff-progress completed">
+                        <span>
+                            ${match.team_a_wins}
+                            :
+                            ${match.team_b_wins}
+                        </span>
+
+                        ${
+                            match.winner
+                                ? `
+                                    <small>
+                                        승자
+                                        ${match.winner}
+                                    </small>
+                                `
+                                : ""
+                        }
+                    </div>
+                `;
+            }
+
+
+            // =========================
+            // 카드
+            // =========================
+
+            playoffCardElement.innerHTML = `
+                <div class="match-date">
+
+                    ${match.date}
 
                     <span class="playoff-divider">
                         /
                     </span>
 
-                <span class="playoff-format">
-                    ${playoffFormat}
-                </span>
-            </div>
-
-            <div class="playoff-stage">
-                ${match.stage}
-            </div>
-
-            <div class="match-teams">
-
-                <div class="team-box">
-                    <span class="team-name">
-                        ${match.team_a}
+                    <span class="playoff-format">
+                        ${playoffFormat}
                     </span>
+
+                    <span
+                        class="
+                            playoff-status
+                            ${statusClass}
+                        "
+                    >
+                        ${statusText}
+                    </span>
+
                 </div>
 
-                <span class="versus">
-                    VS
-                </span>
 
-                <div class="team-box">
-                    <span class="team-name">
-                        ${match.team_b}
-                    </span>
+                <div class="playoff-stage">
+                    ${match.stage}
                 </div>
 
-            </div>
-        `;
 
-        playoffMatchListElement.appendChild(
-            playoffCardElement
-        );
-    });
+                <div class="match-teams">
+
+                    <div class="team-box">
+
+                        ${teamALogoHtml}
+
+                        <span class="team-name">
+                            ${match.team_a}
+                        </span>
+
+                    </div>
+
+
+                    <span class="versus">
+                        VS
+                    </span>
+
+
+                    <div class="team-box">
+
+                        ${teamBLogoHtml}
+
+                        <span class="team-name">
+                            ${match.team_b}
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                ${progressHtml}
+            `;
+
+
+            playoffMatchListElement.appendChild(
+                playoffCardElement
+            );
+        }
+    );
 }
 
 

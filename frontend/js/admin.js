@@ -120,38 +120,15 @@ const adminResultEditSaveButtonElement =
         "#admin-result-edit-save"
     );
 
+const adminResultEditGridElement =
+document.querySelector(
+    "#admin-result-edit-grid"
+);
 
-const adminEditSet1AElement =
-    document.querySelector(
-        "#admin-edit-set1-a"
-    );
-
-const adminEditSet1BElement =
-    document.querySelector(
-        "#admin-edit-set1-b"
-    );
-
-const adminEditSet2AElement =
-    document.querySelector(
-        "#admin-edit-set2-a"
-    );
-
-const adminEditSet2BElement =
-    document.querySelector(
-        "#admin-edit-set2-b"
-    );
-
-const adminEditSet3AElement =
-    document.querySelector(
-        "#admin-edit-set3-a"
-    );
-
-const adminEditSet3BElement =
-    document.querySelector(
-        "#admin-edit-set3-b"
-    );
 
 let editingAdminResult = null;
+
+
 
 
 
@@ -1519,6 +1496,18 @@ async function deleteAdminResult(
             + "경기 일정은 유지되고 "
             + "경기 결과만 초기화됩니다.";
 
+    } else if (
+        result.match_type
+        === "플레이오프"
+    ) {
+
+        warningMessage =
+            `${result.playoff_stage ?? "플레이오프"} `
+            + "경기 결과를 삭제하시겠습니까?\n\n"
+            + "현재 경기는 예정 상태로 복구되며, "
+            + "이후 자동 생성된 대진이 있으면 "
+            + "함께 정리될 수 있습니다.";
+
     } else {
 
         warningMessage =
@@ -1607,27 +1596,91 @@ async function deleteAdminResult(
 }
 
 // =========================================
+// 경기 결과 수정
+// 동점 승자 UI 표시 갱신
+// =========================================
+
+function updateAdminResultTieControls(
+    setNumber
+) {
+
+    if (
+        !editingAdminResult
+        ||
+        editingAdminResult.match_type
+        !== "플레이오프"
+    ) {
+        return;
+    }
+
+
+    const teamAInputElement =
+        adminResultEditGridElement
+            .querySelector(
+                `[data-set-number="${setNumber}"]`
+                + `[data-score-side="team_a"]`
+            );
+
+
+    const teamBInputElement =
+        adminResultEditGridElement
+            .querySelector(
+                `[data-set-number="${setNumber}"]`
+                + `[data-score-side="team_b"]`
+            );
+
+
+    if (
+        !teamAInputElement
+        ||
+        !teamBInputElement
+    ) {
+        return;
+    }
+
+
+    const teamAValue =
+        teamAInputElement.value.trim();
+
+    const teamBValue =
+        teamBInputElement.value.trim();
+
+
+    const isTie =
+        teamAValue !== ""
+        &&
+        teamBValue !== ""
+        &&
+        Number(teamAValue)
+        === Number(teamBValue);
+
+
+    const tieControlElements =
+        adminResultEditGridElement
+            .querySelectorAll(
+                `[data-tie-set="${setNumber}"]`
+            );
+
+
+    tieControlElements.forEach(
+        (controlElement) => {
+
+            controlElement.classList.toggle(
+                "hidden",
+                !isTie
+            );
+        }
+    );
+}
+
+
+// =========================================
 // 경기 결과 수정 열기
 // =========================================
 
 function openAdminResultEdit(
     result
 ) {
-
-    const sets =
-        result.sets ?? [];
-
-
-    if (sets.length !== 3) {
-
-        alert(
-            "현재는 3세트 경기만 "
-            + "수정할 수 있습니다."
-        );
-
-        return;
-    }
-
 
     if (!result.series_id) {
 
@@ -1639,36 +1692,299 @@ function openAdminResultEdit(
     }
 
 
+    const isPlayoff =
+        result.match_type
+        === "플레이오프";
+
+
+    const maxSets =
+        isPlayoff
+            ? Number(result.best_of)
+            : 3;
+
+
+    if (
+        !Number.isInteger(maxSets)
+        ||
+        ![3, 5, 7].includes(maxSets)
+    ) {
+
+        alert(
+            "경기 세트 정보를 확인할 수 없습니다."
+        );
+
+        return;
+    }
+
+
     editingAdminResult =
         result;
 
 
+    const sets =
+        result.sets ?? [];
+
+
+    let titleText =
+        `${result.team_a}`
+        + " VS "
+        + `${result.team_b}`;
+
+
+    if (isPlayoff) {
+
+        titleText +=
+            ` / ${result.playoff_stage}`
+            + ` / BO${maxSets}`
+            + ` / ${result.wins_required}선승`;
+    }
+
+
     adminResultEditTitleElement
         .textContent =
-            `${result.team_a}`
-            + " VS "
-            + `${result.team_b}`;
+            titleText;
 
 
-    adminEditSet1AElement.value =
-        sets[0].team_a_score;
-
-    adminEditSet1BElement.value =
-        sets[0].team_b_score;
+    adminResultEditGridElement
+        .innerHTML = "";
 
 
-    adminEditSet2AElement.value =
-        sets[1].team_a_score;
+    for (
+        let setNumber = 1;
+        setNumber <= maxSets;
+        setNumber += 1
+    ) {
 
-    adminEditSet2BElement.value =
-        sets[1].team_b_score;
+        const savedSet =
+            sets.find(
+                (setResult) =>
+                    Number(
+                        setResult.set
+                    )
+                    === setNumber
+            )
+            ?? null;
 
 
-    adminEditSet3AElement.value =
-        sets[2].team_a_score;
+        const teamAScore =
+            savedSet
+                ?.team_a_score
+            ?? "";
 
-    adminEditSet3BElement.value =
-        sets[2].team_b_score;
+        const teamBScore =
+            savedSet
+                ?.team_b_score
+            ?? "";
+
+
+        const winnerSide =
+            savedSet
+                ?.winner_side
+            ?? "";
+
+
+        const teamASelected =
+            winnerSide
+            === "team_a";
+
+        const teamBSelected =
+            winnerSide
+            === "team_b";
+
+
+        let tieWinnerHtml = "";
+
+
+        if (isPlayoff) {
+
+            tieWinnerHtml = `
+                <div
+                    class="admin-result-edit-tie-row hidden"
+                    data-tie-set="${setNumber}"
+                >
+
+                    <button
+                        type="button"
+                        class="admin-result-edit-winner-button"
+                        data-set-number="${setNumber}"
+                        data-winner-side="team_a"
+                        data-team-name="${result.team_a}"
+                    >
+                        ${teamASelected ? "✓ " : ""}
+                        ${result.team_a} 승
+                    </button>
+
+                    <span
+                        class="admin-result-edit-tie-label"
+                    >
+                        동점 승자
+                    </span>
+
+                    <button
+                        type="button"
+                        class="admin-result-edit-winner-button"
+                        data-set-number="${setNumber}"
+                        data-winner-side="team_b"
+                        data-team-name="${result.team_b}"
+                    >
+                        ${teamBSelected ? "✓ " : ""}
+                        ${result.team_b} 승
+                    </button>
+
+                </div>
+            `;
+        }
+
+
+        adminResultEditGridElement
+            .insertAdjacentHTML(
+                "beforeend",
+                `
+                    <span>
+                        ${setNumber} SET
+                    </span>
+
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value="${teamAScore}"
+                        data-set-number="${setNumber}"
+                        data-score-side="team_a"
+                    >
+
+                    <span>:</span>
+
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value="${teamBScore}"
+                        data-set-number="${setNumber}"
+                        data-score-side="team_b"
+                    >
+
+                    ${tieWinnerHtml}
+                `
+            );
+    }
+
+
+    const scoreInputElements =
+        adminResultEditGridElement
+            .querySelectorAll(
+                "[data-score-side]"
+            );
+
+
+    scoreInputElements.forEach(
+        (inputElement) => {
+
+            inputElement.addEventListener(
+                "input",
+                () => {
+
+                    updateAdminResultTieControls(
+                        Number(
+                            inputElement
+                                .dataset
+                                .setNumber
+                        )
+                    );
+                }
+            );
+        }
+    );
+
+
+    const winnerButtonElements =
+        adminResultEditGridElement
+            .querySelectorAll(
+                ".admin-result-edit-winner-button"
+            );
+
+
+    winnerButtonElements.forEach(
+        (buttonElement) => {
+
+            if (
+                savedWinnerMatchesButton(
+                    result,
+                    buttonElement
+                )
+            ) {
+
+                buttonElement.classList.add(
+                    "selected"
+                );
+            }
+
+
+            buttonElement.addEventListener(
+                "click",
+                () => {
+
+                    const setNumber =
+                        buttonElement
+                            .dataset
+                            .setNumber;
+
+
+                    const sameSetButtons =
+                        adminResultEditGridElement
+                            .querySelectorAll(
+                                ".admin-result-edit-winner-button"
+                                + `[data-set-number="${setNumber}"]`
+                            );
+
+
+                    sameSetButtons.forEach(
+                        (candidateButtonElement) => {
+
+                            const isSelected =
+                                candidateButtonElement
+                                === buttonElement;
+
+
+                            candidateButtonElement
+                                .classList.toggle(
+                                    "selected",
+                                    isSelected
+                                );
+
+
+                            candidateButtonElement
+                                .textContent =
+                                    (
+                                        isSelected
+                                            ? "✓ "
+                                            : ""
+                                    )
+                                    + candidateButtonElement
+                                        .dataset
+                                        .teamName
+                                    + " 승";
+                        }
+                    );
+                }
+            );
+        }
+    );
+
+
+    if (isPlayoff) {
+
+        for (
+            let setNumber = 1;
+            setNumber <= maxSets;
+            setNumber += 1
+        ) {
+
+            updateAdminResultTieControls(
+                setNumber
+            );
+        }
+    }
 
 
     adminResultEditMessageElement
@@ -1681,6 +1997,49 @@ function openAdminResultEdit(
         );
 }
 
+
+// =========================================
+// 기존 winner_side와 버튼 일치 확인
+// =========================================
+
+function savedWinnerMatchesButton(
+    result,
+    buttonElement
+) {
+
+    const setNumber =
+        Number(
+            buttonElement
+                .dataset
+                .setNumber
+        );
+
+
+    const savedSet =
+        (result.sets ?? [])
+            .find(
+                (setResult) =>
+                    Number(
+                        setResult.set
+                    )
+                    === setNumber
+            );
+
+
+    if (!savedSet) {
+        return false;
+    }
+
+
+    return (
+        savedSet.winner_side
+        === buttonElement
+            .dataset
+            .winnerSide
+    );
+}
+
+
 // =========================================
 // 경기 결과 수정 닫기
 // =========================================
@@ -1689,6 +2048,10 @@ function closeAdminResultEdit() {
 
     editingAdminResult =
         null;
+
+
+    adminResultEditGridElement
+        .innerHTML = "";
 
 
     adminResultEditMessageElement
@@ -1700,6 +2063,7 @@ function closeAdminResultEdit() {
             "hidden"
         );
 }
+
 
 // =========================================
 // 경기 결과 수정 저장
@@ -1715,59 +2079,284 @@ adminResultEditSaveButtonElement
             }
 
 
-            const set1TeamA =
-                Number(
-                    adminEditSet1AElement.value
+            const isPlayoff =
+                editingAdminResult
+                    .match_type
+                === "플레이오프";
+
+
+            const maxSets =
+                isPlayoff
+                    ? Number(
+                        editingAdminResult
+                            .best_of
+                    )
+                    : 3;
+
+
+            const winsRequired =
+                isPlayoff
+                    ? Number(
+                        editingAdminResult
+                            .wins_required
+                    )
+                    : null;
+
+
+            const requestBody = {};
+
+
+            let gapFound = false;
+
+            let teamAWins = 0;
+            let teamBWins = 0;
+
+            let seriesWinnerFound =
+                false;
+
+
+            for (
+                let setNumber = 1;
+                setNumber <= maxSets;
+                setNumber += 1
+            ) {
+
+                const teamAInputElement =
+                    adminResultEditGridElement
+                        .querySelector(
+                            `[data-set-number="${setNumber}"]`
+                            + `[data-score-side="team_a"]`
+                        );
+
+
+                const teamBInputElement =
+                    adminResultEditGridElement
+                        .querySelector(
+                            `[data-set-number="${setNumber}"]`
+                            + `[data-score-side="team_b"]`
+                        );
+
+
+                const teamARaw =
+                    teamAInputElement
+                        .value
+                        .trim();
+
+                const teamBRaw =
+                    teamBInputElement
+                        .value
+                        .trim();
+
+
+                if (
+                    teamARaw === ""
+                    &&
+                    teamBRaw === ""
+                ) {
+
+                    if (
+                        !isPlayoff
+                        ||
+                        setNumber <= 3
+                    ) {
+
+                        adminResultEditMessageElement
+                            .textContent =
+                                `${setNumber}세트 점수를 `
+                                + "입력해주세요.";
+
+                        return;
+                    }
+
+
+                    gapFound = true;
+
+                    continue;
+                }
+
+
+                if (
+                    teamARaw === ""
+                    ||
+                    teamBRaw === ""
+                ) {
+
+                    adminResultEditMessageElement
+                        .textContent =
+                            `${setNumber}세트의 `
+                            + "양쪽 점수를 모두 입력해주세요.";
+
+                    return;
+                }
+
+
+                if (gapFound) {
+
+                    adminResultEditMessageElement
+                        .textContent =
+                            "중간 세트를 비워둔 채 "
+                            + "다음 세트를 입력할 수 없습니다.";
+
+                    return;
+                }
+
+
+                if (
+                    isPlayoff
+                    &&
+                    seriesWinnerFound
+                ) {
+
+                    adminResultEditMessageElement
+                        .textContent =
+                            "선승 도달 이후의 "
+                            + "추가 세트는 입력할 수 없습니다.";
+
+                    return;
+                }
+
+
+                const teamAScore =
+                    Number(teamARaw);
+
+                const teamBScore =
+                    Number(teamBRaw);
+
+
+                if (
+                    !Number.isInteger(
+                        teamAScore
+                    )
+                    ||
+                    !Number.isInteger(
+                        teamBScore
+                    )
+                    ||
+                    teamAScore < 0
+                    ||
+                    teamBScore < 0
+                ) {
+
+                    adminResultEditMessageElement
+                        .textContent =
+                            "점수는 0 이상의 "
+                            + "정수여야 합니다.";
+
+                    return;
+                }
+
+
+                let winnerSide = null;
+
+
+                if (
+                    teamAScore
+                    >
+                    teamBScore
+                ) {
+
+                    winnerSide =
+                        "team_a";
+
+                } else if (
+                    teamBScore
+                    >
+                    teamAScore
+                ) {
+
+                    winnerSide =
+                        "team_b";
+
+                } else if (isPlayoff) {
+
+                    const selectedWinnerButton =
+                        adminResultEditGridElement
+                            .querySelector(
+                                ".admin-result-edit-winner-button.selected"
+                                + `[data-set-number="${setNumber}"]`
+                            );
+
+
+                    if (!selectedWinnerButton) {
+
+                        adminResultEditMessageElement
+                            .textContent =
+                                `${setNumber}세트가 동점입니다. `
+                                + "실제 승자를 선택해주세요.";
+
+                        return;
+                    }
+
+
+                    winnerSide =
+                        selectedWinnerButton
+                            .dataset
+                            .winnerSide;
+                }
+
+
+                requestBody[
+                    `set${setNumber}_team_a`
+                ] = teamAScore;
+
+
+                requestBody[
+                    `set${setNumber}_team_b`
+                ] = teamBScore;
+
+
+                requestBody[
+                    `set${setNumber}_winner_side`
+                ] = (
+                    isPlayoff
+                        ? winnerSide
+                        : null
                 );
 
-            const set1TeamB =
-                Number(
-                    adminEditSet1BElement.value
-                );
 
-            const set2TeamA =
-                Number(
-                    adminEditSet2AElement.value
-                );
+                if (isPlayoff) {
 
-            const set2TeamB =
-                Number(
-                    adminEditSet2BElement.value
-                );
+                    if (
+                        winnerSide
+                        === "team_a"
+                    ) {
 
-            const set3TeamA =
-                Number(
-                    adminEditSet3AElement.value
-                );
+                        teamAWins += 1;
 
-            const set3TeamB =
-                Number(
-                    adminEditSet3BElement.value
-                );
+                    } else if (
+                        winnerSide
+                        === "team_b"
+                    ) {
+
+                        teamBWins += 1;
+                    }
 
 
-            const scores = [
-                set1TeamA,
-                set1TeamB,
-                set2TeamA,
-                set2TeamB,
-                set3TeamA,
-                set3TeamB,
-            ];
+                    if (
+                        teamAWins
+                        >= winsRequired
+                        ||
+                        teamBWins
+                        >= winsRequired
+                    ) {
+
+                        seriesWinnerFound =
+                            true;
+                    }
+                }
+            }
 
 
             if (
-                scores.some(
-                    score =>
-                        !Number.isInteger(score)
-                        ||
-                        score < 0
-                )
+                isPlayoff
+                &&
+                !seriesWinnerFound
             ) {
 
                 adminResultEditMessageElement
                     .textContent =
-                        "점수는 0 이상의 정수여야 합니다.";
+                        `${winsRequired}승에 도달한 `
+                        + "참가자가 없습니다.";
 
                 return;
             }
@@ -1792,6 +2381,7 @@ adminResultEditSaveButtonElement
 
             adminResultEditSaveButtonElement
                 .disabled = true;
+
 
             adminResultEditMessageElement
                 .textContent =
@@ -1818,25 +2408,9 @@ adminResultEditSaveButtonElement
                             },
 
                             body:
-                                JSON.stringify({
-                                    set1_team_a:
-                                        set1TeamA,
-
-                                    set1_team_b:
-                                        set1TeamB,
-
-                                    set2_team_a:
-                                        set2TeamA,
-
-                                    set2_team_b:
-                                        set2TeamB,
-
-                                    set3_team_a:
-                                        set3TeamA,
-
-                                    set3_team_b:
-                                        set3TeamB,
-                                }),
+                                JSON.stringify(
+                                    requestBody
+                                ),
                         }
                     );
 
@@ -1845,12 +2419,16 @@ adminResultEditSaveButtonElement
                     await response.json();
 
 
-                if (response.status === 401) {
+                if (
+                    response.status
+                    === 401
+                ) {
 
                     sessionStorage
                         .removeItem(
                             adminTokenStorageKey
                         );
+
 
                     closeAdminResultEdit();
 
@@ -1875,15 +2453,29 @@ adminResultEditSaveButtonElement
                 await loadAdminResults();
 
 
+                if (
+                    responseData
+                        .progression_warning
+                ) {
+
+                    alert(
+                        responseData
+                            .progression_warning
+                    );
+                }
+
+
             } catch (error) {
 
                 console.error(
                     error
                 );
 
+
                 adminResultEditMessageElement
                     .textContent =
                         error.message;
+
 
             } finally {
 
