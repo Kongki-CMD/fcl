@@ -569,6 +569,8 @@ def initialize_database():
 
                     completed_at TIMESTAMPTZ,
 
+                    cancelled_at TIMESTAMPTZ,
+
                     finished_at TIMESTAMPTZ,
 
                     stats_sync_status VARCHAR(20)
@@ -1383,12 +1385,31 @@ class ManualSeriesCompleteRequest(BaseModel):
 
     set1_team_a: int
     set1_team_b: int
+    set1_winner_side: str | None = None
 
     set2_team_a: int
     set2_team_b: int
+    set2_winner_side: str | None = None
 
     set3_team_a: int
     set3_team_b: int
+    set3_winner_side: str | None = None
+
+    set4_team_a: int | None = None
+    set4_team_b: int | None = None
+    set4_winner_side: str | None = None
+
+    set5_team_a: int | None = None
+    set5_team_b: int | None = None
+    set5_winner_side: str | None = None
+
+    set6_team_a: int | None = None
+    set6_team_b: int | None = None
+    set6_winner_side: str | None = None
+
+    set7_team_a: int | None = None
+    set7_team_b: int | None = None
+    set7_winner_side: str | None = None
 
 class AdminSeriesResultUpdateRequest(
     BaseModel
@@ -1408,6 +1429,16 @@ class HistorySeriesImportRequest(BaseModel):
     match_date: str
 
 class PlayoffInitializeRequest(
+    BaseModel
+):
+    scheduled_date: str
+
+class PlayoffAdvanceRequest(
+    BaseModel
+):
+    scheduled_date: str
+
+class AdminRegularScheduleUpdateRequest(
     BaseModel
 ):
     scheduled_date: str
@@ -1735,6 +1766,329 @@ def admin_check(
 def get_round_number(match_index):
     return (match_index // 5) + 1
 
+# =========================
+# ADMIN REGULAR SCHEDULE
+# 정규리그 일정 조회
+# =========================
+
+@app.get(
+    "/api/admin/regular-schedule"
+)
+def admin_get_regular_schedule(
+    admin_token: str =
+        Depends(
+            require_admin
+        )
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id AS series_id,
+                    s.fixture_number,
+                    s.round_number,
+                    s.scheduled_date,
+                    s.status,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_b.fcl_name
+                        AS team_b
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type =
+                        '정규리그'
+
+                ORDER BY
+                    s.fixture_number,
+                    s.id
+                """
+            )
+
+
+            schedule_rows = cursor.fetchall()
+
+
+    schedules = []
+
+
+    for schedule_row in schedule_rows:
+
+        scheduled_date = schedule_row [
+                "scheduled_date"
+            ]
+
+
+        schedules.append(
+            {
+                "series_id":
+                    schedule_row[
+                        "series_id"
+                    ],
+
+                "fixture_number":
+                    schedule_row[
+                        "fixture_number"
+                    ],
+
+                "round":
+                    schedule_row[
+                        "round_number"
+                    ],
+
+                "date":
+                    (
+                        scheduled_date.isoformat()
+                        if scheduled_date
+                        else None
+                    ),
+
+                "team_a":
+                    schedule_row[
+                        "team_a"
+                    ],
+
+                "team_b":
+                    schedule_row[
+                        "team_b"
+                    ],
+
+                "status":
+                    schedule_row[
+                        "status"
+                    ],
+            }
+        )
+
+
+    return schedules
+
+# =========================
+# ADMIN REGULAR SCHEDULE UPDATE
+# 정규리그 일정 변경
+# =========================
+
+@app.put(
+    "/api/admin/series/{series_id}/schedule"
+)
+def admin_update_regular_schedule(
+    series_id: int,
+    request:
+        AdminRegularScheduleUpdateRequest,
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 날짜 형식 확인
+    # =========================
+
+    try:
+
+        new_scheduled_date = (
+            datetime.strptime(
+                request.scheduled_date,
+                "%Y-%m-%d",
+            ).date()
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "경기 날짜 형식이 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    # =========================
+    # 과거 날짜 금지
+    # =========================
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    if new_scheduled_date < today:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지난 날짜로는 "
+                "일정을 변경할 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    series_type,
+                    scheduled_date,
+                    status
+
+                FROM series
+
+                WHERE id = %s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            series = cursor.fetchone()
+
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "경기를 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 정규리그만 허용
+            # =========================
+
+            if (
+                series["series_type"]
+                != "정규리그"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "정규리그 경기만 "
+                        "일정을 변경할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 예정 경기만 허용
+            # =========================
+
+            if (
+                series["status"]
+                != "scheduled"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "예정 상태의 경기만 "
+                        "일정을 변경할 수 있습니다."
+                    ),
+                )
+
+
+            previous_date = (
+                series["scheduled_date"]
+            )
+
+
+            # =========================
+            # 날짜 변경
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE series
+
+                SET
+                    scheduled_date = %s
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    fixture_number,
+                    round_number,
+                    scheduled_date,
+                    status
+                """,
+                (
+                    new_scheduled_date,
+                    series_id,
+                ),
+            )
+
+
+            updated_series = cursor.fetchone()
+
+
+        connection.commit()
+
+
+    return {
+        "series_id":
+            updated_series["id"],
+
+        "fixture_number":
+            updated_series[
+                "fixture_number"
+            ],
+
+        "round":
+            updated_series[
+                "round_number"
+            ],
+
+        "previous_date":
+            (
+                previous_date.isoformat()
+                if previous_date
+                else None
+            ),
+
+        "scheduled_date":
+            updated_series[
+                "scheduled_date"
+            ].isoformat(),
+
+        "status":
+            updated_series[
+                "status"
+            ],
+
+        "message":
+            "정규리그 일정이 변경되었습니다.",
+    }
+
+
 
 # =========================
 # ADMIN SERIES DELETE
@@ -1881,7 +2235,6 @@ def admin_delete_series(
 
                     SET
                         status = 'scheduled',
-                        
                         started_at = NULL,
                         completed_at = NULL,
                         finished_at = NULL,
@@ -3972,6 +4325,776 @@ def initialize_playoffs(
             series_row["status"],
     }
 
+
+# =========================
+# PLAYOFF ADVANCE
+# 다음 플레이오프 단계 생성
+# =========================
+
+@app.post(
+    "/api/admin/playoffs/{series_id}/advance"
+)
+def advance_playoff_series(
+    series_id: int,
+    request: PlayoffAdvanceRequest,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 다음 경기 날짜 검증
+    # =========================
+
+    try:
+
+        scheduled_date = (
+            datetime.strptime(
+                request.scheduled_date,
+                "%Y-%m-%d",
+            ).date()
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "경기 날짜 형식은 "
+                "YYYY-MM-DD여야 합니다."
+            ),
+        )
+
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    if scheduled_date < today:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지난 날짜로 다음 "
+                "플레이오프 경기를 "
+                "생성할 수 없습니다."
+            ),
+        )
+
+
+    # =========================
+    # 정규리그 최종 순위
+    #
+    # 다음 단계의
+    # 1위 / 2위 참가자 확인
+    # =========================
+
+    standings = get_standings()
+
+
+    if len(standings) < 4:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "정규리그 최종 순위를 "
+                "확인할 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 현재 플레이오프 SERIES
+            #
+            # 동시에 advance 되는 것을
+            # 방지하기 위해 행 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.series_type,
+                    s.playoff_stage,
+                    s.best_of,
+                    s.wins_required,
+                    s.status,
+                    s.completed_at,
+
+                    s.team_a_id,
+                    s.team_b_id,
+
+                    team_a.fcl_name
+                        AS team_a_name,
+
+                    team_a.fc_nickname
+                        AS team_a_nickname,
+
+                    team_b.fcl_name
+                        AS team_b_name,
+
+                    team_b.fc_nickname
+                        AS team_b_nickname
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE s.id = %s
+
+                FOR UPDATE OF s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            series = cursor.fetchone()
+
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "SERIES를 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 플레이오프 확인
+            # =========================
+
+            if (
+                series["series_type"]
+                != "플레이오프"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "플레이오프 SERIES만 "
+                        "다음 단계로 "
+                        "진출시킬 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 완료 상태 확인
+            # =========================
+
+            if (
+                series["status"]
+                != "completed"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "완료된 플레이오프만 "
+                        "다음 단계로 "
+                        "진출시킬 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 결승은 다음 단계 없음
+            # =========================
+
+            if (
+                series["playoff_stage"]
+                == "결승시리즈"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "결승시리즈는 "
+                        "다음 단계가 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 현재 SERIES 세트 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    set_number,
+                    winner_side
+
+                FROM series_sets
+
+                WHERE series_id = %s
+
+                ORDER BY set_number
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            saved_sets = cursor.fetchall()
+
+
+            if not saved_sets:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "플레이오프 세트 결과가 "
+                        "없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # SERIES 승자 계산
+            #
+            # 선승 도달 이후 세트가
+            # 존재하는지도 검증
+            # =========================
+
+            team_a_wins = 0
+            team_b_wins = 0
+
+            series_winner_side = None
+            winning_set_number = None
+
+
+            for saved_set in saved_sets:
+
+                winner_side = (
+                    saved_set[
+                        "winner_side"
+                    ]
+                )
+
+
+                if winner_side not in (
+                    "team_a",
+                    "team_b",
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "플레이오프 세트의 "
+                            "승패 정보가 "
+                            "올바르지 않습니다."
+                        ),
+                    )
+
+
+                # 이미 선승 도달 후인데
+                # 추가 세트가 존재하면 비정상
+                if (
+                    series_winner_side
+                    is not None
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "선승 도달 이후의 "
+                            "추가 세트가 존재합니다."
+                        ),
+                    )
+
+
+                if (
+                    winner_side
+                    == "team_a"
+                ):
+
+                    team_a_wins += 1
+
+                else:
+
+                    team_b_wins += 1
+
+
+                if (
+                    team_a_wins
+                    >=
+                    int(
+                        series[
+                            "wins_required"
+                        ]
+                    )
+                ):
+
+                    series_winner_side = (
+                        "team_a"
+                    )
+
+                    winning_set_number = (
+                        saved_set[
+                            "set_number"
+                        ]
+                    )
+
+
+                elif (
+                    team_b_wins
+                    >=
+                    int(
+                        series[
+                            "wins_required"
+                        ]
+                    )
+                ):
+
+                    series_winner_side = (
+                        "team_b"
+                    )
+
+                    winning_set_number = (
+                        saved_set[
+                            "set_number"
+                        ]
+                    )
+
+
+            # =========================
+            # 선승 미도달 방어
+            # =========================
+
+            if series_winner_side is None:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "SERIES 승자가 "
+                        "확정되지 않았습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 최대 세트 수 방어
+            # =========================
+
+            if (
+                len(saved_sets)
+                >
+                int(
+                    series["best_of"]
+                )
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "허용된 경기 수보다 "
+                        "많은 세트가 "
+                        "저장되어 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 현재 SERIES 승자
+            # =========================
+
+            if (
+                series_winner_side
+                == "team_a"
+            ):
+
+                winner_id = (
+                    series[
+                        "team_a_id"
+                    ]
+                )
+
+                winner_name = (
+                    series[
+                        "team_a_name"
+                    ]
+                )
+
+                winner_nickname = (
+                    series[
+                        "team_a_nickname"
+                    ]
+                )
+
+            else:
+
+                winner_id = (
+                    series[
+                        "team_b_id"
+                    ]
+                )
+
+                winner_name = (
+                    series[
+                        "team_b_name"
+                    ]
+                )
+
+                winner_nickname = (
+                    series[
+                        "team_b_nickname"
+                    ]
+                )
+
+
+            # =========================
+            # 다음 단계 설정
+            # =========================
+
+            if (
+                series["playoff_stage"]
+                == "준플레이오프"
+            ):
+
+                next_stage = (
+                    "플레이오프"
+                )
+
+                seeded_rank = 2
+
+                next_best_of = 5
+                next_wins_required = 3
+
+
+            elif (
+                series["playoff_stage"]
+                == "플레이오프"
+            ):
+
+                next_stage = (
+                    "결승시리즈"
+                )
+
+                seeded_rank = 1
+
+                next_best_of = 7
+                next_wins_required = 4
+
+
+            else:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "알 수 없는 "
+                        "플레이오프 단계입니다."
+                    ),
+                )
+
+
+            # =========================
+            # 이미 다음 단계가
+            # 생성되어 있는지 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    status
+
+                FROM series
+
+                WHERE
+                    series_type =
+                        '플레이오프'
+
+                    AND
+                    playoff_stage = %s
+
+                    AND
+                    status <> 'cancelled'
+
+                LIMIT 1
+                """,
+                (
+                    next_stage,
+                ),
+            )
+
+
+            existing_next_series = (
+                cursor.fetchone()
+            )
+
+
+            if existing_next_series:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"이미 {next_stage} "
+                        "SERIES가 "
+                        "생성되어 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 1위 또는 2위 확인
+            # =========================
+
+            seeded_name = (
+                standings[
+                    seeded_rank - 1
+                ][
+                    "name"
+                ]
+            )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    fcl_name,
+                    fc_nickname
+
+                FROM participants
+
+                WHERE fcl_name = %s
+                """,
+                (
+                    seeded_name,
+                ),
+            )
+
+
+            seeded_participant = (
+                cursor.fetchone()
+            )
+
+
+            if not seeded_participant:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "시드 참가자 정보를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                seeded_participant["id"]
+                == winner_id
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "다음 플레이오프의 "
+                        "두 참가자가 같습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 다음 SERIES 생성
+            #
+            # team_a = 상위 시드
+            # team_b = 이전 단계 승자
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO series (
+                    series_type,
+
+                    team_a_id,
+                    team_b_id,
+
+                    match_type,
+                    scheduled_date,
+
+                    playoff_stage,
+                    best_of,
+                    wins_required,
+
+                    stats_sync_status,
+                    status
+                )
+
+                VALUES (
+                    '플레이오프',
+
+                    %s,
+                    %s,
+
+                    40,
+                    %s,
+
+                    %s,
+                    %s,
+                    %s,
+
+                    'pending',
+                    'scheduled'
+                )
+
+                RETURNING
+                    id,
+                    scheduled_date,
+                    playoff_stage,
+                    best_of,
+                    wins_required,
+                    status
+                """,
+                (
+                    seeded_participant[
+                        "id"
+                    ],
+
+                    winner_id,
+
+                    scheduled_date,
+
+                    next_stage,
+                    next_best_of,
+                    next_wins_required,
+                ),
+            )
+
+
+            next_series = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "source_series": {
+            "series_id":
+                series_id,
+
+            "playoff_stage":
+                series[
+                    "playoff_stage"
+                ],
+
+            "winner": {
+                "side":
+                    series_winner_side,
+
+                "fcl_name":
+                    winner_name,
+
+                "nickname":
+                    winner_nickname,
+
+                "wins":
+                    (
+                        team_a_wins
+                        if
+                        series_winner_side
+                        == "team_a"
+                        else
+                        team_b_wins
+                    ),
+
+                "winning_set":
+                    winning_set_number,
+            },
+        },
+
+        "next_series": {
+            "series_id":
+                next_series[
+                    "id"
+                ],
+
+            "playoff_stage":
+                next_series[
+                    "playoff_stage"
+                ],
+
+            "scheduled_date":
+                next_series[
+                    "scheduled_date"
+                ].isoformat(),
+
+            "team_a": {
+                "rank":
+                    seeded_rank,
+
+                "fcl_name":
+                    seeded_participant[
+                        "fcl_name"
+                    ],
+
+                "nickname":
+                    seeded_participant[
+                        "fc_nickname"
+                    ],
+            },
+
+            "team_b": {
+                "source":
+                    (
+                        series[
+                            "playoff_stage"
+                        ]
+                        + " 승자"
+                    ),
+
+                "fcl_name":
+                    winner_name,
+
+                "nickname":
+                    winner_nickname,
+            },
+
+            "best_of":
+                next_series[
+                    "best_of"
+                ],
+
+            "wins_required":
+                next_series[
+                    "wins_required"
+                ],
+
+            "status":
+                next_series[
+                    "status"
+                ],
+        },
+
+        "message":
+            (
+                f"{next_stage} SERIES가 "
+                "생성되었습니다."
+            ),
+    }
+
+
 # =========================
 # 선수 득점 순위
 # Neon PostgreSQL
@@ -5954,20 +7077,35 @@ def cancel_fcl_series(
     series_id: int,
 ):
 
+    cancelled_at = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    )
+
+
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES 확인
+            #
+            # 취소와 완료 처리가 동시에
+            # 발생하지 않도록 행 잠금
+            # =========================
 
             cursor.execute(
                 """
                 SELECT
                     id,
                     series_type,
-                    status
+                    status,
+                    started_at
 
                 FROM series
 
                 WHERE id = %s
+
+                FOR UPDATE
                 """,
                 (
                     series_id,
@@ -5982,9 +7120,15 @@ def cancel_fcl_series(
 
                 raise HTTPException(
                     status_code=404,
-                    detail="SERIES를 찾을 수 없습니다.",
+                    detail=(
+                        "SERIES를 찾을 수 없습니다."
+                    ),
                 )
 
+
+            # =========================
+            # 프리시즌만 취소 가능
+            # =========================
 
             if (
                 series["series_type"]
@@ -5999,6 +7143,10 @@ def cancel_fcl_series(
                     ),
                 )
 
+
+            # =========================
+            # 예약 / 진행 중만 취소 가능
+            # =========================
 
             if (
                 series["status"]
@@ -6017,8 +7165,16 @@ def cancel_fcl_series(
                 )
 
 
-            # 이미 감지된 세트가 있다면
-            # 함께 제거
+            previous_status = series["status"]
+
+
+            # =========================
+            # 세트 삭제
+            #
+            # nexon_match_id UNIQUE 연결도
+            # 같이 제거됨
+            # =========================
+
             cursor.execute(
                 """
                 DELETE FROM series_sets
@@ -6029,6 +7185,13 @@ def cancel_fcl_series(
                 ),
             )
 
+
+            deleted_set_count = cursor.rowcount
+
+
+            # =========================
+            # MVP 삭제
+            # =========================
 
             cursor.execute(
                 """
@@ -6041,6 +7204,10 @@ def cancel_fcl_series(
             )
 
 
+            # =========================
+            # 선수 기록 삭제
+            # =========================
+
             cursor.execute(
                 """
                 DELETE FROM series_player_stats
@@ -6052,29 +7219,85 @@ def cancel_fcl_series(
             )
 
 
+            # =========================
+            # SERIES 취소
+            #
+            # started_at은 유지
+            # → 시작 후 취소 여부 확인 가능
+            # =========================
+
             cursor.execute(
                 """
                 UPDATE series
 
                 SET
                     status = 'cancelled',
-                    completed_at = NULL
+
+                    cancelled_at = %s,
+
+                    completed_at = NULL,
+                    finished_at = NULL,
+
+                    stats_sync_status = 'pending',
+
+                    team_a_snapshot_name = NULL,
+                    team_a_snapshot_logo_path = NULL,
+
+                    team_b_snapshot_name = NULL,
+                    team_b_snapshot_logo_path = NULL
 
                 WHERE id = %s
+
+                RETURNING
+                    id,
+                    status,
+                    started_at,
+                    cancelled_at
                 """,
                 (
+                    cancelled_at,
                     series_id,
                 ),
             )
+
+
+            cancelled_series = cursor.fetchone()
 
 
         connection.commit()
 
 
     return {
-        "series_id": series_id,
-        "status": "cancelled",
-        "message": "친선전 SERIES가 취소되었습니다.",
+        "series_id":
+            cancelled_series["id"],
+
+        "previous_status":
+            previous_status,
+
+        "status":
+            cancelled_series["status"],
+
+        "started_at":
+            (
+                cancelled_series[
+                    "started_at"
+                ].isoformat()
+                if cancelled_series[
+                    "started_at"
+                ]
+                else None
+            ),
+
+        "cancelled_at":
+            cancelled_series[
+                "cancelled_at"
+            ].isoformat(),
+
+        "deleted_set_count":
+            deleted_set_count,
+
+        "message":
+            "친선전이 취소되었습니다.",
     }
 
 # =========================
@@ -6089,31 +7312,11 @@ def manual_complete_fcl_series(
     series_id: int,
     request: ManualSeriesCompleteRequest,
 ):
-    scores = [
-        request.set1_team_a,
-        request.set1_team_b,
-        request.set2_team_a,
-        request.set2_team_b,
-        request.set3_team_a,
-        request.set3_team_b,
-    ]
-
-    # =========================
-    # 점수 검증
-    # =========================
-
-    if any(
-        score < 0
-        for score in scores
-    ):
-        raise HTTPException(
-            status_code=400,
-            detail="점수는 0 이상이어야 합니다.",
-        )
 
     finished_at = datetime.now(
         ZoneInfo("Asia/Seoul")
     )
+
 
     with get_db_connection() as connection:
 
@@ -6129,6 +7332,10 @@ def manual_complete_fcl_series(
                     s.id,
                     s.series_type,
                     s.status,
+
+                    s.playoff_stage,
+                    s.best_of,
+                    s.wins_required,
 
                     team_a.fcl_name
                         AS team_a,
@@ -6159,13 +7366,17 @@ def manual_complete_fcl_series(
                         s.team_b_id
 
                 WHERE s.id = %s
+
+                FOR UPDATE OF s
                 """,
                 (
                     series_id,
                 ),
             )
 
+
             series = cursor.fetchone()
+
 
             if not series:
                 raise HTTPException(
@@ -6173,16 +7384,15 @@ def manual_complete_fcl_series(
                     detail="SERIES를 찾을 수 없습니다.",
                 )
 
+
             # =========================
-            # 프리시즌 / 정규리그
+            # 지원 SERIES
             # =========================
 
-            if (
-                series["series_type"]
-                not in (
-                    "프리시즌",
-                    "정규리그",
-                )
+            if series["series_type"] not in (
+                "프리시즌",
+                "정규리그",
+                "플레이오프",
             ):
                 raise HTTPException(
                     status_code=400,
@@ -6192,44 +7402,12 @@ def manual_complete_fcl_series(
                     ),
                 )
 
+
             # =========================
-            # 진행 중 SERIES만 완료
+            # 진행 중 경기만 가능
             # =========================
 
-            if (
-                series["status"]
-                != "active"
-            ):
-
-                # =========================
-                # 완료 Snapshot 기준 정보 확인
-                # =========================
-
-                if (
-                    not series[
-                        "team_a_current_team_name"
-                    ]
-                    or
-                    not series[
-                        "team_a_current_team_logo_path"
-                    ]
-                    or
-                    not series[
-                        "team_b_current_team_name"
-                    ]
-                    or
-                    not series[
-                        "team_b_current_team_logo_path"
-                    ]
-                ):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=(
-                            "현재 팀 또는 로고 정보가 "
-                            "등록되지 않았습니다."
-                        ),
-                    )
-            
+            if series["status"] != "active":
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -6238,8 +7416,401 @@ def manual_complete_fcl_series(
                     ),
                 )
 
+
             # =========================
-            # 기존 세트 제거
+            # 완료 Snapshot 검증
+            # =========================
+
+            if (
+                not series[
+                    "team_a_current_team_name"
+                ]
+                or
+                not series[
+                    "team_a_current_team_logo_path"
+                ]
+                or
+                not series[
+                    "team_b_current_team_name"
+                ]
+                or
+                not series[
+                    "team_b_current_team_logo_path"
+                ]
+            ):
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "현재 팀 또는 로고 정보가 "
+                        "등록되지 않았습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 입력된 모든 세트
+            # =========================
+
+            requested_sets = [
+                (
+                    1,
+                    request.set1_team_a,
+                    request.set1_team_b,
+                    request.set1_winner_side,
+                ),
+                (
+                    2,
+                    request.set2_team_a,
+                    request.set2_team_b,
+                    request.set2_winner_side,
+                ),
+                (
+                    3,
+                    request.set3_team_a,
+                    request.set3_team_b,
+                    request.set3_winner_side,
+                ),
+                (
+                    4,
+                    request.set4_team_a,
+                    request.set4_team_b,
+                    request.set4_winner_side,
+                ),
+                (
+                    5,
+                    request.set5_team_a,
+                    request.set5_team_b,
+                    request.set5_winner_side,
+                ),
+                (
+                    6,
+                    request.set6_team_a,
+                    request.set6_team_b,
+                    request.set6_winner_side,
+                ),
+                (
+                    7,
+                    request.set7_team_a,
+                    request.set7_team_b,
+                    request.set7_winner_side,
+                ),
+            ]
+
+
+            is_playoff = (
+                series["series_type"]
+                == "플레이오프"
+            )
+
+
+            if is_playoff:
+
+                if (
+                    series["best_of"] is None
+                    or
+                    series["wins_required"] is None
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "플레이오프 진행 정보가 "
+                            "올바르지 않습니다."
+                        ),
+                    )
+
+
+                max_sets = int(
+                    series["best_of"]
+                )
+
+                wins_required = int(
+                    series["wins_required"]
+                )
+
+            else:
+
+                max_sets = 3
+                wins_required = None
+
+
+            # =========================
+            # 허용 세트 초과 방어
+            # =========================
+
+            for (
+                set_number,
+                team_a_score,
+                team_b_score,
+                explicit_winner_side,
+            ) in requested_sets[max_sets:]:
+
+                if (
+                    team_a_score is not None
+                    or team_b_score is not None
+                    or explicit_winner_side is not None
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{max_sets}세트를 초과하여 "
+                            "결과를 입력할 수 없습니다."
+                        ),
+                    )
+
+
+            # =========================
+            # 실제 저장할 세트 검증
+            # =========================
+
+            manual_sets = []
+
+            gap_found = False
+
+            team_a_wins = 0
+            team_b_wins = 0
+
+            series_winner_side = None
+            winning_set_number = None
+
+
+            for (
+                set_number,
+                team_a_score,
+                team_b_score,
+                explicit_winner_side,
+            ) in requested_sets[:max_sets]:
+
+                # 둘 다 비어 있으면
+                # 여기서 실제 경기 종료
+                if (
+                    team_a_score is None
+                    and team_b_score is None
+                ):
+
+                    if explicit_winner_side is not None:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"{set_number}세트 점수 없이 "
+                                "승자만 지정할 수 없습니다."
+                            ),
+                        )
+
+                    gap_found = True
+                    continue
+
+
+                # 한쪽만 입력됨
+                if (
+                    team_a_score is None
+                    or team_b_score is None
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{set_number}세트의 "
+                            "양쪽 점수를 모두 입력해주세요."
+                        ),
+                    )
+
+
+                # 중간 빈 세트 이후 입력
+                if gap_found:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "중간 세트를 비워둔 채 "
+                            "다음 세트를 입력할 수 없습니다."
+                        ),
+                    )
+
+
+                if (
+                    team_a_score < 0
+                    or team_b_score < 0
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "점수는 0 이상의 "
+                            "정수여야 합니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 세트 승자
+                # =========================
+
+                if team_a_score > team_b_score:
+
+                    winner_side = "team_a"
+
+                    if (
+                        explicit_winner_side
+                        is not None
+                        and
+                        explicit_winner_side
+                        != winner_side
+                    ):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"{set_number}세트 승자와 "
+                                "입력 점수가 일치하지 않습니다."
+                            ),
+                        )
+
+
+                elif team_b_score > team_a_score:
+
+                    winner_side = "team_b"
+
+                    if (
+                        explicit_winner_side
+                        is not None
+                        and
+                        explicit_winner_side
+                        != winner_side
+                    ):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                f"{set_number}세트 승자와 "
+                                "입력 점수가 일치하지 않습니다."
+                            ),
+                        )
+
+
+                else:
+
+                    # 일반 경기에서는 무승부 허용
+                    if not is_playoff:
+                        winner_side = "draw"
+
+                    # 플레이오프는
+                    # 승부차기 등 실제 승자 필요
+                    else:
+
+                        if explicit_winner_side not in (
+                            "team_a",
+                            "team_b",
+                        ):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=(
+                                    f"{set_number}세트가 동점입니다. "
+                                    "플레이오프에서는 실제 승자를 "
+                                    "지정해야 합니다."
+                                ),
+                            )
+
+                        winner_side = (
+                            explicit_winner_side
+                        )
+
+
+                # =========================
+                # 선승 이후 추가 세트 방어
+                # =========================
+
+                if (
+                    is_playoff
+                    and
+                    series_winner_side is not None
+                ):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "선승 도달 이후의 "
+                            "추가 세트가 입력되었습니다."
+                        ),
+                    )
+
+
+                manual_sets.append(
+                    (
+                        set_number,
+                        team_a_score,
+                        team_b_score,
+                        winner_side,
+                    )
+                )
+
+
+                # =========================
+                # 플레이오프 승수 계산
+                # =========================
+
+                if is_playoff:
+
+                    if winner_side == "team_a":
+                        team_a_wins += 1
+
+                    elif winner_side == "team_b":
+                        team_b_wins += 1
+
+
+                    if (
+                        team_a_wins
+                        >= wins_required
+                    ):
+                        series_winner_side = (
+                            "team_a"
+                        )
+
+                        winning_set_number = (
+                            set_number
+                        )
+
+
+                    elif (
+                        team_b_wins
+                        >= wins_required
+                    ):
+                        series_winner_side = (
+                            "team_b"
+                        )
+
+                        winning_set_number = (
+                            set_number
+                        )
+
+
+            # =========================
+            # 일반 SERIES는 정확히 3세트
+            # =========================
+
+            if not is_playoff:
+
+                if len(manual_sets) != 3:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "프리시즌과 정규리그는 "
+                            "3세트를 모두 입력해야 합니다."
+                        ),
+                    )
+
+
+            # =========================
+            # 플레이오프는 선승 필수
+            # =========================
+
+            else:
+
+                if series_winner_side is None:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{wins_required}승에 도달한 "
+                            "참가자가 없습니다."
+                        ),
+                    )
+
+
+            # =========================
+            # 검증 완료 후 기존 기록 제거
             # =========================
 
             cursor.execute(
@@ -6252,9 +7823,6 @@ def manual_complete_fcl_series(
                 ),
             )
 
-            # =========================
-            # 기존 MVP 제거
-            # =========================
 
             cursor.execute(
                 """
@@ -6266,9 +7834,6 @@ def manual_complete_fcl_series(
                 ),
             )
 
-            # =========================
-            # 기존 선수 기록 제거
-            # =========================
 
             cursor.execute(
                 """
@@ -6280,32 +7845,16 @@ def manual_complete_fcl_series(
                 ),
             )
 
-            # =========================
-            # 수동 결과
-            # =========================
 
-            manual_sets = [
-                (
-                    1,
-                    request.set1_team_a,
-                    request.set1_team_b,
-                ),
-                (
-                    2,
-                    request.set2_team_a,
-                    request.set2_team_b,
-                ),
-                (
-                    3,
-                    request.set3_team_a,
-                    request.set3_team_b,
-                ),
-            ]
+            # =========================
+            # 세트 저장
+            # =========================
 
             for (
                 set_number,
                 team_a_score,
                 team_b_score,
+                winner_side,
             ) in manual_sets:
 
                 cursor.execute(
@@ -6313,14 +7862,12 @@ def manual_complete_fcl_series(
                     INSERT INTO series_sets (
                         series_id,
                         set_number,
-
                         nexon_match_id,
                         played_at,
-
                         team_a_score,
                         team_b_score,
-
-                        score_source
+                        score_source,
+                        winner_side
                     )
 
                     VALUES (
@@ -6330,25 +7877,23 @@ def manual_complete_fcl_series(
                         %s,
                         %s,
                         %s,
-                        'manual'
+                        'manual',
+                        %s
                     )
                     """,
                     (
                         series_id,
                         set_number,
-
                         finished_at,
-
                         team_a_score,
                         team_b_score,
+                        winner_side,
                     ),
                 )
 
+
             # =========================
-            # SERIES 결과 완료
-            #
-            # 점수 결과는 즉시 완료
-            # Nexon 통계는 pending
+            # SERIES 완료 + Snapshot
             # =========================
 
             cursor.execute(
@@ -6390,19 +7935,21 @@ def manual_complete_fcl_series(
                     series_id,
                 ),
             )
+
+
         connection.commit()
 
-    team_a_total_score = (
-        request.set1_team_a
-        + request.set2_team_a
-        + request.set3_team_a
+
+    team_a_total_score = sum(
+        manual_set[1]
+        for manual_set in manual_sets
     )
 
-    team_b_total_score = (
-        request.set1_team_b
-        + request.set2_team_b
-        + request.set3_team_b
+    team_b_total_score = sum(
+        manual_set[2]
+        for manual_set in manual_sets
     )
+
 
     return {
         "series_id":
@@ -6417,6 +7964,15 @@ def manual_complete_fcl_series(
         "series_type":
             series["series_type"],
 
+        "playoff_stage":
+            series["playoff_stage"],
+
+        "best_of":
+            series["best_of"],
+
+        "wins_required":
+            series["wins_required"],
+
         "team_a":
             series["team_a"],
 
@@ -6429,31 +7985,50 @@ def manual_complete_fcl_series(
         "team_b_score":
             team_b_total_score,
 
+        "team_a_wins":
+            (
+                team_a_wins
+                if is_playoff
+                else None
+            ),
+
+        "team_b_wins":
+            (
+                team_b_wins
+                if is_playoff
+                else None
+            ),
+
+        "winner_side":
+            series_winner_side,
+
+        "winning_set":
+            winning_set_number,
+
         "finished_at":
             finished_at.isoformat(),
 
         "sets": [
             {
-                "set": 1,
+                "set":
+                    set_number,
+
                 "team_a_score":
-                    request.set1_team_a,
+                    team_a_score,
+
                 "team_b_score":
-                    request.set1_team_b,
-            },
-            {
-                "set": 2,
-                "team_a_score":
-                    request.set2_team_a,
-                "team_b_score":
-                    request.set2_team_b,
-            },
-            {
-                "set": 3,
-                "team_a_score":
-                    request.set3_team_a,
-                "team_b_score":
-                    request.set3_team_b,
-            },
+                    team_b_score,
+
+                "winner_side":
+                    winner_side,
+            }
+
+            for (
+                set_number,
+                team_a_score,
+                team_b_score,
+                winner_side,
+            ) in manual_sets
         ],
     }
 
@@ -6489,6 +8064,11 @@ def get_fcl_series_status(
                     s.series_type,
                     s.match_type,
                     s.scheduled_date,
+
+                    s.playoff_stage,
+                    s.best_of,
+                    s.wins_required,
+
                     s.started_at,
                     s.completed_at,
                     s.finished_at,
@@ -6546,6 +8126,7 @@ def get_fcl_series_status(
                     team_a_score,
                     team_b_score,
                     score_source
+                    winner_side
 
                 FROM series_sets
 
@@ -6638,6 +8219,11 @@ def get_fcl_series_status(
                     saved_set[
                         "score_source"
                     ],
+
+                "winner_side":
+                    saved_set[
+                        "winner_side"
+                    ],
             }
         )
 
@@ -6658,6 +8244,21 @@ def get_fcl_series_status(
 
             "series_type":
                 series["series_type"],
+
+            "playoff_stage":
+                series[
+                    "playoff_stage"
+                ],
+
+            "best_of":
+                series[
+                    "best_of"
+                ],
+
+            "wins_required":
+                series[
+                    "wins_required"
+                ],
 
             "team_a":
                 series["team_a_name"],
@@ -8559,6 +10160,441 @@ def get_saved_series_mvp(
 
 
     return mvp
+
+
+# =========================
+# SEASON CHAMPION
+# 시즌 우승자 + FINAL MVP
+# =========================
+
+@app.get("/api/season/champion")
+def get_season_champion():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 현재 시즌 결승 SERIES
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.status,
+                    s.stats_sync_status,
+                    s.best_of,
+                    s.wins_required,
+
+                    s.team_a_id,
+                    s.team_b_id,
+
+                    s.team_a_snapshot_name,
+                    s.team_a_snapshot_logo_path,
+
+                    s.team_b_snapshot_name,
+                    s.team_b_snapshot_logo_path,
+
+                    team_a.fcl_name
+                        AS team_a_name,
+
+                    team_a.fc_nickname
+                        AS team_a_nickname,
+
+                    team_b.fcl_name
+                        AS team_b_name,
+
+                    team_b.fc_nickname
+                        AS team_b_nickname
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type = '플레이오프'
+
+                    AND
+                    s.playoff_stage = '결승시리즈'
+
+                    AND
+                    s.status <> 'cancelled'
+
+                ORDER BY s.id DESC
+
+                LIMIT 1
+                """
+            )
+
+
+            final_series = cursor.fetchone()
+
+
+            # 결승 자체가 아직 없음
+            if not final_series:
+                return {
+                    "season": 1,
+                    "completed": False,
+                    "champion": None,
+                    "final": None,
+                    "final_mvp": None,
+                }
+
+
+            # 결승이 아직 진행 중
+            if (
+                final_series["status"]
+                != "completed"
+            ):
+                return {
+                    "season": 1,
+                    "completed": False,
+                    "champion": None,
+                    "final": {
+                        "series_id":
+                            final_series["id"],
+
+                        "status":
+                            final_series["status"],
+                    },
+                    "final_mvp": None,
+                }
+
+
+            # =========================
+            # 결승 세트 결과
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    set_number,
+                    winner_side
+
+                FROM series_sets
+
+                WHERE series_id = %s
+
+                ORDER BY set_number
+                """,
+                (
+                    final_series["id"],
+                ),
+            )
+
+
+            final_sets = cursor.fetchall()
+
+
+            team_a_wins = 0
+            team_b_wins = 0
+
+            champion_side = None
+            winning_set = None
+
+            invalid_final = False
+
+
+            for final_set in final_sets:
+
+                winner_side = final_set[
+                    "winner_side"
+                ]
+
+
+                if winner_side not in (
+                    "team_a",
+                    "team_b",
+                ):
+                    invalid_final = True
+                    break
+
+
+                # 이미 우승 확정 뒤
+                # 추가 세트가 존재하면 비정상
+                if champion_side is not None:
+                    invalid_final = True
+                    break
+
+
+                if winner_side == "team_a":
+                    team_a_wins += 1
+
+                else:
+                    team_b_wins += 1
+
+
+                if (
+                    team_a_wins
+                    >= int(
+                        final_series[
+                            "wins_required"
+                        ]
+                    )
+                ):
+                    champion_side = "team_a"
+
+                    winning_set = final_set[
+                        "set_number"
+                    ]
+
+
+                elif (
+                    team_b_wins
+                    >= int(
+                        final_series[
+                            "wins_required"
+                        ]
+                    )
+                ):
+                    champion_side = "team_b"
+
+                    winning_set = final_set[
+                        "set_number"
+                    ]
+
+
+            # =========================
+            # 실제 4승 미도달
+            # 또는 비정상 데이터
+            # =========================
+
+            if (
+                invalid_final
+                or
+                champion_side is None
+            ):
+                return {
+                    "season": 1,
+                    "completed": False,
+                    "champion": None,
+
+                    "final": {
+                        "series_id":
+                            final_series["id"],
+
+                        "status":
+                            final_series["status"],
+
+                        "team_a_wins":
+                            team_a_wins,
+
+                        "team_b_wins":
+                            team_b_wins,
+                    },
+
+                    "final_mvp": None,
+                }
+
+
+            # =========================
+            # 우승자
+            # =========================
+
+            if champion_side == "team_a":
+
+                champion = {
+                    "participant_id":
+                        final_series[
+                            "team_a_id"
+                        ],
+
+                    "fcl_name":
+                        final_series[
+                            "team_a_name"
+                        ],
+
+                    "nickname":
+                        final_series[
+                            "team_a_nickname"
+                        ],
+
+                    "team_name":
+                        final_series[
+                            "team_a_snapshot_name"
+                        ],
+
+                    "team_logo_path":
+                        final_series[
+                            "team_a_snapshot_logo_path"
+                        ],
+                }
+
+            else:
+
+                champion = {
+                    "participant_id":
+                        final_series[
+                            "team_b_id"
+                        ],
+
+                    "fcl_name":
+                        final_series[
+                            "team_b_name"
+                        ],
+
+                    "nickname":
+                        final_series[
+                            "team_b_nickname"
+                        ],
+
+                    "team_name":
+                        final_series[
+                            "team_b_snapshot_name"
+                        ],
+
+                    "team_logo_path":
+                        final_series[
+                            "team_b_snapshot_logo_path"
+                        ],
+                }
+
+
+            # =========================
+            # FINAL MVP
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.fcl_name,
+                    p.fc_nickname
+                        AS nickname,
+
+                    sm.sp_id,
+                    sm.player_name,
+                    sm.sets_played,
+                    sm.rating_total,
+                    sm.average_rating,
+                    sm.goals,
+                    sm.assists,
+                    sm.image_url
+
+                FROM series_mvp AS sm
+
+                JOIN participants AS p
+                    ON p.id =
+                        sm.participant_id
+
+                WHERE sm.series_id = %s
+                """,
+                (
+                    final_series["id"],
+                ),
+            )
+
+
+            final_mvp_row = cursor.fetchone()
+
+
+    final_mvp = None
+
+
+    if final_mvp_row:
+
+        final_mvp = {
+            "fcl_name":
+                final_mvp_row[
+                    "fcl_name"
+                ],
+
+            "nickname":
+                final_mvp_row[
+                    "nickname"
+                ],
+
+            "sp_id":
+                final_mvp_row[
+                    "sp_id"
+                ],
+
+            "player_name":
+                final_mvp_row[
+                    "player_name"
+                ],
+
+            "sets_played":
+                final_mvp_row[
+                    "sets_played"
+                ],
+
+            "rating_total":
+                float(
+                    final_mvp_row[
+                        "rating_total"
+                    ]
+                ),
+
+            "average_rating":
+                float(
+                    final_mvp_row[
+                        "average_rating"
+                    ]
+                ),
+
+            "goals":
+                final_mvp_row[
+                    "goals"
+                ],
+
+            "assists":
+                final_mvp_row[
+                    "assists"
+                ],
+
+            "image_url":
+                final_mvp_row[
+                    "image_url"
+                ],
+        }
+
+
+    return {
+        "season": 1,
+
+        "completed": True,
+
+        "champion":
+            champion,
+
+        "final": {
+            "series_id":
+                final_series["id"],
+
+            "best_of":
+                final_series["best_of"],
+
+            "wins_required":
+                final_series[
+                    "wins_required"
+                ],
+
+            "team_a_wins":
+                team_a_wins,
+
+            "team_b_wins":
+                team_b_wins,
+
+            "winning_set":
+                winning_set,
+
+            "stats_sync_status":
+                final_series[
+                    "stats_sync_status"
+                ],
+        },
+
+        "final_mvp":
+            final_mvp,
+    }
+
 
 # =========================
 # 완료된 SERIES 결과 조회

@@ -80,6 +80,21 @@ scheduleListElement.addEventListener(
             return;
         }
 
+        const preseasonCancelButtonElement =
+            event.target.closest(
+                ".preseason-series-cancel-button"
+            );
+
+
+        if (preseasonCancelButtonElement) {
+
+            cancelPreseasonReservation(
+                preseasonCancelButtonElement
+            );
+
+            return;
+        }
+
 
         const preseasonStartButtonElement =
             event.target.closest(
@@ -328,6 +343,89 @@ async function startPreseasonSeries(
 
         buttonElement.disabled =
             false;
+
+        buttonElement.textContent =
+            originalText;
+    }
+}
+
+// =========================================
+// PRE-SEASON RESERVATION CANCEL
+// 예약 친선전 취소
+// =========================================
+
+async function cancelPreseasonReservation(
+    buttonElement
+) {
+
+    const seriesId =
+        Number(
+            buttonElement.dataset.seriesId
+        );
+
+
+    if (!seriesId) {
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "예약한 친선전을 취소하시겠습니까?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const originalText =
+        buttonElement.textContent;
+
+
+    buttonElement.disabled = true;
+
+    buttonElement.textContent =
+        "취소 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}`
+            + `/api/fconline/series/`
+            + `${seriesId}/cancel`,
+            {
+                method: "POST"
+            }
+        );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ?? "친선전 예약 취소에 실패했습니다."
+            );
+        }
+
+
+        await loadSchedule();
+
+
+    } catch (error) {
+
+        alert(
+            error.message
+        );
+
+
+        buttonElement.disabled = false;
 
         buttonElement.textContent =
             originalText;
@@ -711,24 +809,26 @@ function renderSchedule(matches) {
 
         // =====================================
         // PRE-SEASON
-        // 예약됨 + 경기 당일
+        // 예약 상태
         // =====================================
 
         if (
             isPreseasonMatch
             &&
             match.series_id
-            !== null
+                !== null
             &&
             match.status
-            === "scheduled"
-            &&
-            isTodayMatch
+                === "scheduled"
         ) {
 
-            seriesStartHtml = `
-                <div class="schedule-series-control">
+            let preseasonStartButtonHtml = "";
 
+
+            // 경기 시작은 당일만 가능
+            if (isTodayMatch) {
+
+                preseasonStartButtonHtml = `
                     <button
                         type="button"
                         class="preseason-series-start-button"
@@ -736,6 +836,23 @@ function renderSchedule(matches) {
                         data-series-id="${match.series_id}"
                     >
                         경기 시작
+                    </button>
+                `;
+            }
+
+
+            seriesStartHtml = `
+                <div class="schedule-series-control">
+
+                    ${preseasonStartButtonHtml}
+
+                    <button
+                        type="button"
+                        class="preseason-series-cancel-button"
+
+                        data-series-id="${match.series_id}"
+                    >
+                        예약 취소
                     </button>
 
                 </div>

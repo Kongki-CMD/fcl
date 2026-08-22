@@ -1,12 +1,18 @@
 .admin-site-link {
-    color: #555;
+    margin-left: auto;
+
+    color: #aaa;
+
     text-decoration: none;
     font-size: 14px;
+
+    transition: 0.2s;
 }
 
 .admin-site-link:hover {
-    color: #111;
+    color: white;
 }
+
 
 
 /* ========================================
@@ -14,8 +20,16 @@
 ======================================== */
 
 .admin-page {
-    min-height: calc(100vh - 80px);
+    width: 100%;
+    max-width: none;
+
+    min-height: calc(100vh - 70px);
+
+    margin: 0;
+    padding: 0;
+
     background: #f6f7f9;
+    color: #222;
 }
 
 
@@ -24,7 +38,7 @@
 ======================================== */
 
 .admin-login-section {
-    min-height: calc(100vh - 80px);
+    min-height: calc(100vh - 70px);
 
     display: flex;
     justify-content: center;
@@ -102,7 +116,7 @@
 .admin-dashboard {
     display: flex;
 
-    min-height: calc(100vh - 80px);
+    min-height: calc(100vh - 70px);
 }
 
 .admin-sidebar {
@@ -175,22 +189,41 @@
 
 .admin-content {
     flex: 1;
+    min-width: 0;
 
     padding: 40px;
 
     box-sizing: border-box;
 }
 
+
 .admin-content-page {
     display: none;
+
+    width: 100%;
+    max-width: 1200px;
+
+    margin: 0 auto;
 }
+
 
 .admin-content-page.active {
     display: block;
 }
 
+
 .admin-content-page h1 {
-    margin-top: 0;
+    margin: 0 0 10px;
+
+    font-size: 28px;
+}
+
+
+.admin-content-page > p {
+    color: #777;
+
+    font-size: 14px;
+    line-height: 1.6;
 }
 
 .admin-placeholder {
@@ -536,4 +569,651 @@
 
     background: #17191d;
     color: white;
+}
+
+/* ========================================
+   정규리그 일정 관리
+======================================== */
+
+.admin-schedule-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+
+    margin-top: 25px;
+}
+
+
+.admin-schedule-card {
+    display: grid;
+    grid-template-columns:
+        180px 140px 1fr auto;
+
+    align-items: center;
+    gap: 24px;
+
+    padding: 20px;
+
+    background: white;
+
+    border: 1px solid #e2e4e8;
+    border-radius: 10px;
+}
+
+
+.admin-schedule-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+
+    color: #777;
+    font-size: 13px;
+}
+
+
+.admin-schedule-meta strong {
+    color: #222;
+    font-size: 14px;
+}
+
+
+.admin-schedule-date {
+    font-weight: 600;
+}
+
+
+.admin-schedule-match {
+    display: grid;
+    grid-template-columns:
+        1fr 40px 1fr;
+
+    align-items: center;
+
+    text-align: center;
+}
+
+
+.admin-schedule-match strong {
+    color: #999;
+    font-size: 13px;
+}
+
+
+.admin-schedule-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+
+.admin-schedule-edit-button {
+    padding: 9px 14px;
+
+    border: 1px solid #777;
+    border-radius: 5px;
+
+    background: white;
+    color: #333;
+
+    cursor: pointer;
+}
+
+
+.admin-schedule-edit-button:hover {
+    background: #f2f3f5;
+}
+
+
+/* ========================================
+   일정 수정 팝업
+======================================== */
+
+#admin-schedule-edit-modal
+.admin-result-edit-panel label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    color: #666;
+    font-size: 13px;
+}
+
+
+#admin-schedule-edit-date {
+    width: 100%;
+    height: 42px;
+
+    padding: 0 12px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #ccc;
+    border-radius: 5px;
+
+    background: white;
+
+    font-family: inherit;
+    font-size: 14px;
+}
+
+
+#admin-schedule-edit-save {
+    border-color: #17191d;
+
+    background: #17191d;
+    color: white;
+}
+
+/* ========================================
+   TABLET / MOBILE
+======================================== */
+
+@media (max-width: 768px) {
+
+    /* ====================================
+       관리자 헤더
+    ==================================== */
+
+    .admin-page {
+        min-height: 0;
+    }
+
+
+    .admin-site-link {
+        margin-left: 0;
+
+        font-size: 13px;
+    }
+
+
+    /* ====================================
+       로그인
+    ==================================== */
+
+    .admin-login-section {
+        min-height: calc(100vh - 120px);
+
+        padding: 24px 16px;
+
+        box-sizing: border-box;
+    }
+
+
+    .admin-login-card {
+        width: 100%;
+        max-width: 380px;
+
+        padding: 30px 22px;
+    }
+
+
+    /* ====================================
+       관리자 전체 레이아웃
+    ==================================== */
+
+    .admin-dashboard {
+    display: block;
+
+    min-height: 0;
+}
+
+
+/* ====================================
+   모바일 관리자 상단
+==================================== */
+
+.admin-sidebar {
+    width: 100%;
+
+    background: #17191d;
+}
+
+
+/* FCL ADMIN + 로그아웃 */
+
+.admin-sidebar-header {
+    padding: 12px 14px;
+
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+}
+
+
+.admin-sidebar-header strong {
+    font-size: 13px;
+}
+
+
+.admin-logout-button {
+    padding: 7px 12px;
+
+    font-size: 12px;
+}
+
+
+/* ====================================
+   사이드 메뉴 → 상단 탭
+==================================== */
+
+.admin-menu {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    width: 100%;
+
+    padding: 0;
+
+    border-top: 1px solid #2d3036;
+    border-bottom: 1px solid #2d3036;
+}
+
+
+.admin-menu-button {
+    min-width: 0;
+
+    padding: 12px 6px;
+
+    border: none;
+    border-radius: 0;
+
+    background: transparent;
+
+    color: #888;
+
+    font-size: 12px;
+    text-align: center;
+
+    white-space: normal;
+
+    line-height: 1.3;
+}
+
+
+.admin-menu-button:hover {
+    background: transparent;
+
+    color: #ddd;
+}
+
+
+.admin-menu-button.active {
+    background: #22252a;
+
+    color: white;
+
+    box-shadow:
+        inset 0 -2px 0 #b49a5a;
+}
+
+
+/* 4번째, 5번째 탭 */
+
+.admin-menu-button:nth-child(4),
+.admin-menu-button:nth-child(5) {
+    grid-column: span 1;
+}
+
+
+    /* ====================================
+       콘텐츠
+    ==================================== */
+
+    .admin-content {
+        width: 100%;
+
+        padding: 26px 14px;
+    }
+
+
+    .admin-content-page h1 {
+        font-size: 24px;
+    }
+
+
+    /* ====================================
+       참가자
+    ==================================== */
+
+    .admin-participant-list {
+        gap: 12px;
+
+        margin-top: 20px;
+    }
+
+
+    .admin-participant-card {
+        grid-template-columns: 1fr;
+
+        gap: 18px;
+
+        padding: 18px 16px;
+    }
+
+
+    .admin-participant-info {
+        gap: 12px;
+    }
+
+
+    .admin-participant-logo {
+        width: 52px;
+        height: 52px;
+    }
+
+
+    .admin-team-fields {
+        grid-template-columns: 1fr;
+
+        gap: 12px;
+    }
+
+
+    .admin-team-fields input {
+        width: 100%;
+
+        min-width: 0;
+    }
+
+
+    .admin-participant-actions {
+        width: 100%;
+
+        align-items: stretch;
+    }
+
+
+    .admin-team-save-button {
+        width: 100%;
+
+        min-height: 42px;
+    }
+
+
+    .admin-participant-message {
+        text-align: center;
+    }
+
+
+    /* ====================================
+       경기 결과
+    ==================================== */
+
+    .admin-result-list {
+        gap: 12px;
+
+        margin-top: 20px;
+    }
+
+
+    .admin-result-card {
+        padding: 18px 14px;
+    }
+
+
+    .admin-result-meta {
+        margin-bottom: 16px;
+    }
+
+
+    .admin-result-match {
+        grid-template-columns:
+            1fr
+            70px
+            1fr;
+
+        gap: 6px;
+    }
+
+
+    .admin-result-team {
+        flex-direction: column;
+
+        gap: 7px;
+
+        text-align: center;
+
+        font-size: 14px;
+    }
+
+
+    .admin-result-team img {
+        width: 42px;
+        height: 42px;
+    }
+
+
+    .admin-result-total-score {
+        font-size: 22px;
+    }
+
+
+    .admin-result-sets {
+        flex-wrap: wrap;
+
+        gap: 8px 14px;
+
+        margin-top: 16px;
+    }
+
+
+    .admin-result-actions {
+        gap: 8px;
+    }
+
+
+    .admin-result-actions button {
+        flex: 1;
+
+        min-height: 40px;
+    }
+
+
+    /* ====================================
+       정규리그 일정
+    ==================================== */
+
+    .admin-schedule-list {
+        gap: 12px;
+
+        margin-top: 20px;
+    }
+
+
+    .admin-schedule-card {
+        grid-template-columns: 1fr;
+
+        gap: 14px;
+
+        padding: 18px 16px;
+    }
+
+
+    .admin-schedule-meta {
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+
+        gap: 6px 12px;
+    }
+
+
+    .admin-schedule-date {
+        font-size: 15px;
+    }
+
+
+    .admin-schedule-match {
+        grid-template-columns:
+            1fr
+            34px
+            1fr;
+
+        gap: 4px;
+
+        font-size: 15px;
+    }
+
+
+    .admin-schedule-actions {
+        width: 100%;
+    }
+
+
+    .admin-schedule-edit-button {
+        width: 100%;
+
+        min-height: 42px;
+    }
+
+
+    /* ====================================
+       팝업
+    ==================================== */
+
+    .admin-result-edit-modal {
+        padding: 14px;
+
+        overflow-y: auto;
+    }
+
+
+    .admin-result-edit-panel {
+        max-width: 400px;
+
+        padding: 24px 18px;
+    }
+
+
+    .admin-result-edit-panel h2 {
+        font-size: 21px;
+    }
+
+
+    .admin-result-edit-grid {
+        grid-template-columns:
+            60px
+            1fr
+            18px
+            1fr;
+
+        gap: 10px 6px;
+    }
+
+
+    .admin-result-edit-grid input {
+        width: 100%;
+        min-width: 0;
+    }
+
+
+    .admin-result-edit-actions button {
+        flex: 1;
+
+        min-height: 42px;
+    }
+
+
+    #admin-schedule-edit-date {
+        min-height: 44px;
+    }
+}
+
+
+/* ========================================
+   SMALL MOBILE
+======================================== */
+
+@media (max-width: 480px) {
+
+    .admin-content {
+        padding: 22px 10px;
+    }
+
+
+    .admin-content-page h1 {
+        font-size: 22px;
+    }
+
+
+    .admin-login-section {
+        padding: 20px 10px;
+    }
+
+
+    .admin-login-card {
+        padding: 26px 18px;
+    }
+
+
+    .admin-menu {
+        padding: 7px;
+    }
+
+
+    .admin-menu-button {
+        padding: 9px 11px;
+
+        font-size: 12px;
+    }
+
+
+    .admin-participant-card,
+    .admin-result-card,
+    .admin-schedule-card {
+        padding: 16px 12px;
+    }
+
+
+    .admin-result-match {
+        grid-template-columns:
+            1fr
+            58px
+            1fr;
+    }
+
+
+    .admin-result-team img {
+        width: 36px;
+        height: 36px;
+    }
+
+
+    .admin-result-team {
+        font-size: 13px;
+    }
+
+
+    .admin-result-total-score {
+        font-size: 20px;
+    }
+
+
+    .admin-result-sets {
+        font-size: 12px;
+    }
+
+
+    .admin-schedule-match {
+        font-size: 14px;
+    }
+
+
+    .admin-result-edit-panel {
+        padding: 22px 14px;
+    }
+
+
+    .admin-result-edit-grid {
+        grid-template-columns:
+            52px
+            1fr
+            14px
+            1fr;
+
+        font-size: 13px;
+    }
 }

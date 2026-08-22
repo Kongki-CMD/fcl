@@ -104,40 +104,9 @@ const manualTeamBNameElement =
         "#manual-team-b-name"
     );
 
-
-const manualSet1TeamAElement =
+const manualResultSetListElement =
     document.querySelector(
-        "#manual-set1-team-a"
-    );
-
-
-const manualSet1TeamBElement =
-    document.querySelector(
-        "#manual-set1-team-b"
-    );
-
-
-const manualSet2TeamAElement =
-    document.querySelector(
-        "#manual-set2-team-a"
-    );
-
-
-const manualSet2TeamBElement =
-    document.querySelector(
-        "#manual-set2-team-b"
-    );
-
-
-const manualSet3TeamAElement =
-    document.querySelector(
-        "#manual-set3-team-a"
-    );
-
-
-const manualSet3TeamBElement =
-    document.querySelector(
-        "#manual-set3-team-b"
+        "#manual-result-set-list"
     );
 
 
@@ -200,6 +169,10 @@ let currentTeamA = "";
 let currentTeamB = "";
 
 let currentSeriesType = "";
+
+let currentPlayoffStage = null;
+let currentSeriesBestOf = 3;
+let currentWinsRequired = null;
 
 let statusTimer = null;
 
@@ -676,13 +649,25 @@ function renderSeriesStatus(data) {
     currentSeriesType =
         series.series_type;
 
+    currentPlayoffStage =
+    series.playoff_stage
+    ?? null;
+
+    currentSeriesBestOf =
+        series.best_of
+        ?? 3;
+
+    currentWinsRequired =
+        series.wins_required
+        ?? null;
+
 
     seriesTitleElement.textContent =
         `${series.team_a} VS ${series.team_b}`;
 
 
     seriesProgressElement.textContent =
-        `${series.set_count} / 3`;
+        `${series.set_count} / ${currentSeriesBestOf}`;
 
 
     /* =========================
@@ -695,7 +680,7 @@ function renderSeriesStatus(data) {
 
     for (
         let setNumber = 1;
-        setNumber <= 3;
+        setNumber <= currentSeriesBestOf;
         setNumber++
     ) {
 
@@ -1141,6 +1126,254 @@ async function cancelSeries() {
 
 }
 
+
+function renderManualResultInputs() {
+
+    manualResultSetListElement.innerHTML =
+        "";
+
+
+    for (
+        let setNumber = 1;
+        setNumber <= currentSeriesBestOf;
+        setNumber++
+    ) {
+
+        const rowElement =
+            document.createElement(
+                "div"
+            );
+
+
+        rowElement.classList.add(
+            "manual-result-row"
+        );
+
+
+        rowElement.dataset.setNumber =
+            String(
+                setNumber
+            );
+
+
+        rowElement.innerHTML = `
+            <div class="manual-set-name">
+                ${setNumber} SET
+            </div>
+
+            <input
+                type="number"
+                class="manual-score-input manual-team-a-score"
+                min="0"
+                step="1"
+            >
+
+            <div class="manual-score-divider">
+                :
+            </div>
+
+            <input
+                type="number"
+                class="manual-score-input manual-team-b-score"
+                min="0"
+                step="1"
+            >
+        `;
+
+
+        // =========================
+        // 플레이오프 동점 승자 선택
+        // =========================
+
+        if (
+            currentSeriesType
+            === "플레이오프"
+        ) {
+
+            const winnerChoiceElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            winnerChoiceElement.classList.add(
+                "manual-winner-choice",
+                "hidden"
+            );
+
+
+            winnerChoiceElement.innerHTML = `
+                <button
+                    type="button"
+                    class="manual-winner-button"
+                    data-winner-side="team_a"
+                >
+                    ${currentTeamA} 승
+                </button>
+
+                <button
+                    type="button"
+                    class="manual-winner-button"
+                    data-winner-side="team_b"
+                >
+                    ${currentTeamB} 승
+                </button>
+            `;
+
+
+            rowElement.append(
+                winnerChoiceElement
+            );
+
+
+            const teamAScoreElement =
+                rowElement.querySelector(
+                    ".manual-team-a-score"
+                );
+
+
+            const teamBScoreElement =
+                rowElement.querySelector(
+                    ".manual-team-b-score"
+                );
+
+
+            const winnerButtons =
+                winnerChoiceElement.querySelectorAll(
+                    ".manual-winner-button"
+                );
+
+
+winnerButtons.forEach(
+    buttonElement => {
+
+        buttonElement.addEventListener(
+            "click",
+            () => {
+
+                rowElement.dataset.winnerSide =
+                    buttonElement.dataset.winnerSide;
+
+
+                winnerButtons.forEach(
+                    winnerButtonElement => {
+
+                        const isSelected =
+                            winnerButtonElement
+                            === buttonElement;
+
+
+                        const winnerName =
+                            (
+                                winnerButtonElement.dataset.winnerSide
+                                === "team_a"
+                            )
+                                ? currentTeamA
+                                : currentTeamB;
+
+
+                        winnerButtonElement.classList.toggle(
+                            "selected",
+                            isSelected
+                        );
+
+
+                        winnerButtonElement.textContent =
+                            isSelected
+                                ? `✓ ${winnerName} 승`
+                                : `${winnerName} 승`;
+                    }
+                );
+            }
+        );
+    }
+);
+
+            const updateWinnerChoice =
+                () => {
+
+                    const teamAValue =
+                        teamAScoreElement.value;
+
+                    const teamBValue =
+                        teamBScoreElement.value;
+
+
+                    const isDraw =
+                        teamAValue !== ""
+                        &&
+                        teamBValue !== ""
+                        &&
+                        Number(teamAValue)
+                        === Number(teamBValue);
+
+
+                    if (isDraw) {
+
+                        winnerChoiceElement.classList.remove(
+                            "hidden"
+                        );
+
+                        return;
+                    }
+
+
+                    winnerChoiceElement.classList.add(
+                        "hidden"
+                    );
+
+
+                    delete rowElement.dataset.winnerSide;
+
+
+winnerButtons.forEach(
+    winnerButtonElement => {
+
+        winnerButtonElement.classList.remove(
+            "selected"
+        );
+
+
+        const winnerName =
+            (
+                winnerButtonElement.dataset.winnerSide
+                === "team_a"
+            )
+                ? currentTeamA
+                : currentTeamB;
+
+
+        winnerButtonElement.textContent =
+            `${winnerName} 승`;
+    }
+);
+                };
+
+
+            teamAScoreElement.addEventListener(
+                "input",
+                updateWinnerChoice
+            );
+
+
+            teamBScoreElement.addEventListener(
+                "input",
+                updateWinnerChoice
+            );
+        }
+
+
+        // 플레이오프 여부와 관계없이
+        // 모든 세트 행을 화면에 추가
+        manualResultSetListElement.append(
+            rowElement
+        );
+    }
+}
+
+
+
+
 /* =========================
    수동 결과 입력창
 ========================= */
@@ -1157,6 +1390,8 @@ function openManualResultPanel() {
 
     manualTeamBNameElement.textContent =
         currentTeamB;
+
+    renderManualResultInputs();
 
 
     manualResultMessageElement.textContent =
@@ -1236,66 +1471,224 @@ async function completeManualResult() {
     }
 
 
-    const scoreElements = [
-        manualSet1TeamAElement,
-        manualSet1TeamBElement,
-
-        manualSet2TeamAElement,
-        manualSet2TeamBElement,
-
-        manualSet3TeamAElement,
-        manualSet3TeamBElement,
+    const rowElements = [
+        ...manualResultSetListElement.querySelectorAll(
+            ".manual-result-row"
+        )
     ];
 
 
-    const hasEmptyScore =
-        scoreElements.some(
-            element =>
-                element.value === ""
-        );
+    const requestBody = {};
+
+    let gapFound = false;
+
+    let playedSetCount = 0;
 
 
-    if (hasEmptyScore) {
+    for (
+        const rowElement
+        of rowElements
+    ) {
+
+        const setNumber =
+            Number(
+                rowElement.dataset.setNumber
+            );
+
+
+        const teamAScoreElement =
+            rowElement.querySelector(
+                ".manual-team-a-score"
+            );
+
+
+        const teamBScoreElement =
+            rowElement.querySelector(
+                ".manual-team-b-score"
+            );
+
+
+        const teamAValue =
+            teamAScoreElement.value.trim();
+
+        const teamBValue =
+            teamBScoreElement.value.trim();
+
+
+        /*
+         * 양쪽 모두 비어있으면
+         * 이후 세트는 아직 진행 안 한 것으로 처리
+         */
+        if (
+            teamAValue === ""
+            &&
+            teamBValue === ""
+        ) {
+
+            gapFound = true;
+            continue;
+        }
+
+
+        /*
+         * 한쪽만 입력
+         */
+        if (
+            teamAValue === ""
+            ||
+            teamBValue === ""
+        ) {
+
+            manualResultMessageElement.textContent =
+                `${setNumber}세트 양쪽 점수를 모두 입력해주세요.`;
+
+            return;
+        }
+
+
+        /*
+         * 중간 세트를 비우고
+         * 다음 세트가 입력된 경우
+         */
+        if (gapFound) {
+
+            manualResultMessageElement.textContent =
+                "중간 세트를 비워둔 채 다음 세트를 입력할 수 없습니다.";
+
+            return;
+        }
+
+
+        const teamAScore =
+            Number(
+                teamAValue
+            );
+
+        const teamBScore =
+            Number(
+                teamBValue
+            );
+
+
+        if (
+            !Number.isInteger(
+                teamAScore
+            )
+            ||
+            !Number.isInteger(
+                teamBScore
+            )
+            ||
+            teamAScore < 0
+            ||
+            teamBScore < 0
+        ) {
+
+            manualResultMessageElement.textContent =
+                "점수는 0 이상의 정수만 입력해주세요.";
+
+            return;
+        }
+
+
+        requestBody[
+            `set${setNumber}_team_a`
+        ] = teamAScore;
+
+
+        requestBody[
+            `set${setNumber}_team_b`
+        ] = teamBScore;
+
+
+        /*
+         * 플레이오프 동점 세트
+         * 실제 승자 선택
+         */
+        if (
+            currentSeriesType
+            === "플레이오프"
+            &&
+            teamAScore === teamBScore
+        ) {
+
+            const winnerSide =
+                rowElement.dataset.winnerSide
+                ?? "";
+
+
+            if (!winnerSide) {
+
+                manualResultMessageElement.textContent =
+                    `${setNumber}세트의 실제 승자를 선택해주세요.`;
+
+                return;
+            }
+
+
+            requestBody[
+                `set${setNumber}_winner_side`
+            ] = winnerSide;
+        }
+
+
+        playedSetCount++;
+    }
+
+
+    /*
+     * 일반 SERIES는 정확히 3세트
+     */
+    if (
+        currentSeriesType
+        !== "플레이오프"
+        &&
+        playedSetCount !== 3
+    ) {
 
         manualResultMessageElement.textContent =
             "3세트 점수를 모두 입력해주세요.";
 
         return;
-
     }
 
 
-    const scores =
-        scoreElements.map(
-            element =>
-                Number(
-                    element.value
-                )
-        );
-
-
-    const hasInvalidScore =
-        scores.some(
-            score =>
-                !Number.isInteger(score)
-                ||
-                score < 0
-        );
-
-
-    if (hasInvalidScore) {
+    /*
+     * 플레이오프는
+     * 최소한 한 세트 이상 입력 필요
+     *
+     * 최종 선승 여부는
+     * 백엔드가 다시 검증
+     */
+    if (
+        currentSeriesType
+        === "플레이오프"
+        &&
+        playedSetCount === 0
+    ) {
 
         manualResultMessageElement.textContent =
-            "점수는 0 이상의 정수만 입력해주세요.";
+            "경기 결과를 입력해주세요.";
 
         return;
-
     }
+
+
+    const seriesLabel =
+        (
+            currentSeriesType
+            === "플레이오프"
+        )
+            ? (
+                currentPlayoffStage
+                ?? "플레이오프"
+            )
+            : currentSeriesType;
 
 
     const confirmed =
         window.confirm(
-            "입력한 결과로 경기를 완료하시겠습니까?"
+            `입력한 결과로 ${seriesLabel} 경기를 완료하시겠습니까?`
         );
 
 
@@ -1316,37 +1709,23 @@ async function completeManualResult() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/fconline/series/${currentSeriesId}/manual-complete`,
-            {
-                method: "POST",
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/fconline/series/${currentSeriesId}/manual-complete`,
+                {
+                    method: "POST",
 
-                headers: {
-                    "Content-Type":
-                        "application/json"
-                },
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
 
-                body: JSON.stringify({
-                    set1_team_a:
-                        scores[0],
-
-                    set1_team_b:
-                        scores[1],
-
-                    set2_team_a:
-                        scores[2],
-
-                    set2_team_b:
-                        scores[3],
-
-                    set3_team_a:
-                        scores[4],
-
-                    set3_team_b:
-                        scores[5]
-                })
-            }
-        );
+                    body:
+                        JSON.stringify(
+                            requestBody
+                        )
+                }
+            );
 
 
         const data =
@@ -1360,7 +1739,6 @@ async function completeManualResult() {
                 ??
                 "수동 결과 저장에 실패했습니다."
             );
-
         }
 
 
@@ -1372,21 +1750,13 @@ async function completeManualResult() {
         currentSeriesId = null;
 
         currentTeamA = "";
-
         currentTeamB = "";
 
+        currentSeriesType = "";
 
-        manualResultMessageElement.textContent =
-            "결과가 저장되었습니다.";
-
-
-        preseasonMessageElement.textContent =
-            (
-                "경기 결과 저장 완료. "
-                + "NEXON 선수 기록은 "
-                + "결과 페이지에서 "
-                + "나중에 동기화할 수 있습니다."
-            );
+        currentPlayoffStage = null;
+        currentSeriesBestOf = 3;
+        currentWinsRequired = null;
 
 
         window.location.href =
@@ -1407,9 +1777,7 @@ async function completeManualResult() {
 
 
         startStatusPolling();
-
     }
-
 }
 
 /* =========================

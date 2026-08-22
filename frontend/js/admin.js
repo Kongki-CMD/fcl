@@ -57,6 +57,44 @@ const adminResultListElement =
         "#admin-result-list"
     );
 
+const adminScheduleListElement =
+    document.querySelector(
+        "#admin-schedule-list"
+    );
+
+const adminScheduleEditModalElement =
+    document.querySelector(
+        "#admin-schedule-edit-modal"
+    );
+
+const adminScheduleEditTitleElement =
+    document.querySelector(
+        "#admin-schedule-edit-title"
+    );
+
+const adminScheduleEditDateElement =
+    document.querySelector(
+        "#admin-schedule-edit-date"
+    );
+
+const adminScheduleEditMessageElement =
+    document.querySelector(
+        "#admin-schedule-edit-message"
+    );
+
+const adminScheduleEditCancelButtonElement =
+    document.querySelector(
+        "#admin-schedule-edit-cancel"
+    );
+
+const adminScheduleEditSaveButtonElement =
+    document.querySelector(
+        "#admin-schedule-edit-save"
+    );
+
+
+let editingAdminSchedule = null;
+
 const adminResultEditModalElement =
     document.querySelector(
         "#admin-result-edit-modal"
@@ -402,7 +440,15 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminResults();
-}
+                }
+                if (
+                    targetPage
+                    === "schedule"
+                ) {
+
+                    loadAdminRegularSchedule();
+                }
+
             }
         );
     }
@@ -992,6 +1038,456 @@ function renderAdminResults(
 }
 
 // =========================================
+// 정규리그 일정 조회
+// =========================================
+
+async function loadAdminRegularSchedule() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminScheduleListElement
+        .textContent =
+            "정규리그 일정을 불러오는 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}`
+            + "/api/admin/regular-schedule",
+            {
+                headers: {
+                    "X-Admin-Token":
+                        adminToken,
+                },
+            }
+        );
+
+
+        if (response.status === 401) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        const schedules =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                schedules.detail
+                ?? "정규리그 일정 조회 실패"
+            );
+        }
+
+
+        renderAdminRegularSchedule(
+            schedules
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminScheduleListElement
+            .textContent =
+                "정규리그 일정을 불러오지 못했습니다.";
+    }
+}
+
+// =========================================
+// 정규리그 일정 출력
+// =========================================
+
+function renderAdminRegularSchedule(
+    schedules
+) {
+
+    adminScheduleListElement
+        .innerHTML = "";
+
+
+    if (schedules.length === 0) {
+
+        adminScheduleListElement
+            .textContent =
+                "등록된 정규리그 일정이 없습니다.";
+
+        return;
+    }
+
+
+    schedules.forEach(
+        (schedule) => {
+
+            const scheduleCardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            scheduleCardElement
+                .classList.add(
+                    "admin-schedule-card"
+                );
+
+
+            let statusText =
+                schedule.status;
+
+
+            if (
+                schedule.status
+                === "scheduled"
+            ) {
+
+                statusText = "예정";
+
+            } else if (
+                schedule.status
+                === "active"
+            ) {
+
+                statusText = "진행 중";
+
+            } else if (
+                schedule.status
+                === "completed"
+            ) {
+
+                statusText = "완료";
+
+            } else if (
+                schedule.status
+                === "cancelled"
+            ) {
+
+                statusText = "취소";
+            }
+
+
+            let scheduleActionHtml = "";
+
+
+            if (
+                schedule.status
+                === "scheduled"
+            ) {
+
+                scheduleActionHtml = `
+                    <button
+                        type="button"
+                        class="admin-schedule-edit-button"
+                    >
+                        날짜 변경
+                    </button>
+                `;
+            }
+
+
+            scheduleCardElement
+                .innerHTML = `
+                    <div class="admin-schedule-meta">
+
+                        <strong>
+                            ROUND ${schedule.round}
+                        </strong>
+
+                        <span>
+                            경기 ${schedule.fixture_number}
+                        </span>
+
+                        <span>
+                            ${statusText}
+                        </span>
+
+                    </div>
+
+
+                    <div class="admin-schedule-date">
+                        ${schedule.date ?? "-"}
+                    </div>
+
+
+                    <div class="admin-schedule-match">
+
+                        <span>
+                            ${schedule.team_a}
+                        </span>
+
+                        <strong>
+                            VS
+                        </strong>
+
+                        <span>
+                            ${schedule.team_b}
+                        </span>
+
+                    </div>
+
+
+                    <div class="admin-schedule-actions">
+                        ${scheduleActionHtml}
+                    </div>
+                `;
+
+
+            const editButtonElement =
+                scheduleCardElement
+                    .querySelector(
+                        ".admin-schedule-edit-button"
+                    );
+
+
+            if (editButtonElement) {
+
+                editButtonElement
+                    .addEventListener(
+                        "click",
+                        () => {
+
+                            openAdminScheduleEdit(
+                                schedule
+                            );
+                        }
+                    );
+            }
+
+
+            adminScheduleListElement
+                .appendChild(
+                    scheduleCardElement
+                );
+        }
+    );
+}
+
+// =========================================
+// 정규리그 일정 수정 열기
+// =========================================
+
+function openAdminScheduleEdit(
+    schedule
+) {
+
+    editingAdminSchedule =
+        schedule;
+
+
+    adminScheduleEditTitleElement
+        .textContent =
+            `ROUND ${schedule.round}`
+            + ` / 경기 ${schedule.fixture_number}`
+            + ` / ${schedule.team_a}`
+            + " VS "
+            + `${schedule.team_b}`;
+
+
+    adminScheduleEditDateElement
+        .value =
+            schedule.date ?? "";
+
+
+    adminScheduleEditMessageElement
+        .textContent = "";
+
+
+    adminScheduleEditModalElement
+        .classList.remove(
+            "hidden"
+        );
+}
+
+
+// =========================================
+// 정규리그 일정 수정 닫기
+// =========================================
+
+function closeAdminScheduleEdit() {
+
+    editingAdminSchedule =
+        null;
+
+
+    adminScheduleEditMessageElement
+        .textContent = "";
+
+
+    adminScheduleEditModalElement
+        .classList.add(
+            "hidden"
+        );
+}
+
+// =========================================
+// 정규리그 일정 수정 저장
+// =========================================
+
+adminScheduleEditSaveButtonElement
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!editingAdminSchedule) {
+                return;
+            }
+
+
+            const scheduledDate =
+                adminScheduleEditDateElement
+                    .value;
+
+
+            if (!scheduledDate) {
+
+                adminScheduleEditMessageElement
+                    .textContent =
+                        "경기 날짜를 선택해주세요.";
+
+                return;
+            }
+
+
+            const isConfirmed =
+                confirm(
+                    `${editingAdminSchedule.date}`
+                    + " → "
+                    + `${scheduledDate}\n\n`
+                    + "경기 날짜를 변경하시겠습니까?"
+                );
+
+
+            if (!isConfirmed) {
+                return;
+            }
+
+
+            const adminToken =
+                getAdminToken();
+
+
+            adminScheduleEditSaveButtonElement
+                .disabled = true;
+
+
+            adminScheduleEditMessageElement
+                .textContent =
+                    "저장 중...";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${apiBaseUrl}`
+                        + `/api/admin/series/`
+                        + `${editingAdminSchedule.series_id}`
+                        + "/schedule",
+                        {
+                            method: "PUT",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+
+                                "X-Admin-Token":
+                                    adminToken,
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    scheduled_date:
+                                        scheduledDate,
+                                }),
+                        }
+                    );
+
+
+                const responseData =
+                    await response.json();
+
+
+                if (
+                    response.status
+                    === 401
+                ) {
+
+                    sessionStorage
+                        .removeItem(
+                            adminTokenStorageKey
+                        );
+
+
+                    closeAdminScheduleEdit();
+
+                    showAdminLogin();
+
+                    return;
+                }
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        responseData.detail
+                        ?? "일정 변경 실패"
+                    );
+                }
+
+
+                closeAdminScheduleEdit();
+
+
+                await loadAdminRegularSchedule();
+
+
+                alert(
+                    responseData.message
+                    ?? "일정이 변경되었습니다."
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                adminScheduleEditMessageElement
+                    .textContent =
+                        error.message;
+
+
+            } finally {
+
+                adminScheduleEditSaveButtonElement
+                    .disabled = false;
+            }
+        }
+    );
+
+// =========================================
 // 경기 결과 삭제
 // =========================================
 
@@ -1402,6 +1898,12 @@ adminResultEditCancelButtonElement
     .addEventListener(
         "click",
         closeAdminResultEdit
+    );
+
+adminScheduleEditCancelButtonElement
+    .addEventListener(
+        "click",
+        closeAdminScheduleEdit
     );
 
 

@@ -13,6 +13,430 @@ const recentResultListElement =
 const teamRankingListElement =
     document.querySelector(".team-ranking-list");
 
+// ======================================================
+// SEASON CHAMPION
+// ======================================================
+
+function getSeasonChampionSection() {
+
+    let championSectionElement =
+        document.querySelector(
+            ".season-champion-section"
+        );
+
+
+    if (championSectionElement) {
+        return championSectionElement;
+    }
+
+
+    championSectionElement =
+        document.createElement("section");
+
+
+    championSectionElement.classList.add(
+        "season-champion-section"
+    );
+
+
+    const todayMatchSectionElement =
+        todayMatchListElement.closest(
+            "section"
+        );
+
+
+    if (todayMatchSectionElement) {
+
+        todayMatchSectionElement.before(
+            championSectionElement
+        );
+
+    } else {
+
+        todayMatchListElement.before(
+            championSectionElement
+        );
+    }
+
+
+    return championSectionElement;
+}
+
+
+async function loadSeasonChampion() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/season/champion`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "시즌 우승 정보를 불러오지 못했습니다."
+            );
+        }
+
+
+        const championData =
+            await response.json();
+
+
+        renderSeasonChampion(
+            championData
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "시즌 우승 정보 조회 오류",
+            error
+        );
+    }
+}
+
+
+function renderSeasonChampion(
+    championData
+) {
+
+    const existingChampionSection =
+        document.querySelector(
+            ".season-champion-section"
+        );
+
+
+    // 시즌 종료 전에는
+    // 우승 카드를 표시하지 않음
+    if (!championData.completed) {
+
+        if (existingChampionSection) {
+
+            existingChampionSection.remove();
+        }
+
+        return;
+    }
+
+
+    const championSectionElement =
+        getSeasonChampionSection();
+
+
+    const champion =
+        championData.champion;
+
+    const finalData =
+        championData.final;
+
+    const finalMvp =
+        championData.final_mvp;
+
+
+    // ================================
+    // 우승 팀 로고
+    // ================================
+
+    const championLogoHtml =
+        champion.team_logo_path
+        ?
+        `
+            <img
+                src="${champion.team_logo_path}"
+                alt="${champion.team_name ?? champion.fcl_name} 로고"
+                class="season-champion-logo"
+            >
+        `
+        :
+        `
+            <div class="season-champion-logo-placeholder">
+                🏆
+            </div>
+        `;
+
+
+    // ================================
+    // FINAL MVP
+    // ================================
+
+    let finalMvpHtml = "";
+
+
+    if (finalMvp) {
+
+        const finalMvpImageHtml =
+            finalMvp.image_url
+            ?
+            `
+                <img
+                    src="${finalMvp.image_url}"
+                    alt="${finalMvp.player_name}"
+                    class="season-final-mvp-image"
+                >
+            `
+            :
+            `
+                <div class="season-final-mvp-image-placeholder">
+                    MVP
+                </div>
+            `;
+
+
+        finalMvpHtml = `
+            <div class="season-final-mvp">
+
+                <div class="season-final-mvp-title">
+                    FINAL MVP
+                </div>
+
+                <div class="season-final-mvp-content">
+
+                    ${finalMvpImageHtml}
+
+                    <div class="season-final-mvp-info">
+
+                        <strong
+                            class="season-final-mvp-name"
+                        >
+                            ${finalMvp.player_name}
+                        </strong>
+
+                        <span
+                            class="season-final-mvp-owner"
+                        >
+                            ${finalMvp.fcl_name}
+                        </span>
+
+                        <div
+                            class="season-final-mvp-stats"
+                        >
+
+                            <span>
+                                AVG
+                                ${finalMvp.average_rating.toFixed(2)}
+                            </span>
+
+                            <span>
+                                ${finalMvp.goals} GOALS
+                            </span>
+
+                            <span>
+                                ${finalMvp.assists} ASSISTS
+                            </span>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+    } else {
+
+        finalMvpHtml = `
+            <div
+                class="
+                    season-final-mvp
+                    season-final-mvp-pending
+                "
+            >
+
+                <div class="season-final-mvp-title">
+                    FINAL MVP
+                </div>
+
+                <strong>
+                    집계 중...
+                </strong>
+
+                <span>
+                    NEXON 경기 기록 동기화 후
+                    FINAL MVP가 공개됩니다.
+                </span>
+
+            </div>
+        `;
+    }
+
+
+    // ================================
+    // Champion 카드
+    // ================================
+
+    championSectionElement.innerHTML = `
+        <div class="season-champion-card">
+
+            <div class="season-champion-glow"></div>
+
+            <div class="season-champion-header">
+
+                <span class="season-champion-season">
+                    SEASON ${championData.season}
+                </span>
+
+                <span class="season-champion-crown">
+                    ★ CHAMPION ★
+                </span>
+
+            </div>
+
+
+            <div class="season-champion-main">
+
+                <div class="season-champion-emblem">
+
+                    ${championLogoHtml}
+
+                </div>
+
+
+                <div class="season-champion-info">
+
+                    <span class="season-champion-label">
+                        SEASON ${championData.season}
+                        CHAMPION
+                    </span>
+
+            <div class="season-champion-name-row">
+
+                <span
+                    class="season-champion-trophy-badge"
+                    aria-hidden="true"
+                >
+
+                    <svg
+                        viewBox="0 0 64 64"
+                        class="season-champion-trophy-icon"
+                    >
+                        <defs>
+                            <linearGradient
+                                id="championTrophyGradient"
+                                x1="0%"
+                                y1="0%"
+                                x2="100%"
+                                y2="100%"
+                            >
+                                <stop offset="0%" stop-color="#f8e39a"></stop>
+                                <stop offset="45%" stop-color="#d9b45a"></stop>
+                                <stop offset="100%" stop-color="#8f6a24"></stop>
+                            </linearGradient>
+                        </defs>
+
+                        <path
+                            d="M22 10h20v8c0 9-4.5 16-10 19-5.5-3-10-10-10-19z"
+                            fill="url(#championTrophyGradient)"
+                        ></path>
+
+                        <path
+                            d="M22 14H14c0 7 2 12 8 14"
+                            fill="none"
+                            stroke="url(#championTrophyGradient)"
+                            stroke-width="4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        ></path>
+
+                        <path
+                            d="M42 14h8c0 7-2 12-8 14"
+                            fill="none"
+                            stroke="url(#championTrophyGradient)"
+                            stroke-width="4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                        ></path>
+
+                        <rect
+                            x="29"
+                            y="36"
+                            width="6"
+                            height="9"
+                            rx="2"
+                            fill="url(#championTrophyGradient)"
+                        ></rect>
+
+                        <rect
+                            x="23"
+                            y="45"
+                            width="18"
+                            height="5"
+                            rx="2.5"
+                            fill="url(#championTrophyGradient)"
+                        ></rect>
+
+                        <rect
+                            x="20"
+                            y="51"
+                            width="24"
+                            height="5"
+                            rx="2.5"
+                            fill="#6f521c"
+                        ></rect>
+                    </svg>
+
+                </span>
+
+                <strong class="season-champion-name">
+                    ${champion.fcl_name}
+                </strong>
+
+            </div>
+
+                    <span class="season-champion-nickname">
+                        ${champion.nickname}
+                    </span>
+
+                    ${
+                        champion.team_name
+                        ?
+                        `
+                            <span
+                                class="season-champion-team-name"
+                            >
+                                ${champion.team_name}
+                            </span>
+                        `
+                        :
+                        ""
+                    }
+
+                </div>
+
+
+                <div class="season-champion-final-score">
+
+                    <span>
+                        FINAL SERIES
+                    </span>
+
+                    <strong>
+                        ${finalData.team_a_wins}
+                        :
+                        ${finalData.team_b_wins}
+                    </strong>
+
+                    <small>
+                        ${finalData.winning_set} SET
+                    </small>
+
+                </div>
+
+            </div>
+
+
+            <div class="season-champion-divider"></div>
+
+
+            ${finalMvpHtml}
+
+        </div>
+    `;
+}
+
 
 // ======================================================
 // 오늘의 경기
@@ -796,6 +1220,8 @@ function renderTeamRanking(standings) {
 // ======================================================
 // 페이지 로딩
 // ======================================================
+
+loadSeasonChampion();
 
 loadTodayMatches();
 
