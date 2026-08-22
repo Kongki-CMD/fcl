@@ -15,6 +15,7 @@ from psycopg.rows import dict_row
 from fastapi import (
     FastAPI,
     HTTPException,
+    Response,
     Header,
     Depends,
 )
@@ -94,6 +95,7 @@ NEXON_API_BASE_URL = (
 # =========================
 
 SPID_METADATA_CACHE = None
+SEASON_METADATA_CACHE = None
 
 
 def get_spid_metadata():
@@ -133,6 +135,271 @@ def get_spid_metadata():
 
     return SPID_METADATA_CACHE
 
+def get_season_metadata():
+
+    global SEASON_METADATA_CACHE
+
+
+    if SEASON_METADATA_CACHE is not None:
+        return SEASON_METADATA_CACHE
+
+
+    url = (
+        "https://open.api.nexon.com/"
+        "static/fconline/meta/seasonid.json"
+    )
+
+
+    response = httpx.get(
+        url,
+        timeout=20.0,
+    )
+
+
+    if response.status_code != 200:
+
+        raise HTTPException(
+            status_code=response.status_code,
+            detail="시즌 메타데이터 조회 실패",
+        )
+
+
+    SEASON_METADATA_CACHE = {
+        int(season["seasonId"]): {
+            "season_id":
+                int(season["seasonId"]),
+
+            "class_name":
+                season["className"],
+
+            "season_image_url":
+                season["seasonImg"],
+        }
+
+        for season
+        in response.json()
+    }
+
+
+    return SEASON_METADATA_CACHE
+
+
+def get_player_season_info(
+    sp_id,
+    season_metadata,
+):
+
+    try:
+        season_id = (
+            int(sp_id)
+            // 1_000_000
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return None
+
+
+    return season_metadata.get(
+        season_id
+    )
+
+def ensure_fconline_season_snapshot(
+    sp_id,
+):
+
+    season_id = (
+        int(sp_id)
+        // 1_000_000
+    )
+
+
+    # =========================
+    # 이미 저장됐으면 종료
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    season_id,
+                    class_name
+                FROM fconline_season_snapshots
+                WHERE season_id = %s
+                """,
+                (
+                    season_id,
+                ),
+            )
+
+
+            existing_snapshot = cursor.fetchone()
+
+
+    if existing_snapshot:
+
+        return {
+            "season_id":
+                existing_snapshot[
+                    "season_id"
+                ],
+
+            "class_name":
+                existing_snapshot[
+                    "class_name"
+                ],
+
+            "season_image_url":
+                (
+                    "/api/fconline/"
+                    "metadata/seasons/"
+                    f"{season_id}/image"
+                ),
+        }
+
+
+    # =========================
+    # Nexon 시즌 메타데이터
+    # =========================
+
+    season_metadata = get_season_metadata()
+
+
+    season = season_metadata.get(
+            season_id
+        )
+
+
+    if not season:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"시즌 메타데이터 없음: "
+                f"{season_id}"
+            ),
+        )
+
+
+    source_image_url = season[
+            "season_image_url"
+        ]
+
+
+    # =========================
+    # 시즌 이미지 실제 다운로드
+    # =========================
+
+    image_response = httpx.get(
+            source_image_url,
+            timeout=20.0,
+            follow_redirects=True,
+        )
+
+
+    if image_response.status_code != 200:
+
+        raise HTTPException(
+            status_code=
+                image_response.status_code,
+
+            detail=(
+                "시즌 이미지 다운로드 실패"
+            ),
+        )
+
+
+    image_content_type = (
+        image_response.headers.get(
+            "content-type",
+            "image/png",
+        )
+        .split(";")[0]
+        .strip()
+    )
+
+
+    image_data = image_response.content
+
+
+    if not image_data:
+
+        raise HTTPException(
+            status_code=502,
+            detail="시즌 이미지 데이터 없음",
+        )
+
+
+    # =========================
+    # Neon 영구 Snapshot
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    fconline_season_snapshots (
+                        season_id,
+                        class_name,
+                        source_image_url,
+                        image_data,
+                        image_content_type
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                ON CONFLICT (
+                    season_id
+                )
+                DO NOTHING
+                """,
+                (
+                    season_id,
+
+                    season[
+                        "class_name"
+                    ],
+
+                    source_image_url,
+                    image_data,
+                    image_content_type,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season_id":
+            season_id,
+
+        "class_name":
+            season[
+                "class_name"
+            ],
+
+        "season_image_url":
+            (
+                "/api/fconline/"
+                "metadata/seasons/"
+                f"{season_id}/image"
+            ),
+    }
 
 def get_player_name(
     sp_id,
@@ -330,6 +597,7 @@ def save_series_set_squad_players(
 
 
             inserted_count = 0
+            ensured_season_ids = set()
 
 
             # =========================
@@ -425,6 +693,28 @@ def save_series_set_squad_players(
                         status = player["status"]
 
                         sp_id = player["spId"]
+
+
+                        # =========================
+                        # 시즌 이미지 Snapshot 보장
+                        # =========================
+
+                        season_id = (
+                            int(sp_id)
+                            // 1_000_000
+                        )
+
+
+                        if season_id not in ensured_season_ids:
+
+                            ensure_fconline_season_snapshot(
+                                sp_id
+                            )
+
+                            ensured_season_ids.add(
+                                season_id
+                            )
+
 
                         player_name = (
                             get_player_name(
@@ -14350,6 +14640,299 @@ def get_database_participants():
 
 
     return participants
+
+# 메타데이터 API
+@app.get(
+    "/api/fconline/metadata/seasons"
+)
+def get_fconline_season_metadata():
+
+    seasons = {}
+
+
+    # =========================
+    # Nexon 메타데이터
+    # 아직 서비스 중일 때 사용
+    # =========================
+
+    try:
+
+        live_metadata = get_season_metadata()
+
+
+        seasons.update(
+            live_metadata
+        )
+
+    except Exception as error:
+
+        print(
+            "Nexon 시즌 메타데이터 "
+            "조회 실패:",
+            error,
+        )
+
+
+    # =========================
+    # 우리 Snapshot
+    # 항상 Snapshot 우선
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    season_id,
+                    class_name
+
+                FROM
+                    fconline_season_snapshots
+
+                ORDER BY
+                    season_id
+                """
+            )
+
+
+            snapshots = cursor.fetchall()
+
+
+    for snapshot in snapshots:
+
+        season_id = snapshot[
+                "season_id"
+            ]
+
+
+        seasons[
+            season_id
+        ] = {
+            "season_id":
+                season_id,
+
+            "class_name":
+                snapshot[
+                    "class_name"
+                ],
+
+            "season_image_url":
+                (
+                    "/api/fconline/"
+                    "metadata/seasons/"
+                    f"{season_id}/image"
+                ),
+        }
+
+
+    return {
+        "seasons":
+            list(
+                seasons.values()
+            )
+    }
+
+@app.get(
+    "/api/fconline/"
+    "metadata/seasons/"
+    "{season_id}/image"
+)
+def get_fconline_season_snapshot_image(
+    season_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    image_data,
+                    image_content_type
+
+                FROM
+                    fconline_season_snapshots
+
+                WHERE
+                    season_id = %s
+                """,
+                (
+                    season_id,
+                ),
+            )
+
+
+            snapshot = cursor.fetchone()
+
+
+    if not snapshot:
+
+        raise HTTPException(
+            status_code=404,
+            detail="저장된 시즌 이미지가 없습니다.",
+        )
+
+
+    return Response(
+        content=
+            bytes(
+                snapshot[
+                    "image_data"
+                ]
+            ),
+
+        media_type=
+            snapshot[
+                "image_content_type"
+            ],
+    )
+
+@app.post(
+    "/api/admin/fconline/season-snapshots/backfill"
+)
+def admin_backfill_fconline_season_snapshots(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 과거 기록에 등장한 모든 sp_id
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT sp_id
+                FROM series_set_squad_players
+
+                UNION
+
+                SELECT sp_id
+                FROM series_mvp
+
+                UNION
+
+                SELECT sp_id
+                FROM series_player_stats
+                """
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    # =========================
+    # 시즌별 대표 sp_id 하나만 사용
+    # =========================
+
+    season_sp_ids = {}
+
+
+    for row in rows:
+
+        sp_id = row["sp_id"]
+
+
+        if sp_id is None:
+            continue
+
+
+        season_id = (
+            int(sp_id)
+            // 1_000_000
+        )
+
+
+        if season_id not in season_sp_ids:
+
+            season_sp_ids[
+                season_id
+            ] = int(sp_id)
+
+
+    # =========================
+    # Snapshot 저장
+    # =========================
+
+    saved = []
+    failed = []
+
+
+    for (
+        season_id,
+        sp_id,
+    ) in sorted(
+        season_sp_ids.items()
+    ):
+
+        try:
+
+            snapshot = ensure_fconline_season_snapshot(
+                    sp_id
+                )
+
+
+            saved.append(
+                {
+                    "season_id":
+                        snapshot[
+                            "season_id"
+                        ],
+
+                    "class_name":
+                        snapshot[
+                            "class_name"
+                        ],
+                }
+            )
+
+
+        except Exception as error:
+
+            failed.append(
+                {
+                    "season_id":
+                        season_id,
+
+                    "error":
+                        (
+                            error.detail
+                            if isinstance(
+                                error,
+                                HTTPException,
+                            )
+                            else str(error)
+                        ),
+                }
+            )
+
+
+    return {
+        "target_season_count":
+            len(
+                season_sp_ids
+            ),
+
+        "snapshot_count":
+            len(saved),
+
+        "failed_count":
+            len(failed),
+
+        "snapshots":
+            saved,
+
+        "failed":
+            failed,
+    }
 
 
 # =========================

@@ -9,6 +9,10 @@ import {
 const resultDetailCustomPlayerImages = {
     "주앙 칸셀루":
         "./assets/images/players/custom/cancelo.png",
+
+    "닉 포프":
+        "./assets/images/players/custom/nick_pope.png",
+
 };
 
 const resultsListElement =
@@ -29,12 +33,15 @@ let currentResultDetailData = null;
 let currentResultDetailSide =
     "team_a";
 
+let resultDetailSeasonMap = new Map();
+
 const resultDetailPositionLayout = {
 
+    // 골키퍼
     0: {
         name: "GK",
         left: 50,
-        top: 90,
+        top: 88,
     },
 
     1: {
@@ -43,64 +50,67 @@ const resultDetailPositionLayout = {
         top: 82,
     },
 
+    // 수비
     2: {
         name: "RWB",
         left: 88,
-        top: 74,
+        top: 79,
     },
 
     3: {
-    name: "RB",
-    left: 86,
-    top: 75,
+        name: "RB",
+        left: 86,
+        top: 80,
     },
 
     4: {
         name: "RCB",
         left: 63,
-        top: 75,
+        top: 80,
     },
 
     5: {
         name: "CB",
         left: 50,
-        top: 75,
+        top: 80,
     },
 
     6: {
         name: "LCB",
         left: 37,
-        top: 75,
+        top: 80,
     },
 
     7: {
         name: "LB",
         left: 14,
-        top: 75,
+        top: 80,
     },
 
     8: {
         name: "LWB",
         left: 12,
-        top: 74,
+        top: 79,
     },
 
+
+   // 수비형 미드필더
     9: {
         name: "RDM",
         left: 65,
-        top: 58,
+        top: 56,
     },
 
     10: {
         name: "CDM",
         left: 50,
-        top: 58,
+        top: 56,
     },
 
     11: {
         name: "LDM",
         left: 35,
-        top: 58,
+        top: 56,
     },
 
     12: {
@@ -160,7 +170,7 @@ const resultDetailPositionLayout = {
     21: {
         name: "CF",
         left: 50,
-        top: 21,
+        top: 30,
     },
 
     22: {
@@ -199,6 +209,113 @@ const resultDetailPositionLayout = {
         top: 17,
     },
 };
+
+
+//시즌 메타데이터 로딩 함수
+async function loadResultDetailSeasonMetadata() {
+
+    if (
+        resultDetailSeasonMap.size > 0
+    ) {
+        return;
+    }
+
+
+    const response = await fetch(
+        `${apiBaseUrl}/api/fconline/metadata/seasons`
+    );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "시즌 메타데이터 조회 실패"
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    resultDetailSeasonMap =
+        new Map(
+            data.seasons.map(
+                season => [
+                    Number(
+                        season.season_id
+                    ),
+                    season,
+                ]
+            )
+        );
+}
+
+//공통 조회 함수
+function getResultDetailSeasonInfo(
+    spId
+) {
+
+    const numericSpId =
+        Number(spId);
+
+
+    if (
+        !Number.isFinite(
+            numericSpId
+        )
+    ) {
+        return null;
+    }
+
+
+    const seasonId =
+        Math.floor(
+            numericSpId
+            /
+            1_000_000
+        );
+
+
+    return (
+        resultDetailSeasonMap.get(
+            seasonId
+        )
+        ||
+        null
+    );
+}
+
+//시즌아이콘 HTML 생성 함수
+function createResultDetailSeasonIconHtml(
+    spId,
+    className = ""
+) {
+
+    const season =
+        getResultDetailSeasonInfo(
+            spId
+        );
+
+
+    if (
+        !season
+        ||
+        !season.season_image_url
+    ) {
+        return "";
+    }
+
+
+    return `
+        <img
+            src="${season.season_image_url}"
+            alt="${season.class_name}"
+            title="${season.class_name}"
+            class="result-detail-season-icon ${className}"
+        >
+    `;
+}
 
 
 //사진 추가 함수
@@ -241,6 +358,8 @@ function createResultKey(result) {
 async function loadResults() {
 
     try {
+
+        await loadResultDetailSeasonMetadata();
 
         // ================================
         // Excel 결과 + Neon 결과
@@ -678,19 +797,36 @@ function createFormationPlayerHtml(
 
     const recordText = [];
 
+
     if (player.goals > 0) {
 
-        recordText.push(
-            `${player.goals}골`
-        );
+        recordText.push(`
+            <span class="result-detail-record-item">
+
+                <span class="result-detail-goal-icon">
+                    ⚽
+                </span>
+
+                ${player.goals}
+
+            </span>
+        `);
     }
 
 
     if (player.assists > 0) {
 
-        recordText.push(
-            `${player.assists}도움`
-        );
+        recordText.push(`
+            <span class="result-detail-record-item">
+
+                <span class="result-detail-assist-icon">
+                    A
+                </span>
+
+                ${player.assists}
+
+            </span>
+        `);
     }
 
 
@@ -725,13 +861,22 @@ function createFormationPlayerHtml(
 
             <div class="result-detail-formation-info">
 
-                <strong>
-                    ${player.player_name}
+                <strong class="result-detail-formation-player-name">
+
+                    ${createResultDetailSeasonIconHtml(
+                        player.sp_id,
+                        "formation"
+                    )}
+
+                    <span>
+                        ${player.player_name}
+                    </span>
+
                 </strong>
 
                 <span>
                     ${player.rating.toFixed(1)}
-                /
+                    &nbsp;
                 ${
                     recordText.length > 0
                         ? `
@@ -837,6 +982,178 @@ function renderResultDetailSquadView(
 }
 
 
+function getResultDetailSetMvp(
+    setData
+) {
+
+    const players = [
+        ...setData.team_a_squad.map(
+            player => ({
+                ...player,
+                side: "team_a",
+            })
+        ),
+
+        ...setData.team_b_squad.map(
+            player => ({
+                ...player,
+                side: "team_b",
+            })
+        ),
+    ];
+
+
+    const playedPlayers =
+        players.filter(
+            player =>
+                player.sp_position !== 28
+        );
+
+
+    if (
+        playedPlayers.length === 0
+    ) {
+        return null;
+    }
+
+
+    playedPlayers.sort(
+        (playerA, playerB) => {
+
+            const ratingDifference =
+                Number(
+                    playerB.rating ?? 0
+                )
+                -
+                Number(
+                    playerA.rating ?? 0
+                );
+
+
+            if (
+                ratingDifference !== 0
+            ) {
+                return ratingDifference;
+            }
+
+
+            const goalDifference =
+                Number(
+                    playerB.goals ?? 0
+                )
+                -
+                Number(
+                    playerA.goals ?? 0
+                );
+
+
+            if (
+                goalDifference !== 0
+            ) {
+                return goalDifference;
+            }
+
+
+            return (
+                Number(
+                    playerB.assists ?? 0
+                )
+                -
+                Number(
+                    playerA.assists ?? 0
+                )
+            );
+        }
+    );
+
+
+    return playedPlayers[0];
+}
+
+function createResultDetailSetMvpHtml(
+    setData
+) {
+
+    const mvp =
+        getResultDetailSetMvp(
+            setData
+        );
+
+
+    if (!mvp) {
+
+        return `
+            <div class="result-detail-set-mvp">
+
+                <span class="result-detail-set-mvp-label">
+                    SET MVP
+                </span>
+
+                <p>
+                    MVP 기록 없음
+                </p>
+
+            </div>
+        `;
+    }
+
+
+    const participant =
+        mvp.side === "team_a"
+            ? currentResultDetailData.team_a
+            : currentResultDetailData.team_b;
+
+
+    return `
+        <div class="result-detail-set-mvp">
+
+            <span class="result-detail-set-mvp-label">
+                SET MVP
+            </span>
+
+
+            <div class="result-detail-set-mvp-player">
+
+                <img
+                    src="${getResultDetailPlayerImage(mvp)}"
+                    alt="${mvp.player_name}"
+                >
+
+
+                <div>
+
+                <strong class="result-detail-set-mvp-name">
+
+                    ${createResultDetailSeasonIconHtml(
+                        mvp.sp_id,
+                        "set-mvp"
+                    )}
+
+                    <span>
+                        ${mvp.player_name}
+                    </span>
+
+                </strong>
+
+                    <span>
+                        ${participant.fcl_name}
+                    </span>
+
+                    <small>
+                        평점
+                        ${Number(
+                            mvp.rating ?? 0
+                        ).toFixed(1)}
+                    </small>
+
+                </div>
+
+            </div>
+
+        </div>
+    `;
+}
+
 // =========================================
 // 선택 SET 출력
 // =========================================
@@ -884,7 +1201,7 @@ function renderResultDetailSet(
                 <div class="result-detail-control-title">
 
                     <span>
-                        1
+                        2
                     </span>
 
                     <strong>
@@ -949,6 +1266,8 @@ function renderResultDetailSet(
 
                 </div>
 
+                ${createResultDetailSetMvpHtml(setData)}
+
             </div>
 
         </aside>
@@ -992,6 +1311,8 @@ function renderResultDetailSet(
 async function openResultDetail(
     seriesId
 ) {
+
+    await loadResultDetailSeasonMetadata();
 
     resultDetailModalElement.inert =
         false;
@@ -1067,19 +1388,52 @@ async function openResultDetail(
 
         <div class="result-detail-match-title">
 
-            <span>
-                ${data.team_a.fcl_name}
-            </span>
+            <div class="result-detail-match-team">
+                <img
+                    src="${data.team_a.logo_path}"
+                    alt=""
+                    class="result-detail-match-team-logo"
+                >
 
-            <strong>
+                <span>
+                    ${data.team_a.fcl_name}
+                </span>
+            </div>
+
+
+            <strong class="result-detail-match-vs">
                 VS
             </strong>
 
-            <span>
-                ${data.team_b.fcl_name}
-            </span>
+
+            <div class="result-detail-match-team">
+                <img
+                    src="${data.team_b.logo_path}"
+                    alt=""
+                    class="result-detail-match-team-logo"
+                >
+
+                <span>
+                    ${data.team_b.fcl_name}
+                </span>
+            </div>
 
         </div>
+
+
+        <div class="result-detail-set-section">
+
+            <div class="result-detail-set-title">
+
+                <span>
+                    1
+                </span>
+
+                <strong>
+                    세트 선택
+                </strong>
+
+            </div>
 
 
             <div
@@ -1094,6 +1448,8 @@ async function openResultDetail(
             >
                 ${setTabHtml}
             </div>
+
+        </div>
 
 
             <div
@@ -1376,7 +1732,16 @@ function renderResults(
                         <div class="match-mvp-info">
 
                             <strong class="match-mvp-name">
-                                ${mvp.player_name}
+
+                                ${createResultDetailSeasonIconHtml(
+                                    mvp.sp_id,
+                                    "match-mvp-season"
+                                )}
+
+                                <span>
+                                    ${mvp.player_name}
+                                </span>
+
                             </strong>
 
 
