@@ -256,6 +256,264 @@ def get_db_connection():
         row_factory=dict_row,
     )
 
+def save_series_set_squad_players(
+    series_id,
+    team_a_id,
+    nickname_a,
+    team_b_id,
+    nickname_b,
+    detected_matches,
+):
+
+    spid_metadata = get_spid_metadata()
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES의 SET ID 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    set_number
+
+                FROM series_sets
+
+                WHERE series_id = %s
+
+                ORDER BY set_number
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            series_sets = cursor.fetchall()
+
+
+            set_id_map = {
+                series_set["set_number"]:
+                    series_set["id"]
+
+                for series_set in series_sets
+            }
+
+
+            # =========================
+            # 기존 Snapshot 초기화
+            #
+            # 재동기화 시 같은 SET의
+            # 스쿼드를 중복 저장하지 않음
+            # =========================
+
+            cursor.execute(
+                """
+                DELETE FROM
+                    series_set_squad_players
+
+                WHERE series_set_id IN (
+                    SELECT id
+
+                    FROM series_sets
+
+                    WHERE series_id = %s
+                )
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            inserted_count = 0
+
+
+            # =========================
+            # SET별 Snapshot 저장
+            # =========================
+
+            for (
+                set_number,
+                detected_match,
+            ) in enumerate(
+                detected_matches,
+                start=1,
+            ):
+
+                series_set_id = (
+                    set_id_map.get(
+                        set_number
+                    )
+                )
+
+
+                if series_set_id is None:
+
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"{set_number}세트의 "
+                            "DB 정보를 찾을 수 없습니다."
+                        ),
+                    )
+
+
+                match_data = (
+                    detected_match["data"]
+                )
+
+
+                participant_map = {
+                    match_info["nickname"]:
+                        match_info
+
+                    for match_info
+                    in match_data["matchInfo"]
+                }
+
+
+                squad_sides = [
+                    (
+                        "team_a",
+                        team_a_id,
+                        nickname_a,
+                    ),
+                    (
+                        "team_b",
+                        team_b_id,
+                        nickname_b,
+                    ),
+                ]
+
+
+                for (
+                    side,
+                    participant_id,
+                    nickname,
+                ) in squad_sides:
+
+                    match_info = (
+                        participant_map.get(
+                            nickname
+                        )
+                    )
+
+
+                    if match_info is None:
+
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                f"{set_number}세트의 "
+                                f"{nickname} 스쿼드를 "
+                                "찾을 수 없습니다."
+                            ),
+                        )
+
+
+                    for (
+                        source_order,
+                        player,
+                    ) in enumerate(
+                        match_info["player"]
+                    ):
+
+                        status = player["status"]
+
+                        sp_id = player["spId"]
+
+                        player_name = (
+                            get_player_name(
+                                sp_id,
+                                spid_metadata,
+                            )
+                        )
+
+
+                        cursor.execute(
+                            """
+                            INSERT INTO
+                                series_set_squad_players (
+                                    series_set_id,
+                                    participant_id,
+                                    side,
+                                    source_order,
+
+                                    sp_id,
+                                    player_name,
+
+                                    sp_position,
+                                    sp_grade,
+
+                                    rating,
+                                    goals,
+                                    assists,
+
+                                    image_url
+                                )
+
+                            VALUES (
+                                %s,
+                                %s,
+                                %s,
+                                %s,
+
+                                %s,
+                                %s,
+
+                                %s,
+                                %s,
+
+                                %s,
+                                %s,
+                                %s,
+
+                                %s
+                            )
+                            """,
+                            (
+                                series_set_id,
+                                participant_id,
+                                side,
+                                source_order,
+
+                                sp_id,
+                                player_name,
+
+                                player["spPosition"],
+                                player["spGrade"],
+
+                                float(
+                                    status["spRating"]
+                                ),
+
+                                int(
+                                    status["goal"]
+                                ),
+
+                                int(
+                                    status["assist"]
+                                ),
+
+                                get_player_image_url(
+                                    sp_id
+                                ),
+                            ),
+                        )
+
+
+                        inserted_count += 1
+
+
+        connection.commit()
+
+
+    return inserted_count
+
 def save_series_player_stats(
     series_id,
     team_a_id,
@@ -760,6 +1018,96 @@ def initialize_database():
                             'team_b',
                             'draw'
                         )
+                    )
+                )
+                """
+            )
+
+            # =========================
+            # SERIES 세트별 스쿼드 Snapshot
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS series_set_squad_players (
+                    id BIGSERIAL PRIMARY KEY,
+
+                    series_set_id BIGINT
+                        NOT NULL
+                        REFERENCES series_sets(id)
+                        ON DELETE CASCADE,
+
+                    participant_id BIGINT
+                        NOT NULL
+                        REFERENCES participants(id),
+
+                    side VARCHAR(10)
+                        NOT NULL,
+
+                    source_order INTEGER
+                        NOT NULL,
+
+                    sp_id BIGINT
+                        NOT NULL,
+
+                    player_name VARCHAR(100)
+                        NOT NULL,
+
+                    sp_position INTEGER
+                        NOT NULL,
+
+                    sp_grade INTEGER
+                        NOT NULL,
+
+                    rating NUMERIC(5, 2)
+                        NOT NULL,
+
+                    goals INTEGER
+                        NOT NULL
+                        DEFAULT 0,
+
+                    assists INTEGER
+                        NOT NULL
+                        DEFAULT 0,
+
+                    image_url TEXT,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT chk_series_set_squad_side
+                    CHECK (
+                        side IN (
+                            'team_a',
+                            'team_b'
+                        )
+                    ),
+
+                    CONSTRAINT chk_series_set_squad_source_order
+                    CHECK (
+                        source_order >= 0
+                    ),
+
+                    CONSTRAINT chk_series_set_squad_rating
+                    CHECK (
+                        rating >= 0
+                    ),
+
+                    CONSTRAINT chk_series_set_squad_goals
+                    CHECK (
+                        goals >= 0
+                    ),
+
+                    CONSTRAINT chk_series_set_squad_assists
+                    CHECK (
+                        assists >= 0
+                    ),
+
+                    UNIQUE (
+                        series_set_id,
+                        side,
+                        source_order
                     )
                 )
                 """
@@ -1781,9 +2129,254 @@ def admin_check(
         "admin": True
     }
 
-
 def get_round_number(match_index):
     return (match_index // 5) + 1
+
+
+# =========================
+# ADMIN SERIES SQUAD BACKFILL
+# 기존 완료 경기 세트별 스쿼드 Snapshot 생성
+# =========================
+
+@app.post(
+    "/api/admin/series/{series_id}/squad-backfill"
+)
+def admin_backfill_series_squad(
+    series_id: int,
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # SERIES + 참가자 조회
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.status,
+
+                    s.team_a_id,
+                    team_a.fc_nickname
+                        AS nickname_a,
+
+                    s.team_b_id,
+                    team_b.fc_nickname
+                        AS nickname_b
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE s.id = %s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            series = cursor.fetchone()
+
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "SERIES를 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if series["status"] != "completed":
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "완료된 경기만 "
+                        "스쿼드 Snapshot을 "
+                        "생성할 수 있습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    set_number,
+                    nexon_match_id,
+                    played_at
+
+                FROM series_sets
+
+                WHERE series_id = %s
+
+                ORDER BY set_number
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            saved_sets = cursor.fetchall()
+
+
+    # =========================
+    # 세트 확인
+    # =========================
+
+    if not saved_sets:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "저장된 세트가 없습니다."
+            ),
+        )
+
+
+    nickname_a = series[
+        "nickname_a"
+    ]
+
+    nickname_b = series[
+        "nickname_b"
+    ]
+
+
+    if not nickname_a or not nickname_b:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "FC Online 닉네임 정보가 "
+                "없습니다."
+            ),
+        )
+
+
+    # =========================
+    # 저장된 matchId 기준
+    # Nexon 원본 다시 조회
+    # =========================
+
+    detected_matches = []
+
+
+    for saved_set in saved_sets:
+
+        match_id = saved_set[
+            "nexon_match_id"
+        ]
+
+
+        if not match_id:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{saved_set['set_number']}세트에 "
+                    "Nexon matchId가 없습니다."
+                ),
+            )
+
+
+        match_data = get_match_detail(
+            match_id
+        )
+
+
+        match_nicknames = {
+            match_info["nickname"]
+
+            for match_info
+            in match_data["matchInfo"]
+        }
+
+
+        if match_nicknames != {
+            nickname_a,
+            nickname_b,
+        }:
+
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{saved_set['set_number']}세트의 "
+                    "Nexon 참가자 정보가 "
+                    "SERIES와 일치하지 않습니다."
+                ),
+            )
+
+
+        detected_matches.append(
+            {
+                "data":
+                    match_data,
+
+                "played_at":
+                    parse_nexon_datetime(
+                        match_data[
+                            "matchDate"
+                        ]
+                    ),
+            }
+        )
+
+
+    # =========================
+    # Snapshot 저장
+    # =========================
+
+    inserted_count = (
+        save_series_set_squad_players(
+            series_id,
+
+            series[
+                "team_a_id"
+            ],
+            nickname_a,
+
+            series[
+                "team_b_id"
+            ],
+            nickname_b,
+
+            detected_matches,
+        )
+    )
+
+
+    return {
+        "series_id":
+            series_id,
+
+        "set_count":
+            len(saved_sets),
+
+        "player_snapshot_count":
+            inserted_count,
+
+        "message":
+            (
+                "세트별 스쿼드 Snapshot "
+                "생성이 완료되었습니다."
+            ),
+    }
 
 # =========================
 # ADMIN REGULAR SCHEDULE
@@ -8906,6 +9499,22 @@ def import_history_series(
 
         connection.commit()
 
+    # =========================
+    # 세트별 스쿼드 Snapshot 저장
+    # =========================
+
+    save_series_set_squad_players(
+        series_id,
+
+        team_a["id"],
+        nickname_a,
+
+        team_b["id"],
+        nickname_b,
+
+        detected_matches,
+    )
+
 
     # =========================
     # 전체 선수 기록 저장
@@ -11490,6 +12099,26 @@ def sync_fcl_series_status(
 
             connection.commit()
 
+        # =========================
+        # 세트별 스쿼드 Snapshot 저장
+        # =========================
+
+        save_series_set_squad_players(
+            series_id,
+
+            series[
+                "team_a_id"
+            ],
+            nickname_a,
+
+            series[
+                "team_b_id"
+            ],
+            nickname_b,
+
+            detected_matches,
+        )
+
 
         # =========================
         # 이미 받은 match detail로
@@ -12089,6 +12718,27 @@ def sync_fcl_series_status(
 
 
         connection.commit()
+
+
+    # =========================
+    # 세트별 스쿼드 Snapshot 저장
+    # =========================
+
+    save_series_set_squad_players(
+        series_id,
+
+        series[
+            "team_a_id"
+        ],
+        nickname_a,
+
+        series[
+            "team_b_id"
+        ],
+        nickname_b,
+
+        detected_matches,
+    )
 
 
 
@@ -13313,6 +13963,347 @@ def get_series_player_stats(
 
 
     return players
+
+# =========================
+# SERIES 세트별 스쿼드 조회
+# =========================
+
+@app.get(
+    "/api/fconline/series/{series_id}/squads"
+)
+def get_series_squads(
+    series_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES 정보
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.series_type,
+                    s.playoff_stage,
+                    s.status,
+
+                    team_a.id
+                        AS team_a_id,
+
+                    team_a.fcl_name
+                        AS team_a_fcl_name,
+
+                    COALESCE(
+                        s.team_a_snapshot_name,
+                        team_a.current_team_name
+                    ) AS team_a_name,
+
+                    COALESCE(
+                        s.team_a_snapshot_logo_path,
+                        team_a.current_team_logo_path
+                    ) AS team_a_logo_path,
+
+                    team_b.id
+                        AS team_b_id,
+
+                    team_b.fcl_name
+                        AS team_b_fcl_name,
+
+                    COALESCE(
+                        s.team_b_snapshot_name,
+                        team_b.current_team_name
+                    ) AS team_b_name,
+
+                    COALESCE(
+                        s.team_b_snapshot_logo_path,
+                        team_b.current_team_logo_path
+                    ) AS team_b_logo_path
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE s.id = %s
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            series = cursor.fetchone()
+
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "SERIES를 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # SET + Snapshot 선수
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    ss.set_number,
+                    ss.played_at,
+
+                    ss.team_a_score,
+                    ss.team_b_score,
+                    ss.winner_side,
+
+                    sssp.side,
+                    sssp.source_order,
+
+                    sssp.sp_id,
+                    sssp.player_name,
+
+                    sssp.sp_position,
+                    sssp.sp_grade,
+
+                    sssp.rating,
+                    sssp.goals,
+                    sssp.assists,
+
+                    sssp.image_url
+
+                FROM series_sets AS ss
+
+                LEFT JOIN
+                    series_set_squad_players
+                        AS sssp
+                    ON sssp.series_set_id =
+                        ss.id
+
+                WHERE ss.series_id = %s
+
+                ORDER BY
+                    ss.set_number,
+                    sssp.side,
+                    sssp.source_order
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+            rows = cursor.fetchall()
+
+
+    # =========================
+    # SET별 응답 구성
+    # =========================
+
+    set_map = {}
+
+
+    for row in rows:
+
+        set_number = row[
+            "set_number"
+        ]
+
+
+        if set_number not in set_map:
+
+            set_map[set_number] = {
+                "set":
+                    set_number,
+
+                "played_at":
+                    (
+                        row[
+                            "played_at"
+                        ].isoformat()
+
+                        if row[
+                            "played_at"
+                        ]
+
+                        else None
+                    ),
+
+                "team_a_score":
+                    row[
+                        "team_a_score"
+                    ],
+
+                "team_b_score":
+                    row[
+                        "team_b_score"
+                    ],
+
+                "winner_side":
+                    row[
+                        "winner_side"
+                    ],
+
+                "team_a_squad": [],
+                "team_b_squad": [],
+            }
+
+
+        # Snapshot이 없는 SET도
+        # LEFT JOIN으로 반환 가능
+        if row["side"] is None:
+            continue
+
+
+        player = {
+            "source_order":
+                row[
+                    "source_order"
+                ],
+
+            "sp_id":
+                row[
+                    "sp_id"
+                ],
+
+            "player_name":
+                row[
+                    "player_name"
+                ],
+
+            "sp_position":
+                row[
+                    "sp_position"
+                ],
+
+            "sp_grade":
+                row[
+                    "sp_grade"
+                ],
+
+            "rating":
+                float(
+                    row[
+                        "rating"
+                    ]
+                ),
+
+            "goals":
+                row[
+                    "goals"
+                ],
+
+            "assists":
+                row[
+                    "assists"
+                ],
+
+            "image_url":
+                row[
+                    "image_url"
+                ],
+        }
+
+
+        if row["side"] == "team_a":
+
+            set_map[
+                set_number
+            ][
+                "team_a_squad"
+            ].append(
+                player
+            )
+
+
+        elif row["side"] == "team_b":
+
+            set_map[
+                set_number
+            ][
+                "team_b_squad"
+            ].append(
+                player
+            )
+
+
+    return {
+        "series_id":
+            series["id"],
+
+        "series_type":
+            series[
+                "series_type"
+            ],
+
+        "playoff_stage":
+            series[
+                "playoff_stage"
+            ],
+
+        "status":
+            series[
+                "status"
+            ],
+
+        "team_a": {
+            "participant_id":
+                series[
+                    "team_a_id"
+                ],
+
+            "fcl_name":
+                series[
+                    "team_a_fcl_name"
+                ],
+
+            "team_name":
+                series[
+                    "team_a_name"
+                ],
+
+            "logo_path":
+                series[
+                    "team_a_logo_path"
+                ],
+        },
+
+        "team_b": {
+            "participant_id":
+                series[
+                    "team_b_id"
+                ],
+
+            "fcl_name":
+                series[
+                    "team_b_fcl_name"
+                ],
+
+            "team_name":
+                series[
+                    "team_b_name"
+                ],
+
+            "logo_path":
+                series[
+                    "team_b_logo_path"
+                ],
+        },
+
+        "sets":
+            list(
+                set_map.values()
+            ),
+    }
 
 # =========================
 # DB 초기화

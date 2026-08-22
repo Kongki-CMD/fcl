@@ -5,9 +5,213 @@ import {
 } from "./config.js";
 
 
+//선수 사진 추가
+const resultDetailCustomPlayerImages = {
+    "주앙 칸셀루":
+        "./assets/images/players/custom/cancelo.png",
+};
+
 const resultsListElement =
     document.querySelector(".results-list");
 
+const resultDetailModalElement =
+    document.querySelector(
+        "#result-detail-modal"
+    );
+
+const resultDetailContentElement =
+    document.querySelector(
+        "#result-detail-content"
+    );
+
+let currentResultDetailData = null;
+
+let currentResultDetailSide =
+    "team_a";
+
+const resultDetailPositionLayout = {
+
+    0: {
+        name: "GK",
+        left: 50,
+        top: 90,
+    },
+
+    1: {
+        name: "SW",
+        left: 50,
+        top: 82,
+    },
+
+    2: {
+        name: "RWB",
+        left: 88,
+        top: 74,
+    },
+
+    3: {
+    name: "RB",
+    left: 86,
+    top: 75,
+    },
+
+    4: {
+        name: "RCB",
+        left: 63,
+        top: 75,
+    },
+
+    5: {
+        name: "CB",
+        left: 50,
+        top: 75,
+    },
+
+    6: {
+        name: "LCB",
+        left: 37,
+        top: 75,
+    },
+
+    7: {
+        name: "LB",
+        left: 14,
+        top: 75,
+    },
+
+    8: {
+        name: "LWB",
+        left: 12,
+        top: 74,
+    },
+
+    9: {
+        name: "RDM",
+        left: 65,
+        top: 58,
+    },
+
+    10: {
+        name: "CDM",
+        left: 50,
+        top: 58,
+    },
+
+    11: {
+        name: "LDM",
+        left: 35,
+        top: 58,
+    },
+
+    12: {
+        name: "RM",
+        left: 84,
+        top: 49,
+    },
+
+    13: {
+        name: "RCM",
+        left: 64,
+        top: 49,
+    },
+
+    14: {
+        name: "CM",
+        left: 50,
+        top: 49,
+    },
+
+    15: {
+        name: "LCM",
+        left: 36,
+        top: 49,
+    },
+
+    16: {
+        name: "LM",
+        left: 16,
+        top: 49,
+    },
+
+    17: {
+        name: "RAM",
+        left: 68,
+        top: 35,
+    },
+
+    18: {
+        name: "CAM",
+        left: 50,
+        top: 35,
+    },
+
+    19: {
+        name: "LAM",
+        left: 32,
+        top: 35,
+    },
+
+    20: {
+        name: "RF",
+        left: 72,
+        top: 21,
+    },
+
+    21: {
+        name: "CF",
+        left: 50,
+        top: 21,
+    },
+
+    22: {
+        name: "LF",
+        left: 28,
+        top: 21,
+    },
+
+    23: {
+        name: "RW",
+        left: 85,
+        top: 17,
+    },
+
+    24: {
+        name: "RS",
+        left: 65,
+        top: 12,
+    },
+
+    25: {
+        name: "ST",
+        left: 50,
+        top: 9,
+    },
+
+    26: {
+        name: "LS",
+        left: 35,
+        top: 12,
+    },
+
+    27: {
+        name: "LW",
+        left: 15,
+        top: 17,
+    },
+};
+
+
+//사진 추가 함수
+function getResultDetailPlayerImage(player) {
+
+    return (
+        resultDetailCustomPlayerImages[
+            player.player_name
+        ]
+        ||
+        player.image_url
+    );
+}
 
 // =========================================
 // Excel / DB 중복 판별용 키
@@ -334,6 +538,595 @@ async function syncCompletedSeries(
     }
 }
 
+// =========================================
+// 경기 상세 모달
+// =========================================
+
+function closeResultDetail() {
+
+    // 모달 내부에 포커스가 남아 있으면 먼저 제거
+    const activeElement =
+        document.activeElement;
+
+
+    if (
+        activeElement
+        &&
+        resultDetailModalElement.contains(
+            activeElement
+        )
+    ) {
+
+        activeElement.blur();
+    }
+
+
+    // 키보드/포커스 접근 차단
+    resultDetailModalElement.inert =
+        true;
+
+
+    resultDetailModalElement.classList.add(
+        "hidden"
+    );
+
+
+    resultDetailModalElement.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    document.body.classList.remove(
+        "result-detail-modal-open"
+    );
+
+
+    resultDetailContentElement.innerHTML =
+        "";
+
+
+    currentResultDetailData =
+        null;
+
+
+    currentResultDetailSide =
+        "team_a";
+}
+
+
+// =========================================
+// 스쿼드 선수 카드
+// =========================================
+
+function createSquadPlayerHtml(
+    player
+) {
+
+    const recordText = [];
+
+    if (player.goals > 0) {
+
+        recordText.push(
+            `${player.goals}골`
+        );
+    }
+
+
+    if (player.assists > 0) {
+
+        recordText.push(
+            `${player.assists}도움`
+        );
+    }
+
+
+    return `
+        <div class="result-detail-player">
+
+            <img
+                src="${player.image_url}"
+                alt="${player.player_name}"
+                class="result-detail-player-image"
+            >
+
+            <div class="result-detail-player-info">
+
+                <strong>
+                    ${player.player_name}
+                </strong>
+
+                <span>
+                    +${player.sp_grade}
+                </span>
+
+                <span>
+                    평점 ${player.rating.toFixed(1)}
+                </span>
+
+                ${
+                    recordText.length > 0
+                        ? `
+                            <span class="result-detail-player-record">
+                                ${recordText.join(" · ")}
+                            </span>
+                        `
+                        : ""
+                }
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+function createFormationPlayerHtml(
+    player
+) {
+
+    const position =
+        resultDetailPositionLayout[
+            player.sp_position
+        ];
+
+
+    if (!position) {
+        return "";
+    }
+
+
+    const recordText = [];
+
+    if (player.goals > 0) {
+
+        recordText.push(
+            `${player.goals}골`
+        );
+    }
+
+
+    if (player.assists > 0) {
+
+        recordText.push(
+            `${player.assists}도움`
+        );
+    }
+
+
+    return `
+        <div
+            class="result-detail-formation-player"
+            style="
+                left: ${position.left}%;
+                top: ${position.top}%;
+            "
+        >
+
+            <span class="result-detail-formation-position">
+                ${position.name}
+            </span>
+
+
+            <div class="result-detail-formation-image-wrap">
+
+                <img
+                    src="${getResultDetailPlayerImage(player)}"
+                    alt="${player.player_name}"
+                    class="result-detail-formation-image"
+                >
+
+                <span class="result-detail-formation-grade">
+                    +${player.sp_grade}
+                </span>
+
+            </div>
+
+
+            <div class="result-detail-formation-info">
+
+                <strong>
+                    ${player.player_name}
+                </strong>
+
+                <span>
+                    ${player.rating.toFixed(1)}
+                /
+                ${
+                    recordText.length > 0
+                        ? `
+                            ${recordText.join(" · ")}
+                        `
+                        : ""
+                }
+                </span>
+
+            </div>
+
+        </div>
+    `;
+}
+
+// =========================================
+// 선택 SET 스쿼드 출력
+// =========================================
+
+
+
+// =========================================
+// 선택 참가자 스쿼드 화면
+// =========================================
+
+function renderResultDetailSquadView(
+    setData,
+    side
+) {
+
+    const squadViewElement =
+        document.querySelector(
+            "#result-detail-squad-view"
+        );
+
+
+    if (!squadViewElement) {
+        return;
+    }
+
+
+    const isTeamA =
+        side === "team_a";
+
+
+    const participant =
+        isTeamA
+            ? currentResultDetailData.team_a
+            : currentResultDetailData.team_b;
+
+
+    const squad =
+        isTeamA
+            ? setData.team_a_squad
+            : setData.team_b_squad;
+
+
+    const startingPlayers =
+        squad.filter(
+            player =>
+                player.sp_position !== 28
+        );
+
+    const formationPlayersHtml =
+    startingPlayers
+        .map(
+            createFormationPlayerHtml
+        )
+        .join("");
+
+
+    const benchPlayers =
+        squad.filter(
+            player =>
+                player.sp_position === 28
+        );
+
+    squadViewElement.innerHTML = `
+
+    <div class="result-detail-pitch">
+
+        <div class="result-detail-pitch-center-line"></div>
+
+        <div class="result-detail-pitch-center-circle"></div>
+
+        <div class="
+            result-detail-pitch-penalty-box
+            top
+        "></div>
+
+        <div class="
+            result-detail-pitch-penalty-box
+            bottom
+        "></div>
+
+
+        ${formationPlayersHtml}
+
+    </div>
+`;
+
+
+}
+
+
+// =========================================
+// 선택 SET 출력
+// =========================================
+
+function renderResultDetailSet(
+    setNumber
+) {
+
+    if (!currentResultDetailData) {
+        return;
+    }
+
+
+    const setData =
+        currentResultDetailData.sets.find(
+            item =>
+                item.set === setNumber
+        );
+
+
+    if (!setData) {
+        return;
+    }
+
+
+    const squadElement =
+        document.querySelector(
+            "#result-detail-squad"
+        );
+
+
+    if (!squadElement) {
+        return;
+    }
+
+
+    squadElement.innerHTML = `
+
+    <div class="result-detail-workspace">
+
+        <aside class="result-detail-control-panel">
+
+            <div class="result-detail-participant-select">
+
+                <div class="result-detail-control-title">
+
+                    <span>
+                        1
+                    </span>
+
+                    <strong>
+                        참가자 선택
+                    </strong>
+
+                </div>
+
+
+                <div class="result-detail-participant-buttons">
+
+                    <button
+                        type="button"
+                        class="
+                            result-detail-participant-button
+                            ${
+                                currentResultDetailSide
+                                    === "team_a"
+                                    ? "active"
+                                    : ""
+                            }
+                        "
+                        data-result-detail-side="team_a"
+                    >
+
+                        <img
+                            src="${currentResultDetailData.team_a.logo_path}"
+                            alt=""
+                        >
+
+                        <span>
+                            ${currentResultDetailData.team_a.fcl_name}
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            result-detail-participant-button
+                            ${
+                                currentResultDetailSide
+                                    === "team_b"
+                                    ? "active"
+                                    : ""
+                            }
+                        "
+                        data-result-detail-side="team_b"
+                    >
+
+                        <img
+                            src="${currentResultDetailData.team_b.logo_path}"
+                            alt=""
+                        >
+
+                        <span>
+                            ${currentResultDetailData.team_b.fcl_name}
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </aside>
+
+
+        <div
+            id="result-detail-squad-view"
+            class="result-detail-squad-view"
+        ></div>
+
+    </div>
+`;
+
+
+    document
+        .querySelectorAll(
+            "[data-result-detail-set]"
+        )
+        .forEach(
+            buttonElement => {
+
+                buttonElement.classList.toggle(
+                    "active",
+                    Number(
+                        buttonElement.dataset
+                            .resultDetailSet
+                    )
+                    === setNumber
+                );
+            }
+        );
+
+
+    renderResultDetailSquadView(
+        setData,
+        currentResultDetailSide
+    );
+}
+
+
+async function openResultDetail(
+    seriesId
+) {
+
+    resultDetailModalElement.inert =
+        false;
+
+    resultDetailModalElement.classList.remove(
+        "hidden"
+    );
+
+    resultDetailModalElement.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+    document.body.classList.add(
+        "result-detail-modal-open"
+    );
+
+
+    resultDetailContentElement.innerHTML = `
+        <div class="result-detail-loading">
+            경기 상세 정보를 불러오는 중...
+        </div>
+    `;
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/${seriesId}/squads`
+        );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "경기 상세 정보를 불러오지 못했습니다."
+            );
+        }
+
+        currentResultDetailData =
+            data;
+
+
+        const setTabHtml =
+            data.sets.map(
+                (setData) => `
+                    <button
+                        type="button"
+                        class="result-detail-set-tab"
+                        data-result-detail-set="${setData.set}"
+                    >
+                        <strong>
+                            SET ${setData.set}
+                        </strong>
+
+                        <span>
+                            ${setData.team_a_score}
+                            :
+                            ${setData.team_b_score}
+                        </span>
+                    </button>
+                `
+            ).join("");
+
+
+        resultDetailContentElement.innerHTML = `
+
+        <div class="result-detail-match-title">
+
+            <span>
+                ${data.team_a.fcl_name}
+            </span>
+
+            <strong>
+                VS
+            </strong>
+
+            <span>
+                ${data.team_b.fcl_name}
+            </span>
+
+        </div>
+
+
+            <div
+                class="result-detail-set-tabs"
+                style="
+                    grid-template-columns:
+                        repeat(
+                            ${data.sets.length},
+                            minmax(0, 1fr)
+                        );
+                "
+            >
+                ${setTabHtml}
+            </div>
+
+
+            <div
+                id="result-detail-squad"
+                class="result-detail-squad"
+            >
+            </div>
+
+        `;
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        resultDetailContentElement.innerHTML = `
+            <div class="result-detail-error">
+                ${error.message}
+            </div>
+        `;
+
+        if (data.sets.length > 0) {
+
+            renderResultDetailSet(
+                data.sets[0].set
+            );
+        }
+    }
+}
+
 
 // =========================================
 // 경기 결과 출력
@@ -386,6 +1179,17 @@ function renderResults(
         resultCardElement.classList.add(
             "result-card"
         );
+
+        // 여기 추가
+        if (result.series_id) {
+
+            resultCardElement.classList.add(
+                "result-card-detail-enabled"
+            );
+
+            resultCardElement.dataset.seriesDetailId =
+                result.series_id;
+        }
 
 
         // =====================================
@@ -836,7 +1640,176 @@ resultsListElement.addEventListener(
     }
 );
 
+// =========================================
+// 경기 상세 열기
+// =========================================
 
+resultsListElement.addEventListener(
+    "click",
+    (event) => {
+
+        // NEXON 동기화 버튼은 제외
+        if (
+            event.target.closest(
+                "[data-series-sync-button]"
+            )
+        ) {
+
+            return;
+        }
+
+
+        const detailCardElement =
+            event.target.closest(
+                "[data-series-detail-id]"
+            );
+
+
+        if (!detailCardElement) {
+            return;
+        }
+
+
+        const seriesId =
+            Number(
+                detailCardElement.dataset
+                    .seriesDetailId
+            );
+
+
+        if (!seriesId) {
+            return;
+        }
+
+
+        openResultDetail(
+            seriesId
+        );
+    }
+);
+
+
+// =========================================
+// 경기 상세 닫기
+// =========================================
+
+resultDetailModalElement.addEventListener(
+    "click",
+    (event) => {
+
+        const closeElement =
+            event.target.closest(
+                "[data-result-detail-close]"
+            );
+
+
+        if (!closeElement) {
+            return;
+        }
+
+
+        closeResultDetail();
+    }
+);
+
+
+document.addEventListener(
+    "keydown",
+    (event) => {
+
+        if (
+            event.key === "Escape"
+            &&
+            !resultDetailModalElement
+                .classList
+                .contains("hidden")
+        ) {
+
+            closeResultDetail();
+        }
+    }
+);
+
+// =========================================
+// 경기 상세 SET 선택
+// =========================================
+
+resultDetailModalElement.addEventListener(
+    "click",
+    (event) => {
+
+        const setButtonElement =
+            event.target.closest(
+                "[data-result-detail-set]"
+            );
+
+
+        if (!setButtonElement) {
+            return;
+        }
+
+
+        const setNumber =
+            Number(
+                setButtonElement.dataset
+                    .resultDetailSet
+            );
+
+
+        renderResultDetailSet(
+            setNumber
+        );
+    }
+);
+
+// =========================================
+// 경기 상세 참가자 선택
+// =========================================
+
+resultDetailModalElement.addEventListener(
+    "click",
+    (event) => {
+
+        const participantButtonElement =
+            event.target.closest(
+                "[data-result-detail-side]"
+            );
+
+
+        if (!participantButtonElement) {
+            return;
+        }
+
+
+        currentResultDetailSide =
+            participantButtonElement.dataset
+                .resultDetailSide;
+
+
+        const activeSetButtonElement =
+            resultDetailModalElement
+                .querySelector(
+                    ".result-detail-set-tab.active"
+                );
+
+
+        if (!activeSetButtonElement) {
+            return;
+        }
+
+
+        const setNumber =
+            Number(
+                activeSetButtonElement.dataset
+                    .resultDetailSet
+            );
+
+
+        renderResultDetailSet(
+            setNumber
+        );
+    }
+);
 
 
 

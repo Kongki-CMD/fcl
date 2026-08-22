@@ -89,6 +89,53 @@
 
         </main>
 
+<!-- 경기 상세 모달 -->
+<div
+    id="result-detail-modal"
+    class="result-detail-modal hidden"
+    aria-hidden="true"
+    inert
+>
+
+    <div
+        class="result-detail-backdrop"
+        data-result-detail-close
+    ></div>
+
+    <section
+        class="result-detail-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="result-detail-title"
+    >
+
+        <div class="result-detail-header">
+
+            <h2 id="result-detail-title">
+                경기 상세
+            </h2>
+
+            <button
+                type="button"
+                class="result-detail-close-button"
+                data-result-detail-close
+                aria-label="경기 상세 닫기"
+            >
+                ×
+            </button>
+
+        </div>
+
+        <div
+            id="result-detail-content"
+            class="result-detail-content"
+        >
+        </div>
+
+    </section>
+
+</div>
+
 <!-- 하단 영역 -->
 <footer>
     <p>V1.0 FCL Created by aria</p>
