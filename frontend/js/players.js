@@ -8,6 +8,149 @@ const playersTableBodyElement =
         ".players-table-body"
     );
 
+let playerRankingData = [];
+
+
+let playerSortKey =
+    "goals";
+
+
+let playerSortDirection =
+    "desc";
+
+
+const playerSortHeaderElements =
+    document.querySelectorAll(
+        ".player-sort-header"
+    );
+
+let playerSeasonMap =
+    new Map();
+
+
+async function loadPlayerSeasonMetadata() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/metadata/seasons`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "시즌 정보를 불러오지 못했습니다."
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        playerSeasonMap =
+            new Map(
+                data.seasons.map(
+                    season => [
+                        Number(
+                            season.season_id
+                        ),
+                        season,
+                    ]
+                )
+            );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+    }
+
+}
+
+
+function getPlayerSeasonInfo(
+    spId
+) {
+
+    if (!spId) {
+        return null;
+    }
+
+
+    const seasonId =
+        Math.floor(
+            Number(spId)
+            / 1000000
+        );
+
+
+    return (
+        playerSeasonMap.get(
+            seasonId
+        )
+        ??
+        null
+    );
+
+}
+
+
+function createPlayerSeasonIconHtml(
+    spId
+) {
+
+    const season =
+        getPlayerSeasonInfo(
+            spId
+        );
+
+
+    if (!season) {
+
+        return "";
+
+    }
+
+
+    return `
+        <img
+            src="${season.season_image_url}"
+            alt="${season.class_name}"
+            class="player-record-season-icon"
+        >
+    `;
+
+}
+
+const playerRecordCustomImages = {
+    "주앙 칸셀루":
+        "./assets/images/players/custom/cancelo.png",
+
+    "닉 포프":
+        "./assets/images/players/custom/nick_pope.png",
+};
+
+
+function getPlayerRecordImage(
+    player
+) {
+
+    return (
+        playerRecordCustomImages[
+            player.player_name
+        ]
+        ||
+        player.image_url
+    );
+
+}
+
 
 // =========================================
 // 선수 기록 불러오기
@@ -35,9 +178,11 @@ async function loadPlayerRankings() {
             await response.json();
 
 
-        renderPlayerRankings(
-            playerData
-        );
+        playerRankingData =
+            playerData;
+
+
+        sortPlayerRankings();
 
 
     } catch (error) {
@@ -49,7 +194,7 @@ async function loadPlayerRankings() {
 
         playersTableBodyElement.innerHTML = `
             <tr>
-                <td colspan="7">
+                <td colspan="8">
                     선수 기록을 불러오는 중
                     오류가 발생했습니다.
                 </td>
@@ -57,6 +202,89 @@ async function loadPlayerRankings() {
         `;
 
     }
+
+}
+
+//선수 정렬 함수
+
+function sortPlayerRankings() {
+
+    const sortedPlayers = [
+        ...playerRankingData
+    ];
+
+
+    sortedPlayers.sort(
+        (playerA, playerB) => {
+
+            const valueA =
+                playerA[playerSortKey];
+
+            const valueB =
+                playerB[playerSortKey];
+
+
+            let compareResult = 0;
+
+
+            if (
+                typeof valueA === "string"
+                || typeof valueB === "string"
+            ) {
+
+                compareResult =
+                    String(
+                        valueA ?? ""
+                    ).localeCompare(
+                        String(
+                            valueB ?? ""
+                        ),
+                        "ko"
+                    );
+
+            } else {
+
+                compareResult =
+                    Number(
+                        valueA ?? 0
+                    )
+                    -
+                    Number(
+                        valueB ?? 0
+                    );
+
+            }
+
+
+            if (
+                compareResult === 0
+            ) {
+
+                compareResult =
+                    playerA.player_name.localeCompare(
+                        playerB.player_name,
+                        "ko"
+                    );
+
+            }
+
+
+            return (
+                playerSortDirection
+                === "asc"
+            )
+                ? compareResult
+                : -compareResult;
+        }
+    );
+
+
+    renderPlayerRankings(
+        sortedPlayers
+    );
+
+
+    updatePlayerSortHeaders();
 
 }
 
@@ -82,7 +310,7 @@ function renderPlayerRankings(
         playersTableBodyElement.innerHTML = `
             <tr>
                 <td
-                    colspan="7"
+                    colspan="8"
                     class="players-empty"
                 >
                     아직 등록된 정규리그
@@ -112,11 +340,17 @@ function renderPlayerRankings(
             let playerImageHtml = "";
 
 
-            if (player.image_url) {
+            const playerImageUrl =
+                getPlayerRecordImage(
+                    player
+                );
+
+
+            if (playerImageUrl) {
 
                 playerImageHtml = `
                     <img
-                        src="${player.image_url}"
+                        src="${playerImageUrl}"
                         alt="${player.player_name}"
                         class="player-record-image"
                         onerror="
@@ -160,13 +394,23 @@ function renderPlayerRankings(
 
                         ${playerImageHtml}
 
-                        <span
+                        <div
                             class="
-                                player-record-name
+                                player-record-name-wrap
                             "
                         >
-                            ${player.player_name}
-                        </span>
+                            ${createPlayerSeasonIconHtml(
+                                player.sp_id
+                            )}
+
+                            <span
+                                class="
+                                    player-record-name
+                                "
+                            >
+                                ${player.player_name}
+                            </span>
+                        </div>
 
                     </div>
                 </td>
@@ -202,6 +446,15 @@ function renderPlayerRankings(
 
                 <td
                     class="
+                        player-mvp-count
+                    "
+                >
+                    ${player.mvp_count}
+                </td>
+
+
+                <td
+                    class="
                         player-average-rating
                     "
                 >
@@ -221,4 +474,107 @@ function renderPlayerRankings(
 }
 
 
-loadPlayerRankings();
+//이벤트
+playerSortHeaderElements.forEach(
+    (headerElement) => {
+
+        headerElement.addEventListener(
+            "click",
+            () => {
+
+                const sortKey =
+                    headerElement.dataset.sortKey;
+
+
+                if (
+                    playerSortKey
+                    === sortKey
+                ) {
+
+                    playerSortDirection =
+                        playerSortDirection
+                        === "desc"
+                            ? "asc"
+                            : "desc";
+
+                } else {
+
+                    playerSortKey =
+                        sortKey;
+
+
+                    if (
+                        sortKey === "player_name"
+                        || sortKey === "fcl_name"
+                    ) {
+
+                        playerSortDirection =
+                            "asc";
+
+                    } else {
+
+                        playerSortDirection =
+                            "desc";
+                    }
+
+                }
+
+
+                sortPlayerRankings();
+
+            }
+        );
+
+    }
+);
+
+function updatePlayerSortHeaders() {
+
+    playerSortHeaderElements.forEach(
+        (headerElement) => {
+
+            const arrowElement =
+                headerElement.querySelector(
+                    ".player-sort-arrow"
+                );
+
+
+            if (!arrowElement) {
+                return;
+            }
+
+
+            if (
+                headerElement.dataset.sortKey
+                !== playerSortKey
+            ) {
+
+                arrowElement.textContent =
+                    "";
+
+                return;
+            }
+
+
+            arrowElement.textContent =
+                playerSortDirection
+                === "asc"
+                    ? "▲"
+                    : "▼";
+
+        }
+    );
+
+}
+
+
+async function initializePlayerRankings() {
+
+    await loadPlayerSeasonMetadata();
+
+    await loadPlayerRankings();
+
+}
+
+
+initializePlayerRankings();

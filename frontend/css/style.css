@@ -814,34 +814,32 @@ main {
     width: 7%;
 }
 
-
 .player-col-name {
-    width: 25%;
+    width: 23%;
 }
-
 
 .player-col-owner {
-    width: 20%;
+    width: 18%;
 }
-
 
 .player-col-goals {
-    width: 10%;
+    width: 9%;
 }
-
 
 .player-col-assists {
+    width: 9%;
+}
+
+.player-col-sets {
     width: 10%;
 }
 
-
-.player-col-sets {
-    width: 12%;
+.player-col-mvp {
+    width: 9%;
 }
 
-
 .player-col-rating {
-    width: 16%;
+    width: 15%;
 }
 
 
@@ -1202,6 +1200,112 @@ footer p {
 
 .playoff-schedule-card .versus {
     text-align: center;
+}
+
+/* =========================
+   메인화면 선수 득점 순위
+========================= */
+
+.player-ranking-list {
+    width: 100%;
+}
+
+
+.dashboard-player-ranking-row {
+    min-height: 55px;
+
+    padding: 0 15px;
+
+    border-bottom: 1px solid #333;
+
+    align-items: center;
+
+    min-height: 55px;
+
+    padding: 0 15px;
+
+    border-bottom: 1px solid #333;
+}
+
+
+.dashboard-player-ranking-row:last-child {
+    border-bottom: none;
+}
+
+.dashboard-player-ranking-header,
+.dashboard-player-ranking-row {
+    display: grid;
+
+    grid-template-columns:
+        50px
+        1fr
+        70px;
+
+    align-items: center;
+}
+
+
+.dashboard-player-ranking-header {
+    min-height: 40px;
+
+    padding: 0 15px;
+
+    border-bottom: 1px solid #444;
+
+    text-align: center;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    color: #aaa;
+}
+
+
+.dashboard-player-rank {
+    text-align: center;
+
+    font-weight: bold;
+}
+
+
+.dashboard-player-name {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.dashboard-player-name span {
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-weight: 600;
+}
+
+
+.dashboard-player-season-icon {
+    width: 22px;
+    height: 22px;
+
+    flex-shrink: 0;
+
+    object-fit: contain;
+}
+
+
+.dashboard-player-goals {
+    text-align: center;
+
+    font-size: 18px;
+    font-weight: bold;
 }
 
 /* =========================
@@ -4837,6 +4941,1204 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     object-fit: contain;
 }
 
+/* 선수 기록 순위 스타일 */
+.player-record-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+.player-record-season-icon {
+    width: 24px;
+    height: 24px;
+
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* 선수 기록 정렬 스타일 */
+.player-sort-header {
+    cursor: pointer;
+
+    user-select: none;
+
+    transition: color 0.2s;
+}
+
+
+.player-sort-header:hover {
+    color: #fff;
+}
+
+
+.player-sort-arrow {
+    display: inline-block;
+
+    min-width: 12px;
+
+    margin-left: 4px;
+
+    font-size: 9px;
+
+    color: #b79a60;
+}
+
+/* =====================================
+   COMMUNITY
+===================================== */
+
+.community-page {
+    width: 94vw;
+    max-width: 1100px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.community-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 20px;
+
+    margin-bottom: 30px;
+}
+
+
+.community-header h1 {
+    margin-bottom: 8px;
+
+    font-size: 32px;
+}
+
+
+.community-header p {
+    color: #888;
+}
+
+
+.community-write-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    height: 42px;
+
+    padding: 0 18px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    color: #fff;
+
+    text-decoration: none;
+
+    transition:
+        background-color 0.2s,
+        border-color 0.2s;
+}
+
+
+.community-write-button:hover {
+    border-color: #888;
+
+    background: #222;
+}
+
+
+.community-board {
+    overflow: hidden;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+}
+
+
+.community-board-header,
+.community-post-row {
+    display: grid;
+
+    grid-template-columns:
+        80px
+        1fr
+        130px
+        130px;
+
+    align-items: center;
+
+    min-height: 60px;
+
+    padding: 0 15px;
+}
+
+
+.community-board-header {
+    min-height: 45px;
+
+    border-bottom: 1px solid #444;
+
+    color: #aaa;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    text-align: center;
+}
+
+
+.community-post-row {
+    border-bottom: 1px solid #333;
+
+    color: inherit;
+
+    text-decoration: none;
+
+    transition:
+        background-color 0.2s;
+}
+
+
+.community-post-row:last-child {
+    border-bottom: none;
+}
+
+
+.community-post-row:hover {
+    background: #191919;
+}
+
+
+.community-post-id,
+.community-post-author,
+.community-post-date {
+    text-align: center;
+}
+
+
+.community-post-title {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    min-width: 0;
+
+    padding: 0 12px;
+}
+
+
+.community-post-title > span:first-child {
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.community-attachment-count {
+    flex-shrink: 0;
+
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.community-loading,
+.community-empty {
+    margin: 0;
+
+    padding: 50px 20px;
+
+    color: #888;
+
+    text-align: center;
+}
+
+/* =====================================
+   COMMUNITY WRITE
+===================================== */
+
+.community-write-page {
+    width: 94vw;
+    max-width: 900px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.community-write-header {
+    margin-bottom: 30px;
+}
+
+
+.community-write-header h1 {
+    margin-bottom: 8px;
+
+    font-size: 32px;
+}
+
+
+.community-write-header p {
+    color: #888;
+}
+
+
+.community-write-form {
+    padding: 30px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+}
+
+
+.community-form-field {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    margin-bottom: 24px;
+}
+
+
+.community-form-field label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+
+.community-form-field input[type="text"],
+.community-form-field input[type="password"],
+.community-form-field textarea {
+    width: 100%;
+
+    box-sizing: border-box;
+
+    border: 1px solid #444;
+    border-radius: 7px;
+
+    background: rgba(
+        0,
+        0,
+        0,
+        0.45
+    );
+
+    color: #fff;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.community-form-field input[type="text"],
+.community-form-field input[type="password"] {
+    height: 45px;
+
+    padding: 0 12px;
+}
+
+
+.community-form-field textarea {
+    min-height: 260px;
+
+    padding: 12px;
+
+    resize: vertical;
+
+    line-height: 1.6;
+}
+
+
+.community-form-field input[type="text"]:focus,
+.community-form-field input[type="password"]:focus,
+.community-form-field textarea:focus {
+    border-color: #888;
+}
+
+
+.community-form-field input[type="file"] {
+    color: #aaa;
+}
+
+
+.community-image-help {
+    margin: 0;
+
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.community-image-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+
+.community-image-item {
+    color: #aaa;
+
+    font-size: 13px;
+}
+
+
+.community-write-message {
+    min-height: 22px;
+
+    margin: 0 0 15px;
+
+    color: #ccc;
+
+    font-size: 13px;
+}
+
+
+.community-write-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+}
+
+
+.community-cancel-button,
+.community-submit-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    height: 42px;
+
+    box-sizing: border-box;
+
+    padding: 0 18px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    font: inherit;
+
+    text-decoration: none;
+
+    cursor: pointer;
+}
+
+
+.community-cancel-button {
+    color: #aaa;
+
+    background: transparent;
+}
+
+
+.community-submit-button {
+    color: #fff;
+
+    background: #222;
+}
+
+/* =====================================
+   COMMUNITY DETAIL
+===================================== */
+
+.community-detail-page {
+    width: 94vw;
+    max-width: 1000px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.community-detail {
+    overflow: hidden;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+}
+
+
+.community-detail-header {
+    padding: 25px 30px;
+
+    border-bottom: 1px solid #333;
+}
+
+
+.community-detail-title {
+    margin: 0 0 15px;
+
+    font-size: 28px;
+    line-height: 1.4;
+
+    word-break: break-word;
+}
+
+
+.community-detail-meta {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 15px;
+
+    color: #888;
+
+    font-size: 13px;
+}
+
+
+.community-detail-content {
+    min-height: 250px;
+
+    padding: 30px;
+
+    line-height: 1.8;
+
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+
+.community-detail-attachments {
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+
+    padding: 0 30px 30px;
+}
+
+
+.community-detail-image {
+    display: block;
+
+    width: auto;
+    max-width: 100%;
+    height: auto;
+
+    margin: 0 auto;
+
+    border-radius: 8px;
+
+    object-fit: contain;
+}
+
+
+.community-detail-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    margin-top: 20px;
+}
+
+
+.community-list-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    height: 42px;
+
+    box-sizing: border-box;
+
+    padding: 0 18px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    color: #fff;
+
+    text-decoration: none;
+}
+
+
+.community-list-button:hover {
+    border-color: #888;
+
+    background: #222;
+}
+
+.community-detail-actions {
+    justify-content: space-between;
+}
+
+
+.community-detail-manage-actions {
+    display: flex;
+
+    gap: 10px;
+}
+
+
+.community-edit-button,
+.community-delete-button {
+    min-width: 90px;
+    height: 42px;
+
+    padding: 0 18px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    color: #fff;
+
+    background: transparent;
+
+    font: inherit;
+
+    cursor: pointer;
+}
+
+
+.community-edit-button:hover {
+    background: #222;
+
+    border-color: #888;
+}
+
+
+.community-delete-button {
+    border-color: #744;
+}
+
+
+.community-delete-button:hover {
+    background: #2a1717;
+
+    border-color: #a55;
+}
+
+/* =====================================
+   COMMUNITY MODAL
+===================================== */
+
+.community-modal {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 2000;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 20px;
+
+    box-sizing: border-box;
+
+    background: rgba(
+        0,
+        0,
+        0,
+        0.75
+    );
+}
+
+
+.community-modal.hidden {
+    display: none;
+}
+
+
+.community-modal-panel {
+    width: 100%;
+    max-width: 650px;
+
+    max-height: 90vh;
+
+    overflow-y: auto;
+
+    padding: 25px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #444;
+    border-radius: 10px;
+
+    background: #111;
+}
+
+
+.community-delete-modal-panel {
+    max-width: 450px;
+}
+
+
+.community-modal-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 25px;
+}
+
+
+.community-modal-header h2 {
+    margin: 0;
+
+    font-size: 22px;
+}
+
+
+.community-modal-close-button {
+    border: none;
+
+    color: #aaa;
+
+    background: transparent;
+
+    font-size: 28px;
+
+    cursor: pointer;
+}
+
+
+.community-modal-message {
+    min-height: 20px;
+
+    margin: 0 0 15px;
+
+    color: #ccc;
+
+    font-size: 13px;
+}
+
+
+.community-modal-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    gap: 10px;
+}
+
+
+.community-modal-cancel-button,
+.community-modal-submit-button,
+.community-delete-submit-button {
+    min-width: 90px;
+    height: 40px;
+
+    padding: 0 15px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    color: #fff;
+
+    background: #222;
+
+    font: inherit;
+
+    cursor: pointer;
+}
+
+
+.community-delete-submit-button {
+    border-color: #844;
+
+    background: #321919;
+}
+
+
+.community-delete-text {
+    margin-bottom: 25px;
+
+    color: #ccc;
+
+    line-height: 1.6;
+}
+
+/* =====================================
+   PLAYER PHOTO REQUEST
+===================================== */
+
+.photo-request-page {
+    width: 94vw;
+    max-width: 1100px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.photo-request-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    gap: 20px;
+
+    margin-bottom: 30px;
+}
+
+
+.photo-request-header h1 {
+    margin-bottom: 8px;
+
+    font-size: 32px;
+}
+
+
+.photo-request-header p {
+    color: #888;
+}
+
+
+.photo-request-write-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 90px;
+    height: 42px;
+
+    padding: 0 18px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    color: #fff;
+
+    text-decoration: none;
+
+    transition:
+        background-color .2s,
+        border-color .2s;
+}
+
+
+.photo-request-write-button:hover {
+    border-color: #888;
+
+    background: #222;
+}
+
+
+.photo-request-board {
+    overflow: hidden;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+}
+
+
+.photo-request-board-header,
+.photo-request-row {
+    display: grid;
+
+    grid-template-columns:
+        70px
+        minmax(180px, 1fr)
+        130px
+        120px
+        100px
+        130px;
+
+    align-items: center;
+
+    min-height: 60px;
+
+    padding: 0 15px;
+}
+
+
+.photo-request-board-header {
+    min-height: 45px;
+
+    border-bottom: 1px solid #444;
+
+    color: #aaa;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    text-align: center;
+}
+
+
+.photo-request-row {
+    border-bottom: 1px solid #333;
+
+    color: inherit;
+
+    text-decoration: none;
+
+    transition:
+        background-color .2s;
+}
+
+
+.photo-request-row:last-child {
+    border-bottom: none;
+}
+
+
+.photo-request-row:hover {
+    background: #191919;
+}
+
+
+.photo-request-number,
+.photo-request-season,
+.photo-request-author,
+.photo-request-status,
+.photo-request-date {
+    text-align: center;
+}
+
+
+.photo-request-player {
+    min-width: 0;
+
+    padding: 0 12px;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.photo-request-status {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    justify-self: center;
+
+    min-width: 58px;
+    height: 26px;
+
+    padding: 0 8px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #555;
+    border-radius: 20px;
+
+    font-size: 12px;
+}
+
+
+.photo-request-status-pending {
+    color: #aaa;
+
+    border-color: #555;
+}
+
+
+.photo-request-status-in_progress {
+    color: #ddd;
+
+    border-color: #777;
+}
+
+
+.photo-request-status-completed {
+    color: #fff;
+
+    border-color: #999;
+
+    background: #292929;
+}
+
+
+.photo-request-status-rejected {
+    color: #aaa;
+
+    border-color: #744;
+
+    background: #241616;
+}
+
+/* =====================================
+   PLAYER PHOTO REQUEST WRITE
+===================================== */
+
+.photo-request-write-page {
+    width: 94vw;
+    max-width: 900px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.photo-request-write-header {
+    margin-bottom: 30px;
+}
+
+
+.photo-request-write-header h1 {
+    margin-bottom: 8px;
+
+    font-size: 32px;
+}
+
+
+.photo-request-write-header p {
+    color: #888;
+}
+
+
+.community-form-field input[type="number"] {
+    width: 100%;
+    height: 45px;
+
+    box-sizing: border-box;
+
+    padding: 0 12px;
+
+    border: 1px solid #444;
+    border-radius: 7px;
+
+    background: rgba(
+        0,
+        0,
+        0,
+        0.45
+    );
+
+    color: #fff;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.community-form-field input[type="number"]:focus {
+    border-color: #888;
+}
+
+/* =====================================
+   PLAYER PHOTO REQUEST DETAIL
+===================================== */
+
+.photo-request-detail-page {
+    width: 94vw;
+    max-width: 1000px;
+
+    margin: 0 auto;
+    padding: 40px 0;
+}
+
+
+.photo-request-detail {
+    overflow: hidden;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+}
+
+
+.photo-request-detail-header {
+    padding: 25px 30px;
+
+    border-bottom: 1px solid #333;
+}
+
+
+.photo-request-detail-title-area {
+    display: flex;
+
+    align-items: center;
+
+    gap: 12px;
+
+    margin-bottom: 15px;
+}
+
+
+.photo-request-detail-title-area h1 {
+    margin: 0;
+
+    min-width: 0;
+
+    font-size: 28px;
+    line-height: 1.4;
+
+    word-break: break-word;
+}
+
+
+.photo-request-detail-meta {
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 15px;
+
+    color: #888;
+
+    font-size: 13px;
+}
+
+
+.photo-request-detail-info {
+    display: grid;
+
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    border-bottom: 1px solid #333;
+}
+
+
+.photo-request-detail-info-item {
+    display: flex;
+    flex-direction: column;
+
+    gap: 7px;
+
+    padding: 20px 25px;
+
+    border-right: 1px solid #333;
+}
+
+
+.photo-request-detail-info-item:last-child {
+    border-right: none;
+}
+
+
+.photo-request-detail-info-label {
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.photo-request-detail-info-value {
+    font-size: 15px;
+    font-weight: bold;
+
+    word-break: break-word;
+}
+
+
+.photo-request-detail-section {
+    padding: 25px 30px;
+
+    border-bottom: 1px solid #333;
+}
+
+
+.photo-request-detail-section:last-child {
+    border-bottom: none;
+}
+
+
+.photo-request-detail-section h2 {
+    margin: 0 0 18px;
+
+    font-size: 17px;
+}
+
+
+.photo-request-detail-content {
+    min-height: 100px;
+
+    line-height: 1.8;
+
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+
+.photo-request-detail-images {
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+}
+
+
+.photo-request-detail-image {
+    display: block;
+
+    width: auto;
+    max-width: 100%;
+    height: auto;
+
+    margin: 0 auto;
+
+    border-radius: 8px;
+
+    object-fit: contain;
+}
+
+
+.photo-request-admin-section {
+    background: rgba(
+        255,
+        255,
+        255,
+        0.015
+    );
+}
+
+
+.photo-request-admin-note {
+    min-height: 60px;
+
+    color: #aaa;
+
+    line-height: 1.7;
+
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+
+.photo-request-completed-date {
+    margin: 15px 0 0;
+
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.photo-request-detail-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    margin-top: 20px;
+}
+
 /* ======================================================
    SEASON CHAMPION MOBILE
 ====================================================== */
@@ -4911,6 +6213,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     .season-final-mvp-stats {
         justify-content: center;
+    }
+
+    .dashboard-player-ranking-header,
+    .dashboard-player-ranking-row {
+        grid-template-columns:
+            40px
+            1fr
+            50px;
+    }
+
+    .dashboard-player-ranking-header {
+        padding: 0 8px;
+
+        font-size: 12px;
+    }
+
+
+    .dashboard-player-season-icon {
+        width: 18px;
+        height: 18px;
+    }
+
+
+    .dashboard-player-name {
+        gap: 5px;
+    }
+
+
+    .dashboard-player-name span {
+        font-size: 13px;
+    }
+
+
+    .dashboard-player-goals {
+        font-size: 16px;
     }
 }
 
@@ -5228,38 +6565,146 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 
 
-    /* =====================================
-       PLAYERS
-    ===================================== */
+/* =====================================
+   PLAYERS
+===================================== */
 
-    .players-page {
-        width: 100%;
-
-        padding: 28px 12px;
-    }
-
-
-    .players-table-container {
-        overflow-x: auto;
-
-        -webkit-overflow-scrolling: touch;
-    }
+.players-page {
+    width: 100%;
+    padding: 24px 10px;
+}
 
 
-    .players-table {
-        min-width: 560px;
-    }
+.players-header {
+    margin-bottom: 20px;
+}
 
 
-    .players-table th,
-    .players-table td {
-        height: 60px;
+.players-header h1 {
+    font-size: 26px;
+}
 
-        padding: 0 10px;
 
-        font-size: 14px;
-    }
+.players-header p {
+    font-size: 13px;
+    line-height: 1.5;
+}
 
+
+.players-table-container {
+    width: 100%;
+
+    overflow-x: auto;
+
+    -webkit-overflow-scrolling: touch;
+
+    border-radius: 8px;
+}
+
+
+.players-table {
+    width: 850px;
+    min-width: 850px;
+
+    table-layout: fixed;
+}
+
+
+/* 순위 */
+
+.players-table th:nth-child(1),
+.players-table td:nth-child(1) {
+    position: sticky;
+    left: 0;
+
+    z-index: 3;
+
+    width: 52px;
+
+    background: #111;
+}
+
+
+/* 선수 */
+
+.players-table th:nth-child(2),
+.players-table td:nth-child(2) {
+    position: sticky;
+    left: 52px;
+
+    z-index: 2;
+
+    width: 190px;
+
+    background: #111;
+
+    border-right: 1px solid #333;
+}
+
+
+.players-table th:nth-child(1),
+.players-table th:nth-child(2) {
+    z-index: 5;
+}
+
+
+.players-table th,
+.players-table td {
+    height: 64px;
+
+    padding: 0 8px;
+
+    font-size: 13px;
+}
+
+
+.player-record-profile {
+    gap: 7px;
+}
+
+
+.player-record-image {
+    width: 42px;
+    height: 42px;
+}
+
+
+.player-record-name-wrap {
+    gap: 4px;
+}
+
+
+.player-record-season-icon {
+    width: 18px;
+    height: 18px;
+}
+
+
+.player-record-name {
+    max-width: 105px;
+
+    overflow: hidden;
+
+    font-size: 13px;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.player-record-owner {
+    font-size: 12px;
+}
+
+
+.player-ranking-number {
+    font-size: 15px;
+}
+
+
+.player-goals {
+    font-size: 17px;
+}
 
     /* =====================================
        RULES
@@ -5766,7 +7211,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     width: 14px;
     height: 14px;
 }
-    
+
 /* =========================================
    RESULT DETAIL - MOBILE
 ========================================= */
@@ -6167,4 +7612,569 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     .match-mvp-name {
         gap: 4px;
     }
+
+    .community-page {
+        width: 100%;
+
+        padding: 28px 10px;
+    }
+
+
+    .community-header {
+        align-items: center;
+
+        margin-bottom: 20px;
+    }
+
+
+    .community-header h1 {
+        font-size: 26px;
+    }
+
+
+    .community-header p {
+        font-size: 13px;
+    }
+
+
+    .community-write-button {
+        min-width: 72px;
+        height: 38px;
+
+        padding: 0 12px;
+
+        font-size: 13px;
+    }
+
+
+    .community-board-header,
+    .community-post-row {
+        grid-template-columns:
+            45px
+            1fr
+            75px;
+
+        min-height: 55px;
+
+        padding: 0 7px;
+    }
+
+
+    .community-board-header
+    span:nth-child(4) {
+        display: none;
+    }
+
+
+    .community-post-date {
+        display: none;
+    }
+
+
+    .community-post-title {
+        padding: 0 7px;
+    }
+
+
+    .community-post-id,
+    .community-post-author {
+        font-size: 12px;
+    }
+
+
+    .community-post-title {
+        font-size: 13px;
+    }
+}
+
+/* community-write */
+@media (max-width: 768px) {
+
+    .community-write-page {
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 28px 10px;
+    }
+
+
+    .community-write-header {
+        margin-bottom: 20px;
+    }
+
+
+    .community-write-header h1 {
+        font-size: 26px;
+    }
+
+
+    .community-write-header p {
+        font-size: 13px;
+    }
+
+
+    .community-write-form {
+        padding: 18px 14px;
+    }
+
+
+    .community-form-field textarea {
+        min-height: 220px;
+    }
+
+
+    .community-cancel-button,
+    .community-submit-button {
+        min-width: 75px;
+        height: 38px;
+
+        padding: 0 12px;
+
+        font-size: 13px;
+    }
+
+        .community-detail-page {
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 28px 10px;
+    }
+
+
+    .community-detail-header {
+        padding: 20px 16px;
+    }
+
+
+    .community-detail-title {
+        margin-bottom: 12px;
+
+        font-size: 22px;
+    }
+
+
+    .community-detail-meta {
+        font-size: 12px;
+    }
+
+
+    .community-detail-content {
+        min-height: 200px;
+
+        padding: 22px 16px;
+
+        font-size: 14px;
+    }
+
+
+    .community-detail-attachments {
+        gap: 12px;
+
+        padding:
+            0
+            16px
+            20px;
+    }
+
+
+    .community-list-button {
+        min-width: 75px;
+        height: 38px;
+
+        padding: 0 12px;
+
+        font-size: 13px;
+    }
+
+}
+
+@media (max-width: 768px) {
+
+    .community-detail-actions {
+        gap: 10px;
+    }
+
+
+    .community-detail-manage-actions {
+        gap: 7px;
+    }
+
+
+    .community-edit-button,
+    .community-delete-button {
+        min-width: 65px;
+        height: 38px;
+
+        padding: 0 10px;
+
+        font-size: 13px;
+    }
+
+
+    .community-modal {
+        padding: 10px;
+    }
+
+
+    .community-modal-panel {
+        padding: 20px 15px;
+    }
+
+
+    .community-modal-header h2 {
+        font-size: 20px;
+    }
+
+}
+
+@media (max-width: 768px) {
+
+    .photo-request-page {
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 28px 10px;
+    }
+
+
+    .photo-request-header {
+        align-items: center;
+
+        margin-bottom: 20px;
+    }
+
+
+    .photo-request-header h1 {
+        font-size: 26px;
+    }
+
+
+    .photo-request-header p {
+        font-size: 13px;
+    }
+
+
+    .photo-request-write-button {
+        min-width: 72px;
+        height: 38px;
+
+        padding: 0 12px;
+
+        font-size: 13px;
+    }
+
+
+    .photo-request-board {
+        overflow-x: auto;
+    }
+
+
+    .photo-request-board-header,
+    .photo-request-row {
+        grid-template-columns:
+            45px
+            minmax(130px, 1fr)
+            90px
+            80px
+            75px;
+
+        min-width: 620px;
+
+        min-height: 55px;
+
+        padding: 0 7px;
+    }
+
+
+    .photo-request-board-header span:nth-child(6) {
+        display: none;
+    }
+
+
+    .photo-request-date {
+        display: none;
+    }
+
+
+    .photo-request-player {
+        padding: 0 7px;
+    }
+
+
+    .photo-request-number,
+    .photo-request-season,
+    .photo-request-author,
+    .photo-request-status {
+        font-size: 12px;
+    }
+
+}
+
+
+@media (max-width: 768px) {
+
+    .photo-request-write-page {
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 28px 10px;
+    }
+
+
+    .photo-request-write-header {
+        margin-bottom: 20px;
+    }
+
+
+    .photo-request-write-header h1 {
+        font-size: 26px;
+    }
+
+
+    .photo-request-write-header p {
+        font-size: 13px;
+    }
+
+}
+
+@media (max-width: 768px) {
+
+    .photo-request-detail-page {
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 28px 10px;
+    }
+
+
+    .photo-request-detail-header {
+        padding: 20px 16px;
+    }
+
+
+    .photo-request-detail-title-area {
+        align-items: flex-start;
+    }
+
+
+    .photo-request-detail-title-area h1 {
+        font-size: 22px;
+    }
+
+
+    .photo-request-detail-meta {
+        font-size: 12px;
+    }
+
+
+    .photo-request-detail-info {
+        grid-template-columns: 1fr;
+    }
+
+
+    .photo-request-detail-info-item {
+        flex-direction: row;
+
+        justify-content: space-between;
+
+        padding: 14px 16px;
+
+        border-right: none;
+        border-bottom: 1px solid #333;
+    }
+
+
+    .photo-request-detail-info-item:last-child {
+        border-bottom: none;
+    }
+
+
+    .photo-request-detail-section {
+        padding: 22px 16px;
+    }
+
+
+    .photo-request-detail-content {
+        font-size: 14px;
+    }
+
+
+    .photo-request-detail-images {
+        gap: 12px;
+    }
+
+}
+
+/* =========================================
+   PLAYER PHOTO REQUEST MOBILE FIX
+========================================= */
+
+@media (max-width: 768px) {
+
+    .photo-request-page {
+        width: 100%;
+
+        padding:
+            24px
+            12px;
+
+        box-sizing: border-box;
+    }
+
+
+    /* =========================
+       HEADER
+    ========================= */
+
+    .photo-request-header {
+        display: flex;
+
+        flex-direction: column;
+        align-items: stretch;
+
+        gap: 18px;
+
+        margin-bottom: 22px;
+    }
+
+
+    .photo-request-header h1 {
+        margin: 0 0 8px;
+
+        font-size: 26px;
+        line-height: 1.3;
+    }
+
+
+    .photo-request-header p {
+        margin: 0;
+
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+
+    .photo-request-write-button {
+        width: 100%;
+        height: 42px;
+
+        box-sizing: border-box;
+
+        white-space: nowrap;
+    }
+
+
+    /* =========================
+       BOARD
+    ========================= */
+
+    .photo-request-board {
+        width: 100%;
+
+        overflow: hidden;
+    }
+
+
+    .photo-request-board-header,
+    .photo-request-row {
+        width: 100%;
+        min-width: 0;
+
+        grid-template-columns:
+            42px
+            minmax(0, 1fr)
+            68px
+            62px;
+
+        gap: 4px;
+
+        padding:
+            0
+            8px;
+
+        box-sizing: border-box;
+    }
+
+
+    .photo-request-board-header {
+        min-height: 42px;
+
+        font-size: 11px;
+    }
+
+
+    .photo-request-row {
+        min-height: 58px;
+    }
+
+
+    /* 작성자 숨김 */
+    .photo-request-board-header
+    span:nth-child(4),
+    .photo-request-author {
+        display: none;
+    }
+
+
+    /* 작성일 숨김 */
+    .photo-request-board-header
+    span:nth-child(6),
+    .photo-request-date {
+        display: none;
+    }
+
+
+    .photo-request-number {
+        font-size: 12px;
+    }
+
+
+    .photo-request-player {
+        min-width: 0;
+
+        padding:
+            0
+            10px;
+
+        font-size: 13px;
+
+        text-align: center;
+
+        overflow: hidden;
+
+        text-overflow: ellipsis;
+
+        white-space: nowrap;
+    }
+
+
+    .photo-request-season {
+        min-width: 0;
+
+        font-size: 11px;
+
+        overflow: hidden;
+
+        text-overflow: ellipsis;
+
+        white-space: nowrap;
+    }
+
+
+    .photo-request-status {
+        min-width: 50px;
+        height: 24px;
+
+        padding:
+            0
+            6px;
+
+        font-size: 10px;
+    }
+
 }

@@ -1283,3 +1283,310 @@
 
     color: #d7bc78;
 }
+
+/* =====================================
+   PLAYER PHOTO REQUEST ADMIN
+===================================== */
+
+.admin-photo-request-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 18px;
+
+    margin-top: 25px;
+}
+
+
+.admin-photo-request-card {
+    padding: 22px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    background: rgba(
+        255,
+        255,
+        255,
+        0.02
+    );
+}
+
+
+.admin-photo-request-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 15px;
+
+    margin-bottom: 12px;
+}
+
+
+.admin-photo-request-header > div {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+
+.admin-photo-request-player {
+    font-size: 18px;
+}
+
+
+.admin-photo-request-season {
+    color: #888;
+
+    font-size: 13px;
+}
+
+
+.admin-photo-request-status {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 64px;
+    height: 28px;
+
+    padding: 0 10px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #555;
+    border-radius: 20px;
+
+    font-size: 12px;
+}
+
+
+.admin-photo-request-status-pending {
+    color: #aaa;
+}
+
+
+.admin-photo-request-status-in_progress {
+    border-color: #777;
+
+    color: #ddd;
+}
+
+
+.admin-photo-request-status-completed {
+    border-color: #999;
+
+    background: #292929;
+
+    color: #fff;
+}
+
+
+.admin-photo-request-status-rejected {
+    border-color: #744;
+
+    background: #241616;
+
+    color: #aaa;
+}
+
+
+.admin-photo-request-meta {
+    display: flex;
+
+    gap: 18px;
+
+    margin-bottom: 22px;
+
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.admin-photo-request-fields {
+    display: grid;
+
+    grid-template-columns:
+        180px
+        1fr;
+
+    gap: 15px;
+}
+
+
+.admin-photo-request-fields label {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    color: #aaa;
+
+    font-size: 13px;
+}
+
+
+.admin-photo-request-status-select,
+.admin-photo-request-note {
+    width: 100%;
+
+    box-sizing: border-box;
+
+    border: 1px solid #444;
+    border-radius: 7px;
+
+    background: #111;
+
+    color: #fff;
+
+    font: inherit;
+
+    outline: none;
+}
+
+
+.admin-photo-request-status-select {
+    height: 42px;
+
+    padding: 0 10px;
+}
+
+
+.admin-photo-request-note {
+    min-height: 90px;
+
+    padding: 10px 12px;
+
+    resize: vertical;
+
+    line-height: 1.5;
+}
+
+
+.admin-photo-request-status-select:focus,
+.admin-photo-request-note:focus {
+    border-color: #777;
+}
+
+
+.admin-photo-request-actions {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: center;
+
+    gap: 15px;
+
+    margin-top: 18px;
+}
+
+
+.admin-photo-request-message {
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.admin-photo-request-buttons {
+    display: flex;
+
+    gap: 8px;
+}
+
+
+.admin-photo-request-detail-button,
+.admin-photo-request-save-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 82px;
+    height: 38px;
+
+    box-sizing: border-box;
+
+    padding: 0 14px;
+
+    border: 1px solid #555;
+    border-radius: 7px;
+
+    background: transparent;
+
+    color: #fff;
+
+    font: inherit;
+    font-size: 13px;
+
+    text-decoration: none;
+
+    cursor: pointer;
+}
+
+
+.admin-photo-request-detail-button:hover,
+.admin-photo-request-save-button:hover {
+    border-color: #888;
+
+    background: #222;
+}
+
+
+.admin-photo-request-save-button:disabled {
+    opacity: 0.5;
+
+    cursor: default;
+}
+
+@media (max-width: 768px) {
+
+    .admin-photo-request-card {
+        padding: 16px;
+    }
+
+
+    .admin-photo-request-header {
+        align-items: flex-start;
+    }
+
+
+    .admin-photo-request-header > div {
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 4px;
+    }
+
+
+    .admin-photo-request-meta {
+        flex-wrap: wrap;
+
+        gap: 7px 14px;
+    }
+
+
+    .admin-photo-request-fields {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-photo-request-actions {
+        align-items: flex-end;
+
+        flex-direction: column;
+    }
+
+
+    .admin-photo-request-message {
+        align-self: flex-start;
+    }
+
+}

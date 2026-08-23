@@ -75,7 +75,7 @@
     <section class="players-section">
 
         <div class="players-header">
-            <h1>선수 득점 순위</h1>
+            <h1>FCL 선수 순위</h1>
             <p>
                 FC Online Champions League 정규리그 선수 누적 기록
             </p>
@@ -93,18 +93,69 @@
                     <col class="player-col-assists">
                     <col class="player-col-sets">
                     <col class="player-col-rating">
+                    <col class="player-col-mvp">
                 </colgroup>
 
 
                 <thead>
                     <tr>
                         <th>순위</th>
-                        <th>선수</th>
-                        <th>FCL 참가자</th>
-                        <th>득점</th>
-                        <th>도움</th>
-                        <th>출전</th>
-                        <th>평균 평점</th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="player_name"
+                        >
+                            선수
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="fcl_name"
+                        >
+                            FCL 참가자
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="goals"
+                        >
+                            득점
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="assists"
+                        >
+                            도움
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="sets_played"
+                        >
+                            출전
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="mvp_count"
+                        >
+                            MVP
+                            <span class="player-sort-arrow"></span>
+                        </th>
+
+                        <th
+                            class="player-sort-header"
+                            data-sort-key="average_rating"
+                        >
+                            평균 평점
+                            <span class="player-sort-arrow"></span>
+                        </th>
                     </tr>
                 </thead>
 
@@ -127,3 +178,7 @@
 </footer>
 
 <script type="module" src="./js/players.js"></script>
+<script src="./js/site-nav.js"></script>
+
+</body>
+</html>

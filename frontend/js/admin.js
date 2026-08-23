@@ -62,6 +62,11 @@ const adminScheduleListElement =
         "#admin-schedule-list"
     );
 
+const adminPhotoRequestListElement =
+    document.querySelector(
+        "#admin-photo-request-list"
+    );
+
 const adminScheduleEditModalElement =
     document.querySelector(
         "#admin-schedule-edit-modal"
@@ -424,6 +429,14 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminRegularSchedule();
+                }
+
+                if (
+                    targetPage
+                    === "photo-requests"
+                ) {
+
+                    loadAdminPhotoRequests();
                 }
 
             }
@@ -2497,6 +2510,694 @@ adminScheduleEditCancelButtonElement
         "click",
         closeAdminScheduleEdit
     );
+
+// =========================================
+// 선수 사진 요청 관리
+// =========================================
+
+function getAdminPhotoRequestStatusText(
+    requestStatus
+) {
+
+    const statusTextMap = {
+        pending:
+            "대기중",
+
+        in_progress:
+            "처리중",
+
+        completed:
+            "완료",
+
+        rejected:
+            "반려",
+    };
+
+
+    return (
+        statusTextMap[
+            requestStatus
+        ]
+        ?? requestStatus
+    );
+
+}
+
+
+function formatAdminPhotoRequestDate(
+    dateValue
+) {
+
+    if (!dateValue) {
+        return "-";
+    }
+
+
+    const date =
+        new Date(
+            dateValue
+        );
+
+
+    return date.toLocaleString(
+        "ko-KR",
+        {
+            timeZone:
+                "Asia/Seoul",
+
+            year:
+                "numeric",
+
+            month:
+                "2-digit",
+
+            day:
+                "2-digit",
+
+            hour:
+                "2-digit",
+
+            minute:
+                "2-digit",
+        }
+    );
+
+}
+
+
+// =========================================
+// 요청 목록 조회
+// =========================================
+
+async function loadAdminPhotoRequests() {
+
+    adminPhotoRequestListElement
+        .textContent =
+            "선수 사진 요청을 불러오는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/community/player-photo-requests`
+            );
+
+
+        const requests =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                requests.detail
+                ?? "선수 사진 요청 조회 실패"
+            );
+
+        }
+
+
+        renderAdminPhotoRequests(
+            requests
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminPhotoRequestListElement
+            .textContent =
+                error.message;
+
+    }
+
+}
+
+
+// =========================================
+// 요청 목록 출력
+// =========================================
+
+function renderAdminPhotoRequests(
+    requests
+) {
+
+    adminPhotoRequestListElement
+        .innerHTML = "";
+
+
+    if (
+        requests.length === 0
+    ) {
+
+        adminPhotoRequestListElement
+            .textContent =
+                "등록된 선수 사진 요청이 없습니다.";
+
+        return;
+
+    }
+
+
+    requests.forEach(
+        (request) => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.classList.add(
+                "admin-photo-request-card"
+            );
+
+
+            cardElement.dataset.postId =
+                request.id;
+
+
+            // =========================
+            // 상단
+            // =========================
+
+            const headerElement =
+                document.createElement(
+                    "div"
+                );
+
+            headerElement.classList.add(
+                "admin-photo-request-header"
+            );
+
+
+            const titleAreaElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            const playerElement =
+                document.createElement(
+                    "strong"
+                );
+
+            playerElement.classList.add(
+                "admin-photo-request-player"
+            );
+
+            playerElement.textContent =
+                request.player_name;
+
+
+            const seasonElement =
+                document.createElement(
+                    "span"
+                );
+
+            seasonElement.classList.add(
+                "admin-photo-request-season"
+            );
+
+            seasonElement.textContent =
+                request.season_name
+                || "시즌 미입력";
+
+
+            titleAreaElement.append(
+                playerElement,
+                seasonElement
+            );
+
+
+            const statusBadgeElement =
+                document.createElement(
+                    "span"
+                );
+
+            statusBadgeElement.classList.add(
+                "admin-photo-request-status",
+                `admin-photo-request-status-${request.request_status}`
+            );
+
+            statusBadgeElement.textContent =
+                getAdminPhotoRequestStatusText(
+                    request.request_status
+                );
+
+
+            headerElement.append(
+                titleAreaElement,
+                statusBadgeElement
+            );
+
+
+            // =========================
+            // 기본 정보
+            // =========================
+
+            const metaElement =
+                document.createElement(
+                    "div"
+                );
+
+            metaElement.classList.add(
+                "admin-photo-request-meta"
+            );
+
+
+            const authorElement =
+                document.createElement(
+                    "span"
+                );
+
+            authorElement.textContent =
+                `작성자 ${request.author_name}`;
+
+
+            const dateElement =
+                document.createElement(
+                    "span"
+                );
+
+            dateElement.textContent =
+                formatAdminPhotoRequestDate(
+                    request.created_at
+                );
+
+
+            const attachmentElement =
+                document.createElement(
+                    "span"
+                );
+
+            attachmentElement.textContent =
+                `첨부 ${request.attachment_count}장`;
+
+
+            metaElement.append(
+                authorElement,
+                dateElement,
+                attachmentElement
+            );
+
+
+            // =========================
+            // 상태 선택
+            // =========================
+
+            const fieldsElement =
+                document.createElement(
+                    "div"
+                );
+
+            fieldsElement.classList.add(
+                "admin-photo-request-fields"
+            );
+
+
+            const statusLabelElement =
+                document.createElement(
+                    "label"
+                );
+
+            statusLabelElement.textContent =
+                "처리 상태";
+
+
+            const statusSelectElement =
+                document.createElement(
+                    "select"
+                );
+
+            statusSelectElement.classList.add(
+                "admin-photo-request-status-select"
+            );
+
+
+            const statuses = [
+                {
+                    value:
+                        "pending",
+
+                    label:
+                        "대기중",
+                },
+
+                {
+                    value:
+                        "in_progress",
+
+                    label:
+                        "처리중",
+                },
+
+                {
+                    value:
+                        "completed",
+
+                    label:
+                        "완료",
+                },
+
+                {
+                    value:
+                        "rejected",
+
+                    label:
+                        "반려",
+                },
+            ];
+
+
+            statuses.forEach(
+                (status) => {
+
+                    const optionElement =
+                        document.createElement(
+                            "option"
+                        );
+
+                    optionElement.value =
+                        status.value;
+
+                    optionElement.textContent =
+                        status.label;
+
+                    optionElement.selected =
+                        status.value
+                        === request.request_status;
+
+
+                    statusSelectElement.appendChild(
+                        optionElement
+                    );
+
+                }
+            );
+
+
+            statusLabelElement.appendChild(
+                statusSelectElement
+            );
+
+
+            // =========================
+            // 관리자 메모
+            // =========================
+
+            const noteLabelElement =
+                document.createElement(
+                    "label"
+                );
+
+            noteLabelElement.textContent =
+                "관리자 메모";
+
+
+            const noteTextareaElement =
+                document.createElement(
+                    "textarea"
+                );
+
+            noteTextareaElement.classList.add(
+                "admin-photo-request-note"
+            );
+
+            noteTextareaElement.rows =
+                4;
+
+            noteTextareaElement.placeholder =
+                "처리 내용이나 반려 사유를 입력해주세요.";
+
+            noteTextareaElement.value =
+                request.admin_note
+                ?? "";
+
+
+            noteLabelElement.appendChild(
+                noteTextareaElement
+            );
+
+
+            fieldsElement.append(
+                statusLabelElement,
+                noteLabelElement
+            );
+
+
+            // =========================
+            // 하단 액션
+            // =========================
+
+            const actionsElement =
+                document.createElement(
+                    "div"
+                );
+
+            actionsElement.classList.add(
+                "admin-photo-request-actions"
+            );
+
+
+            const messageElement =
+                document.createElement(
+                    "span"
+                );
+
+            messageElement.classList.add(
+                "admin-photo-request-message"
+            );
+
+
+            const buttonAreaElement =
+                document.createElement(
+                    "div"
+                );
+
+            buttonAreaElement.classList.add(
+                "admin-photo-request-buttons"
+            );
+
+
+            const detailLinkElement =
+                document.createElement(
+                    "a"
+                );
+
+            detailLinkElement.href =
+                `./player-photo-request-detail.html?id=${request.id}`;
+
+            detailLinkElement.target =
+                "_blank";
+
+            detailLinkElement.rel =
+                "noopener";
+
+            detailLinkElement.classList.add(
+                "admin-photo-request-detail-button"
+            );
+
+            detailLinkElement.textContent =
+                "상세보기";
+
+
+            const saveButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+            saveButtonElement.type =
+                "button";
+
+            saveButtonElement.classList.add(
+                "admin-photo-request-save-button"
+            );
+
+            saveButtonElement.textContent =
+                "저장";
+
+
+            saveButtonElement.addEventListener(
+                "click",
+                () => {
+
+                    saveAdminPhotoRequest(
+                        request.id,
+                        statusSelectElement,
+                        noteTextareaElement,
+                        saveButtonElement,
+                        messageElement
+                    );
+
+                }
+            );
+
+
+            buttonAreaElement.append(
+                detailLinkElement,
+                saveButtonElement
+            );
+
+
+            actionsElement.append(
+                messageElement,
+                buttonAreaElement
+            );
+
+
+            cardElement.append(
+                headerElement,
+                metaElement,
+                fieldsElement,
+                actionsElement
+            );
+
+
+            adminPhotoRequestListElement
+                .appendChild(
+                    cardElement
+                );
+
+        }
+    );
+
+}
+
+
+// =========================================
+// 요청 상태 / 관리자 메모 저장
+// =========================================
+
+async function saveAdminPhotoRequest(
+    postId,
+    statusSelectElement,
+    noteTextareaElement,
+    saveButtonElement,
+    messageElement
+) {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+
+    }
+
+
+    const requestStatus =
+        statusSelectElement
+            .value;
+
+    const adminNote =
+        noteTextareaElement
+            .value
+            .trim();
+
+
+    saveButtonElement.disabled =
+        true;
+
+    messageElement.textContent =
+        "저장 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/community/player-photo-requests/`
+                + `${postId}`,
+                {
+                    method:
+                        "PATCH",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            request_status:
+                                requestStatus,
+
+                            admin_note:
+                                adminNote,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "요청 저장 실패"
+            );
+
+        }
+
+
+        messageElement.textContent =
+            "저장되었습니다.";
+
+
+        await loadAdminPhotoRequests();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+    } finally {
+
+        saveButtonElement.disabled =
+            false;
+
+    }
+
+}
 
 
 // =========================================

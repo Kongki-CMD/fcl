@@ -13,6 +13,103 @@ const recentResultListElement =
 const teamRankingListElement =
     document.querySelector(".team-ranking-list");
 
+const playerRankingListElement =
+    document.querySelector(
+        ".player-ranking-list"
+    );
+
+
+let dashboardSeasonMap =
+    new Map();
+
+// ======================================================
+// 선수 시즌 정보
+// ======================================================
+
+async function loadDashboardSeasonMetadata() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/metadata/seasons`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "시즌 정보를 불러오지 못했습니다."
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        dashboardSeasonMap =
+            new Map(
+                data.seasons.map(
+                    (season) => [
+                        Number(
+                            season.season_id
+                        ),
+                        season,
+                    ]
+                )
+            );
+
+
+    } catch (error) {
+
+        console.error(
+            "시즌 정보 조회 오류",
+            error
+        );
+
+    }
+
+}
+
+
+function createDashboardSeasonIconHtml(
+    spId
+) {
+
+    if (!spId) {
+        return "";
+    }
+
+
+    const seasonId =
+        Math.floor(
+            Number(spId)
+            / 1000000
+        );
+
+
+    const season =
+        dashboardSeasonMap.get(
+            seasonId
+        );
+
+
+    if (!season) {
+        return "";
+    }
+
+
+    return `
+        <img
+            src="${season.season_image_url}"
+            alt="${season.class_name}"
+            class="dashboard-player-season-icon"
+        >
+    `;
+
+}
+
 // ======================================================
 // SEASON CHAMPION
 // ======================================================
@@ -1216,15 +1313,150 @@ function renderTeamRanking(standings) {
     });
 }
 
+// ======================================================
+// 선수 득점 순위
+// ======================================================
+
+async function loadPlayerRanking() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/player-rankings`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "선수 득점 순위를 불러오지 못했습니다."
+            );
+
+        }
+
+
+        const playerData =
+            await response.json();
+
+
+        renderPlayerRanking(
+            playerData
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        playerRankingListElement.innerHTML = `
+            <p>
+                선수 득점 순위를 불러오는 중
+                오류가 발생했습니다.
+            </p>
+        `;
+
+    }
+
+}
+
+
+function renderPlayerRanking(
+    players
+) {
+
+    playerRankingListElement.innerHTML =
+        "";
+
+
+    const topPlayers =
+        players.slice(
+            0,
+            5
+        );
+
+
+    topPlayers.forEach(
+        (player) => {
+
+            const playerRankingRowElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            playerRankingRowElement.classList.add(
+                "dashboard-player-ranking-row"
+            );
+
+
+            playerRankingRowElement.innerHTML = `
+                <span
+                    class="
+                        dashboard-player-rank
+                    "
+                >
+                    ${player.rank}
+                </span>
+
+
+                <div
+                    class="
+                        dashboard-player-name
+                    "
+                >
+                    ${createDashboardSeasonIconHtml(
+                        player.sp_id
+                    )}
+
+                    <span>
+                        ${player.player_name}
+                    </span>
+                </div>
+
+
+                <span
+                    class="
+                        dashboard-player-goals
+                    "
+                >
+                    ${player.goals}
+                </span>
+            `;
+
+
+            playerRankingListElement.appendChild(
+                playerRankingRowElement
+            );
+
+        }
+    );
+
+}
+
 
 // ======================================================
 // 페이지 로딩
 // ======================================================
 
-loadSeasonChampion();
+async function initializeDashboard() {
 
-loadTodayMatches();
+    await loadDashboardSeasonMetadata();
 
-loadRecentResults();
 
-loadTeamRanking();
+    loadSeasonChampion();
+
+    loadTodayMatches();
+
+    loadRecentResults();
+
+    loadTeamRanking();
+
+    loadPlayerRanking();
+
+}
+
+
+initializeDashboard();

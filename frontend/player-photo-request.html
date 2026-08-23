@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL 선수 사진 요청</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+
+                </span>
+
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu">
+
+                <li class="menu-item">
+
+                    <a href="#">
+                        경기
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./schedule.html">
+                                경기 일정
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./results.html">
+                                경기 결과
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./rules.html">
+                                경기 규칙
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </li>
+
+
+                <li class="menu-item">
+
+                    <a href="#">
+                        기록
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./standings.html">
+                                팀 기록
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./players.html">
+                                선수 기록
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </li>
+
+
+                <li class="menu-item">
+
+                    <a href="#">
+                        커뮤니티
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./community.html">
+                                자유게시판
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./player-photo-request.html">
+                                선수 사진 요청
+                            </a>
+                        </li>
+
+                    </ul>
+
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="photo-request-page">
+
+    <section class="photo-request-header">
+
+        <div>
+
+            <h1>
+                선수 사진 요청
+            </h1>
+
+            <p>
+                선수 사진 변경이 필요한 경우 요청을 등록해주세요.
+            </p>
+
+        </div>
+
+
+        <a
+            href="./player-photo-request-write.html"
+            class="photo-request-write-button"
+        >
+            요청하기
+        </a>
+
+    </section>
+
+
+    <section class="photo-request-board">
+
+        <div class="photo-request-board-header">
+
+            <span>
+                번호
+            </span>
+
+            <span>
+                선수
+            </span>
+
+            <span>
+                시즌
+            </span>
+
+            <span>
+                작성자
+            </span>
+
+            <span>
+                상태
+            </span>
+
+            <span>
+                작성일
+            </span>
+
+        </div>
+
+
+        <div
+            id="photo-request-list"
+            class="photo-request-list"
+        >
+
+            <p class="community-loading">
+                요청 목록을 불러오는 중...
+            </p>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<footer>
+    <p>
+        V1.0 FCL Created by aria
+    </p>
+</footer>
+
+
+<script
+    src="./js/player-photo-request.js"
+    type="module"
+></script>
+
+    <script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>

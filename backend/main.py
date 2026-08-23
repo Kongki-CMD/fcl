@@ -1,6 +1,9 @@
 import os
 import time
 import secrets
+import hashlib
+import hmac
+import secrets
 
 
 from pathlib import Path
@@ -16,6 +19,8 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Response,
+    File,
+    UploadFile,
     Header,
     Depends,
 )
@@ -89,6 +94,48 @@ ADMIN_SESSIONS = {}
 NEXON_API_BASE_URL = (
     "https://open.api.nexon.com/fconline/v1"
 )
+
+def get_community_post_attachments(
+    cursor,
+    post_id: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            original_file_name,
+            content_type,
+            sort_order
+
+        FROM community_attachments
+
+        WHERE post_id = %s
+
+        ORDER BY
+            sort_order ASC,
+            id ASC
+        """,
+        (
+            post_id,
+        ),
+    )
+
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "original_file_name": row["original_file_name"],
+            "content_type": row["content_type"],
+            "sort_order": row["sort_order"],
+            "image_url": (
+                "/api/community/"
+                f"attachments/{row['id']}"
+            ),
+        }
+        for row in rows
+    ]
 
 # =========================
 # FC Online 선수 메타데이터
@@ -1215,7 +1262,7 @@ def initialize_database():
             )
 
 
-            
+
             cursor.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS
@@ -7099,76 +7146,301 @@ def get_player_rankings():
 
             cursor.execute(
                 """
+                WITH base_player_rows AS (
+
+                    SELECT
+                        sssp.participant_id,
+
+                        TRIM(
+                            sssp.player_name
+                        )
+                            AS player_name,
+
+                        sssp.sp_id,
+
+                        sssp.image_url,
+
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                sssp.participant_id,
+                                TRIM(
+                                    sssp.player_name
+                                )
+
+                            ORDER BY
+                                sssp.created_at DESC,
+                                sssp.id DESC
+                        )
+                            AS row_number
+
+                    FROM series_set_squad_players
+                        AS sssp
+
+                    JOIN series_sets AS ss
+                        ON ss.id =
+                            sssp.series_set_id
+
+                    JOIN series AS s
+                        ON s.id =
+                            ss.series_id
+
+                    WHERE
+                        s.series_type =
+                            '프리시즌'
+
+                        AND
+                        s.status =
+                            'completed'
+
+                        AND
+                        sssp.sp_position
+                            BETWEEN 1 AND 27
+                ),
+
+                base_players AS (
+
+                    SELECT
+                        participant_id,
+                        player_name,
+                        sp_id,
+                        image_url
+
+                    FROM base_player_rows
+
+                    WHERE
+                        row_number = 1
+                ),
+
+                regular_stats AS (
+
+                    SELECT
+                        sps.participant_id,
+
+                        TRIM(
+                            sps.player_name
+                        )
+                            AS player_name,
+
+                        (
+                            ARRAY_AGG(
+                                sps.sp_id
+
+                                ORDER BY
+                                    s.completed_at DESC
+                                        NULLS LAST,
+                                    s.id DESC
+                            )
+                        )[1]
+                            AS sp_id,
+
+                        (
+                            ARRAY_AGG(
+                                sps.image_url
+
+                                ORDER BY
+                                    s.completed_at DESC
+                                        NULLS LAST,
+                                    s.id DESC
+                            )
+                        )[1]
+                            AS image_url,
+
+                        SUM(
+                            sps.sets_played
+                        )
+                            AS sets_played,
+
+                        SUM(
+                            sps.rating_total
+                        )
+                            AS rating_total,
+
+                        SUM(
+                            sps.goals
+                        )
+                            AS goals,
+
+                        SUM(
+                            sps.assists
+                        )
+                            AS assists
+
+                    FROM series_player_stats
+                        AS sps
+
+                    JOIN series AS s
+                        ON s.id =
+                            sps.series_id
+
+                    WHERE
+                        s.status =
+                            'completed'
+
+                        AND
+                        s.series_type =
+                            '정규리그'
+
+                    GROUP BY
+                        sps.participant_id,
+                        TRIM(
+                            sps.player_name
+                        )
+                ),
+
+                regular_mvp AS (
+
+                    SELECT
+                        sm.participant_id,
+
+                        TRIM(
+                            sm.player_name
+                        )
+                            AS player_name,
+
+                        COUNT(*)
+                            AS mvp_count
+
+                    FROM series_mvp AS sm
+
+                    JOIN series AS s
+                        ON s.id =
+                            sm.series_id
+
+                    WHERE
+                        s.status =
+                            'completed'
+
+                        AND
+                        s.series_type =
+                            '정규리그'
+
+                    GROUP BY
+                        sm.participant_id,
+                        TRIM(
+                            sm.player_name
+                        )
+                ),
+
+
+                all_players AS (
+
+                    SELECT
+                        participant_id,
+                        player_name
+
+                    FROM base_players
+
+                    UNION
+
+                    SELECT
+                        participant_id,
+                        player_name
+
+                    FROM regular_stats
+                )
+
                 SELECT
+                    p.id
+                        AS participant_id,
+
                     p.fcl_name,
 
                     p.fc_nickname
                         AS nickname,
 
-                    sps.player_name,
+                    ap.player_name,
 
-                    MAX(
-                        sps.image_url
+                    COALESCE(
+                        rs.sp_id,
+                        bp.sp_id
+                    )
+                        AS sp_id,
+
+                    COALESCE(
+                        rs.image_url,
+                        bp.image_url
                     )
                         AS image_url,
 
-                    SUM(
-                        sps.sets_played
+                    COALESCE(
+                        rs.sets_played,
+                        0
                     )
                         AS sets_played,
 
-                    SUM(
-                        sps.rating_total
+                    COALESCE(
+                        rs.rating_total,
+                        0
                     )
                         AS rating_total,
 
-                    SUM(
-                        sps.goals
+                    COALESCE(
+                        rs.goals,
+                        0
                     )
                         AS goals,
 
-                    SUM(
-                        sps.assists
+                    COALESCE(
+                        rs.assists,
+                        0
                     )
-                        AS assists
+                        AS assists,
 
-                FROM series_player_stats
-                    AS sps
+                    COALESCE(
+                        rm.mvp_count,
+                        0
+                    )
+                        AS mvp_count
 
-                JOIN series AS s
-                    ON s.id =
-                        sps.series_id
+                FROM all_players AS ap
 
                 JOIN participants AS p
                     ON p.id =
-                        sps.participant_id
+                        ap.participant_id
 
-                WHERE
-                    s.status = 'completed'
+                LEFT JOIN base_players AS bp
+                    ON bp.participant_id =
+                        ap.participant_id
 
                     AND
-                    s.series_type = '정규리그'
+                    bp.player_name =
+                        ap.player_name
 
-                GROUP BY
-                    p.id,
-                    p.fcl_name,
-                    p.fc_nickname,
-                    sps.player_name
+                LEFT JOIN regular_stats AS rs
+                    ON rs.participant_id =
+                        ap.participant_id
+
+                    AND
+                    rs.player_name =
+                        ap.player_name
+
+                LEFT JOIN regular_mvp AS rm
+                    ON rm.participant_id =
+                        ap.participant_id
+
+                    AND
+                    rm.player_name =
+                        ap.player_name
 
                 ORDER BY
-                    SUM(
-                        sps.goals
+                    COALESCE(
+                        rs.goals,
+                        0
                     ) DESC,
 
-                    SUM(
-                        sps.assists
+                    COALESCE(
+                        rs.assists,
+                        0
                     ) DESC,
 
-                    SUM(
-                        sps.rating_total
+                    COALESCE(
+                        rs.rating_total,
+                        0
                     ) DESC,
 
-                    sps.player_name ASC
+                    ap.player_name ASC,
+
+                    p.id ASC
                 """
             )
 
@@ -7191,6 +7463,20 @@ def get_player_rankings():
         )
 
 
+        goals = int(
+            row["goals"]
+        )
+
+
+        assists = int(
+            row["assists"]
+        )
+
+        mvp_count = int(
+            row["mvp_count"]
+        )
+
+
         if sets_played > 0:
 
             average_rating = round(
@@ -7206,11 +7492,6 @@ def get_player_rankings():
 
         players.append(
             {
-                # 기존 players.js 호환용
-                # 선수 시즌 정보는
-                # 아직 DB에 따로 저장하지 않음
-                "season": "-",
-
                 "fcl_name":
                     row["fcl_name"],
 
@@ -7219,6 +7500,9 @@ def get_player_rankings():
 
                 "player_name":
                     row["player_name"],
+
+                "sp_id":
+                    row["sp_id"],
 
                 "image_url":
                     row["image_url"],
@@ -7236,31 +7520,52 @@ def get_player_rankings():
                     average_rating,
 
                 "goals":
-                    int(
-                        row["goals"]
-                    ),
+                    goals,
 
                 "assists":
-                    int(
-                        row["assists"]
-                    ),
+                    assists,
+
+                "mvp_count":
+                    mvp_count,
             }
         )
 
 
     # =========================
-    # 순위
+    # 득점 공동 순위
     # =========================
+
+    previous_goals = None
+    previous_rank = 0
+
 
     for index, player in enumerate(
         players,
         start=1,
     ):
 
-        player["rank"] = index
+        if (
+            previous_goals is None
+            or
+            player["goals"]
+            != previous_goals
+        ):
+
+            previous_rank = index
+
+
+        player["rank"] = (
+            previous_rank
+        )
+
+
+        previous_goals = (
+            player["goals"]
+        )
 
 
     return players
+
 
 def get_playoff_schedule_date(
     playoff_stage: str,
@@ -14933,6 +15238,1624 @@ def admin_backfill_fconline_season_snapshots(
         "failed":
             failed,
     }
+
+# =========================
+# COMMUNITY
+# 자유게시판
+# =========================
+
+def hash_community_password(
+    password: str,
+):
+
+    iterations = 200_000
+
+    salt = secrets.token_bytes(
+        16
+    )
+
+    password_hash = (
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(
+                "utf-8"
+            ),
+            salt,
+            iterations,
+        )
+    )
+
+    return (
+        f"pbkdf2_sha256$"
+        f"{iterations}$"
+        f"{salt.hex()}$"
+        f"{password_hash.hex()}"
+    )
+
+
+def verify_community_password(
+    password: str,
+    stored_hash: str,
+):
+
+    if not stored_hash:
+        return False
+
+
+    try:
+
+        (
+            algorithm,
+            iterations_text,
+            salt_hex,
+            expected_hash_hex,
+        ) = stored_hash.split(
+            "$"
+        )
+
+
+        if (
+            algorithm
+            != "pbkdf2_sha256"
+        ):
+            return False
+
+
+        iterations = int(
+            iterations_text
+        )
+
+        salt = bytes.fromhex(
+            salt_hex
+        )
+
+        expected_hash = (
+            bytes.fromhex(
+                expected_hash_hex
+            )
+        )
+
+
+        actual_hash = (
+            hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode(
+                    "utf-8"
+                ),
+                salt,
+                iterations,
+            )
+        )
+
+
+        return hmac.compare_digest(
+            actual_hash,
+            expected_hash,
+        )
+
+    except (
+        ValueError,
+        TypeError,
+    ):
+
+        return False
+
+def get_community_post_attachments(
+    cursor,
+    post_id: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            original_file_name,
+            content_type,
+            sort_order
+
+        FROM community_attachments
+
+        WHERE post_id = %s
+
+        ORDER BY
+            sort_order ASC,
+            id ASC
+        """,
+        (
+            post_id,
+        ),
+    )
+
+    rows = cursor.fetchall()
+
+    return [
+        {
+            "id": row["id"],
+            "original_file_name": row["original_file_name"],
+            "content_type": row["content_type"],
+            "sort_order": row["sort_order"],
+            "image_url": (
+                "/api/community/"
+                f"attachments/{row['id']}"
+            ),
+        }
+        for row in rows
+    ]
+
+@app.get("/api/community/posts")
+def get_community_posts(
+    board_type: str = "free",
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    cp.id,
+                    cp.board_type,
+                    cp.title,
+                    cp.content,
+                    cp.author_name,
+                    cp.created_at,
+                    cp.updated_at,
+                    COUNT(ca.id) AS attachment_count
+
+                FROM community_posts AS cp
+
+                LEFT JOIN community_attachments AS ca
+                    ON ca.post_id = cp.id
+
+                WHERE cp.board_type = %s
+
+                GROUP BY
+                    cp.id
+
+                ORDER BY
+                    cp.created_at DESC,
+                    cp.id DESC
+                """,
+                (
+                    board_type,
+                ),
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    posts = []
+
+
+    for row in rows:
+
+        posts.append(
+            {
+                "id":
+                    row["id"],
+
+                "board_type":
+                    row["board_type"],
+
+                "title":
+                    row["title"],
+
+                "content":
+                    row["content"],
+
+                "author_name":
+                    row["author_name"],
+
+                "created_at":
+                    row["created_at"].isoformat(),
+
+                "updated_at":
+                    row["updated_at"].isoformat(),
+
+                "attachment_count":
+                    int(row["attachment_count"]),
+            }
+        )
+
+
+    return posts
+
+@app.post("/api/community/posts")
+def create_community_post(
+    payload: dict,
+):
+
+    board_type = str(
+            payload.get(
+                "board_type",
+                ""
+            )
+        ).strip()
+
+
+    title = str(
+            payload.get(
+                "title",
+                ""
+            )
+        ).strip()
+
+
+    content = str(
+            payload.get(
+                "content",
+                ""
+            )
+        ).strip()
+
+
+    author_name = str(
+            payload.get(
+                "author_name",
+                ""
+            )
+        ).strip()
+
+    password = str(
+            payload.get(
+                "password",
+                ""
+            )
+        ).strip()
+
+
+    if board_type not in (
+        "free",
+        "player_photo_request",
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="올바르지 않은 게시판 유형입니다.",
+        )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail="제목을 입력해주세요.",
+        )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail="내용을 입력해주세요.",
+        )
+
+
+    if not author_name:
+
+        raise HTTPException(
+            status_code=400,
+            detail="작성자를 입력해주세요.",
+        )
+
+    if len(password) < 4:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호는 4자 이상 입력해주세요.",
+        )
+
+
+    if len(password) > 50:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호는 50자 이하로 입력해주세요.",
+        )
+
+
+    password_hash = (
+        hash_community_password(
+            password
+        )
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO community_posts (
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    password_hash
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    password_hash,
+                ),
+            )
+
+
+            row = cursor.fetchone()
+
+
+        connection.commit()
+
+
+    return {
+        "id":
+            row["id"],
+
+        "board_type":
+            row["board_type"],
+
+        "title":
+            row["title"],
+
+        "content":
+            row["content"],
+
+        "author_name":
+            row["author_name"],
+
+        "created_at":
+            row["created_at"].isoformat(),
+
+        "updated_at":
+            row["updated_at"].isoformat(),
+    }
+
+@app.get("/api/community/posts/{post_id}")
+def get_community_post(
+    post_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    created_at,
+                    updated_at
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+            row = cursor.fetchone()
+
+            if not row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="게시글을 찾을 수 없습니다.",
+                )
+
+            attachments = (
+                get_community_post_attachments(
+                    cursor,
+                    post_id,
+                )
+            )
+
+
+    return {
+        "id":
+            row["id"],
+
+        "board_type":
+            row["board_type"],
+
+        "title":
+            row["title"],
+
+        "content":
+            row["content"],
+
+        "author_name":
+            row["author_name"],
+
+        "created_at":
+            row["created_at"].isoformat(),
+
+        "updated_at":
+            row["updated_at"].isoformat(),
+
+        "attachments":
+            attachments,
+    }
+
+@app.patch(
+    "/api/community/posts/{post_id}"
+)
+def update_community_post(
+    post_id: int,
+    payload: dict,
+):
+
+    password = str(
+        payload.get(
+            "password",
+            ""
+        )
+    ).strip()
+
+    title = str(
+        payload.get(
+            "title",
+            ""
+        )
+    ).strip()
+
+    author_name = str(
+        payload.get(
+            "author_name",
+            ""
+        )
+    ).strip()
+
+    content = str(
+        payload.get(
+            "content",
+            ""
+        )
+    ).strip()
+
+
+    if not password:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호를 입력해주세요.",
+        )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail="제목을 입력해주세요.",
+        )
+
+
+    if not author_name:
+
+        raise HTTPException(
+            status_code=400,
+            detail="작성자를 입력해주세요.",
+        )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail="내용을 입력해주세요.",
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    password_hash
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+            post_row = cursor.fetchone()
+
+
+            if not post_row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="게시글을 찾을 수 없습니다.",
+                )
+
+
+            if not verify_community_password(
+                password,
+                post_row[
+                    "password_hash"
+                ],
+            ):
+
+                raise HTTPException(
+                    status_code=403,
+                    detail="비밀번호가 일치하지 않습니다.",
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE community_posts
+
+                SET
+                    title = %s,
+                    author_name = %s,
+                    content = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    title,
+                    author_name,
+                    content,
+                    post_id,
+                ),
+            )
+
+            row = cursor.fetchone()
+
+
+        connection.commit()
+
+
+    return {
+        "id": row["id"],
+        "board_type": row["board_type"],
+        "title": row["title"],
+        "content": row["content"],
+        "author_name": row["author_name"],
+        "created_at": row["created_at"].isoformat(),
+        "updated_at": row["updated_at"].isoformat(),
+    }
+
+@app.delete(
+    "/api/community/posts/{post_id}"
+)
+def delete_community_post(
+    post_id: int,
+    payload: dict,
+):
+
+    password = str(
+        payload.get(
+            "password",
+            ""
+        )
+    ).strip()
+
+
+    if not password:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호를 입력해주세요.",
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    password_hash
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+            post_row = cursor.fetchone()
+
+
+            if not post_row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="게시글을 찾을 수 없습니다.",
+                )
+
+
+            if not verify_community_password(
+                password,
+                post_row[
+                    "password_hash"
+                ],
+            ):
+
+                raise HTTPException(
+                    status_code=403,
+                    detail="비밀번호가 일치하지 않습니다.",
+                )
+
+
+            cursor.execute(
+                """
+                DELETE FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "deleted": True,
+        "post_id": post_id,
+    }
+
+# =========================
+# PLAYER PHOTO REQUEST
+# =========================
+
+@app.post(
+    "/api/community/player-photo-requests"
+)
+def create_player_photo_request(
+    payload: dict,
+):
+
+    player_name = str(
+        payload.get(
+            "player_name",
+            ""
+        )
+    ).strip()
+
+    season_name = str(
+        payload.get(
+            "season_name",
+            ""
+        )
+    ).strip()
+
+    sp_id_value = payload.get(
+        "sp_id"
+    )
+
+    content = str(
+        payload.get(
+            "content",
+            ""
+        )
+    ).strip()
+
+    author_name = str(
+        payload.get(
+            "author_name",
+            ""
+        )
+    ).strip()
+
+    password = str(
+        payload.get(
+            "password",
+            ""
+        )
+    ).strip()
+
+
+    if not player_name:
+
+        raise HTTPException(
+            status_code=400,
+            detail="선수명을 입력해주세요.",
+        )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail="요청 내용을 입력해주세요.",
+        )
+
+
+    if not author_name:
+
+        raise HTTPException(
+            status_code=400,
+            detail="작성자 닉네임을 입력해주세요.",
+        )
+
+
+    if len(password) < 4:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호는 4자 이상 입력해주세요.",
+        )
+
+
+    if len(password) > 50:
+
+        raise HTTPException(
+            status_code=400,
+            detail="비밀번호는 50자 이하로 입력해주세요.",
+        )
+
+
+    sp_id = None
+
+
+    if (
+        sp_id_value is not None
+        and
+        str(sp_id_value).strip()
+    ):
+
+        try:
+
+            sp_id = int(
+                sp_id_value
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            raise HTTPException(
+                status_code=400,
+                detail="sp_id가 올바르지 않습니다.",
+            )
+
+
+    password_hash = (
+        hash_community_password(
+            password
+        )
+    )
+
+
+    if season_name:
+
+        title = (
+            f"{player_name} "
+            f"({season_name}) "
+            "선수 사진 요청"
+        )
+
+    else:
+
+        title = (
+            f"{player_name} "
+            "선수 사진 요청"
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO community_posts (
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    password_hash
+                )
+
+                VALUES (
+                    'player_photo_request',
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    title,
+                    content,
+                    author_name,
+                    password_hash,
+                ),
+            )
+
+            post_row = cursor.fetchone()
+
+
+            cursor.execute(
+                """
+                INSERT INTO player_photo_requests (
+                    post_id,
+                    player_name,
+                    season_name,
+                    sp_id,
+                    request_status
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    'pending'
+                )
+
+                RETURNING
+                    player_name,
+                    season_name,
+                    sp_id,
+                    request_status,
+                    admin_note,
+                    completed_at
+                """,
+                (
+                    post_row["id"],
+                    player_name,
+                    (
+                        season_name
+                        if season_name
+                        else None
+                    ),
+                    sp_id,
+                ),
+            )
+
+            request_row = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "id":
+            post_row["id"],
+
+        "board_type":
+            post_row["board_type"],
+
+        "title":
+            post_row["title"],
+
+        "content":
+            post_row["content"],
+
+        "author_name":
+            post_row["author_name"],
+
+        "created_at":
+            post_row[
+                "created_at"
+            ].isoformat(),
+
+        "updated_at":
+            post_row[
+                "updated_at"
+            ].isoformat(),
+
+        "player_name":
+            request_row[
+                "player_name"
+            ],
+
+        "season_name":
+            request_row[
+                "season_name"
+            ],
+
+        "sp_id":
+            request_row[
+                "sp_id"
+            ],
+
+        "request_status":
+            request_row[
+                "request_status"
+            ],
+
+        "admin_note":
+            request_row[
+                "admin_note"
+            ],
+
+        "completed_at":
+            (
+                request_row[
+                    "completed_at"
+                ].isoformat()
+
+                if request_row[
+                    "completed_at"
+                ]
+
+                else None
+            ),
+    }
+
+@app.get(
+    "/api/community/player-photo-requests"
+)
+def get_player_photo_requests():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    cp.id,
+                    cp.title,
+                    cp.content,
+                    cp.author_name,
+                    cp.created_at,
+                    cp.updated_at,
+
+                    ppr.player_name,
+                    ppr.season_name,
+                    ppr.sp_id,
+                    ppr.request_status,
+                    ppr.admin_note,
+                    ppr.completed_at,
+
+                    COUNT(ca.id) AS attachment_count
+
+                FROM community_posts cp
+
+                INNER JOIN player_photo_requests ppr
+                    ON ppr.post_id = cp.id
+
+                LEFT JOIN community_attachments ca
+                    ON ca.post_id = cp.id
+
+                WHERE
+                    cp.board_type = 'player_photo_request'
+
+                GROUP BY
+                    cp.id,
+                    ppr.post_id
+
+                ORDER BY
+                    cp.id DESC
+                """
+            )
+
+            rows = cursor.fetchall()
+
+
+    return [
+        {
+            "id":
+                row["id"],
+
+            "title":
+                row["title"],
+
+            "content":
+                row["content"],
+
+            "author_name":
+                row["author_name"],
+
+            "created_at":
+                row[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                row[
+                    "updated_at"
+                ].isoformat(),
+
+            "player_name":
+                row["player_name"],
+
+            "season_name":
+                row["season_name"],
+
+            "sp_id":
+                row["sp_id"],
+
+            "request_status":
+                row[
+                    "request_status"
+                ],
+
+            "admin_note":
+                row["admin_note"],
+
+            "completed_at":
+                (
+                    row[
+                        "completed_at"
+                    ].isoformat()
+
+                    if row[
+                        "completed_at"
+                    ]
+
+                    else None
+                ),
+
+            "attachment_count":
+                row[
+                    "attachment_count"
+                ],
+        }
+
+        for row in rows
+    ]
+
+@app.get(
+    "/api/community/player-photo-requests/{post_id}"
+)
+def get_player_photo_request(
+    post_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    cp.id,
+                    cp.board_type,
+                    cp.title,
+                    cp.content,
+                    cp.author_name,
+                    cp.created_at,
+                    cp.updated_at,
+
+                    ppr.player_name,
+                    ppr.season_name,
+                    ppr.sp_id,
+                    ppr.request_status,
+                    ppr.admin_note,
+                    ppr.completed_at
+
+                FROM community_posts cp
+
+                INNER JOIN player_photo_requests ppr
+                    ON ppr.post_id = cp.id
+
+                WHERE
+                    cp.id = %s
+                    AND
+                    cp.board_type = 'player_photo_request'
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+            row = cursor.fetchone()
+
+
+            if not row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="선수 사진 요청을 찾을 수 없습니다.",
+                )
+
+
+            attachments = (
+                get_community_post_attachments(
+                    cursor,
+                    post_id,
+                )
+            )
+
+
+    return {
+        "id":
+            row["id"],
+
+        "board_type":
+            row["board_type"],
+
+        "title":
+            row["title"],
+
+        "content":
+            row["content"],
+
+        "author_name":
+            row["author_name"],
+
+        "created_at":
+            row[
+                "created_at"
+            ].isoformat(),
+
+        "updated_at":
+            row[
+                "updated_at"
+            ].isoformat(),
+
+        "player_name":
+            row["player_name"],
+
+        "season_name":
+            row["season_name"],
+
+        "sp_id":
+            row["sp_id"],
+
+        "request_status":
+            row[
+                "request_status"
+            ],
+
+        "admin_note":
+            row["admin_note"],
+
+        "completed_at":
+            (
+                row[
+                    "completed_at"
+                ].isoformat()
+
+                if row[
+                    "completed_at"
+                ]
+
+                else None
+            ),
+
+        "attachments":
+            attachments,
+    }
+
+@app.patch(
+    "/api/admin/community/player-photo-requests/{post_id}"
+)
+def update_admin_player_photo_request(
+    post_id: int,
+    payload: dict,
+    _admin=Depends(require_admin),
+):
+
+    request_status = str(
+        payload.get(
+            "request_status",
+            ""
+        )
+    ).strip()
+
+    admin_note = str(
+        payload.get(
+            "admin_note",
+            ""
+        )
+    ).strip()
+
+
+    allowed_statuses = {
+        "pending",
+        "in_progress",
+        "completed",
+        "rejected",
+    }
+
+
+    if (
+        request_status
+        not in allowed_statuses
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="올바르지 않은 처리 상태입니다.",
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE player_photo_requests
+
+                SET
+                    request_status = %s,
+                    admin_note = %s,
+                    completed_at =
+                        CASE
+                            WHEN %s = 'completed'
+                            THEN COALESCE(
+                                completed_at,
+                                NOW()
+                            )
+                            ELSE NULL
+                        END
+
+                WHERE post_id = %s
+
+                RETURNING
+                    post_id,
+                    player_name,
+                    season_name,
+                    sp_id,
+                    request_status,
+                    admin_note,
+                    completed_at
+                """,
+                (
+                    request_status,
+                    (
+                        admin_note
+                        if admin_note
+                        else None
+                    ),
+                    request_status,
+                    post_id,
+                ),
+            )
+
+            row = cursor.fetchone()
+
+
+            if not row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="선수 사진 요청을 찾을 수 없습니다.",
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "post_id":
+            row["post_id"],
+
+        "player_name":
+            row["player_name"],
+
+        "season_name":
+            row["season_name"],
+
+        "sp_id":
+            row["sp_id"],
+
+        "request_status":
+            row[
+                "request_status"
+            ],
+
+        "admin_note":
+            row["admin_note"],
+
+        "completed_at":
+            (
+                row[
+                    "completed_at"
+                ].isoformat()
+
+                if row[
+                    "completed_at"
+                ]
+
+                else None
+            ),
+    }
+
+# =========================
+# COMMUNITY ATTACHMENTS
+# =========================
+
+@app.post(
+    "/api/community/posts/{post_id}/attachments"
+)
+async def upload_community_attachments(
+    post_id: int,
+    files: list[UploadFile] = File(...),
+):
+
+    if len(files) > 5:
+
+        raise HTTPException(
+            status_code=400,
+            detail="이미지는 최대 5장까지 첨부할 수 있습니다.",
+        )
+
+
+    allowed_content_types = {
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+    }
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT id
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            post_row = cursor.fetchone()
+
+
+            if not post_row:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="게시글을 찾을 수 없습니다.",
+                )
+
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS count
+
+                FROM community_attachments
+
+                WHERE post_id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            attachment_count = int(
+                    cursor.fetchone()["count"]
+                )
+
+
+            if (
+                attachment_count
+                + len(files)
+                > 5
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail="게시글당 이미지는 최대 5장까지 첨부할 수 있습니다.",
+                )
+
+
+            uploaded_attachments = []
+
+
+            for index, upload_file in enumerate(
+                files,
+                start=attachment_count,
+            ):
+
+                if (
+                    upload_file.content_type
+                    not in allowed_content_types
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail="지원하지 않는 이미지 형식입니다.",
+                    )
+
+
+                image_data = await upload_file.read()
+
+
+                if len(image_data) > 5 * 1024 * 1024:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail="이미지 한 장의 최대 크기는 5MB입니다.",
+                    )
+
+
+                cursor.execute(
+                    """
+                    INSERT INTO community_attachments (
+                        post_id,
+                        original_file_name,
+                        content_type,
+                        image_data,
+                        sort_order
+                    )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s
+                    )
+
+                    RETURNING
+                        id,
+                        original_file_name,
+                        content_type,
+                        sort_order
+                    """,
+                    (
+                        post_id,
+                        upload_file.filename
+                        or "image",
+                        upload_file.content_type,
+                        image_data,
+                        index,
+                    ),
+                )
+
+
+                attachment_row = cursor.fetchone()
+
+
+                uploaded_attachments.append(
+                    {
+                        "id":
+                            attachment_row["id"],
+
+                        "original_file_name":
+                            attachment_row[
+                                "original_file_name"
+                            ],
+
+                        "content_type":
+                            attachment_row[
+                                "content_type"
+                            ],
+
+                        "sort_order":
+                            attachment_row[
+                                "sort_order"
+                            ],
+
+                        "image_url":
+                            (
+                                "/api/community/"
+                                "attachments/"
+                                f"{attachment_row['id']}"
+                            ),
+                    }
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "post_id":
+            post_id,
+
+        "attachments":
+            uploaded_attachments,
+    }
+
+@app.get(
+    "/api/community/attachments/{attachment_id}"
+)
+def get_community_attachment(
+    attachment_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    content_type,
+                    image_data
+
+                FROM community_attachments
+
+                WHERE id = %s
+                """,
+                (
+                    attachment_id,
+                ),
+            )
+
+
+            row = cursor.fetchone()
+
+
+    if not row:
+
+        raise HTTPException(
+            status_code=404,
+            detail="첨부 이미지를 찾을 수 없습니다.",
+        )
+
+
+    return Response(
+        content=bytes(
+            row["image_data"]
+        ),
+        media_type=row["content_type"],
+    )
 
 
 # =========================

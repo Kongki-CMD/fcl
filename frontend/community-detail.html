@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL 자유게시판</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+
+                </span>
+
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu">
+
+                <li class="menu-item">
+                    <a href="#">
+                        경기
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./schedule.html">
+                                경기 일정
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./results.html">
+                                경기 결과
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./rules.html">
+                                경기 규칙
+                            </a>
+                        </li>
+
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        기록
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./standings.html">
+                                팀 기록
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./players.html">
+                                선수 기록
+                            </a>
+                        </li>
+
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        커뮤니티
+                    </a>
+
+                    <ul class="sub-menu">
+
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./community.html">
+                                자유게시판
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./player-photo-request.html">
+                                선수 사진 요청
+                            </a>
+                        </li>
+
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="community-detail-page">
+
+    <section
+        id="community-detail"
+        class="community-detail"
+    >
+
+        <p class="community-loading">
+            게시글을 불러오는 중...
+        </p>
+
+    </section>
+
+
+    <div class="community-detail-actions">
+
+        <a
+            href="./community.html"
+            class="community-list-button"
+        >
+            목록
+        </a>
+
+
+        <div class="community-detail-manage-actions">
+
+            <button
+                type="button"
+                id="community-edit-button"
+                class="community-edit-button"
+            >
+                수정
+            </button>
+
+
+            <button
+                type="button"
+                id="community-delete-button"
+                class="community-delete-button"
+            >
+                삭제
+            </button>
+
+        </div>
+
+    </div>
+
+</main>
+
+<!-- ========================= -->
+<!-- 게시글 수정 팝업 -->
+<!-- ========================= -->
+
+<div
+    id="community-edit-modal"
+    class="community-modal hidden"
+>
+
+    <div class="community-modal-panel">
+
+        <div class="community-modal-header">
+
+            <h2>
+                게시글 수정
+            </h2>
+
+            <button
+                type="button"
+                id="community-edit-close-button"
+                class="community-modal-close-button"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div class="community-form-field">
+
+            <label for="community-edit-title">
+                제목
+            </label>
+
+            <input
+                type="text"
+                id="community-edit-title"
+                maxlength="200"
+            >
+
+        </div>
+
+
+        <div class="community-form-field">
+
+            <label for="community-edit-author">
+                작성자 닉네임
+            </label>
+
+            <input
+                type="text"
+                id="community-edit-author"
+                maxlength="100"
+            >
+
+        </div>
+
+
+        <div class="community-form-field">
+
+            <label for="community-edit-content">
+                내용
+            </label>
+
+            <textarea
+                id="community-edit-content"
+                rows="10"
+            ></textarea>
+
+        </div>
+
+
+        <div class="community-form-field">
+
+            <label for="community-edit-password">
+                비밀번호
+            </label>
+
+            <input
+                type="password"
+                id="community-edit-password"
+                maxlength="50"
+                placeholder="작성할 때 사용한 비밀번호"
+            >
+
+        </div>
+
+
+        <p
+            id="community-edit-message"
+            class="community-modal-message"
+        ></p>
+
+
+        <div class="community-modal-actions">
+
+            <button
+                type="button"
+                id="community-edit-cancel-button"
+                class="community-modal-cancel-button"
+            >
+                취소
+            </button>
+
+            <button
+                type="button"
+                id="community-edit-submit-button"
+                class="community-modal-submit-button"
+            >
+                수정 완료
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+
+<!-- ========================= -->
+<!-- 게시글 삭제 팝업 -->
+<!-- ========================= -->
+
+<div
+    id="community-delete-modal"
+    class="community-modal hidden"
+>
+
+    <div class="community-modal-panel community-delete-modal-panel">
+
+        <div class="community-modal-header">
+
+            <h2>
+                게시글 삭제
+            </h2>
+
+            <button
+                type="button"
+                id="community-delete-close-button"
+                class="community-modal-close-button"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <p class="community-delete-text">
+            게시글을 삭제하시겠습니까?
+        </p>
+
+
+        <div class="community-form-field">
+
+            <label for="community-delete-password">
+                비밀번호
+            </label>
+
+            <input
+                type="password"
+                id="community-delete-password"
+                maxlength="50"
+                placeholder="작성할 때 사용한 비밀번호"
+            >
+
+        </div>
+
+
+        <p
+            id="community-delete-message"
+            class="community-modal-message"
+        ></p>
+
+
+        <div class="community-modal-actions">
+
+            <button
+                type="button"
+                id="community-delete-cancel-button"
+                class="community-modal-cancel-button"
+            >
+                취소
+            </button>
+
+            <button
+                type="button"
+                id="community-delete-submit-button"
+                class="community-delete-submit-button"
+            >
+                삭제
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<footer>
+    <p>
+        V1.0 FCL Created by aria
+    </p>
+</footer>
+
+
+<script
+    src="./js/community-detail.js"
+    type="module"
+></script>
+
+    <script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>
