@@ -4,6 +4,20 @@ const siteMainMenuElement =
     );
 
 
+const siteFooterElement =
+    document.querySelector(
+        "#site-footer"
+    );
+
+
+const siteVersion =
+    "V1.2";
+
+
+// =========================================
+// 공통 헤더 메뉴
+// =========================================
+
 if (siteMainMenuElement) {
 
     const siteNavigationItems = [
@@ -91,6 +105,14 @@ if (siteMainMenuElement) {
                 },
             ],
         },
+
+        {
+            label:
+                "패치노트",
+
+            href:
+                "./patch-notes.html",
+        },
     ];
 
 
@@ -113,6 +135,7 @@ if (siteMainMenuElement) {
                     "li"
                 );
 
+
             menuItemElement.classList.add(
                 "menu-item"
             );
@@ -123,17 +146,71 @@ if (siteMainMenuElement) {
                     "a"
                 );
 
-            menuTitleElement.href =
-                "#";
 
             menuTitleElement.textContent =
                 navigationItem.label;
+
+
+            // =====================================
+            // 단독 메뉴
+            // =====================================
+
+            if (navigationItem.href) {
+
+                menuTitleElement.href =
+                    navigationItem.href;
+
+
+                const linkPageName =
+                    navigationItem.href
+                        .replace(
+                            "./",
+                            ""
+                        );
+
+
+                if (
+                    linkPageName
+                    === currentPageName
+                ) {
+
+                    menuTitleElement.setAttribute(
+                        "aria-current",
+                        "page"
+                    );
+
+                }
+
+
+                menuItemElement.appendChild(
+                    menuTitleElement
+                );
+
+
+                siteMainMenuElement
+                    .appendChild(
+                        menuItemElement
+                    );
+
+
+                return;
+
+            }
+
+
+            // =====================================
+            // 하위 메뉴가 있는 메뉴
+            // =====================================
+
+            menuTitleElement.href =
+                "#";
 
 
             const subMenuElement =
                 document.createElement(
                     "ul"
                 );
+
 
             subMenuElement.classList.add(
                 "sub-menu"
@@ -154,8 +231,10 @@ if (siteMainMenuElement) {
                             "a"
                         );
 
+
                     linkElement.href =
                         childItem.href;
+
 
                     linkElement.textContent =
                         childItem.label;
@@ -210,5 +289,21 @@ if (siteMainMenuElement) {
 
         }
     );
+
+}
+
+
+// =========================================
+// 공통 FOOTER
+// =========================================
+
+if (siteFooterElement) {
+
+    siteFooterElement.innerHTML = `
+        <p>
+            ${siteVersion}
+            FCL Created by aria
+        </p>
+    `;
 
 }

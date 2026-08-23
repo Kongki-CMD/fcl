@@ -81,6 +81,17 @@
             </p>
         </div>
 
+        <div
+            class="player-sync-status"
+            id="player-sync-status"
+            hidden
+        >
+            <p
+                class="player-sync-status-message"
+                id="player-sync-status-message"
+            ></p>
+        </div>
+
         <div class="players-table-container">
 
             <table class="players-table">
@@ -113,7 +124,7 @@
                             class="player-sort-header"
                             data-sort-key="fcl_name"
                         >
-                            FCL 참가자
+                            Owner
                             <span class="player-sort-arrow"></span>
                         </th>
 
@@ -172,13 +183,11 @@
 
 </main>
 
-<!-- 하단 영역 -->
-<footer>
-    <p>V1.0 FCL Created by aria</p>
-</footer>
+<footer id="site-footer"></footer>
 
 <script type="module" src="./js/players.js"></script>
 <script src="./js/site-nav.js"></script>
+<footer id="site-footer"></footer>
 
 </body>
 </html>

@@ -7305,6 +7305,69 @@ def advance_playoff_series(
 
 
 # =========================
+# 선수 기록 동기화 상태
+# 정규리그만 확인
+# =========================
+
+@app.get("/api/player-rankings/sync-status")
+def get_player_rankings_sync_status():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE
+                            stats_sync_status =
+                                'pending'
+                    )
+                        AS pending_count,
+
+                    COUNT(*) FILTER (
+                        WHERE
+                            stats_sync_status =
+                                'conflict'
+                    )
+                        AS conflict_count
+
+                FROM series
+
+                WHERE
+                    status = 'completed'
+                    AND
+                    series_type = '정규리그'
+                """
+            )
+
+            row = cursor.fetchone()
+
+
+    pending_count = int(
+        row["pending_count"]
+        or 0
+    )
+
+    conflict_count = int(
+        row["conflict_count"]
+        or 0
+    )
+
+
+    return {
+        "is_syncing":
+            pending_count > 0,
+
+        "pending_count":
+            pending_count,
+
+        "conflict_count":
+            conflict_count,
+    }
+
+# =========================
 # 선수 득점 순위
 # Neon PostgreSQL
 # 정규리그만 집계

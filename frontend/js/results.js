@@ -2177,6 +2177,107 @@ resultDetailModalElement.addEventListener(
 );
 
 
+// =========================================
+// 완료 SERIES NEXON 자동 재확인
+// 30분 간격
+// =========================================
+
+const resultAutoSyncIntervalMs =
+    30 * 60 * 1000;
+
+
+let resultAutoSyncRunning =
+    false;
+
+
+async function autoSyncPendingResults() {
+
+    if (resultAutoSyncRunning) {
+        return;
+    }
+
+
+    resultAutoSyncRunning =
+        true;
+
+
+    try {
+
+        const pendingSyncButtonElements =
+            Array.from(
+                resultsListElement.querySelectorAll(
+                    "[data-series-sync-button]"
+                )
+            )
+            .filter(
+                buttonElement =>
+                    buttonElement.textContent
+                        .trim()
+                    ===
+                    "NEXON 기록 확인"
+            );
+
+
+        for (
+            const syncButtonElement
+            of pendingSyncButtonElements
+        ) {
+
+            const seriesId =
+                Number(
+                    syncButtonElement.dataset
+                        .seriesId
+                );
+
+
+            if (!seriesId) {
+                continue;
+            }
+
+
+            const resultCardElement =
+                syncButtonElement.closest(
+                    ".result-card"
+                );
+
+
+            const syncMessageElement =
+                resultCardElement
+                    ?.querySelector(
+                        "[data-series-sync-message]"
+                    );
+
+
+            await syncCompletedSeries(
+                seriesId,
+                syncButtonElement,
+                syncMessageElement
+            );
+
+        }
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+    } finally {
+
+        resultAutoSyncRunning =
+            false;
+
+    }
+
+}
+
+
+// 30분마다 pending 경기만 자동 확인
+setInterval(
+    autoSyncPendingResults,
+    resultAutoSyncIntervalMs
+);
+
 
 
 // =========================================

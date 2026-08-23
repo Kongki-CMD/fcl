@@ -27,6 +27,25 @@ const playerSortHeaderElements =
 let playerSeasonMap =
     new Map();
 
+const playerSyncStatusElement =
+    document.querySelector(
+        "#player-sync-status"
+    );
+
+
+const playerSyncStatusMessageElement =
+    document.querySelector(
+        "#player-sync-status-message"
+    );
+
+
+const playerSyncCheckIntervalMs =
+    30 * 60 * 1000;
+
+
+let playerSyncCheckRunning =
+    false;
+
 
 async function loadPlayerSeasonMetadata() {
 
@@ -361,15 +380,21 @@ function renderPlayerRankings(
 
             }
 
-
-            let ownerText =
-                player.fcl_name;
+            let ownerNicknameHtml =
+                "";
 
 
             if (player.nickname) {
 
-                ownerText +=
-                    ` (${player.nickname})`;
+                ownerNicknameHtml = `
+                    <span
+                        class="
+                            player-record-owner-nickname
+                        "
+                    >
+                        (${player.nickname})
+                    </span>
+                `;
 
             }
 
@@ -421,7 +446,15 @@ function renderPlayerRankings(
                         player-record-owner
                     "
                 >
-                    ${ownerText}
+                    <span
+                        class="
+                            player-record-owner-name
+                        "
+                    >
+                        ${player.fcl_name}
+                    </span>
+
+                    ${ownerNicknameHtml}
                 </td>
 
 
@@ -567,6 +600,99 @@ function updatePlayerSortHeaders() {
 
 }
 
+async function checkPlayerRankingSyncStatus() {
+
+    if (playerSyncCheckRunning) {
+        return;
+    }
+
+
+    playerSyncCheckRunning =
+        true;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/player-rankings/sync-status`
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "선수 기록 동기화 상태를 불러오지 못했습니다."
+            );
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            data.conflict_count > 0
+        ) {
+
+            playerSyncStatusElement.hidden =
+                false;
+
+
+            playerSyncStatusMessageElement
+                .textContent =
+                    "선수 기록 확인이 필요한 경기가 있습니다.";
+
+
+            return;
+        }
+
+
+        if (
+            data.is_syncing
+        ) {
+
+            playerSyncStatusElement.hidden =
+                false;
+
+
+            playerSyncStatusMessageElement
+                .textContent =
+                    "선수 기록 집계 중입니다. "
+                    + "30분마다 자동으로 다시 확인합니다.";
+
+
+            return;
+        }
+
+
+        playerSyncStatusElement.hidden =
+            true;
+
+
+        playerSyncStatusMessageElement
+            .textContent =
+                "";
+
+
+        await loadPlayerRankings();
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+    } finally {
+
+        playerSyncCheckRunning =
+            false;
+
+    }
+
+}
+
 
 async function initializePlayerRankings() {
 
@@ -574,7 +700,15 @@ async function initializePlayerRankings() {
 
     await loadPlayerRankings();
 
+    await checkPlayerRankingSyncStatus();
+
 }
 
 
 initializePlayerRankings();
+
+
+setInterval(
+    checkPlayerRankingSyncStatus,
+    playerSyncCheckIntervalMs
+);
