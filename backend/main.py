@@ -1689,6 +1689,10 @@ def get_user_match_ids(
 
     return response.json()
 
+# =========================
+# FC Online 경기 상세 조회
+# =========================
+
 def get_match_detail(
     match_id,
 ):
@@ -1713,15 +1717,11 @@ def get_match_detail(
 
     return response.json()
 
-
-# =========================
-# FC Online 경기 승자 판별
-# =========================
-
 def get_match_winner_side(
     match_data,
     nickname_a,
     nickname_b,
+    series_type=None,
 ):
 
     participant_map = {
@@ -1729,7 +1729,10 @@ def get_match_winner_side(
             match_info
 
         for match_info
-        in match_data["matchInfo"]
+        in match_data.get(
+            "matchInfo",
+            [],
+        )
     }
 
 
@@ -1737,25 +1740,120 @@ def get_match_winner_side(
         nickname_a
     )
 
+
     team_b_info = participant_map.get(
         nickname_b
     )
 
 
-    if not team_a_info or not team_b_info:
+    if (
+        team_a_info is None
+        or
+        team_b_info is None
+    ):
+
         return None
 
 
+    # =========================
+    # 실제 경기 점수
+    #
+    # FCL 경기 스코어 기준은
+    # NEXON goalTotal 사용
+    # =========================
+
+    team_a_score = int(
+        team_a_info
+        .get(
+            "shoot",
+            {},
+        )
+        .get(
+            "goalTotal",
+            0,
+        )
+        or 0
+    )
+
+
+    team_b_score = int(
+        team_b_info
+        .get(
+            "shoot",
+            {},
+        )
+        .get(
+            "goalTotal",
+            0,
+        )
+        or 0
+    )
+
+
+    # =========================
+    # 점수로 승자가 명확한 경우
+    # =========================
+
+    if (
+        team_a_score
+        >
+        team_b_score
+    ):
+
+        return "team_a"
+
+
+    if (
+        team_b_score
+        >
+        team_a_score
+    ):
+
+        return "team_b"
+
+
+    # =========================
+    # 프리시즌 / 정규리그
+    #
+    # 스코어가 같으면 무승부
+    # =========================
+
+    if (
+        series_type
+        != "플레이오프"
+    ):
+
+        return "draw"
+
+
+    # =========================
+    # 플레이오프 동점
+    #
+    # 연장 / 승부차기 결과는
+    # NEXON matchResult 사용
+    # =========================
+
     team_a_result = (
         team_a_info
-        .get("matchDetail", {})
-        .get("matchResult")
+        .get(
+            "matchDetail",
+            {},
+        )
+        .get(
+            "matchResult"
+        )
     )
+
 
     team_b_result = (
         team_b_info
-        .get("matchDetail", {})
-        .get("matchResult")
+        .get(
+            "matchDetail",
+            {},
+        )
+        .get(
+            "matchResult"
+        )
     )
 
 
@@ -1764,6 +1862,7 @@ def get_match_winner_side(
         and
         team_b_result == "패"
     ):
+
         return "team_a"
 
 
@@ -1772,16 +1871,12 @@ def get_match_winner_side(
         and
         team_b_result == "승"
     ):
+
         return "team_b"
 
 
-    if (
-        team_a_result == "무"
-        and
-        team_b_result == "무"
-    ):
-        return "draw"
-
+    # 플레이오프인데
+    # 동점 스코어 + 승자 판별 실패
 
     return None
 
@@ -1793,10 +1888,13 @@ def get_match_integrity_conflict(
     match_data,
     nickname_a,
     nickname_b,
+    series_type=None,
 ):
+
     participant_map = {
         match_info["nickname"]:
             match_info
+
         for match_info
         in match_data.get(
             "matchInfo",
@@ -1804,11 +1902,13 @@ def get_match_integrity_conflict(
         )
     }
 
+
     team_a_info = (
         participant_map.get(
             nickname_a
         )
     )
+
 
     team_b_info = (
         participant_map.get(
@@ -1816,51 +1916,25 @@ def get_match_integrity_conflict(
         )
     )
 
+
+    # =========================
+    # 참가자 정합성
+    # =========================
+
     if (
         team_a_info is None
         or
         team_b_info is None
     ):
+
         return (
             "NEXON 경기 데이터에서 "
             "SERIES 참가자를 찾을 수 없습니다."
         )
 
-    # =========================
-    # 경기 결과 조합 검증
-    # =========================
-
-    team_a_result = (
-        team_a_info
-        .get("matchDetail", {})
-        .get("matchResult")
-    )
-
-    team_b_result = (
-        team_b_info
-        .get("matchDetail", {})
-        .get("matchResult")
-    )
-
-    valid_result_pairs = {
-        ("승", "패"),
-        ("패", "승"),
-        ("무", "무"),
-    }
-
-    if (
-        team_a_result,
-        team_b_result,
-    ) not in valid_result_pairs:
-        return (
-            "NEXON 경기 결과 조합이 "
-            "정상적이지 않습니다. "
-            f"({nickname_a}: {team_a_result}, "
-            f"{nickname_b}: {team_b_result})"
-        )
 
     # =========================
-    # 팀별 점수 / 선수 득점 정합성
+    # 팀 점수 / 선수 득점 정합성
     # =========================
 
     for (
@@ -1871,17 +1945,20 @@ def get_match_integrity_conflict(
             nickname_a,
             team_a_info,
         ),
+
         (
             nickname_b,
             team_b_info,
         ),
     ):
+
         shoot = (
             match_info.get(
                 "shoot",
                 {},
             )
         )
+
 
         goal_total = int(
             shoot.get(
@@ -1891,13 +1968,6 @@ def get_match_integrity_conflict(
             or 0
         )
 
-        goal_total_display = int(
-            shoot.get(
-                "goalTotalDisplay",
-                0,
-            )
-            or 0
-        )
 
         own_goal = int(
             shoot.get(
@@ -1907,13 +1977,21 @@ def get_match_integrity_conflict(
             or 0
         )
 
+
         player_goal_sum = sum(
             int(
                 player
-                .get("status", {})
-                .get("goal", 0)
+                .get(
+                    "status",
+                    {},
+                )
+                .get(
+                    "goal",
+                    0,
+                )
                 or 0
             )
+
             for player
             in match_info.get(
                 "player",
@@ -1921,25 +1999,14 @@ def get_match_integrity_conflict(
             )
         )
 
-        # 실제 득점과 표시 점수가 다르면
-        # 자동 저장 금지
-        if (
-            goal_total
-            !=
-            goal_total_display
-        ):
-            return (
-                "NEXON 팀 점수 데이터가 "
-                "서로 일치하지 않습니다. "
-                f"({nickname}: "
-                f"goalTotal={goal_total}, "
-                f"goalTotalDisplay="
-                f"{goal_total_display})"
-            )
 
-        # 자책골이 없는 경기에서는
-        # 선수 득점 합계도 팀 득점과
-        # 반드시 일치해야 함
+        # =========================
+        # 자책골이 없는 경우
+        #
+        # 선수 득점 합계와
+        # 실제 팀 득점이 같아야 함
+        # =========================
+
         if (
             own_goal == 0
             and
@@ -1947,6 +2014,7 @@ def get_match_integrity_conflict(
             !=
             goal_total
         ):
+
             return (
                 "NEXON 선수 득점 합계와 "
                 "팀 득점이 일치하지 않습니다. "
@@ -1956,8 +2024,96 @@ def get_match_integrity_conflict(
                 f"goalTotal={goal_total})"
             )
 
-    return None
 
+    # =========================
+    # 플레이오프 동점 경기 검증
+    # =========================
+
+    team_a_score = int(
+        team_a_info
+        .get(
+            "shoot",
+            {},
+        )
+        .get(
+            "goalTotal",
+            0,
+        )
+        or 0
+    )
+
+
+    team_b_score = int(
+        team_b_info
+        .get(
+            "shoot",
+            {},
+        )
+        .get(
+            "goalTotal",
+            0,
+        )
+        or 0
+    )
+
+
+    if (
+        series_type == "플레이오프"
+        and
+        team_a_score == team_b_score
+    ):
+
+        winner_side = (
+            get_match_winner_side(
+                match_data,
+                nickname_a,
+                nickname_b,
+                series_type,
+            )
+        )
+
+
+        if (
+            winner_side
+            not in (
+                "team_a",
+                "team_b",
+            )
+        ):
+
+            team_a_result = (
+                team_a_info
+                .get(
+                    "matchDetail",
+                    {},
+                )
+                .get(
+                    "matchResult"
+                )
+            )
+
+
+            team_b_result = (
+                team_b_info
+                .get(
+                    "matchDetail",
+                    {},
+                )
+                .get(
+                    "matchResult"
+                )
+            )
+
+
+            return (
+                "플레이오프 동점 경기의 "
+                "승자를 확인할 수 없습니다. "
+                f"({nickname_a}: {team_a_result}, "
+                f"{nickname_b}: {team_b_result})"
+            )
+
+
+    return None
 
 # =========================
 # FCL SERIES MVP 계산
@@ -9282,7 +9438,7 @@ def get_series_test():
 
                     "score": (
                         match_info["shoot"][
-                            "goalTotalDisplay"
+                            "goalTotal"
                         ]
                     ),
 
@@ -10275,7 +10431,7 @@ def import_history_series(
                     team_a_info[
                         "shoot"
                     ][
-                        "goalTotalDisplay"
+                        "goalTotal"
                     ]
                 )
 
@@ -10283,7 +10439,7 @@ def import_history_series(
                     team_b_info[
                         "shoot"
                     ][
-                        "goalTotalDisplay"
+                        "goalTotal"
                     ]
                 )
 
@@ -12377,6 +12533,7 @@ def sync_fcl_series_status(
                     detected_match["data"],
                     nickname_a,
                     nickname_b,
+                    series["series_type"],
                 )
             )
 
@@ -12464,6 +12621,7 @@ def sync_fcl_series_status(
                     detected_match["data"],
                     nickname_a,
                     nickname_b,
+                    series["series_type"],
                 )
             )
 
@@ -12545,6 +12703,7 @@ def sync_fcl_series_status(
                     detected_match["data"],
                     nickname_a,
                     nickname_b,
+                    series["series_type"],
                 )
             )
 
@@ -12566,6 +12725,7 @@ def sync_fcl_series_status(
                 detected_match["data"],
                 nickname_a,
                 nickname_b,
+                series["series_type"],
             )
         )
 
@@ -12862,7 +13022,7 @@ def sync_fcl_series_status(
                 team_a_info[
                     "shoot"
                 ][
-                    "goalTotalDisplay"
+                    "goalTotal"
                 ]
             )
 
@@ -12871,7 +13031,7 @@ def sync_fcl_series_status(
                 team_b_info[
                     "shoot"
                 ][
-                    "goalTotalDisplay"
+                    "goalTotal"
                 ]
             )
 
@@ -13452,7 +13612,7 @@ def sync_fcl_series_status(
                     ][
                         "shoot"
                     ][
-                        "goalTotalDisplay"
+                        "goalTotal"
                     ]
                 )
 
@@ -13463,7 +13623,7 @@ def sync_fcl_series_status(
                     ][
                         "shoot"
                     ][
-                        "goalTotalDisplay"
+                        "goalTotal"
                     ]
                 )
 
