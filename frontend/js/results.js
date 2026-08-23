@@ -33,6 +33,9 @@ let currentResultDetailData = null;
 let currentResultDetailSide =
     "team_a";
 
+let currentResultDetailCompetitionLabel =
+    "";
+
 let resultDetailSeasonMap = new Map();
 
 const resultDetailPositionLayout = {
@@ -1070,6 +1073,119 @@ function getResultDetailSetMvp(
     return playedPlayers[0];
 }
 
+// =========================================
+// 경기 상세 대회 단계
+// =========================================
+
+function getResultDetailCompetitionLabel(
+    result
+) {
+
+    if (
+        result.match_type
+        === "프리시즌"
+    ) {
+
+        return "PRE-SEASON";
+
+    }
+
+
+    if (
+        result.match_type
+        === "플레이오프"
+    ) {
+
+        if (
+            result.playoff_stage
+            === "준플레이오프"
+        ) {
+
+            return "QUALIFIER";
+
+        }
+
+
+        if (
+            result.playoff_stage
+            === "플레이오프"
+        ) {
+
+            return "SEMI-FINAL";
+
+        }
+
+
+        if (
+            result.playoff_stage
+            === "결승시리즈"
+        ) {
+
+            return "FINAL";
+
+        }
+
+
+        return "PLAYOFF";
+
+    }
+
+
+    if (result.round) {
+
+        return `
+            ROUND ${result.round}
+        `.trim();
+
+    }
+
+
+    return "";
+
+}
+
+
+// =========================================
+// 경기 상세 대회 단계 HTML
+// =========================================
+
+function createResultDetailCompetitionHtml() {
+
+    if (
+        !currentResultDetailCompetitionLabel
+    ) {
+
+        return "";
+
+    }
+
+
+    return `
+        <div
+            class="
+                result-detail-competition
+            "
+        >
+            <span
+                class="
+                    result-detail-competition-season
+                "
+            >
+                FCL SEASON 1
+            </span>
+
+            <strong
+                class="
+                    result-detail-competition-stage
+                "
+            >
+                ${currentResultDetailCompetitionLabel}
+            </strong>
+        </div>
+    `;
+
+}
+
 function createResultDetailSetMvpHtml(
     setData
 ) {
@@ -1268,6 +1384,8 @@ function renderResultDetailSet(
 
                 ${createResultDetailSetMvpHtml(setData)}
 
+                ${createResultDetailCompetitionHtml()}
+
             </div>
 
         </aside>
@@ -1309,8 +1427,12 @@ function renderResultDetailSet(
 
 
 async function openResultDetail(
-    seriesId
+    seriesId,
+    competitionLabel = ""
 ) {
+
+    currentResultDetailCompetitionLabel =
+        competitionLabel;
 
     await loadResultDetailSeasonMetadata();
 
@@ -1543,8 +1665,21 @@ function renderResults(
                 "result-card-detail-enabled"
             );
 
+
             resultCardElement.dataset.seriesDetailId =
                 result.series_id;
+
+
+            const competitionLabel =
+                getResultDetailCompetitionLabel(
+                    result
+                );
+
+
+            resultCardElement.dataset
+                .seriesDetailCompetition =
+                    competitionLabel;
+
         }
 
 
@@ -2046,9 +2181,15 @@ resultsListElement.addEventListener(
             return;
         }
 
+        const competitionLabel =
+            detailCardElement.dataset
+                .seriesDetailCompetition
+            ?? "";
+
 
         openResultDetail(
-            seriesId
+            seriesId,
+            competitionLabel
         );
     }
 );

@@ -14537,6 +14537,7 @@ def get_completed_series_results():
                 SELECT
                     s.id AS series_id,
                     s.series_type,
+                    s.round_number,
 
                     s.playoff_stage,
                     s.best_of,
@@ -14832,8 +14833,9 @@ def get_completed_series_results():
                         ),
 
                         "round":
-                            None,
-
+                            series_row[
+                                "round_number"
+                            ],
                         "match_type":
                             series_row[
                                 "series_type"

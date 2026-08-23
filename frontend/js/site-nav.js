@@ -301,7 +301,7 @@ if (siteFooterElement) {
 
     siteFooterElement.innerHTML = `
         <p>
-            ${siteVersion}
+            [${siteVersion}]
             FCL Created by aria
         </p>
     `;

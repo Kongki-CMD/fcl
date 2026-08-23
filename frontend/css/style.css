@@ -3491,6 +3491,49 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     font-weight: 700;
 }
 
+/* =========================================
+   RESULT DETAIL COMPETITION
+========================================= */
+
+.result-detail-competition {
+    margin-top: 28px;
+    padding-top: 20px;
+
+    border-top: 1px solid #333;
+
+    text-align: center;
+}
+
+
+.result-detail-competition-season {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #666;
+
+    font-size: 9px;
+    font-weight: 700;
+
+    letter-spacing: 0.12em;
+}
+
+
+.result-detail-competition-stage {
+    display: block;
+
+    color: #d7bc78;
+
+    font-size: 22px;
+    font-weight: 900;
+
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+
+    white-space: normal;
+    word-break: keep-all;
+}
+
 
 .result-detail-backdrop {
     position: absolute;
@@ -7624,8 +7667,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         text-align: center;
     }
 
+        .result-detail-competition {
+        margin-top: 16px;
+        padding-top: 13px;
+    }
+
+
+    .result-detail-competition-season {
+        margin-bottom: 5px;
+
+        font-size: 6px;
+
+        letter-spacing: 0.08em;
+    }
+
+
+    .result-detail-competition-stage {
+        font-size: 13px;
+
+        line-height: 1.15;
+        letter-spacing: 0.02em;
+    }
+
     .result-detail-match-vs {
-    font-size: 8px;
+        font-size: 8px;
     }
 }
 
