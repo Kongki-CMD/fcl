@@ -1785,6 +1785,179 @@ def get_match_winner_side(
 
     return None
 
+# =========================
+# FC Online 경기 데이터 정합성 검증
+# =========================
+
+def get_match_integrity_conflict(
+    match_data,
+    nickname_a,
+    nickname_b,
+):
+    participant_map = {
+        match_info["nickname"]:
+            match_info
+        for match_info
+        in match_data.get(
+            "matchInfo",
+            [],
+        )
+    }
+
+    team_a_info = (
+        participant_map.get(
+            nickname_a
+        )
+    )
+
+    team_b_info = (
+        participant_map.get(
+            nickname_b
+        )
+    )
+
+    if (
+        team_a_info is None
+        or
+        team_b_info is None
+    ):
+        return (
+            "NEXON 경기 데이터에서 "
+            "SERIES 참가자를 찾을 수 없습니다."
+        )
+
+    # =========================
+    # 경기 결과 조합 검증
+    # =========================
+
+    team_a_result = (
+        team_a_info
+        .get("matchDetail", {})
+        .get("matchResult")
+    )
+
+    team_b_result = (
+        team_b_info
+        .get("matchDetail", {})
+        .get("matchResult")
+    )
+
+    valid_result_pairs = {
+        ("승", "패"),
+        ("패", "승"),
+        ("무", "무"),
+    }
+
+    if (
+        team_a_result,
+        team_b_result,
+    ) not in valid_result_pairs:
+        return (
+            "NEXON 경기 결과 조합이 "
+            "정상적이지 않습니다. "
+            f"({nickname_a}: {team_a_result}, "
+            f"{nickname_b}: {team_b_result})"
+        )
+
+    # =========================
+    # 팀별 점수 / 선수 득점 정합성
+    # =========================
+
+    for (
+        nickname,
+        match_info,
+    ) in (
+        (
+            nickname_a,
+            team_a_info,
+        ),
+        (
+            nickname_b,
+            team_b_info,
+        ),
+    ):
+        shoot = (
+            match_info.get(
+                "shoot",
+                {},
+            )
+        )
+
+        goal_total = int(
+            shoot.get(
+                "goalTotal",
+                0,
+            )
+            or 0
+        )
+
+        goal_total_display = int(
+            shoot.get(
+                "goalTotalDisplay",
+                0,
+            )
+            or 0
+        )
+
+        own_goal = int(
+            shoot.get(
+                "ownGoal",
+                0,
+            )
+            or 0
+        )
+
+        player_goal_sum = sum(
+            int(
+                player
+                .get("status", {})
+                .get("goal", 0)
+                or 0
+            )
+            for player
+            in match_info.get(
+                "player",
+                [],
+            )
+        )
+
+        # 실제 득점과 표시 점수가 다르면
+        # 자동 저장 금지
+        if (
+            goal_total
+            !=
+            goal_total_display
+        ):
+            return (
+                "NEXON 팀 점수 데이터가 "
+                "서로 일치하지 않습니다. "
+                f"({nickname}: "
+                f"goalTotal={goal_total}, "
+                f"goalTotalDisplay="
+                f"{goal_total_display})"
+            )
+
+        # 자책골이 없는 경기에서는
+        # 선수 득점 합계도 팀 득점과
+        # 반드시 일치해야 함
+        if (
+            own_goal == 0
+            and
+            player_goal_sum
+            !=
+            goal_total
+        ):
+            return (
+                "NEXON 선수 득점 합계와 "
+                "팀 득점이 일치하지 않습니다. "
+                f"({nickname}: "
+                f"playerGoals="
+                f"{player_goal_sum}, "
+                f"goalTotal={goal_total})"
+            )
+
+    return None
+
 
 # =========================
 # FCL SERIES MVP 계산
@@ -9835,6 +10008,8 @@ def import_history_series(
             "matchId"
         ]
 
+
+
         for detected_match
         in detected_matches
     ]
@@ -12208,6 +12383,95 @@ def sync_fcl_series_status(
             detected_matches[:3]
         )
 
+        # =========================
+        # NEXON 경기 데이터 정합성 검증
+        # =========================
+
+        integrity_conflict = None
+
+        for (
+            set_index,
+            detected_match,
+        ) in enumerate(
+            detected_matches,
+            start=1,
+        ):
+            conflict_reason = (
+                get_match_integrity_conflict(
+                    detected_match["data"],
+                    nickname_a,
+                    nickname_b,
+                )
+            )
+
+            if conflict_reason:
+                integrity_conflict = (
+                    f"{set_index}세트: "
+                    f"{conflict_reason}"
+                )
+                break
+
+        if integrity_conflict:
+            if is_pending_result_sync:
+                with get_db_connection() as connection:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            UPDATE series
+                            SET
+                                stats_sync_status =
+                                    'conflict'
+                            WHERE id = %s
+                            """,
+                            (
+                                series_id,
+                            ),
+                        )
+
+                    connection.commit()
+
+            return {
+                "series": {
+                    "series_id":
+                        series_id,
+
+                    "series_type":
+                        series["series_type"],
+
+                    "team_a":
+                        series["team_a_name"],
+
+                    "team_b":
+                        series["team_b_name"],
+
+                    "status":
+                        series["status"],
+
+                    "set_count":
+                        0,
+
+                    "stats_sync_status":
+                        (
+                            "conflict"
+                            if is_pending_result_sync
+                            else
+                            series[
+                                "stats_sync_status"
+                            ]
+                        ),
+                },
+
+                "sets": [],
+
+                "mvp": None,
+
+                "sync_message": (
+                    "NEXON 경기 데이터 정합성 "
+                    "검증에 실패했습니다. "
+                    f"{integrity_conflict}"
+                ),
+            }
+
 
         for detected_match in detected_matches:
 
@@ -12221,6 +12485,94 @@ def sync_fcl_series_status(
                 )
             )
 
+    # =========================
+    # NEXON 경기 데이터 정합성 검증
+    # =========================
+
+    integrity_conflict = None
+
+    for (
+        set_index,
+        detected_match,
+    ) in enumerate(
+        detected_matches,
+        start=1,
+    ):
+        conflict_reason = (
+            get_match_integrity_conflict(
+                detected_match["data"],
+                nickname_a,
+                nickname_b,
+            )
+        )
+
+        if conflict_reason:
+            integrity_conflict = (
+                f"{set_index}세트: "
+                f"{conflict_reason}"
+            )
+            break
+
+    if integrity_conflict:
+        if is_pending_result_sync:
+            with get_db_connection() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE series
+                        SET
+                            stats_sync_status =
+                                'conflict'
+                        WHERE id = %s
+                        """,
+                        (
+                            series_id,
+                        ),
+                    )
+
+                connection.commit()
+
+        return {
+            "series": {
+                "series_id":
+                    series_id,
+
+                "series_type":
+                    series["series_type"],
+
+                "team_a":
+                    series["team_a_name"],
+
+                "team_b":
+                    series["team_b_name"],
+
+                "status":
+                    series["status"],
+
+                "set_count":
+                    0,
+
+                "stats_sync_status":
+                    (
+                        "conflict"
+                        if is_pending_result_sync
+                        else
+                        series[
+                            "stats_sync_status"
+                        ]
+                    ),
+            },
+
+            "sets": [],
+
+            "mvp": None,
+
+            "sync_message": (
+                "NEXON 경기 데이터 정합성 "
+                "검증에 실패했습니다. "
+                f"{integrity_conflict}"
+            ),
+        }
 
     # ==================================================
     # A.
