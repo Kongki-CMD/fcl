@@ -148,11 +148,16 @@ function createPlayerSeasonIconHtml(
 }
 
 const playerRecordCustomImages = {
+
     "주앙 칸셀루":
         "./assets/images/players/custom/cancelo.png",
 
     "닉 포프":
         "./assets/images/players/custom/nick_pope.png",
+
+    "곤살루 게드스":
+        "./assets/images/players/custom/goncalo_guedes.png",
+        
 };
 
 

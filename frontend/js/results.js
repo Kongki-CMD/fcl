@@ -13,6 +13,9 @@ const resultDetailCustomPlayerImages = {
     "닉 포프":
         "./assets/images/players/custom/nick_pope.png",
 
+    "곤살루 게드스":
+        "./assets/images/players/custom/goncalo_guedes.png",
+
 };
 
 const resultsListElement =
