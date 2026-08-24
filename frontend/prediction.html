@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL | 승부예측</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+                </span>
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu">
+
+                <li class="menu-item">
+                    <a href="#">
+                        경기
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./schedule.html">
+                                경기 일정
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./results.html">
+                                경기 결과
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./rules.html">
+                                경기 규칙
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        기록
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./standings.html">
+                                팀 기록
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./players.html">
+                                선수 기록
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        커뮤니티
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./community.html">
+                                자유게시판
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./player-photo-request.html">
+                                선수 사진 요청
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="prediction-page">
+
+    <section class="prediction-header">
+
+        <div>
+            <span class="prediction-eyebrow">
+                FCL PLAYGROUND
+            </span>
+
+            <h1>
+                승부예측
+            </h1>
+
+            <p>
+                정규리그 경기 결과를 예측하고
+                포인트에 도전하세요.
+            </p>
+        </div>
+
+        <div
+            id="prediction-user-summary"
+            class="prediction-user-summary"
+        >
+            회원 정보를 확인하는 중...
+        </div>
+
+    </section>
+
+
+    <section class="prediction-guide">
+
+        <div>
+            <strong>승리</strong>
+            <span>× 2.50</span>
+        </div>
+
+        <div>
+            <strong>무승부</strong>
+            <span>× 2.50</span>
+        </div>
+
+        <div>
+            <strong>승리</strong>
+            <span>× 2.50</span>
+        </div>
+
+    </section>
+
+
+    <section class="prediction-match-section">
+
+        <div class="prediction-section-header">
+
+            <div>
+                <h2>
+                    예측 가능 경기
+                </h2>
+
+                <p>
+                    경기 전날 23:59까지 참여할 수 있습니다.
+                </p>
+            </div>
+
+        </div>
+
+
+        <div
+            id="prediction-match-list"
+            class="prediction-match-list"
+        >
+            경기를 불러오는 중...
+        </div>
+
+    </section>
+
+</main>
+
+
+<footer id="site-footer"></footer>
+
+
+<script
+    type="module"
+    src="./js/prediction.js"
+></script>
+
+    <script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>

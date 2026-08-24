@@ -24,6 +24,11 @@ from fastapi import (
     Header,
     Depends,
 )
+
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -570,6 +575,188 @@ def get_db_connection():
         row_factory=dict_row,
     )
 
+# =========================
+# POINTS
+# =========================
+
+def change_user_points(
+    cursor,
+    user_id: int,
+    amount: int,
+    transaction_type: str,
+    reference_type: str | None = None,
+    reference_id: int | None = None,
+    description: str | None = None,
+):
+
+    if amount == 0:
+
+        raise ValueError(
+            "포인트 변동 금액은 "
+            "0일 수 없습니다."
+        )
+
+
+    # =========================
+    # 사용자 행 잠금
+    # =========================
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            points
+
+        FROM users
+
+        WHERE id = %s
+
+        FOR UPDATE
+        """,
+        (
+            user_id,
+        ),
+    )
+
+
+    user = (
+        cursor.fetchone()
+    )
+
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "사용자를 찾을 수 없습니다."
+            ),
+        )
+
+
+    current_balance = int(
+        user["points"]
+    )
+
+
+    new_balance = (
+        current_balance
+        + amount
+    )
+
+
+    # =========================
+    # 잔액 부족 방지
+    # =========================
+
+    if new_balance < 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "보유 포인트가 부족합니다."
+            ),
+        )
+
+
+    # =========================
+    # 현재 잔액 수정
+    # =========================
+
+    cursor.execute(
+        """
+        UPDATE users
+
+        SET
+            points = %s,
+            updated_at = NOW()
+
+        WHERE id = %s
+        """,
+        (
+            new_balance,
+            user_id,
+        ),
+    )
+
+
+    # =========================
+    # 거래 원장 기록
+    # =========================
+
+    cursor.execute(
+        """
+        INSERT INTO point_transactions (
+            user_id,
+            amount,
+            balance_after,
+            transaction_type,
+            reference_type,
+            reference_id,
+            description
+        )
+
+        VALUES (
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s,
+            %s
+        )
+
+        RETURNING
+            id,
+            created_at
+        """,
+        (
+            user_id,
+            amount,
+            new_balance,
+            transaction_type,
+            reference_type,
+            reference_id,
+            description,
+        ),
+    )
+
+
+    transaction = (
+        cursor.fetchone()
+    )
+
+
+    return {
+        "transaction_id":
+            transaction["id"],
+
+        "amount":
+            amount,
+
+        "balance_before":
+            current_balance,
+
+        "balance_after":
+            new_balance,
+
+        "transaction_type":
+            transaction_type,
+
+        "reference_type":
+            reference_type,
+
+        "reference_id":
+            reference_id,
+
+        "description":
+            description,
+
+        "created_at":
+            transaction["created_at"],
+    }
+
+
 def save_series_set_squad_players(
     series_id,
     team_a_id,
@@ -1093,6 +1280,173 @@ def initialize_database():
 
         with connection.cursor() as cursor:
 
+            # =========================
+            # USERS
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS users (
+                    id BIGSERIAL PRIMARY KEY,
+
+                    email VARCHAR(255)
+                        NOT NULL
+                        UNIQUE,
+
+                    password_hash TEXT
+                        NOT NULL,
+
+                    nickname VARCHAR(50)
+                        NOT NULL
+                        UNIQUE,
+
+                    points INTEGER
+                        NOT NULL
+                        DEFAULT 0,
+
+                    is_admin BOOLEAN
+                        NOT NULL
+                        DEFAULT FALSE,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    updated_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT users_points_check
+                    CHECK (
+                        points >= 0
+                    )
+                )
+                """
+            )
+
+            # =========================
+            # POINT TRANSACTIONS
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS point_transactions (
+                    id BIGSERIAL PRIMARY KEY,
+
+                    user_id BIGINT
+                        NOT NULL
+                        REFERENCES users(id)
+                        ON DELETE CASCADE,
+
+                    amount INTEGER
+                        NOT NULL,
+
+                    balance_after INTEGER
+                        NOT NULL,
+
+                    transaction_type VARCHAR(50)
+                        NOT NULL,
+
+                    reference_type VARCHAR(50),
+
+                    reference_id BIGINT,
+
+                    description TEXT,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT
+                        point_transactions_balance_check
+                    CHECK (
+                        balance_after >= 0
+                    ),
+
+                    CONSTRAINT
+                        point_transactions_amount_check
+                    CHECK (
+                        amount <> 0
+                    )
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_point_transactions_user_id
+
+                ON point_transactions (
+                    user_id
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_point_transactions_created_at
+
+                ON point_transactions (
+                    created_at
+                )
+                """
+            )
+
+            # =========================
+            # USER SESSIONS
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id BIGSERIAL PRIMARY KEY,
+
+                    user_id BIGINT
+                        NOT NULL
+                        REFERENCES users(id)
+                        ON DELETE CASCADE,
+
+                    token_hash VARCHAR(64)
+                        NOT NULL
+                        UNIQUE,
+
+                    expires_at TIMESTAMPTZ
+                        NOT NULL,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW()
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_user_sessions_user_id
+
+                ON user_sessions (
+                    user_id
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_user_sessions_expires_at
+
+                ON user_sessions (
+                    expires_at
+                )
+                """
+            )
 
             # =========================
             # 참가자
@@ -1555,6 +1909,33 @@ def initialize_database():
                 """
             )
 
+            # =========================
+            # COMMUNITY NOTICE
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE community_posts
+
+                ADD COLUMN IF NOT EXISTS
+                    is_notice BOOLEAN
+                    NOT NULL
+                    DEFAULT FALSE
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_community_posts_notice
+
+                ON community_posts (
+                    is_notice,
+                    created_at DESC
+                )
+                """
+            )
 
         connection.commit()
 
@@ -2378,6 +2759,512 @@ FCONLINE_NICKNAMES = {
     "서종원": "붉은심장베컴",
 }
 
+# =========================
+# PREDICTIONS
+# 승부예측 운영 설정
+# =========================
+
+PREDICTION_FIXED_ODDS = 2.50
+PREDICTION_MAX_STAKE_POINTS = 1000
+
+# =========================
+# PREDICTIONS
+# 세트별 승부예측 자동 정산
+# =========================
+
+def settle_predictions_for_series(
+    cursor,
+    series_id: int,
+):
+
+    # =========================
+    # SERIES 확인
+    # =========================
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            series_type,
+            team_a_id,
+            team_b_id,
+            status
+
+        FROM series
+
+        WHERE id = %s
+
+        FOR UPDATE
+        """,
+        (
+            series_id,
+        ),
+    )
+
+
+    series = cursor.fetchone()
+
+
+    if not series:
+
+        raise RuntimeError(
+            "승부예측 정산 대상 SERIES를 "
+            "찾을 수 없습니다."
+        )
+
+
+    # 정규리그만 승부예측 정산
+    if (
+        series["series_type"]
+        != "정규리그"
+    ):
+
+        return {
+            "settled": 0,
+            "wins": 0,
+            "losses": 0,
+            "payout_points": 0,
+        }
+
+
+    # 완료된 경기만 정산
+    if (
+        series["status"]
+        != "completed"
+    ):
+
+        return {
+            "settled": 0,
+            "wins": 0,
+            "losses": 0,
+            "payout_points": 0,
+        }
+
+
+    # =========================
+    # 실제 1 / 2 / 3세트 결과
+    # =========================
+
+    cursor.execute(
+        """
+        SELECT
+            set_number,
+            team_a_score,
+            team_b_score
+
+        FROM series_sets
+
+        WHERE
+            series_id = %s
+
+            AND set_number
+                BETWEEN 1 AND 3
+
+        ORDER BY
+            set_number
+
+        FOR UPDATE
+        """,
+        (
+            series_id,
+        ),
+    )
+
+
+    set_rows = cursor.fetchall()
+
+
+    set_map = {
+        int(
+            row["set_number"]
+        ):
+            row
+
+        for row
+        in set_rows
+    }
+
+
+    if (
+        set(
+            set_map.keys()
+        )
+        !=
+        {
+            1,
+            2,
+            3,
+        }
+    ):
+
+        raise RuntimeError(
+            "승부예측 정산에 필요한 "
+            "1~3세트 결과가 모두 존재하지 않습니다."
+        )
+
+
+    # =========================
+    # 아직 정산되지 않은 예측
+    #
+    # pending만 가져오므로
+    # 같은 경기 sync를 다시 눌러도
+    # 중복 지급되지 않음
+    # =========================
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            user_id,
+            set_number,
+            prediction_type,
+            predicted_participant_id,
+            stake_points,
+            odds
+
+        FROM predictions
+
+        WHERE
+            series_id = %s
+
+            AND status =
+                'pending'
+
+        ORDER BY
+            id
+
+        FOR UPDATE
+        """,
+        (
+            series_id,
+        ),
+    )
+
+
+    predictions = (
+        cursor.fetchall()
+    )
+
+
+    settled_count = 0
+    win_count = 0
+    loss_count = 0
+    total_payout_points = 0
+
+
+    for prediction in predictions:
+
+        set_number = int(
+            prediction[
+                "set_number"
+            ]
+        )
+
+
+        set_result = (
+            set_map[
+                set_number
+            ]
+        )
+
+
+        team_a_score = int(
+            set_result[
+                "team_a_score"
+            ]
+        )
+
+        team_b_score = int(
+            set_result[
+                "team_b_score"
+            ]
+        )
+
+
+        # =========================
+        # 실제 결과 판단
+        # =========================
+
+        if (
+            team_a_score
+            ==
+            team_b_score
+        ):
+
+            winning_type = (
+                "draw"
+            )
+
+            winning_participant_id = (
+                None
+            )
+
+
+        elif (
+            team_a_score
+            >
+            team_b_score
+        ):
+
+            winning_type = (
+                "participant"
+            )
+
+            winning_participant_id = int(
+                series[
+                    "team_a_id"
+                ]
+            )
+
+
+        else:
+
+            winning_type = (
+                "participant"
+            )
+
+            winning_participant_id = int(
+                series[
+                    "team_b_id"
+                ]
+            )
+
+
+        # =========================
+        # 예측 적중 여부
+        # =========================
+
+        is_win = False
+
+
+        if (
+            prediction[
+                "prediction_type"
+            ]
+            ==
+            "draw"
+
+            and
+
+            winning_type
+            ==
+            "draw"
+        ):
+
+            is_win = True
+
+
+        elif (
+            prediction[
+                "prediction_type"
+            ]
+            ==
+            "participant"
+
+            and
+
+            winning_type
+            ==
+            "participant"
+
+            and
+
+            int(
+                prediction[
+                    "predicted_participant_id"
+                ]
+            )
+            ==
+            winning_participant_id
+        ):
+
+            is_win = True
+
+
+        # =========================
+        # 적중
+        # =========================
+
+        if is_win:
+
+            payout_points = int(
+                prediction[
+                    "stake_points"
+                ]
+                *
+                prediction[
+                    "odds"
+                ]
+            )
+
+
+            change_user_points(
+                cursor,
+
+                prediction[
+                    "user_id"
+                ],
+
+                payout_points,
+
+                "prediction_win",
+
+                reference_type=
+                    "prediction",
+
+                reference_id=
+                    prediction[
+                        "id"
+                    ],
+
+                description=(
+                    "FCL 승부예측 "
+                    f"{set_number}세트 적중"
+                ),
+            )
+
+
+            prediction_status = (
+                "win"
+            )
+
+            win_count += 1
+
+            total_payout_points += (
+                payout_points
+            )
+
+
+        # =========================
+        # 실패
+        # =========================
+
+        else:
+
+            payout_points = 0
+
+            prediction_status = (
+                "loss"
+            )
+
+            loss_count += 1
+
+
+        # =========================
+        # 예측 정산 완료
+        # =========================
+
+        cursor.execute(
+            """
+            UPDATE predictions
+
+            SET
+                status = %s,
+                payout_points = %s,
+                settled_at = NOW(),
+                updated_at = NOW()
+
+            WHERE
+                id = %s
+                AND status = 'pending'
+            """,
+            (
+                prediction_status,
+                payout_points,
+                prediction[
+                    "id"
+                ],
+            ),
+        )
+
+
+        settled_count += 1
+
+
+    return {
+        "settled":
+            settled_count,
+
+        "wins":
+            win_count,
+
+        "losses":
+            loss_count,
+
+        "payout_points":
+            total_payout_points,
+    }
+
+class PredictionCreateRequest(
+    BaseModel
+): 
+    series_id: int
+    set_number: int
+    prediction_type: str
+    participant_id: int | None = None
+    stake_points: int
+
+class PredictionSettlementTestRequest(
+    BaseModel
+):
+    series_id: int
+
+    set1_team_a: int
+    set1_team_b: int
+
+    set2_team_a: int
+    set2_team_b: int
+
+    set3_team_a: int
+    set3_team_b: int
+
+class UserSignupRequest(
+    BaseModel
+):
+    email: str
+    password: str
+    nickname: str
+
+class UserLoginRequest(
+    BaseModel
+):
+    email: str
+    password: str
+
+class AdminUserPointRequest(
+    BaseModel
+):
+    amount: int
+    description: str | None = None
+
+
+class AdminUserRoleRequest(
+    BaseModel
+):
+    is_admin: bool
+
+class AdminCommunityPostUpdateRequest(
+    BaseModel
+):
+    title: str
+    content: str
+
+class AdminCommunityNoticeRequest(
+    BaseModel
+):
+    title: str
+    content: str
+
+class CommunityCommentCreateRequest(
+    BaseModel
+):
+    content: str
+
+class CommunityCommentUpdateRequest(
+    BaseModel
+):
+    content: str
+
 class AdminLoginRequest(BaseModel):
     password: str
 
@@ -2475,6 +3362,860 @@ class AdminRegularScheduleUpdateRequest(
     BaseModel
 ):
     scheduled_date: str
+
+# =========================
+# USER AUTH
+# =========================
+
+PASSWORD_HASH_ITERATIONS = (
+    600_000
+)
+
+USER_SESSION_SECONDS = (
+    30 * 24 * 60 * 60
+)
+
+SIGNUP_BONUS_POINTS = 1000
+
+user_bearer_scheme = HTTPBearer(
+    auto_error=False
+)
+
+
+def hash_user_password(
+    password: str,
+):
+
+    salt = secrets.token_bytes(
+        16
+    )
+
+
+    password_hash = (
+        hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(
+                "utf-8"
+            ),
+            salt,
+            PASSWORD_HASH_ITERATIONS,
+        )
+    )
+
+
+    return (
+        "pbkdf2_sha256"
+        f"${PASSWORD_HASH_ITERATIONS}"
+        f"${salt.hex()}"
+        f"${password_hash.hex()}"
+    )
+
+
+def verify_user_password(
+    password: str,
+    stored_password_hash: str,
+):
+
+    try:
+
+        (
+            algorithm,
+            iterations_text,
+            salt_hex,
+            password_hash_hex,
+        ) = stored_password_hash.split(
+            "$",
+            3,
+        )
+
+
+        if (
+            algorithm
+            != "pbkdf2_sha256"
+        ):
+
+            return False
+
+
+        iterations = int(
+            iterations_text
+        )
+
+
+        salt = bytes.fromhex(
+            salt_hex
+        )
+
+
+        expected_hash = (
+            bytes.fromhex(
+                password_hash_hex
+            )
+        )
+
+
+        calculated_hash = (
+            hashlib.pbkdf2_hmac(
+                "sha256",
+                password.encode(
+                    "utf-8"
+                ),
+                salt,
+                iterations,
+            )
+        )
+
+
+        return hmac.compare_digest(
+            calculated_hash,
+            expected_hash,
+        )
+
+
+    except (
+        ValueError,
+        TypeError,
+    ):
+
+        return False
+
+def hash_user_session_token(
+    token: str,
+):
+
+    return hashlib.sha256(
+        token.encode(
+            "utf-8"
+        )
+    ).hexdigest()
+
+
+def create_user_session(
+    user_id: int,
+):
+
+    token = secrets.token_urlsafe(
+        48
+    )
+
+
+    token_hash = (
+        hash_user_session_token(
+            token
+        )
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # 만료된 세션 정리
+            cursor.execute(
+                """
+                DELETE FROM user_sessions
+
+                WHERE expires_at <= NOW()
+                """
+            )
+
+
+            cursor.execute(
+                """
+                INSERT INTO user_sessions (
+                    user_id,
+                    token_hash,
+                    expires_at
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    NOW()
+                    + (
+                        %s
+                        * INTERVAL '1 second'
+                    )
+                )
+
+                RETURNING
+                    expires_at
+                """,
+                (
+                    user_id,
+                    token_hash,
+                    USER_SESSION_SECONDS,
+                ),
+            )
+
+
+            session = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return (
+        token,
+        session["expires_at"],
+    )
+
+
+def get_user_bearer_token(
+    authorization: str | None,
+):
+
+    if not authorization:
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "로그인이 필요합니다."
+            ),
+        )
+
+
+    parts = authorization.split(
+        " ",
+        1,
+    )
+
+
+    if (
+        len(parts) != 2
+        or
+        parts[0].lower()
+        != "bearer"
+        or
+        not parts[1].strip()
+    ):
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "로그인 정보가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    return parts[1].strip()
+
+def require_user(
+    credentials:
+        HTTPAuthorizationCredentials
+        | None
+        = Depends(
+            user_bearer_scheme
+        )
+):
+
+    if not credentials:
+
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요합니다.",
+        )
+
+
+    token = (
+        credentials.credentials
+    )
+
+
+    token_hash = (
+        hash_user_session_token(
+            token
+        )
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    users.id,
+                    users.email,
+                    users.nickname,
+                    users.points,
+                    users.is_admin,
+                    users.created_at
+
+                FROM user_sessions
+
+                JOIN users
+                    ON users.id
+                    = user_sessions.user_id
+
+                WHERE
+                    user_sessions.token_hash
+                    = %s
+
+                    AND
+                    user_sessions.expires_at
+                    > NOW()
+                """,
+                (
+                    token_hash,
+                ),
+            )
+
+
+            user = (
+                cursor.fetchone()
+            )
+
+
+    if not user:
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "로그인이 만료되었거나 "
+                "유효하지 않습니다."
+            ),
+        )
+
+
+    return user
+
+def require_user_admin(
+    user = Depends(
+        require_user
+    )
+):
+
+    if not user["is_admin"]:
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "관리자 권한이 필요합니다."
+            ),
+        )
+
+    return user
+
+
+@app.post(
+    "/api/auth/signup"
+)
+def signup_user(
+    request: UserSignupRequest
+):
+
+    email = (
+        request.email
+        .strip()
+        .lower()
+    )
+
+
+    nickname = (
+        request.nickname
+        .strip()
+    )
+
+
+    password = (
+        request.password
+    )
+
+
+    # =========================
+    # 이메일 검증
+    # =========================
+
+    if (
+        not email
+        or
+        "@" not in email
+        or
+        len(email) > 255
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 이메일을 "
+                "입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 닉네임 검증
+    # =========================
+
+    if (
+        len(nickname) < 2
+        or
+        len(nickname) > 20
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "닉네임은 2자 이상 "
+                "20자 이하로 입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 비밀번호 검증
+    # =========================
+
+    if (
+        len(password) < 8
+        or
+        len(password) > 128
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "비밀번호는 8자 이상 "
+                "128자 이하로 입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 중복 확인
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT id
+
+                FROM users
+
+                WHERE email = %s
+                """,
+                (
+                    email,
+                ),
+            )
+
+
+            if cursor.fetchone():
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 사용 중인 "
+                        "이메일입니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                SELECT id
+
+                FROM users
+
+                WHERE nickname = %s
+                """,
+                (
+                    nickname,
+                ),
+            )
+
+
+            if cursor.fetchone():
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 사용 중인 "
+                        "닉네임입니다."
+                    ),
+                )
+
+
+            # =========================
+            # 비밀번호 해시
+            # =========================
+
+            password_hash = (
+                hash_user_password(
+                    password
+                )
+            )
+
+
+            # =========================
+            # 회원 생성
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO users (
+                    email,
+                    password_hash,
+                    nickname
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    email,
+                    nickname,
+                    points,
+                    is_admin,
+                    created_at
+                """,
+                (
+                    email,
+                    password_hash,
+                    nickname,
+                ),
+            )
+
+
+            user = (
+                cursor.fetchone()
+            )
+
+            point_transaction = (
+                change_user_points(
+                    cursor,
+                    user["id"],
+                    SIGNUP_BONUS_POINTS,
+                    "signup_bonus",
+                    description=(
+                        "FCL 신규 회원 가입 보너스"
+                    ),
+                )
+            )
+
+
+            user["points"] = (
+                point_transaction[
+                    "balance_after"
+                ]
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "회원가입이 완료되었습니다.",
+
+        "user":
+            user,
+    }
+
+@app.post(
+    "/api/auth/login"
+)
+def login_user(
+    request: UserLoginRequest
+):
+
+    email = (
+        request.email
+        .strip()
+        .lower()
+    )
+
+
+    password = (
+        request.password
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    email,
+                    password_hash,
+                    nickname,
+                    points,
+                    is_admin,
+                    created_at
+
+                FROM users
+
+                WHERE email = %s
+                """,
+                (
+                    email,
+                ),
+            )
+
+
+            user = (
+                cursor.fetchone()
+            )
+
+
+    if (
+        not user
+        or
+        not verify_user_password(
+            password,
+            user["password_hash"],
+        )
+    ):
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "이메일 또는 비밀번호가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    (
+        token,
+        expires_at,
+    ) = create_user_session(
+        user["id"]
+    )
+
+
+    return {
+        "message":
+            "로그인되었습니다.",
+
+        "token_type":
+            "Bearer",
+
+        "token":
+            token,
+
+        "expires_in":
+            USER_SESSION_SECONDS,
+
+        "expires_at":
+            expires_at,
+
+        "user": {
+            "id":
+                user["id"],
+
+            "email":
+                user["email"],
+
+            "nickname":
+                user["nickname"],
+
+            "points":
+                user["points"],
+
+            "is_admin":
+                user["is_admin"],
+
+            "created_at":
+                user["created_at"],
+        },
+    }
+
+@app.get(
+    "/api/auth/me"
+)
+def get_current_user(
+    user = Depends(
+        require_user
+    )
+):
+
+    return {
+        "user":
+            user,
+    }
+
+
+@app.post(
+    "/api/auth/logout"
+)
+def logout_user(
+    credentials:
+        HTTPAuthorizationCredentials
+        = Depends(
+            user_bearer_scheme
+        ),
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    if not credentials:
+
+        raise HTTPException(
+            status_code=401,
+            detail="로그인이 필요합니다.",
+        )
+
+
+    token = (
+        credentials.credentials
+    )
+
+
+    token_hash = (
+        hash_user_session_token(
+            token
+        )
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                DELETE FROM user_sessions
+
+                WHERE token_hash = %s
+                """,
+                (
+                    token_hash,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "로그아웃되었습니다."
+    }
+
+# =========================
+# MYPAGE
+# =========================
+
+@app.get(
+    "/api/mypage"
+)
+def get_mypage(
+    user = Depends(
+        require_user
+    )
+):
+
+    return {
+        "user": {
+            "id":
+                user["id"],
+
+            "email":
+                user["email"],
+
+            "nickname":
+                user["nickname"],
+
+            "points":
+                user["points"],
+
+            "is_admin":
+                user["is_admin"],
+
+            "created_at":
+                user["created_at"],
+        }
+    }
+
+
+@app.get(
+    "/api/mypage/point-transactions"
+)
+def get_mypage_point_transactions(
+    limit: int = 50,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    # =========================
+    # 조회 개수 제한
+    # =========================
+
+    limit = max(
+        1,
+        min(
+            limit,
+            100,
+        ),
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    amount,
+                    balance_after,
+                    transaction_type,
+                    reference_type,
+                    reference_id,
+                    description,
+                    created_at
+
+                FROM point_transactions
+
+                WHERE user_id = %s
+
+                ORDER BY
+                    created_at DESC,
+                    id DESC
+
+                LIMIT %s
+                """,
+                (
+                    user["id"],
+                    limit,
+                ),
+            )
+
+
+            transactions = (
+                cursor.fetchall()
+            )
+
+
+    return {
+        "current_points":
+            user["points"],
+
+        "transactions":
+            transactions,
+    }
+
 
 # =========================
 # ADMIN AUTH
@@ -2575,6 +4316,223 @@ def admin_login(
         "expires_in":
             ADMIN_SESSION_SECONDS,
     }
+
+# =========================
+# ADMIN USERS
+# =========================
+
+@app.get(
+    "/api/admin/users"
+)
+def get_admin_users(
+    admin_token = Depends(
+        require_admin
+    )
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    email,
+                    nickname,
+                    points,
+                    is_admin,
+                    created_at,
+                    updated_at
+
+                FROM users
+
+                ORDER BY
+                    created_at DESC,
+                    id DESC
+                """
+            )
+
+
+            users = (
+                cursor.fetchall()
+            )
+
+
+    return {
+        "users":
+            users
+    }
+
+@app.post(
+    "/api/admin/users/{user_id}/points"
+)
+def change_admin_user_points(
+    user_id: int,
+
+    request:
+        AdminUserPointRequest,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    amount = (
+        request.amount
+    )
+
+
+    if amount == 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "포인트 변동 금액은 "
+                "0일 수 없습니다."
+            ),
+        )
+
+
+    description = (
+        request.description.strip()
+        if request.description
+        else None
+    )
+
+
+    if (
+        description
+        and
+        len(description) > 200
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "포인트 사유는 "
+                "200자 이하로 입력해주세요."
+            ),
+        )
+
+
+    transaction_type = (
+        "admin_grant"
+        if amount > 0
+        else "admin_deduct"
+    )
+
+
+    if not description:
+
+        description = (
+            "관리자 포인트 지급"
+            if amount > 0
+            else "관리자 포인트 차감"
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            transaction = (
+                change_user_points(
+                    cursor,
+                    user_id,
+                    amount,
+                    transaction_type,
+                    description=
+                        description,
+                )
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "포인트가 변경되었습니다.",
+
+        "transaction":
+            transaction,
+    }
+
+@app.patch(
+    "/api/admin/users/{user_id}/role"
+)
+def change_admin_user_role(
+    user_id: int,
+
+    request:
+        AdminUserRoleRequest,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE users
+
+                SET
+                    is_admin = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    email,
+                    nickname,
+                    points,
+                    is_admin,
+                    created_at
+                """,
+                (
+                    request.is_admin,
+                    user_id,
+                ),
+            )
+
+
+            user = (
+                cursor.fetchone()
+            )
+
+
+            if not user:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "사용자를 찾을 수 없습니다."
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            (
+                "관리자 권한이 부여되었습니다."
+                if request.is_admin
+                else
+                "관리자 권한이 해제되었습니다."
+            ),
+
+        "user":
+            user,
+    }
+
 
 # =========================
 # ADMIN PARTICIPANTS
@@ -4901,6 +6859,1588 @@ def admin_update_series_result(
         "message":
             "경기 결과가 수정되었습니다.",
     }
+
+# =========================
+# PREDICTIONS
+# 승부예측 가능 경기 조회
+# =========================
+
+# =========================
+# PREDICTIONS
+# 승부예측 대상 경기 조회
+# =========================
+
+@app.get(
+    "/api/predictions/matches"
+)
+def get_prediction_matches():
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 표시할 경기 날짜 결정
+            #
+            # 1. 오늘 경기 있으면 오늘
+            # 2. 없으면 가장 가까운 다음 경기일
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    MIN(scheduled_date)
+                        AS target_date
+
+                FROM series
+
+                WHERE
+                    series_type = '정규리그'
+
+                    AND scheduled_date
+                        IS NOT NULL
+
+                    AND scheduled_date >= %s
+
+                    AND status <> 'cancelled'
+                """,
+                (
+                    today,
+                ),
+            )
+
+
+            target_row = (
+                cursor.fetchone()
+            )
+
+
+            target_date = (
+                target_row["target_date"]
+                if target_row
+                else None
+            )
+
+
+            # 앞으로 남은 정규리그가 없음
+            if target_date is None:
+
+                return []
+
+
+            # =========================
+            # 해당 날짜의 경기 전부 조회
+            #
+            # 같은 날 2경기면
+            # 둘 다 반환
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id AS series_id,
+                    s.fixture_number,
+                    s.round_number,
+                    s.scheduled_date,
+                    s.status,
+                    s.started_at,
+
+                    team_a.id
+                        AS team_a_id,
+
+                    team_a.fcl_name
+                        AS team_a_fcl_name,
+
+                    team_a.current_team_name
+                        AS team_a_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_logo_path,
+
+                    team_b.id
+                        AS team_b_id,
+
+                    team_b.fcl_name
+                        AS team_b_fcl_name,
+
+                    team_b.current_team_name
+                        AS team_b_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_logo_path
+
+                FROM series AS s
+
+                INNER JOIN participants
+                    AS team_a
+
+                    ON team_a.id =
+                        s.team_a_id
+
+                INNER JOIN participants
+                    AS team_b
+
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type =
+                        '정규리그'
+
+                    AND s.scheduled_date =
+                        %s
+
+                    AND s.status <>
+                        'cancelled'
+
+                ORDER BY
+                    s.fixture_number ASC,
+                    s.id ASC
+                """,
+                (
+                    target_date,
+                ),
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    matches = []
+
+
+    for row in rows:
+
+        # =========================
+        # 예측 가능 여부
+        #
+        # 경기 당일부터는 마감
+        # =========================
+
+        is_open = (
+            row["scheduled_date"] > today
+            and row["status"] == "scheduled"
+        )
+
+
+        matches.append(
+            {
+                "series_id":
+                    row["series_id"],
+
+                "fixture_number":
+                    row[
+                        "fixture_number"
+                    ],
+
+                "round":
+                    row[
+                        "round_number"
+                    ],
+
+                "date":
+                    (
+                        row[
+                            "scheduled_date"
+                        ].isoformat()
+
+                        if row[
+                            "scheduled_date"
+                        ]
+
+                        else None
+                    ),
+
+                "status":
+                    row["status"],
+
+                "is_open":
+                    is_open,
+
+                "odds": {
+                    "team_a":
+                        PREDICTION_FIXED_ODDS,
+
+                    "draw":
+                        PREDICTION_FIXED_ODDS,
+
+                    "team_b":
+                        PREDICTION_FIXED_ODDS,
+                },
+
+                "max_stake_points":
+                    PREDICTION_MAX_STAKE_POINTS,
+
+                "team_a": {
+                    "participant_id":
+                        row[
+                            "team_a_id"
+                        ],
+
+                    "fcl_name":
+                        row[
+                            "team_a_fcl_name"
+                        ],
+
+                    "team_name":
+                        row[
+                            "team_a_team_name"
+                        ],
+
+                    "logo_path":
+                        row[
+                            "team_a_logo_path"
+                        ],
+                },
+
+                "team_b": {
+                    "participant_id":
+                        row[
+                            "team_b_id"
+                        ],
+
+                    "fcl_name":
+                        row[
+                            "team_b_fcl_name"
+                        ],
+
+                    "team_name":
+                        row[
+                            "team_b_team_name"
+                        ],
+
+                    "logo_path":
+                        row[
+                            "team_b_logo_path"
+                        ],
+                },
+            }
+        )
+
+
+    return matches
+
+# =========================
+# PREDICTIONS
+# 세트별 승부예측 참여
+# =========================
+
+@app.post(
+    "/api/predictions"
+)
+def create_prediction(
+    request:
+        PredictionCreateRequest,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    # =========================
+    # 기본 검증
+    # =========================
+
+    if request.set_number not in (
+        1,
+        2,
+        3,
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "세트 번호는 "
+                "1, 2, 3 중 하나여야 합니다."
+            ),
+        )
+
+
+    if request.stake_points <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "예측 포인트는 "
+                "1P 이상이어야 합니다."
+            ),
+        )
+
+    if (
+        request.stake_points
+        >
+        PREDICTION_MAX_STAKE_POINTS
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "한 세트에는 최대 "
+                f"{PREDICTION_MAX_STAKE_POINTS:,}P까지 "
+                "예측할 수 있습니다."
+            ),
+        )
+
+
+    prediction_type = (
+        request.prediction_type
+        .strip()
+        .lower()
+    )
+
+
+    if prediction_type not in (
+        "participant",
+        "draw",
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바르지 않은 "
+                "승부예측 유형입니다."
+            ),
+        )
+
+
+    # 현재 배당은 기존과 동일
+    prediction_odds = (
+        PREDICTION_FIXED_ODDS
+    )
+
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    with get_db_connection() as connection:
+
+        try:
+
+            with connection.cursor() as cursor:
+
+                # =========================
+                # SERIES 확인
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        series_type,
+                        team_a_id,
+                        team_b_id,
+                        status,
+                        scheduled_date,
+                        started_at
+
+                    FROM series
+
+                    WHERE id = %s
+
+                    FOR UPDATE
+                    """,
+                    (
+                        request.series_id,
+                    ),
+                )
+
+
+                series = cursor.fetchone()
+
+
+                if not series:
+
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            "경기를 찾을 수 없습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 정규리그만 가능
+                # =========================
+
+                if (
+                    series[
+                        "series_type"
+                    ]
+                    != "정규리그"
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "정규리그 경기만 "
+                            "승부예측할 수 있습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 경기 날짜 확인
+                # =========================
+
+                if (
+                    series[
+                        "scheduled_date"
+                    ]
+                    is None
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "경기 날짜가 "
+                            "등록되지 않았습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 예측 마감
+                #
+                # 경기 전날까지만 가능
+                # 경기 당일 00:00부터 마감
+                # =========================
+
+                if (
+                    series[
+                        "scheduled_date"
+                    ]
+                    <= today
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "승부예측은 "
+                            "경기 전날까지만 "
+                            "참여할 수 있습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # SERIES 상태 확인
+                # =========================
+
+                if (
+                    series["status"]
+                    != "scheduled"
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "이미 시작되었거나 "
+                            "마감된 경기입니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 예측 대상
+                # =========================
+
+                predicted_participant_id = (
+                    None
+                )
+
+
+                if (
+                    prediction_type
+                    == "participant"
+                ):
+
+                    if (
+                        request.participant_id
+                        is None
+                    ):
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "예측할 참가자를 "
+                                "선택해주세요."
+                            ),
+                        )
+
+
+                    valid_participant_ids = {
+                        int(
+                            series[
+                                "team_a_id"
+                            ]
+                        ),
+
+                        int(
+                            series[
+                                "team_b_id"
+                            ]
+                        ),
+                    }
+
+
+                    if (
+                        request.participant_id
+                        not in
+                        valid_participant_ids
+                    ):
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "해당 경기에 "
+                                "참가하는 선수만 "
+                                "선택할 수 있습니다."
+                            ),
+                        )
+
+
+                    predicted_participant_id = (
+                        request.participant_id
+                    )
+
+
+                elif (
+                    prediction_type
+                    == "draw"
+                ):
+
+                    if (
+                        request.participant_id
+                        is not None
+                    ):
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "무승부 예측에는 "
+                                "참가자 ID가 "
+                                "필요하지 않습니다."
+                            ),
+                        )
+
+
+                # =========================
+                # 같은 세트 중복 확인
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id
+
+                    FROM predictions
+
+                    WHERE
+                        user_id = %s
+
+                        AND series_id = %s
+
+                        AND set_number = %s
+                    """,
+                    (
+                        user["id"],
+
+                        request.series_id,
+
+                        request.set_number,
+                    ),
+                )
+
+
+                existing_prediction = (
+                    cursor.fetchone()
+                )
+
+
+                if existing_prediction:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"이미 {request.set_number}세트 "
+                            "승부예측에 참여했습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 예측 저장
+                # =========================
+
+                cursor.execute(
+                    """
+                    INSERT INTO predictions (
+                        user_id,
+                        series_id,
+                        set_number,
+                        predicted_participant_id,
+                        prediction_type,
+                        stake_points,
+                        odds,
+                        status
+                    )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        'pending'
+                    )
+
+                    RETURNING
+                        id,
+                        user_id,
+                        series_id,
+                        set_number,
+                        predicted_participant_id,
+                        prediction_type,
+                        stake_points,
+                        odds,
+                        status,
+                        created_at
+                    """,
+                    (
+                        user["id"],
+
+                        request.series_id,
+
+                        request.set_number,
+
+                        predicted_participant_id,
+
+                        prediction_type,
+
+                        request.stake_points,
+
+                        prediction_odds,
+                    ),
+                )
+
+
+                prediction = (
+                    cursor.fetchone()
+                )
+
+
+                # =========================
+                # 포인트 차감
+                # =========================
+
+                point_transaction = (
+                    change_user_points(
+                        cursor,
+
+                        user["id"],
+
+                        -request.stake_points,
+
+                        "prediction_bet",
+
+                        reference_type=
+                            "prediction",
+
+                        reference_id=
+                            prediction["id"],
+
+                        description=(
+                            "FCL 승부예측 "
+                            f"{request.set_number}세트 참여"
+                        ),
+                    )
+                )
+
+
+            connection.commit()
+
+
+        except psycopg.errors.UniqueViolation:
+
+            connection.rollback()
+
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"이미 {request.set_number}세트 "
+                    "승부예측에 참여했습니다."
+                ),
+            )
+
+
+    return {
+        "status":
+            "success",
+
+        "message":
+            (
+                f"{request.set_number}세트 "
+                "승부예측 참여가 완료되었습니다."
+            ),
+
+        "prediction": {
+
+            "id":
+                prediction["id"],
+
+            "series_id":
+                prediction[
+                    "series_id"
+                ],
+
+            "set_number":
+                prediction[
+                    "set_number"
+                ],
+
+            "prediction_type":
+                prediction[
+                    "prediction_type"
+                ],
+
+            "participant_id":
+                prediction[
+                    "predicted_participant_id"
+                ],
+
+            "stake_points":
+                prediction[
+                    "stake_points"
+                ],
+
+            "odds":
+                float(
+                    prediction["odds"]
+                ),
+
+            "status":
+                prediction[
+                    "status"
+                ],
+
+            "created_at":
+                prediction[
+                    "created_at"
+                ].isoformat(),
+        },
+
+        "points": {
+
+            "spent":
+                request.stake_points,
+
+            "balance":
+                point_transaction[
+                    "balance_after"
+                ],
+        },
+    }
+
+
+# =========================
+# PREDICTIONS
+# 내 세트별 승부예측 조회
+# =========================
+
+@app.get(
+    "/api/predictions/me"
+)
+def get_my_predictions(
+    user = Depends(
+        require_user
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id,
+                    p.series_id,
+                    p.set_number,
+                    p.prediction_type,
+                    p.predicted_participant_id,
+                    p.stake_points,
+                    p.odds,
+                    p.status,
+                    p.payout_points,
+                    p.settled_at,
+                    p.created_at,
+
+                    s.fixture_number,
+                    s.round_number,
+                    s.scheduled_date,
+                    s.status
+                        AS series_status,
+
+                    s.team_a_id,
+                    s.team_b_id,
+
+                    team_a.fcl_name
+                        AS team_a_fcl_name,
+
+                    team_a.current_team_name
+                        AS team_a_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_logo_path,
+
+                    team_b.fcl_name
+                        AS team_b_fcl_name,
+
+                    team_b.current_team_name
+                        AS team_b_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_logo_path
+
+                FROM predictions AS p
+
+                INNER JOIN series AS s
+                    ON s.id =
+                        p.series_id
+
+                INNER JOIN participants
+                    AS team_a
+
+                    ON team_a.id =
+                        s.team_a_id
+
+                INNER JOIN participants
+                    AS team_b
+
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    p.user_id = %s
+
+                ORDER BY
+                    s.scheduled_date DESC,
+                    s.fixture_number DESC,
+                    p.set_number ASC,
+                    p.id ASC
+                """,
+                (
+                    user["id"],
+                ),
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    predictions = []
+
+
+    for row in rows:
+
+        if (
+            row["prediction_type"]
+            == "draw"
+        ):
+
+            selection_side = "draw"
+            selection_name = "무승부"
+
+
+        elif (
+            row[
+                "predicted_participant_id"
+            ]
+            ==
+            row["team_a_id"]
+        ):
+
+            selection_side = "team_a"
+
+            selection_name = (
+                row[
+                    "team_a_fcl_name"
+                ]
+            )
+
+
+        elif (
+            row[
+                "predicted_participant_id"
+            ]
+            ==
+            row["team_b_id"]
+        ):
+
+            selection_side = "team_b"
+
+            selection_name = (
+                row[
+                    "team_b_fcl_name"
+                ]
+            )
+
+
+        else:
+
+            selection_side = "unknown"
+            selection_name = "알 수 없음"
+
+
+        predictions.append(
+            {
+                "id":
+                    row["id"],
+
+                "series_id":
+                    row[
+                        "series_id"
+                    ],
+
+                "set_number":
+                    row[
+                        "set_number"
+                    ],
+
+                "fixture_number":
+                    row[
+                        "fixture_number"
+                    ],
+
+                "round":
+                    row[
+                        "round_number"
+                    ],
+
+                "date":
+                    (
+                        row[
+                            "scheduled_date"
+                        ].isoformat()
+
+                        if row[
+                            "scheduled_date"
+                        ]
+
+                        else None
+                    ),
+
+                "series_status":
+                    row[
+                        "series_status"
+                    ],
+
+                "prediction_type":
+                    row[
+                        "prediction_type"
+                    ],
+
+                "selection_side":
+                    selection_side,
+
+                "selection_name":
+                    selection_name,
+
+                "stake_points":
+                    row[
+                        "stake_points"
+                    ],
+
+                "odds":
+                    float(
+                        row["odds"]
+                    ),
+
+                "expected_payout":
+                    int(
+                        row[
+                            "stake_points"
+                        ]
+                        *
+                        float(
+                            row["odds"]
+                        )
+                    ),
+
+                "status":
+                    row["status"],
+
+                "payout_points":
+                    row[
+                        "payout_points"
+                    ],
+
+                "team_a": {
+
+                    "participant_id":
+                        row[
+                            "team_a_id"
+                        ],
+
+                    "fcl_name":
+                        row[
+                            "team_a_fcl_name"
+                        ],
+
+                    "team_name":
+                        row[
+                            "team_a_team_name"
+                        ],
+
+                    "logo_path":
+                        row[
+                            "team_a_logo_path"
+                        ],
+                },
+
+                "team_b": {
+
+                    "participant_id":
+                        row[
+                            "team_b_id"
+                        ],
+
+                    "fcl_name":
+                        row[
+                            "team_b_fcl_name"
+                        ],
+
+                    "team_name":
+                        row[
+                            "team_b_team_name"
+                        ],
+
+                    "logo_path":
+                        row[
+                            "team_b_logo_path"
+                        ],
+                },
+
+                "created_at":
+                    row[
+                        "created_at"
+                    ].isoformat(),
+
+                "settled_at":
+                    (
+                        row[
+                            "settled_at"
+                        ].isoformat()
+
+                        if row[
+                            "settled_at"
+                        ]
+
+                        else None
+                    ),
+            }
+        )
+
+
+    return predictions
+
+# =========================
+# PREDICTIONS
+# 자동 정산 테스트
+#
+# 실제 DB 변경 없음
+# 마지막에 무조건 ROLLBACK
+# =========================
+
+@app.post(
+    "/api/admin/predictions/settlement-test"
+)
+def test_prediction_settlement(
+    request:
+        PredictionSettlementTestRequest,
+
+    admin_user = Depends(
+        require_user_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        try:
+
+            with connection.cursor() as cursor:
+
+                # =========================
+                # SERIES 확인
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        series_type,
+                        status,
+                        team_a_id,
+                        team_b_id
+
+                    FROM series
+
+                    WHERE id = %s
+
+                    FOR UPDATE
+                    """,
+                    (
+                        request.series_id,
+                    ),
+                )
+
+
+                series = cursor.fetchone()
+
+
+                if not series:
+
+                    raise HTTPException(
+                        status_code=404,
+                        detail=(
+                            "경기를 찾을 수 없습니다."
+                        ),
+                    )
+
+
+                if (
+                    series["series_type"]
+                    != "정규리그"
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "정규리그 경기만 "
+                            "정산 테스트할 수 있습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 현재 pending 예측 조회
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        p.id,
+                        p.user_id,
+                        p.set_number,
+                        p.prediction_type,
+                        p.predicted_participant_id,
+                        p.stake_points,
+                        p.odds,
+                        p.status,
+
+                        u.nickname,
+                        u.points
+
+                    FROM predictions AS p
+
+                    INNER JOIN users AS u
+                        ON u.id =
+                            p.user_id
+
+                    WHERE
+                        p.series_id = %s
+
+                        AND p.status =
+                            'pending'
+
+                    ORDER BY
+                        p.set_number,
+                        p.id
+                    """,
+                    (
+                        request.series_id,
+                    ),
+                )
+
+
+                before_predictions = (
+                    cursor.fetchall()
+                )
+
+
+                if (
+                    len(
+                        before_predictions
+                    )
+                    == 0
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "이 경기에 정산 테스트할 "
+                            "pending 예측이 없습니다."
+                        ),
+                    )
+
+
+                before_points = {
+                    int(
+                        row["user_id"]
+                    ):
+                        int(
+                            row["points"]
+                        )
+
+                    for row
+                    in before_predictions
+                }
+
+
+                # =========================
+                # 테스트용 경기 완료 처리
+                #
+                # ROLLBACK되므로
+                # 실제 상태는 바뀌지 않음
+                # =========================
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET
+                        status =
+                            'completed'
+
+                    WHERE id = %s
+                    """,
+                    (
+                        request.series_id,
+                    ),
+                )
+
+
+                # =========================
+                # 테스트 세트 결과
+                # =========================
+
+                test_sets = [
+                    (
+                        1,
+                        request.set1_team_a,
+                        request.set1_team_b,
+                    ),
+                    (
+                        2,
+                        request.set2_team_a,
+                        request.set2_team_b,
+                    ),
+                    (
+                        3,
+                        request.set3_team_a,
+                        request.set3_team_b,
+                    ),
+                ]
+
+
+                for (
+                    set_number,
+                    team_a_score,
+                    team_b_score,
+                ) in test_sets:
+
+                    if (
+                        team_a_score < 0
+                        or
+                        team_b_score < 0
+                    ):
+
+                        raise HTTPException(
+                            status_code=400,
+                            detail=(
+                                "세트 점수는 "
+                                "0 이상이어야 합니다."
+                            ),
+                        )
+
+
+                    if (
+                        team_a_score
+                        >
+                        team_b_score
+                    ):
+
+                        winner_side = (
+                            "team_a"
+                        )
+
+
+                    elif (
+                        team_a_score
+                        <
+                        team_b_score
+                    ):
+
+                        winner_side = (
+                            "team_b"
+                        )
+
+
+                    else:
+
+                        winner_side = (
+                            "draw"
+                        )
+
+
+                    cursor.execute(
+                        """
+                        INSERT INTO series_sets (
+                            series_id,
+                            set_number,
+                            nexon_match_id,
+                            played_at,
+                            team_a_score,
+                            team_b_score,
+                            score_source,
+                            winner_side
+                        )
+
+                        VALUES (
+                            %s,
+                            %s,
+                            NULL,
+                            NOW(),
+                            %s,
+                            %s,
+                            'manual',
+                            %s
+                        )
+
+                        ON CONFLICT (
+                            series_id,
+                            set_number
+                        )
+
+                        DO UPDATE SET
+                            team_a_score =
+                                EXCLUDED.team_a_score,
+
+                            team_b_score =
+                                EXCLUDED.team_b_score,
+
+                            score_source =
+                                'manual',
+
+                            winner_side =
+                                EXCLUDED.winner_side
+                        """,
+                        (
+                            request.series_id,
+                            set_number,
+                            team_a_score,
+                            team_b_score,
+                            winner_side,
+                        ),
+                    )
+
+
+                # =========================
+                # 실제 정산 함수 실행
+                # =========================
+
+                settlement_result = (
+                    settle_predictions_for_series(
+                        cursor,
+                        request.series_id,
+                    )
+                )
+
+
+                # =========================
+                # 정산 후 예측 상태
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        p.id,
+                        p.user_id,
+                        p.set_number,
+                        p.prediction_type,
+                        p.predicted_participant_id,
+                        p.stake_points,
+                        p.odds,
+                        p.status,
+                        p.payout_points,
+
+                        u.nickname,
+                        u.points
+
+                    FROM predictions AS p
+
+                    INNER JOIN users AS u
+                        ON u.id =
+                            p.user_id
+
+                    WHERE
+                        p.series_id = %s
+
+                    ORDER BY
+                        p.set_number,
+                        p.id
+                    """,
+                    (
+                        request.series_id,
+                    ),
+                )
+
+
+                after_predictions = (
+                    cursor.fetchall()
+                )
+
+
+                prediction_results = []
+
+
+                for row in after_predictions:
+
+                    user_id = int(
+                        row["user_id"]
+                    )
+
+
+                    points_before = (
+                        before_points.get(
+                            user_id,
+                            int(
+                                row["points"]
+                            ),
+                        )
+                    )
+
+
+                    points_after = int(
+                        row["points"]
+                    )
+
+
+                    prediction_results.append(
+                        {
+                            "prediction_id":
+                                row["id"],
+
+                            "nickname":
+                                row[
+                                    "nickname"
+                                ],
+
+                            "set_number":
+                                row[
+                                    "set_number"
+                                ],
+
+                            "prediction_type":
+                                row[
+                                    "prediction_type"
+                                ],
+
+                            "participant_id":
+                                row[
+                                    "predicted_participant_id"
+                                ],
+
+                            "stake_points":
+                                row[
+                                    "stake_points"
+                                ],
+
+                            "odds":
+                                float(
+                                    row[
+                                        "odds"
+                                    ]
+                                ),
+
+                            "result_status":
+                                row[
+                                    "status"
+                                ],
+
+                            "payout_points":
+                                row[
+                                    "payout_points"
+                                ],
+
+                            "points_before":
+                                points_before,
+
+                            "points_after":
+                                points_after,
+
+                            "point_change":
+                                int(
+                                    row[
+                                        "payout_points"
+                                    ]
+                                    or 0
+                                ),
+                            "user_total_point_change":
+                                (
+                                    points_after
+                                    -
+                                    points_before
+                                ),
+                        }
+                    )
+
+
+            # =========================
+            # 핵심
+            #
+            # 모든 테스트 변경 취소
+            # =========================
+
+            connection.rollback()
+
+
+        except Exception:
+
+            connection.rollback()
+
+            raise
+
+
+    return {
+        "status":
+            "success",
+
+        "database_change":
+            "rolled_back",
+
+        "message":
+            (
+                "정산 테스트가 완료되었습니다. "
+                "실제 DB 변경은 모두 취소되었습니다."
+            ),
+
+        "settlement":
+            settlement_result,
+
+        "predictions":
+            prediction_results,
+    }
+
 
 # =========================
 # 전체 경기 일정
@@ -13396,6 +16936,13 @@ def sync_fcl_series_status(
                     ),
                 )
 
+                settlement_result = (
+                    settle_predictions_for_series(
+                        cursor,
+                        series_id,
+                    )
+                )
+
             connection.commit()
 
 
@@ -14031,6 +17578,13 @@ def sync_fcl_series_status(
                     (
                         series_id,
                     ),
+                )
+
+                settlement_result = (
+                    settle_predictions_for_series(
+                        cursor,
+                        series_id,
+                    )
                 )
 
             connection.commit()
@@ -15486,9 +19040,439 @@ def init_database():
 
     initialize_database()
 
+
+    # =========================
+    # COMMUNITY NOTICE MIGRATION
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # PREDICTIONS
+            # 승부예측
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    predictions (
+
+                    id BIGSERIAL PRIMARY KEY,
+
+                    user_id BIGINT
+                        NOT NULL
+                        REFERENCES users(id)
+                        ON DELETE CASCADE,
+
+                    series_id BIGINT
+                        NOT NULL
+                        REFERENCES series(id)
+                        ON DELETE CASCADE,
+
+                    predicted_participant_id BIGINT
+                        REFERENCES participants(id),
+
+                    prediction_type VARCHAR(20)
+                        NOT NULL
+                        DEFAULT 'participant',
+
+                    stake_points INTEGER
+                        NOT NULL,
+
+                    odds NUMERIC(8, 2)
+                        NOT NULL
+                        DEFAULT 2.00,
+
+                    status VARCHAR(20)
+                        NOT NULL
+                        DEFAULT 'pending',
+
+                    payout_points INTEGER
+                        NOT NULL
+                        DEFAULT 0,
+
+                    settled_at TIMESTAMPTZ,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    updated_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT
+                        predictions_stake_check
+
+                    CHECK (
+                        prediction_type IN (
+                            'participant',
+                            'draw'
+                        )
+                    ),
+
+                    CHECK (
+                        stake_points > 0
+                    ),
+
+                    CONSTRAINT
+                        predictions_odds_check
+
+                    CHECK (
+                        odds >= 1.00
+                    ),
+
+                    CONSTRAINT
+                        predictions_payout_check
+
+                    CHECK (
+                        payout_points >= 0
+                    ),
+
+                    CONSTRAINT
+                        predictions_status_check
+
+                    CHECK (
+                        status IN (
+                            'pending',
+                            'win',
+                            'loss',
+                            'refunded'
+                        )
+                    ),
+
+                    CONSTRAINT
+                        predictions_user_series_unique
+
+                    UNIQUE (
+                        user_id,
+                        series_id
+                    )
+                )
+                """
+            )
+
+            # =========================
+            # PREDICTIONS
+            # 무승부 예측 지원
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE predictions
+
+                ADD COLUMN IF NOT EXISTS
+                    prediction_type VARCHAR(20)
+                """
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE predictions
+
+                SET prediction_type =
+                    'participant'
+
+                WHERE prediction_type
+                    IS NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE predictions
+
+                ALTER COLUMN
+                    predicted_participant_id
+
+                DROP NOT NULL
+                """
+            )
+
+            # =========================
+            # PREDICTIONS
+            # 세트별 승부예측 지원
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE predictions
+
+                ADD COLUMN IF NOT EXISTS
+                    set_number INTEGER
+                """
+            )
+
+
+            # 기존 테스트 예측 데이터는
+            # 우선 1세트 예측으로 변환
+            cursor.execute(
+                """
+                UPDATE predictions
+
+                SET set_number = 1
+
+                WHERE set_number IS NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE predictions
+
+                ALTER COLUMN set_number
+                SET NOT NULL
+                """
+            )
+
+
+            # 기존 경기당 1회 UNIQUE 제거
+            cursor.execute(
+                """
+                ALTER TABLE predictions
+
+                DROP CONSTRAINT IF EXISTS
+                    predictions_user_series_unique
+                """
+            )
+
+
+            # 세트 번호 검증
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+                        WHERE conname =
+                            'predictions_set_number_check'
+                    ) THEN
+
+                        ALTER TABLE predictions
+
+                        ADD CONSTRAINT
+                            predictions_set_number_check
+
+                        CHECK (
+                            set_number
+                            BETWEEN 1 AND 3
+                        );
+
+                    END IF;
+
+                END
+                $$;
+                """
+            )
+
+
+            # 회원 + 경기 + 세트별 1회
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    ux_predictions_user_series_set
+
+                ON predictions (
+                    user_id,
+                    series_id,
+                    set_number
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_predictions_series_set
+
+                ON predictions (
+                    series_id,
+                    set_number,
+                    status
+                )
+                """
+            )
+
+
+
+            # =========================
+            # POINT TRANSACTION
+            # IDEMPOTENCY
+            # 중복 지급 / 환불 방지
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE point_transactions
+
+                ADD COLUMN IF NOT EXISTS
+                    idempotency_key VARCHAR(150)
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    idx_point_transactions_idempotency_key
+
+                ON point_transactions (
+                    idempotency_key
+                )
+
+                WHERE
+                    idempotency_key
+                    IS NOT NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_predictions_series_id
+
+                ON predictions (
+                    series_id
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_predictions_user_id
+
+                ON predictions (
+                    user_id,
+                    created_at DESC
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_predictions_pending
+
+                ON predictions (
+                    series_id,
+                    status
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                ALTER TABLE community_posts
+
+                ADD COLUMN IF NOT EXISTS
+                    is_notice BOOLEAN
+                    NOT NULL
+                    DEFAULT FALSE
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_community_posts_notice
+
+                ON community_posts (
+                    is_notice,
+                    created_at DESC
+                )
+                """
+            )
+
+            # =========================
+            # COMMUNITY COMMENTS
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    community_comments (
+
+                    id BIGSERIAL PRIMARY KEY,
+
+                    post_id BIGINT NOT NULL
+                        REFERENCES community_posts(id)
+                        ON DELETE CASCADE,
+
+                    user_id BIGINT NOT NULL
+                        REFERENCES users(id)
+                        ON DELETE CASCADE,
+
+                    content TEXT NOT NULL,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    updated_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT
+                        community_comments_content_check
+
+                    CHECK (
+                        LENGTH(
+                            BTRIM(content)
+                        ) > 0
+                    )
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_community_comments_post_id
+
+                ON community_comments (
+                    post_id,
+                    created_at ASC,
+                    id ASC
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_community_comments_user_id
+
+                ON community_comments (
+                    user_id
+                )
+                """
+            )
+
+
+        connection.commit()
+
+
     return {
-        "status": "success",
-        "message": "FCL 데이터베이스가 초기화되었습니다.",
+        "status":
+            "success",
+
+        "message":
+            "FCL 데이터베이스가 초기화되었습니다.",
     }
 
 # =========================
@@ -15976,6 +19960,7 @@ def get_community_posts(
                     cp.title,
                     cp.content,
                     cp.author_name,
+                    cp.is_notice,
                     cp.created_at,
                     cp.updated_at,
                     COUNT(ca.id) AS attachment_count
@@ -15991,6 +19976,7 @@ def get_community_posts(
                     cp.id
 
                 ORDER BY
+                    cp.is_notice DESC,
                     cp.created_at DESC,
                     cp.id DESC
                 """,
@@ -16015,6 +20001,11 @@ def get_community_posts(
 
                 "board_type":
                     row["board_type"],
+
+                "is_notice":
+                    bool(
+                        row["is_notice"]
+                    ),
 
                 "title":
                     row["title"],
@@ -16210,6 +20201,8 @@ def create_community_post(
             row["updated_at"].isoformat(),
     }
 
+
+
 @app.get("/api/community/posts/{post_id}")
 def get_community_post(
     post_id: int,
@@ -16227,6 +20220,7 @@ def get_community_post(
                     title,
                     content,
                     author_name,
+                    is_notice,
                     created_at,
                     updated_at
 
@@ -16263,6 +20257,11 @@ def get_community_post(
         "board_type":
             row["board_type"],
 
+        "is_notice":
+            bool(
+                row["is_notice"]
+            ),
+
         "title":
             row["title"],
 
@@ -16281,6 +20280,331 @@ def get_community_post(
         "attachments":
             attachments,
     }
+
+# =========================
+# COMMUNITY COMMENTS
+# 댓글 조회
+# =========================
+
+@app.get(
+    "/api/community/posts/{post_id}/comments"
+)
+def get_community_comments(
+    post_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 게시글 존재 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    board_type
+                FROM community_posts
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            post = cursor.fetchone()
+
+
+            if not post:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "게시글을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # 자유게시판에만 댓글 사용
+            if (
+                post["board_type"]
+                != "free"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "자유게시판 게시글의 "
+                        "댓글만 조회할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 댓글 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    cc.id,
+                    cc.post_id,
+                    cc.user_id,
+                    cc.content,
+                    cc.created_at,
+                    cc.updated_at,
+
+                    u.nickname
+                        AS author_nickname,
+
+                    u.is_admin
+                        AS author_is_admin
+
+                FROM community_comments
+                    AS cc
+
+                INNER JOIN users AS u
+                    ON u.id = cc.user_id
+
+                WHERE
+                    cc.post_id = %s
+
+                ORDER BY
+                    cc.created_at ASC,
+                    cc.id ASC
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    return [
+        {
+            "id":
+                row["id"],
+
+            "post_id":
+                row["post_id"],
+
+            "user_id":
+                row["user_id"],
+
+            "author_nickname":
+                row[
+                    "author_nickname"
+                ],
+
+            "author_is_admin":
+                bool(
+                    row[
+                        "author_is_admin"
+                    ]
+                ),
+
+            "content":
+                row["content"],
+
+            "created_at":
+                row[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                row[
+                    "updated_at"
+                ].isoformat(),
+        }
+
+        for row in rows
+    ]
+
+
+# =========================
+# COMMUNITY COMMENTS
+# 댓글 작성
+# =========================
+
+@app.post(
+    "/api/community/posts/{post_id}/comments"
+)
+def create_community_comment(
+    post_id: int,
+
+    request:
+        CommunityCommentCreateRequest,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    content = (
+        request.content
+        .strip()
+    )
+
+
+    # =========================
+    # 내용 검증
+    # =========================
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "댓글 내용을 입력해주세요."
+            ),
+        )
+
+
+    if len(content) > 1000:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "댓글은 1000자 이하로 "
+                "입력해주세요."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 게시글 존재 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    board_type
+                FROM community_posts
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            post = cursor.fetchone()
+
+
+            if not post:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "게시글을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                post["board_type"]
+                != "free"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "자유게시판 게시글에만 "
+                        "댓글을 작성할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 댓글 저장
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    community_comments (
+                        post_id,
+                        user_id,
+                        content
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    post_id,
+                    user_id,
+                    content,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    post_id,
+                    user["id"],
+                    content,
+                ),
+            )
+
+
+            comment = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "댓글이 등록되었습니다.",
+
+        "comment": {
+            "id":
+                comment["id"],
+
+            "post_id":
+                comment["post_id"],
+
+            "user_id":
+                comment["user_id"],
+
+            "author_nickname":
+                user["nickname"],
+
+            "author_is_admin":
+                bool(
+                    user["is_admin"]
+                ),
+
+            "content":
+                comment["content"],
+
+            "created_at":
+                comment[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                comment[
+                    "updated_at"
+                ].isoformat(),
+        },
+    }
+
 
 @app.patch(
     "/api/community/posts/{post_id}"
@@ -16359,7 +20683,8 @@ def update_community_post(
                 """
                 SELECT
                     id,
-                    password_hash
+                    password_hash,
+                    is_notice
 
                 FROM community_posts
 
@@ -16378,6 +20703,16 @@ def update_community_post(
                 raise HTTPException(
                     status_code=404,
                     detail="게시글을 찾을 수 없습니다.",
+                )
+
+            if post_row["is_notice"]:
+
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "공지사항은 관리자만 "
+                        "수정할 수 있습니다."
+                    ),
                 )
 
 
@@ -16471,7 +20806,8 @@ def delete_community_post(
                 """
                 SELECT
                     id,
-                    password_hash
+                    password_hash,
+                    is_notice
 
                 FROM community_posts
 
@@ -16490,6 +20826,16 @@ def delete_community_post(
                 raise HTTPException(
                     status_code=404,
                     detail="게시글을 찾을 수 없습니다.",
+                )
+
+            if post_row["is_notice"]:
+
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "공지사항은 관리자만 "
+                        "삭제할 수 있습니다."
+                    ),
                 )
 
 
@@ -16524,6 +20870,700 @@ def delete_community_post(
     return {
         "deleted": True,
         "post_id": post_id,
+    }
+
+# =========================
+# COMMUNITY COMMENTS
+# 댓글 수정
+# =========================
+
+@app.patch(
+    "/api/community/comments/{comment_id}"
+)
+def update_community_comment(
+    comment_id: int,
+
+    request:
+        CommunityCommentUpdateRequest,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    content = (
+        request.content
+        .strip()
+    )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail="댓글 내용을 입력해주세요.",
+        )
+
+
+    if len(content) > 1000:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "댓글은 1000자 이하로 "
+                "입력해주세요."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    post_id,
+                    user_id
+                FROM community_comments
+                WHERE id = %s
+                """,
+                (
+                    comment_id,
+                ),
+            )
+
+
+            comment = cursor.fetchone()
+
+
+            if not comment:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="댓글을 찾을 수 없습니다.",
+                )
+
+
+            # 작성자 본인만 수정 가능
+            if (
+                comment["user_id"]
+                != user["id"]
+            ):
+
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "본인이 작성한 댓글만 "
+                        "수정할 수 있습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE community_comments
+
+                SET
+                    content = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    post_id,
+                    user_id,
+                    content,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    content,
+                    comment_id,
+                ),
+            )
+
+
+            updated_comment = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "댓글이 수정되었습니다.",
+
+        "comment": {
+            "id":
+                updated_comment["id"],
+
+            "post_id":
+                updated_comment["post_id"],
+
+            "user_id":
+                updated_comment["user_id"],
+
+            "author_nickname":
+                user["nickname"],
+
+            "author_is_admin":
+                bool(
+                    user["is_admin"]
+                ),
+
+            "content":
+                updated_comment["content"],
+
+            "created_at":
+                updated_comment[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                updated_comment[
+                    "updated_at"
+                ].isoformat(),
+        },
+    }
+
+# =========================
+# COMMUNITY COMMENTS
+# 댓글 삭제
+# =========================
+
+@app.delete(
+    "/api/community/comments/{comment_id}"
+)
+def delete_community_comment(
+    comment_id: int,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    post_id,
+                    user_id
+
+                FROM community_comments
+
+                WHERE id = %s
+                """,
+                (
+                    comment_id,
+                ),
+            )
+
+
+            comment = cursor.fetchone()
+
+
+            if not comment:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail="댓글을 찾을 수 없습니다.",
+                )
+
+
+            is_owner = (
+                comment["user_id"]
+                == user["id"]
+            )
+
+
+            is_admin = bool(
+                user["is_admin"]
+            )
+
+
+            # 작성자 또는 관리자만 삭제 가능
+            if (
+                not is_owner
+                and
+                not is_admin
+            ):
+
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "댓글을 삭제할 "
+                        "권한이 없습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                DELETE FROM
+                    community_comments
+
+                WHERE id = %s
+                """,
+                (
+                    comment_id,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "deleted":
+            True,
+
+        "comment_id":
+            comment_id,
+
+        "post_id":
+            comment["post_id"],
+    }
+
+@app.post(
+    "/api/community/admin/notices"
+)
+def create_community_notice(
+    request:
+        AdminCommunityNoticeRequest,
+
+    admin_user = Depends(
+        require_user_admin
+    ),
+):
+
+    title = (
+        request.title
+        .strip()
+    )
+
+
+    content = (
+        request.content
+        .strip()
+    )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "제목을 입력해주세요."
+            ),
+        )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "내용을 입력해주세요."
+            ),
+        )
+
+
+    if len(title) > 200:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "제목은 200자 이하로 "
+                "입력해주세요."
+            ),
+        )
+
+
+    # 일반 게시글 비밀번호 수정 기능으로
+    # 공지를 수정할 수 없도록
+    # 아무도 알 수 없는 임의 비밀번호 생성
+    random_password = (
+        secrets.token_urlsafe(
+            32
+        )
+    )
+
+
+    password_hash = (
+        hash_community_password(
+            random_password
+        )
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO community_posts (
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    password_hash,
+                    is_notice
+                )
+
+                VALUES (
+                    'free',
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    TRUE
+                )
+
+                RETURNING
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    is_notice,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    title,
+                    content,
+                    admin_user[
+                        "nickname"
+                    ],
+                    password_hash,
+                ),
+            )
+
+
+            notice = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "공지사항이 등록되었습니다.",
+
+        "notice": {
+            "id":
+                notice["id"],
+
+            "board_type":
+                notice[
+                    "board_type"
+                ],
+
+            "title":
+                notice["title"],
+
+            "content":
+                notice["content"],
+
+            "author_name":
+                notice[
+                    "author_name"
+                ],
+
+            "is_notice":
+                notice[
+                    "is_notice"
+                ],
+
+            "created_at":
+                notice[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                notice[
+                    "updated_at"
+                ].isoformat(),
+        },
+    }
+
+# =========================
+# COMMUNITY ADMIN
+# =========================
+
+@app.patch(
+    "/api/community/admin/posts/{post_id}"
+)
+def admin_update_community_post(
+    post_id: int,
+
+    request:
+        AdminCommunityPostUpdateRequest,
+
+    admin_user = Depends(
+        require_user_admin
+    ),
+):
+
+    title = (
+        request.title
+        .strip()
+    )
+
+    content = (
+        request.content
+        .strip()
+    )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "제목을 입력해주세요."
+            ),
+        )
+
+
+    if not content:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "내용을 입력해주세요."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    board_type
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            post = (
+                cursor.fetchone()
+            )
+
+
+            if not post:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "게시글을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                post["board_type"]
+                != "free"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "자유게시판 게시글만 "
+                        "관리할 수 있습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE community_posts
+
+                SET
+                    title = %s,
+                    content = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    board_type,
+                    title,
+                    content,
+                    author_name,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    title,
+                    content,
+                    post_id,
+                ),
+            )
+
+
+            updated_post = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "게시글이 관리자에 의해 수정되었습니다.",
+
+        "post": {
+            "id":
+                updated_post["id"],
+
+            "board_type":
+                updated_post["board_type"],
+
+            "title":
+                updated_post["title"],
+
+            "content":
+                updated_post["content"],
+
+            "author_name":
+                updated_post["author_name"],
+
+            "created_at":
+                updated_post[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                updated_post[
+                    "updated_at"
+                ].isoformat(),
+        },
+    }
+
+
+@app.delete(
+    "/api/community/admin/posts/{post_id}"
+)
+def admin_delete_community_post(
+    post_id: int,
+
+    admin_user = Depends(
+        require_user_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    board_type,
+                    title
+
+                FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            post = (
+                cursor.fetchone()
+            )
+
+
+            if not post:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "게시글을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                post["board_type"]
+                != "free"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "자유게시판 게시글만 "
+                        "관리할 수 있습니다."
+                    ),
+                )
+
+
+            # 첨부파일 레코드 먼저 제거
+            cursor.execute(
+                """
+                DELETE FROM community_attachments
+
+                WHERE post_id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+            cursor.execute(
+                """
+                DELETE FROM community_posts
+
+                WHERE id = %s
+                """,
+                (
+                    post_id,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "deleted":
+            True,
+
+        "post_id":
+            post_id,
+
+        "message":
+            "게시글이 관리자에 의해 삭제되었습니다.",
     }
 
 # =========================

@@ -305,3 +305,740 @@ function renderCommunityPosts(
 
 
 loadCommunityPosts();
+
+// =========================================
+// COMMUNITY NOTICE
+// =========================================
+
+async function initializeCommunityNoticeUi() {
+
+    await decorateCommunityNotices();
+
+
+    try {
+
+        const {
+            getCurrentUser,
+            getUserToken,
+            removeUserToken,
+        } = await import(
+            "./auth.js"
+        );
+
+
+        const user =
+            await getCurrentUser();
+
+
+        if (
+            !user
+            ||
+            !user.is_admin
+        ) {
+            return;
+        }
+
+
+        createCommunityNoticeButton(
+            getUserToken,
+            removeUserToken
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "공지사항 UI 초기화 오류",
+            error
+        );
+
+    }
+
+}
+
+
+// =========================================
+// 공지 목록 표시
+// =========================================
+
+async function decorateCommunityNotices() {
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/community/posts"
+                + "?board_type=free"
+            );
+
+
+        if (!response.ok) {
+            return;
+        }
+
+
+        const posts =
+            await response.json();
+
+
+        const noticeIds =
+            new Set(
+                posts
+                    .filter(
+                        post =>
+                            post.is_notice
+                    )
+                    .map(
+                        post =>
+                            Number(
+                                post.id
+                            )
+                    )
+            );
+
+
+        if (
+            noticeIds.size === 0
+        ) {
+            return;
+        }
+
+
+        // 기존 community.js의
+        // 게시글 렌더링 완료를 조금 기다림
+        for (
+            let attempt = 0;
+            attempt < 20;
+            attempt += 1
+        ) {
+
+            const rows =
+                document.querySelectorAll(
+                    ".community-post-row"
+                );
+
+
+            if (
+                rows.length > 0
+            ) {
+
+                rows.forEach(
+                    rowElement => {
+
+                        const href =
+                            rowElement.getAttribute(
+                                "href"
+                            );
+
+
+                        if (!href) {
+                            return;
+                        }
+
+
+                        const url =
+                            new URL(
+                                href,
+                                window.location.href
+                            );
+
+
+                        const postId =
+                            Number(
+                                url.searchParams.get(
+                                    "id"
+                                )
+                                ??
+                                url.searchParams.get(
+                                    "post_id"
+                                )
+                            );
+
+
+                        if (
+                            !noticeIds.has(
+                                postId
+                            )
+                        ) {
+                            return;
+                        }
+
+
+                        rowElement
+                            .classList
+                            .add(
+                                "community-notice-row"
+                            );
+
+
+                        const titleElement =
+                            rowElement.querySelector(
+                                ".community-post-title"
+                            );
+
+
+                        if (
+                            !titleElement
+                            ||
+                            titleElement.querySelector(
+                                ".community-notice-badge"
+                            )
+                        ) {
+                            return;
+                        }
+
+
+                        const badgeElement =
+                            document.createElement(
+                                "span"
+                            );
+
+
+                        badgeElement.classList.add(
+                            "community-notice-badge"
+                        );
+
+
+                        badgeElement.textContent =
+                            "공지";
+
+
+                        // DOM상 뒤에 붙이되
+                        // CSS order로 제목 앞에 표시
+                        titleElement.append(
+                            badgeElement
+                        );
+
+                    }
+                );
+
+
+                return;
+
+            }
+
+
+            await new Promise(
+                resolve => {
+                    setTimeout(
+                        resolve,
+                        100
+                    );
+                }
+            );
+
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            "공지사항 표시 오류",
+            error
+        );
+
+    }
+
+}
+
+
+// =========================================
+// 관리자 공지 작성 버튼
+// =========================================
+
+function createCommunityNoticeButton(
+    getUserToken,
+    removeUserToken
+) {
+
+    if (
+        document.querySelector(
+            ".community-notice-write-button"
+        )
+    ) {
+        return;
+    }
+
+
+    const headerElement =
+        document.querySelector(
+            ".community-header"
+        );
+
+
+    if (!headerElement) {
+        return;
+    }
+
+
+    const writeButtonElement =
+        headerElement.querySelector(
+            ".community-write-button"
+        );
+
+
+    const actionsElement =
+        document.createElement(
+            "div"
+        );
+
+
+    actionsElement.classList.add(
+        "community-header-actions"
+    );
+
+
+    const noticeButtonElement =
+        document.createElement(
+            "button"
+        );
+
+
+    noticeButtonElement.type =
+        "button";
+
+
+    noticeButtonElement.classList.add(
+        "community-notice-write-button"
+    );
+
+
+    noticeButtonElement.textContent =
+        "공지 작성";
+
+
+    if (writeButtonElement) {
+
+        writeButtonElement.replaceWith(
+            actionsElement
+        );
+
+
+        actionsElement.append(
+            noticeButtonElement,
+            writeButtonElement
+        );
+
+    } else {
+
+        actionsElement.append(
+            noticeButtonElement
+        );
+
+
+        headerElement.append(
+            actionsElement
+        );
+
+    }
+
+
+    noticeButtonElement
+        .addEventListener(
+            "click",
+            () => {
+
+                openCommunityNoticeModal(
+                    getUserToken,
+                    removeUserToken
+                );
+
+            }
+        );
+
+}
+
+
+// =========================================
+// 공지 작성 모달 생성
+// =========================================
+
+function getCommunityNoticeModal() {
+
+    let modalElement =
+        document.querySelector(
+            "#community-notice-modal"
+        );
+
+
+    if (modalElement) {
+        return modalElement;
+    }
+
+
+    modalElement =
+        document.createElement(
+            "div"
+        );
+
+
+    modalElement.id =
+        "community-notice-modal";
+
+
+    modalElement.classList.add(
+        "community-modal",
+        "hidden"
+    );
+
+
+    modalElement.innerHTML = `
+        <div
+            class="
+                community-modal-panel
+                community-notice-modal-panel
+            "
+        >
+
+            <div class="community-modal-header">
+
+                <h2>
+                    공지사항 작성
+                </h2>
+
+                <button
+                    type="button"
+                    class="community-modal-close-button"
+                    data-community-notice-close
+                >
+                    ×
+                </button>
+
+            </div>
+
+
+            <div
+                class="community-notice-modal-fields"
+            >
+
+                <label>
+                    <span>
+                        제목
+                    </span>
+
+                    <input
+                        type="text"
+                        id="community-notice-title"
+                        maxlength="200"
+                        placeholder="공지사항 제목"
+                    >
+                </label>
+
+
+                <label>
+                    <span>
+                        내용
+                    </span>
+
+                    <textarea
+                        id="community-notice-content"
+                        placeholder="공지사항 내용을 입력해주세요."
+                    ></textarea>
+                </label>
+
+            </div>
+
+
+            <p
+                id="community-notice-message"
+                class="community-write-message"
+            ></p>
+
+
+            <div class="community-modal-actions">
+
+                <button
+                    type="button"
+                    class="community-modal-cancel-button"
+                    data-community-notice-close
+                >
+                    취소
+                </button>
+
+                <button
+                    type="button"
+                    id="community-notice-submit"
+                    class="community-notice-submit-button"
+                >
+                    공지 등록
+                </button>
+
+            </div>
+
+        </div>
+    `;
+
+
+    document.body.append(
+        modalElement
+    );
+
+
+    modalElement
+        .querySelectorAll(
+            "[data-community-notice-close]"
+        )
+        .forEach(
+            buttonElement => {
+
+                buttonElement
+                    .addEventListener(
+                        "click",
+                        () => {
+
+                            modalElement
+                                .classList
+                                .add(
+                                    "hidden"
+                                );
+
+                        }
+                    );
+
+            }
+        );
+
+
+    modalElement.addEventListener(
+        "click",
+        event => {
+
+            if (
+                event.target
+                === modalElement
+            ) {
+
+                modalElement
+                    .classList
+                    .add(
+                        "hidden"
+                    );
+
+            }
+
+        }
+    );
+
+
+    return modalElement;
+
+}
+
+
+// =========================================
+// 공지 작성 모달 열기
+// =========================================
+
+function openCommunityNoticeModal(
+    getUserToken,
+    removeUserToken
+) {
+
+    const modalElement =
+        getCommunityNoticeModal();
+
+
+    const titleInputElement =
+        modalElement.querySelector(
+            "#community-notice-title"
+        );
+
+
+    const contentInputElement =
+        modalElement.querySelector(
+            "#community-notice-content"
+        );
+
+
+    const messageElement =
+        modalElement.querySelector(
+            "#community-notice-message"
+        );
+
+
+    const submitButtonElement =
+        modalElement.querySelector(
+            "#community-notice-submit"
+        );
+
+
+    titleInputElement.value =
+        "";
+
+
+    contentInputElement.value =
+        "";
+
+
+    messageElement.textContent =
+        "";
+
+
+    submitButtonElement.disabled =
+        false;
+
+
+    modalElement
+        .classList
+        .remove(
+            "hidden"
+        );
+
+
+    titleInputElement.focus();
+
+
+    submitButtonElement.onclick =
+        async () => {
+
+            const title =
+                titleInputElement
+                    .value
+                    .trim();
+
+
+            const content =
+                contentInputElement
+                    .value
+                    .trim();
+
+
+            if (!title) {
+
+                messageElement.textContent =
+                    "제목을 입력해주세요.";
+
+                return;
+            }
+
+
+            if (!content) {
+
+                messageElement.textContent =
+                    "내용을 입력해주세요.";
+
+                return;
+            }
+
+
+            const token =
+                getUserToken();
+
+
+            if (!token) {
+
+                messageElement.textContent =
+                    "로그인이 필요합니다.";
+
+                return;
+            }
+
+
+            submitButtonElement.disabled =
+                true;
+
+
+            messageElement.textContent =
+                "공지사항 등록 중...";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${apiBaseUrl}`
+                        + "/api/community/admin/notices",
+                        {
+                            method:
+                                "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+
+                                Authorization:
+                                    `Bearer ${token}`,
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    title,
+                                    content,
+                                }),
+                        }
+                    );
+
+
+                const responseData =
+                    await response.json();
+
+
+                if (
+                    response.status
+                    === 401
+                ) {
+
+                    removeUserToken();
+
+                    throw new Error(
+                        "로그인이 만료되었습니다."
+                    );
+
+                }
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        responseData.detail
+                        ??
+                        "공지사항 등록에 실패했습니다."
+                    );
+
+                }
+
+
+                window.location.reload();
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                messageElement.textContent =
+                    error.message;
+
+
+                submitButtonElement.disabled =
+                    false;
+
+            }
+
+        };
+
+}
+
+
+// =========================================
+// 공지 UI 실행
+// =========================================
+
+if (
+    document.readyState
+    === "loading"
+) {
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeCommunityNoticeUi
+    );
+
+} else {
+
+    initializeCommunityNoticeUi();
+
+}

@@ -52,6 +52,11 @@ const adminParticipantListElement =
         "#admin-participant-list"
     );
 
+const adminUserListElement =
+    document.querySelector(
+        "#admin-user-list"
+    );
+
 const adminResultListElement =
     document.querySelector(
         "#admin-result-list"
@@ -409,6 +414,14 @@ adminMenuButtonElements.forEach(
 
                 // 참가자 메뉴를 눌렀을 때
                 // Neon 참가자 데이터 조회
+                if (
+                    targetPage
+                    === "users"
+                ) {
+
+                    loadAdminUsers();
+                }
+
                 if (
                     targetPage
                     === "participants"
@@ -3193,6 +3206,766 @@ async function saveAdminPhotoRequest(
     } finally {
 
         saveButtonElement.disabled =
+            false;
+
+    }
+
+}
+
+// =========================================
+// 회원 관리
+// =========================================
+
+async function loadAdminUsers() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminUserListElement
+        .textContent =
+            "회원 정보를 불러오는 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/admin/users`,
+            {
+                headers: {
+                    "X-Admin-Token":
+                        adminToken,
+                },
+            }
+        );
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        const responseData =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ??
+                "회원 조회에 실패했습니다."
+            );
+        }
+
+
+        renderAdminUsers(
+            responseData.users
+            ?? []
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminUserListElement
+            .textContent =
+                error.message;
+
+    }
+}
+
+
+// =========================================
+// 회원 목록 출력
+// =========================================
+
+function renderAdminUsers(
+    users
+) {
+
+    adminUserListElement
+        .innerHTML = "";
+
+
+    if (
+        users.length === 0
+    ) {
+
+        adminUserListElement
+            .textContent =
+                "가입된 회원이 없습니다.";
+
+        return;
+    }
+
+
+    users.forEach(
+        user => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.classList.add(
+                "admin-user-card"
+            );
+
+
+            cardElement.dataset.userId =
+                user.id;
+
+
+            // -------------------------
+            // 회원 기본정보
+            // -------------------------
+
+            const infoElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            infoElement.classList.add(
+                "admin-user-info"
+            );
+
+
+            const nameRowElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            nameRowElement.classList.add(
+                "admin-user-name-row"
+            );
+
+
+            const nicknameElement =
+                document.createElement(
+                    "strong"
+                );
+
+
+            nicknameElement.textContent =
+                user.nickname;
+
+
+            const roleBadgeElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            roleBadgeElement.classList.add(
+                "admin-user-role"
+            );
+
+
+            if (
+                user.is_admin
+            ) {
+
+                roleBadgeElement
+                    .classList
+                    .add(
+                        "administrator"
+                    );
+
+                roleBadgeElement
+                    .textContent =
+                        "ADMIN";
+
+            } else {
+
+                roleBadgeElement
+                    .textContent =
+                        "MEMBER";
+
+            }
+
+
+            nameRowElement.append(
+                nicknameElement,
+                roleBadgeElement
+            );
+
+
+            const emailElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            emailElement.classList.add(
+                "admin-user-email"
+            );
+
+
+            emailElement.textContent =
+                user.email;
+
+
+            const idElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            idElement.classList.add(
+                "admin-user-id"
+            );
+
+
+            idElement.textContent =
+                `USER #${user.id}`;
+
+
+            infoElement.append(
+                nameRowElement,
+                emailElement,
+                idElement
+            );
+
+
+            // -------------------------
+            // 포인트
+            // -------------------------
+
+            const pointElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            pointElement.classList.add(
+                "admin-user-point"
+            );
+
+
+            const pointLabelElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            pointLabelElement.textContent =
+                "보유 포인트";
+
+
+            const pointValueElement =
+                document.createElement(
+                    "strong"
+                );
+
+
+            pointValueElement.textContent =
+                `${Number(
+                    user.points
+                    ?? 0
+                ).toLocaleString()} P`;
+
+
+            pointElement.append(
+                pointLabelElement,
+                pointValueElement
+            );
+
+
+            // -------------------------
+            // 포인트 조정
+            // -------------------------
+
+            const pointControlElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            pointControlElement.classList.add(
+                "admin-user-point-control"
+            );
+
+
+            const amountInputElement =
+                document.createElement(
+                    "input"
+                );
+
+
+            amountInputElement.type =
+                "number";
+
+
+            amountInputElement.classList.add(
+                "admin-user-point-input"
+            );
+
+
+            amountInputElement.placeholder =
+                "+5000 또는 -500";
+
+
+            const descriptionInputElement =
+                document.createElement(
+                    "input"
+                );
+
+
+            descriptionInputElement.type =
+                "text";
+
+
+            descriptionInputElement.classList.add(
+                "admin-user-point-description"
+            );
+
+
+            descriptionInputElement.placeholder =
+                "포인트 변경 사유";
+
+
+            descriptionInputElement.maxLength =
+                200;
+
+
+            const pointButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            pointButtonElement.type =
+                "button";
+
+
+            pointButtonElement.classList.add(
+                "admin-user-point-button"
+            );
+
+
+            pointButtonElement.textContent =
+                "포인트 반영";
+
+
+            pointControlElement.append(
+                amountInputElement,
+                descriptionInputElement,
+                pointButtonElement
+            );
+
+
+            // -------------------------
+            // 권한
+            // -------------------------
+
+            const actionElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            actionElement.classList.add(
+                "admin-user-actions"
+            );
+
+
+            const roleButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            roleButtonElement.type =
+                "button";
+
+
+            roleButtonElement.classList.add(
+                "admin-user-role-button"
+            );
+
+
+            if (
+                user.is_admin
+            ) {
+
+                roleButtonElement
+                    .classList
+                    .add(
+                        "remove"
+                    );
+
+                roleButtonElement
+                    .textContent =
+                        "관리자 해제";
+
+            } else {
+
+                roleButtonElement
+                    .textContent =
+                        "관리자 지정";
+
+            }
+
+
+            const messageElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            messageElement.classList.add(
+                "admin-user-message"
+            );
+
+
+            actionElement.append(
+                messageElement,
+                roleButtonElement
+            );
+
+
+            // -------------------------
+            // 이벤트
+            // -------------------------
+
+            pointButtonElement
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        changeAdminUserPoints(
+                            user,
+                            amountInputElement,
+                            descriptionInputElement,
+                            pointButtonElement,
+                            messageElement
+                        );
+
+                    }
+                );
+
+
+            roleButtonElement
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        changeAdminUserRole(
+                            user,
+                            roleButtonElement,
+                            messageElement
+                        );
+
+                    }
+                );
+
+
+            cardElement.append(
+                infoElement,
+                pointElement,
+                pointControlElement,
+                actionElement
+            );
+
+
+            adminUserListElement.append(
+                cardElement
+            );
+
+        }
+    );
+
+}
+
+
+// =========================================
+// 관리자 포인트 변경
+// =========================================
+
+async function changeAdminUserPoints(
+    user,
+    amountInputElement,
+    descriptionInputElement,
+    buttonElement,
+    messageElement
+) {
+
+    const amount =
+        Number(
+            amountInputElement.value
+        );
+
+
+    if (
+        !Number.isInteger(
+            amount
+        )
+        ||
+        amount === 0
+    ) {
+
+        messageElement.textContent =
+            "0이 아닌 정수 포인트를 입력해주세요.";
+
+        return;
+    }
+
+
+    const description =
+        descriptionInputElement
+            .value
+            .trim();
+
+
+    const actionText =
+        amount > 0
+            ? "지급"
+            : "차감";
+
+
+    const confirmed =
+        window.confirm(
+            `${user.nickname} 회원에게 `
+            + `${Math.abs(
+                amount
+            ).toLocaleString()}P를 `
+            + `${actionText}하시겠습니까?`
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    buttonElement.disabled =
+        true;
+
+
+    messageElement.textContent =
+        "처리 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}`
+            + `/api/admin/users/${user.id}/points`,
+            {
+                method:
+                    "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    "X-Admin-Token":
+                        adminToken,
+                },
+
+                body: JSON.stringify({
+                    amount:
+                        amount,
+
+                    description:
+                        description
+                        || null,
+                }),
+            }
+        );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ??
+                "포인트 변경에 실패했습니다."
+            );
+        }
+
+
+        await loadAdminUsers();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+        buttonElement.disabled =
+            false;
+
+    }
+
+}
+
+
+// =========================================
+// 관리자 권한 변경
+// =========================================
+
+async function changeAdminUserRole(
+    user,
+    buttonElement,
+    messageElement
+) {
+
+    const nextAdminState =
+        !user.is_admin;
+
+
+    const actionText =
+        nextAdminState
+            ? "관리자로 지정"
+            : "관리자 권한을 해제";
+
+
+    const confirmed =
+        window.confirm(
+            `${user.nickname} 회원을 `
+            + `${actionText}하시겠습니까?`
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    buttonElement.disabled =
+        true;
+
+
+    messageElement.textContent =
+        "처리 중...";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}`
+            + `/api/admin/users/${user.id}/role`,
+            {
+                method:
+                    "PATCH",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+
+                    "X-Admin-Token":
+                        adminToken,
+                },
+
+                body: JSON.stringify({
+                    is_admin:
+                        nextAdminState,
+                }),
+            }
+        );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ??
+                "관리자 권한 변경에 실패했습니다."
+            );
+        }
+
+
+        await loadAdminUsers();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+        buttonElement.disabled =
             false;
 
     }

@@ -151,6 +151,14 @@
                     <button
                         type="button"
                         class="admin-menu-button"
+                        data-admin-page="users"
+                    >
+                        회원 관리
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
                         data-admin-page="participants"
                     >
                         참가자 / 현재 팀
@@ -209,6 +217,30 @@
                     <p>
                         FCL 운영 기능을 관리합니다.
                     </p>
+
+                </section>
+
+                <!-- 회원 관리 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="users"
+                >
+
+                    <h1>
+                        회원 관리
+                    </h1>
+
+                    <p>
+                        FCL 회원의 포인트와 관리자 권한을 관리합니다.
+                    </p>
+
+
+                    <div
+                        id="admin-user-list"
+                        class="admin-user-list"
+                    >
+                    </div>
 
                 </section>
 
