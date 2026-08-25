@@ -11350,3 +11350,16 @@ body.site-auth-modal-open {
     }
 
 }
+
+/* =========================
+   승부예측 팀 이름 iOS 보정
+========================= */
+
+.prediction-match-card
+.prediction-versus
+.prediction-team
+strong {
+    color: #1f2937 !important;
+    -webkit-text-fill-color: #1f2937 !important;
+    opacity: 1 !important;
+}
