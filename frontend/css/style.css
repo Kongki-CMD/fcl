@@ -8408,6 +8408,15 @@ body.site-auth-modal-open {
     color: #111827;
 }
 
+/* =========================
+   승부예측 팀 이름 색상 보정
+========================= */
+
+.prediction-team strong {
+    color: #1f2937;
+}
+
+
 
 /* =========================================
    모바일
@@ -10971,6 +10980,14 @@ body.site-auth-modal-open {
     .players-table th,
     .players-table td {
         padding: 0 6px;
+    }
+
+    @media (max-width: 768px) {
+
+        .prediction-team strong {
+            color: #1f2937;
+        }
+
     }
 
 }
