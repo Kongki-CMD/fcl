@@ -11352,14 +11352,31 @@ body.site-auth-modal-open {
 }
 
 /* =========================
-   승부예측 팀 이름 iOS 보정
+   승부예측 참가자 이름
 ========================= */
 
-.prediction-match-card
-.prediction-versus
-.prediction-team
-strong {
+.prediction-team-name {
+    display: block !important;
+
+    width: 100%;
+
     color: #1f2937 !important;
     -webkit-text-fill-color: #1f2937 !important;
+
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.4;
+
+    text-align: center;
+
+    visibility: visible !important;
     opacity: 1 !important;
+}
+
+@media (max-width: 600px) {
+
+    .prediction-team-name {
+        font-size: 14px;
+    }
+
 }

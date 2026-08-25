@@ -965,6 +965,9 @@ function createMatchCard(
             "strong"
         );
 
+    teamANameElement.className =
+        "prediction-team-name";
+
     teamANameElement.textContent =
         match.team_a.fcl_name;
 
@@ -1021,6 +1024,9 @@ function createMatchCard(
         document.createElement(
             "strong"
         );
+
+    teamANameElement.className =
+        "prediction-team-name";
 
     teamBNameElement.textContent =
         match.team_b.fcl_name;
