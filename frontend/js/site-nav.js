@@ -11,7 +11,7 @@ const siteFooterElement =
 
 
 const siteVersion =
-    "v1.3";
+    "v1.31";
 
 
 // =========================================
