@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL - 포인트 교환소</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+                </span>
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu">
+
+                <li class="menu-item">
+                    <a href="#">
+                        경기
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./schedule.html">
+                                경기 일정
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./results.html">
+                                경기 결과
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./rules.html">
+                                경기 규칙
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        기록
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./standings.html">
+                                팀 기록
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./players.html">
+                                선수 기록
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        커뮤니티
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./community.html">
+                                자유게시판
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./player-photo-request.html">
+                                선수 사진 요청
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+<main class="point-shop-page">
+
+    <section class="point-shop-header">
+
+        <span class="point-shop-eyebrow">
+            FCL POINT SHOP
+        </span>
+
+        <h1>
+            포인트 교환소
+        </h1>
+
+        <p>
+            FCL 활동으로 모은 포인트를 다양한 상품으로 교환할 수 있습니다.
+        </p>
+
+    </section>
+
+
+    <section class="point-shop-balance-card">
+
+        <div class="point-shop-balance-info">
+
+            <span>
+                MY POINT
+            </span>
+
+            <strong
+                id="point-shop-balance"
+            >
+                확인 중
+            </strong>
+
+        </div>
+
+
+        <a
+            href="./mypage.html"
+            class="point-shop-history-link"
+        >
+            포인트 내역 보기
+        </a>
+
+    </section>
+
+
+    <section class="point-shop-products-section">
+
+        <div class="point-shop-section-header">
+
+            <div>
+
+                <span>
+                    REWARDS
+                </span>
+
+                <h2>
+                    교환 상품
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="point-shop-product-grid"
+            id="point-shop-product-grid"
+        >
+
+            <article class="point-shop-product-card preparing">
+
+                <div class="point-shop-product-image">
+
+                    <span>
+                        COMING
+                        <br>
+                        SOON
+                    </span>
+
+                </div>
+
+
+                <div class="point-shop-product-info">
+
+                    <span class="point-shop-product-category">
+                        준비 중
+                    </span>
+
+                    <h3>
+                        교환 상품 준비 중
+                    </h3>
+
+                    <p>
+                        FCL 포인트로 교환할 수 있는 상품이 추가될 예정입니다.
+                    </p>
+
+                </div>
+
+
+                <button
+                    type="button"
+                    class="point-shop-exchange-button"
+                    disabled
+                >
+                    준비 중
+                </button>
+
+            </article>
+
+        </div>
+
+    </section>
+
+
+    <section class="point-shop-guide">
+
+        <h2>
+            이용 안내
+        </h2>
+
+        <ul>
+
+            <li>
+                포인트는 FCL 이벤트 및 승부예측 등에서 획득할 수 있습니다.
+            </li>
+
+            <li>
+                상품별 필요 포인트와 교환 조건은 상품 등록 시 안내됩니다.
+            </li>
+
+            <li>
+                교환 완료 후 사용된 포인트는 차감됩니다.
+            </li>
+
+            <li>
+                실제 상품 및 교환 방식은 추후 업데이트될 예정입니다.
+            </li>
+
+        </ul>
+
+    </section>
+
+</main>
+
+
+
+<footer id="site-footer"></footer>
+
+
+<script
+    type="module"
+    src="./js/point-shop.js?v=point-shop-2"
+></script>
+
+    <script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>

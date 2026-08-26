@@ -1793,6 +1793,491 @@
     cursor: default;
 }
 
+/* =========================================
+   POINT SHOP ADMIN
+========================================= */
+
+.admin-point-shop-form {
+    margin-top: 24px;
+    margin-bottom: 36px;
+
+    padding: 22px;
+
+    border: 1px solid #333;
+    border-radius: 12px;
+
+    background: #151515;
+}
+
+
+.admin-point-shop-form-grid,
+.admin-point-shop-edit-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+
+    gap: 15px;
+}
+
+
+.admin-point-shop-form-grid label,
+.admin-point-shop-edit-grid label {
+    display: flex;
+    flex-direction: column;
+
+    gap: 7px;
+
+    color: #999;
+
+    font-size: 12px;
+    font-weight: 700;
+}
+
+
+.admin-point-shop-form-grid input,
+.admin-point-shop-form-grid textarea,
+.admin-point-shop-edit-grid input,
+.admin-point-shop-edit-grid textarea {
+    width: 100%;
+
+    padding: 10px 11px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #3a3a3a;
+    border-radius: 7px;
+
+    background: #0e0e0e;
+    color: #ddd;
+
+    font-family: inherit;
+}
+
+
+.admin-point-shop-wide {
+    grid-column: 1 / -1;
+}
+
+
+.admin-point-shop-active-field {
+    display: flex;
+    align-items: center;
+
+    gap: 7px;
+
+    margin-top: 16px;
+
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.admin-point-shop-form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: 15px;
+
+    margin-top: 18px;
+}
+
+
+.admin-point-shop-form-actions button,
+.admin-point-shop-save-button {
+    padding: 9px 16px;
+
+    border: 1px solid #8d7748;
+    border-radius: 7px;
+
+    background: transparent;
+    color: #d7bc78;
+
+    font-family: inherit;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.admin-point-shop-message,
+.admin-point-shop-card-message {
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.admin-point-shop-list-header {
+    margin-bottom: 15px;
+}
+
+
+.admin-point-shop-list-header h2 {
+    margin: 0;
+
+    font-size: 18px;
+}
+
+
+.admin-point-shop-product-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 15px;
+}
+
+
+.admin-point-shop-product-card {
+    padding: 20px;
+
+    border: 1px solid #333;
+    border-radius: 12px;
+
+    background: #141414;
+}
+
+
+.admin-point-shop-product-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 15px;
+
+    margin-bottom: 18px;
+}
+
+
+.admin-point-shop-product-card-header div {
+    display: flex;
+    flex-direction: column;
+
+    gap: 4px;
+}
+
+
+.admin-point-shop-product-card-header strong {
+    color: #ddd;
+
+    font-size: 16px;
+}
+
+
+.admin-point-shop-product-card-header div span {
+    color: #666;
+
+    font-size: 11px;
+}
+
+
+.admin-point-shop-status {
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+
+.admin-point-shop-status.active {
+    background: rgba(80, 170, 110, 0.12);
+    color: #71c78e;
+}
+
+
+.admin-point-shop-status.inactive {
+    background: rgba(180, 80, 80, 0.12);
+    color: #ce7777;
+}
+
+
+.admin-point-shop-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: 15px;
+
+    margin-top: 18px;
+}
+
+
+.admin-point-shop-card-actions label {
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    margin-right: auto;
+
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+/* =========================================
+   POINT SHOP EXCHANGE ADMIN
+========================================= */
+
+.admin-point-shop-exchange-section {
+    margin-top: 45px;
+}
+
+
+.admin-point-shop-list-header > span {
+    color: #777;
+
+    font-size: 11px;
+}
+
+
+.admin-point-shop-exchange-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+}
+
+
+.admin-point-shop-exchange-card {
+    padding: 18px 20px;
+
+    border: 1px solid #333;
+    border-radius: 11px;
+
+    background: #141414;
+}
+
+
+.admin-point-shop-exchange-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 15px;
+
+    border-bottom: 1px solid #292929;
+}
+
+
+.admin-point-shop-exchange-top > div {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+}
+
+
+.admin-point-shop-exchange-top strong {
+    color: #ddd;
+
+    font-size: 15px;
+}
+
+
+.admin-point-shop-exchange-price {
+    color: #d7bc78 !important;
+
+    white-space: nowrap;
+}
+
+
+.admin-point-shop-exchange-status {
+    padding: 5px 8px;
+
+    border-radius: 999px;
+
+    font-size: 10px;
+    font-weight: 800;
+}
+
+
+.admin-point-shop-exchange-status.requested {
+    background:
+        rgba(
+            180,
+            154,
+            90,
+            0.13
+        );
+
+    color: #d7bc78;
+}
+
+
+.admin-point-shop-exchange-status.completed {
+    background:
+        rgba(
+            80,
+            170,
+            110,
+            0.12
+        );
+
+    color: #71c78e;
+}
+
+
+.admin-point-shop-exchange-status.cancelled {
+    background:
+        rgba(
+            180,
+            80,
+            80,
+            0.12
+        );
+
+    color: #ce7777;
+}
+
+
+.admin-point-shop-exchange-info {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap: 12px;
+
+    margin-top: 15px;
+}
+
+
+.admin-point-shop-exchange-info > div {
+    display: flex;
+    flex-direction: column;
+
+    gap: 5px;
+}
+
+
+.admin-point-shop-exchange-info span {
+    color: #666;
+
+    font-size: 10px;
+}
+
+
+.admin-point-shop-exchange-info strong {
+    color: #aaa;
+
+    font-size: 12px;
+
+    word-break: break-all;
+}
+
+
+.admin-point-shop-exchange-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    gap: 12px;
+
+    margin-top: 16px;
+}
+
+
+.admin-point-shop-complete-button {
+    padding: 9px 16px;
+
+    border: 1px solid #557b61;
+    border-radius: 7px;
+
+    background:
+        rgba(
+            80,
+            170,
+            110,
+            0.08
+        );
+
+    color: #71c78e;
+
+    font-family: inherit;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.admin-point-shop-complete-button:hover {
+    background:
+        rgba(
+            80,
+            170,
+            110,
+            0.16
+        );
+}
+
+
+.admin-point-shop-complete-button:disabled {
+    opacity: 0.5;
+
+    cursor: wait;
+}
+
+
+@media (max-width: 800px) {
+
+    .admin-point-shop-exchange-info {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+}
+
+
+@media (max-width: 500px) {
+
+    .admin-point-shop-exchange-info {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-point-shop-exchange-top {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+}
+
+
+@media (max-width: 700px) {
+
+    .admin-point-shop-form-grid,
+    .admin-point-shop-edit-grid {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-point-shop-wide {
+        grid-column: auto;
+    }
+
+
+    .admin-point-shop-card-actions {
+        flex-wrap: wrap;
+    }
+
+}
+
 
 @media (max-width: 1100px) {
 

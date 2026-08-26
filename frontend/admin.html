@@ -196,6 +196,14 @@
                         선수 사진 요청
                     </button>
 
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="point-shop"
+                    >
+                        포인트 교환소
+                    </button>
+
                 </nav>
 
             </aside>
@@ -356,6 +364,174 @@
 
                 </section>
 
+                <!-- 포인트 교환소 -->
+                <section
+                    class="admin-content-page"
+                    data-admin-content="point-shop"
+                >
+
+                    <h1>
+                        포인트 교환소 관리
+                    </h1>
+
+                    <p>
+                        교환 상품을 등록하고 가격 및 판매 상태를 관리합니다.
+                    </p>
+
+
+                    <form
+                        id="admin-point-shop-form"
+                        class="admin-point-shop-form"
+                    >
+
+                        <div class="admin-point-shop-form-grid">
+
+                            <label>
+                                상품명
+
+                                <input
+                                    type="text"
+                                    id="admin-point-shop-name"
+                                    maxlength="100"
+                                    required
+                                >
+                            </label>
+
+
+                            <label>
+                                카테고리
+
+                                <input
+                                    type="text"
+                                    id="admin-point-shop-category"
+                                    maxlength="50"
+                                    placeholder="예: 기프티콘"
+                                >
+                            </label>
+
+
+                            <label>
+                                필요 포인트
+
+                                <input
+                                    type="number"
+                                    id="admin-point-shop-price"
+                                    min="1"
+                                    required
+                                >
+                            </label>
+
+
+                            <label>
+                                정렬 순서
+
+                                <input
+                                    type="number"
+                                    id="admin-point-shop-sort-order"
+                                    min="0"
+                                    value="0"
+                                    required
+                                >
+                            </label>
+
+
+                            <label class="admin-point-shop-wide">
+                                이미지 경로 / URL
+
+                                <input
+                                    type="text"
+                                    id="admin-point-shop-image-url"
+                                    placeholder="./assets/images/shop/..."
+                                >
+                            </label>
+
+
+                            <label class="admin-point-shop-wide">
+                                상품 설명
+
+                                <textarea
+                                    id="admin-point-shop-description"
+                                    rows="3"
+                                ></textarea>
+                            </label>
+
+                        </div>
+
+
+                        <label class="admin-point-shop-active-field">
+
+                            <input
+                                type="checkbox"
+                                id="admin-point-shop-active"
+                                checked
+                            >
+
+                            판매 중
+
+                        </label>
+
+
+                        <div class="admin-point-shop-form-actions">
+
+                            <p
+                                id="admin-point-shop-form-message"
+                                class="admin-point-shop-message"
+                            ></p>
+
+                            <button
+                                type="submit"
+                                id="admin-point-shop-create-button"
+                            >
+                                상품 등록
+                            </button>
+
+                        </div>
+
+                    </form>
+
+
+                    <div class="admin-point-shop-list-header">
+
+                        <h2>
+                            등록 상품
+                        </h2>
+
+                    </div>
+
+
+                    <div
+                        id="admin-point-shop-product-list"
+                        class="admin-point-shop-product-list"
+                    >
+                        상품을 불러오는 중...
+                    </div>
+
+                    <div class="admin-point-shop-exchange-section">
+
+                        <div class="admin-point-shop-list-header">
+
+                            <h2>
+                                교환 신청 관리
+                            </h2>
+
+                            <span>
+                                상품 전달 후 처리 완료해주세요.
+                            </span>
+
+                        </div>
+
+
+                        <div
+                            id="admin-point-shop-exchange-list"
+                            class="admin-point-shop-exchange-list"
+                        >
+                            교환 신청을 불러오는 중...
+                        </div>
+
+                    </div>
+
+                </section>
+
             </div>
 
         </section>
@@ -481,7 +657,7 @@
 
     <script
         type="module"
-        src="./js/admin.js"
+        src="./js/admin.js?v=point-shop-1"
     ></script>
 
 </body>

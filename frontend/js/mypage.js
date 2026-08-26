@@ -4,6 +4,7 @@ import {
 
 
 import {
+    getCurrentUser,
     getUserToken,
     removeUserToken,
 } from "./auth.js";

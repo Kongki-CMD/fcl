@@ -1325,6 +1325,90 @@ def initialize_database():
             )
 
             # =========================
+            # ATTENDANCE RECORDS
+            # 출석체크 기록
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    attendance_records (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        user_id BIGINT
+                            NOT NULL
+                            REFERENCES users(id)
+                            ON DELETE CASCADE,
+
+                        attendance_date DATE
+                            NOT NULL,
+
+                        streak_count INTEGER
+                            NOT NULL
+                            DEFAULT 1,
+
+                        base_reward_points INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        streak_bonus_points INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        reward_points INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        CONSTRAINT
+                            attendance_streak_count_check
+                        CHECK (
+                            streak_count >= 1
+                        ),
+
+                        CONSTRAINT
+                            attendance_reward_points_check
+                        CHECK (
+                            base_reward_points >= 0
+                            AND
+                            streak_bonus_points >= 0
+                            AND
+                            reward_points >= 0
+                        )
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    ux_attendance_user_date
+
+                ON attendance_records (
+                    user_id,
+                    attendance_date
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_attendance_user_date
+
+                ON attendance_records (
+                    user_id,
+                    attendance_date DESC
+                )
+                """
+            )
+
+            # =========================
             # POINT TRANSACTIONS
             # =========================
 
@@ -1392,6 +1476,151 @@ def initialize_database():
 
                 ON point_transactions (
                     created_at
+                )
+                """
+            )
+
+            # =========================
+            # POINT SHOP PRODUCTS
+            # 교환소 상품
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    point_shop_products (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        name VARCHAR(100)
+                            NOT NULL,
+
+                        category VARCHAR(50),
+
+                        description TEXT,
+
+                        price_points INTEGER
+                            NOT NULL,
+
+                        image_url TEXT,
+
+                        is_active BOOLEAN
+                            NOT NULL
+                            DEFAULT TRUE,
+
+                        sort_order INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        CONSTRAINT
+                            point_shop_products_price_check
+                        CHECK (
+                            price_points > 0
+                        )
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_point_shop_products_active
+
+                ON point_shop_products (
+                    is_active,
+                    sort_order,
+                    id
+                )
+                """
+            )
+
+
+            # =========================
+            # POINT SHOP EXCHANGES
+            # 상품 교환 내역
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    point_shop_exchanges (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        user_id BIGINT
+                            NOT NULL
+                            REFERENCES users(id)
+                            ON DELETE CASCADE,
+
+                        product_id BIGINT
+                            NOT NULL
+                            REFERENCES point_shop_products(id),
+
+                        product_name VARCHAR(100)
+                            NOT NULL,
+
+                        price_points INTEGER
+                            NOT NULL,
+
+                        status VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'requested',
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        completed_at TIMESTAMPTZ,
+
+                        CONSTRAINT
+                            point_shop_exchanges_price_check
+                        CHECK (
+                            price_points > 0
+                        ),
+
+                        CONSTRAINT
+                            point_shop_exchanges_status_check
+                        CHECK (
+                            status IN (
+                                'requested',
+                                'completed',
+                                'cancelled'
+                            )
+                        )
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_point_shop_exchanges_user
+
+                ON point_shop_exchanges (
+                    user_id,
+                    created_at DESC,
+                    id DESC
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_point_shop_exchanges_status
+
+                ON point_shop_exchanges (
+                    status,
+                    created_at ASC
                 )
                 """
             )
@@ -2768,6 +2997,15 @@ PREDICTION_FIXED_ODDS = 2.50
 PREDICTION_MAX_STAKE_POINTS = 1000
 
 # =========================
+# ATTENDANCE EVENT
+# 출석체크 운영 설정
+# =========================
+
+ATTENDANCE_DAILY_REWARD = 50
+ATTENDANCE_STREAK_DAYS = 7
+ATTENDANCE_STREAK_BONUS = 150
+
+# =========================
 # PREDICTIONS
 # 세트별 승부예측 자동 정산
 # =========================
@@ -3195,6 +3433,11 @@ def settle_predictions_for_series(
             total_payout_points,
     }
 
+class PointShopExchangeRequest(
+    BaseModel
+):
+    product_id: int
+
 class PredictionCreateRequest(
     BaseModel
 ): 
@@ -3242,6 +3485,29 @@ class AdminUserRoleRequest(
     BaseModel
 ):
     is_admin: bool
+
+class AdminPointShopProductCreateRequest(
+    BaseModel
+):
+    name: str
+    category: str | None = None
+    description: str | None = None
+    price_points: int
+    image_url: str | None = None
+    is_active: bool = True
+    sort_order: int = 0
+
+
+class AdminPointShopProductUpdateRequest(
+    BaseModel
+):
+    name: str
+    category: str | None = None
+    description: str | None = None
+    price_points: int
+    image_url: str | None = None
+    is_active: bool
+    sort_order: int
 
 class AdminCommunityPostUpdateRequest(
     BaseModel
@@ -7124,6 +7390,1804 @@ def get_prediction_matches():
 
 
     return matches
+
+# =========================
+# ATTENDANCE EVENT
+# 출석체크 상태 조회
+# =========================
+
+@app.get(
+    "/api/events/attendance"
+)
+def get_attendance_status(
+    user = Depends(require_user)
+):
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 전체 출석 횟수
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_count
+
+                FROM attendance_records
+
+                WHERE user_id = %s
+                """,
+                (
+                    user["id"],
+                ),
+            )
+
+
+            total_row = cursor.fetchone()
+
+
+            total_count = int(
+                total_row[
+                    "total_count"
+                ]
+                or 0
+            )
+
+
+            # =========================
+            # 오늘 출석 여부
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    attendance_date,
+                    streak_count,
+                    base_reward_points,
+                    streak_bonus_points,
+                    reward_points
+
+                FROM attendance_records
+
+                WHERE
+                    user_id = %s
+                    AND
+                    attendance_date = %s
+
+                LIMIT 1
+                """,
+                (
+                    user["id"],
+                    today,
+                ),
+            )
+
+
+            today_record = cursor.fetchone()
+
+
+            # =========================
+            # 가장 최근 출석
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    attendance_date,
+                    streak_count,
+
+                    (
+                        attendance_date
+                        =
+                        (%s::date - 1)
+                    ) AS is_yesterday
+
+                FROM attendance_records
+
+                WHERE user_id = %s
+
+                ORDER BY
+                    attendance_date DESC
+
+                LIMIT 1
+                """,
+                (
+                    today,
+                    user["id"],
+                ),
+            )
+
+
+            latest_record = cursor.fetchone()
+
+            # =========================
+            # 이번 달 출석 기록
+            # =========================
+
+            month_start = (
+                today.replace(
+                    day=1
+                )
+            )
+
+
+            if today.month == 12:
+
+                next_month_start = (
+                    today.replace(
+                        year=today.year + 1,
+                        month=1,
+                        day=1,
+                    )
+                )
+
+            else:
+
+                next_month_start = (
+                    today.replace(
+                        month=today.month + 1,
+                        day=1,
+                    )
+                )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    attendance_date
+
+                FROM attendance_records
+
+                WHERE
+                    user_id = %s
+                    AND
+                    attendance_date >= %s
+                    AND
+                    attendance_date < %s
+
+                ORDER BY
+                    attendance_date ASC
+                """,
+                (
+                    user["id"],
+                    month_start,
+                    next_month_start,
+                ),
+            )
+
+
+            month_records = (
+                cursor.fetchall()
+            )
+
+    month_attendance_dates = [
+        record[
+            "attendance_date"
+        ].isoformat()
+
+        for record
+        in month_records
+    ]
+
+
+    current_month = (
+        today.strftime(
+            "%Y-%m"
+        )
+    )
+
+
+    # =========================
+    # 이미 오늘 출석함
+    # =========================
+
+    if today_record:
+
+        current_streak = int(
+            today_record[
+                "streak_count"
+            ]
+        )
+
+
+        today_reward_points = int(
+            today_record[
+                "reward_points"
+            ]
+        )
+
+
+        streak_bonus_points = int(
+            today_record[
+                "streak_bonus_points"
+            ]
+        )
+
+        month_attendance_dates = [
+            record[
+                "attendance_date"
+            ].isoformat()
+
+            for record
+            in month_records
+        ]
+
+
+        current_month = (
+            today.strftime(
+                "%Y-%m"
+            )
+        )
+
+
+        return {
+            "today_attended":
+                True,
+
+            "attendance_date":
+                today.isoformat(),
+
+            "current_month":
+                current_month,
+
+            "month_attendance_dates":
+                month_attendance_dates,
+
+            "total_count":
+                total_count,
+
+            "current_streak":
+                current_streak,
+
+            "daily_reward_points":
+                ATTENDANCE_DAILY_REWARD,
+
+            "streak_days":
+                ATTENDANCE_STREAK_DAYS,
+
+            "streak_bonus_points":
+                ATTENDANCE_STREAK_BONUS,
+
+            "today_streak_bonus":
+                streak_bonus_points,
+
+            "today_reward_points":
+                today_reward_points,
+        }
+
+
+    # =========================
+    # 아직 오늘 출석하지 않음
+    # 오늘 출석 시 연속 일수 계산
+    # =========================
+
+    if (
+        latest_record
+        and
+        latest_record[
+            "is_yesterday"
+        ]
+    ):
+
+        current_streak = int(
+            latest_record[
+                "streak_count"
+            ]
+        )
+
+
+        next_streak = (
+            current_streak
+            + 1
+        )
+
+    else:
+
+        current_streak = 0
+
+        next_streak = 1
+
+
+    will_get_streak_bonus = (
+        next_streak
+        % ATTENDANCE_STREAK_DAYS
+        == 0
+    )
+
+
+    today_streak_bonus = (
+        ATTENDANCE_STREAK_BONUS
+        if will_get_streak_bonus
+        else 0
+    )
+
+
+    today_reward_points = (
+        ATTENDANCE_DAILY_REWARD
+        +
+        today_streak_bonus
+    )
+
+    month_attendance_dates = [
+        record[
+            "attendance_date"
+        ].isoformat()
+
+        for record
+        in month_records
+    ]
+
+
+    current_month = (
+        today.strftime(
+            "%Y-%m"
+        )
+    )
+
+
+    return {
+        "today_attended":
+            False,
+
+        "attendance_date":
+            today.isoformat(),
+
+        "current_month":
+            current_month,
+
+        "month_attendance_dates":
+            month_attendance_dates,
+
+        "total_count":
+            total_count,
+
+        "current_streak":
+            current_streak,
+
+        "next_streak":
+            next_streak,
+
+        "daily_reward_points":
+            ATTENDANCE_DAILY_REWARD,
+
+        "streak_days":
+            ATTENDANCE_STREAK_DAYS,
+
+        "streak_bonus_points":
+            ATTENDANCE_STREAK_BONUS,
+
+        "today_streak_bonus":
+            today_streak_bonus,
+
+        "today_reward_points":
+            today_reward_points,
+    }
+
+
+# =========================
+# ATTENDANCE EVENT
+# 출석체크 실행
+# =========================
+
+@app.post(
+    "/api/events/attendance"
+)
+def check_attendance(
+    user = Depends(require_user)
+):
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 회원 잠금
+            # 동시에 여러 번 요청되어도
+            # 중복 지급 방지
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM users
+
+                WHERE id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    user["id"],
+                ),
+            )
+
+
+            locked_user = cursor.fetchone()
+
+
+            if not locked_user:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "회원 정보를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 오늘 이미 출석했는지 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM attendance_records
+
+                WHERE
+                    user_id = %s
+                    AND
+                    attendance_date = %s
+
+                LIMIT 1
+                """,
+                (
+                    user["id"],
+                    today,
+                ),
+            )
+
+
+            existing_record = cursor.fetchone()
+
+
+            if existing_record:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "오늘은 이미 "
+                        "출석체크를 완료했습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 가장 최근 출석 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    attendance_date,
+                    streak_count,
+
+                    (
+                        attendance_date
+                        =
+                        (%s::date - 1)
+                    ) AS is_yesterday
+
+                FROM attendance_records
+
+                WHERE user_id = %s
+
+                ORDER BY
+                    attendance_date DESC
+
+                LIMIT 1
+                """,
+                (
+                    today,
+                    user["id"],
+                ),
+            )
+
+
+            latest_record = cursor.fetchone()
+
+
+            # =========================
+            # 연속 출석 계산
+            # =========================
+
+            if (
+                latest_record
+                and
+                latest_record[
+                    "is_yesterday"
+                ]
+            ):
+
+                streak_count = (
+                    int(
+                        latest_record[
+                            "streak_count"
+                        ]
+                    )
+                    + 1
+                )
+
+            else:
+
+                streak_count = 1
+
+
+            # =========================
+            # 7일 단위 보너스
+            # 7 / 14 / 21 / 28 ...
+            # =========================
+
+            if (
+                streak_count
+                % ATTENDANCE_STREAK_DAYS
+                == 0
+            ):
+
+                streak_bonus_points = (
+                    ATTENDANCE_STREAK_BONUS
+                )
+
+            else:
+
+                streak_bonus_points = 0
+
+
+            reward_points = (
+                ATTENDANCE_DAILY_REWARD
+                +
+                streak_bonus_points
+            )
+
+
+            # =========================
+            # 출석 기록 저장
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO attendance_records (
+                    user_id,
+                    attendance_date,
+                    streak_count,
+                    base_reward_points,
+                    streak_bonus_points,
+                    reward_points
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING id
+                """,
+                (
+                    user["id"],
+                    today,
+                    streak_count,
+                    ATTENDANCE_DAILY_REWARD,
+                    streak_bonus_points,
+                    reward_points,
+                ),
+            )
+
+
+            attendance_row = cursor.fetchone()
+
+
+            attendance_id = (
+                attendance_row[
+                    "id"
+                ]
+            )
+
+
+            # =========================
+            # 포인트 지급
+            # =========================
+
+            description = (
+                f"FCL 출석체크 "
+                f"{streak_count}일차"
+            )
+
+
+            if streak_bonus_points > 0:
+
+                description += (
+                    " + 연속 출석 보너스"
+                )
+
+
+            change_user_points(
+                cursor,
+                user["id"],
+                reward_points,
+                "attendance_reward",
+                reference_type=
+                    "attendance",
+                reference_id=
+                    attendance_id,
+                description=
+                    description,
+            )
+
+
+            # =========================
+            # 지급 후 포인트 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    points
+
+                FROM users
+
+                WHERE id = %s
+                """,
+                (
+                    user["id"],
+                ),
+            )
+
+
+            user_row = cursor.fetchone()
+
+
+            current_points = int(
+                user_row[
+                    "points"
+                ]
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "status":
+            "success",
+
+        "attendance_id":
+            attendance_id,
+
+        "attendance_date":
+            today.isoformat(),
+
+        "streak_count":
+            streak_count,
+
+        "base_reward_points":
+            ATTENDANCE_DAILY_REWARD,
+
+        "streak_bonus_points":
+            streak_bonus_points,
+
+        "reward_points":
+            reward_points,
+
+        "current_points":
+            current_points,
+
+        "message":
+            (
+                f"출석체크 완료! "
+                f"{reward_points}P가 지급되었습니다."
+            ),
+    }
+
+# =========================
+# ADMIN POINT SHOP
+# 교환 신청 목록 조회
+# =========================
+
+@app.get(
+    "/api/admin/point-shop/exchanges"
+)
+def get_admin_point_shop_exchanges(
+    admin_token = Depends(
+        require_admin
+    )
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    e.id,
+                    e.user_id,
+                    u.nickname,
+                    u.email,
+
+                    e.product_id,
+                    e.product_name,
+                    e.price_points,
+
+                    e.status,
+                    e.created_at,
+                    e.completed_at
+
+                FROM point_shop_exchanges e
+
+                JOIN users u
+                    ON u.id = e.user_id
+
+                ORDER BY
+                    CASE
+                        WHEN e.status = 'requested'
+                            THEN 0
+                        WHEN e.status = 'completed'
+                            THEN 1
+                        ELSE 2
+                    END,
+
+                    e.created_at DESC,
+                    e.id DESC
+                """
+            )
+
+
+            exchanges = cursor.fetchall()
+
+
+    return [
+        {
+            "id":
+                exchange["id"],
+
+            "user_id":
+                exchange["user_id"],
+
+            "nickname":
+                exchange["nickname"],
+
+            "email":
+                exchange["email"],
+
+            "product_id":
+                exchange["product_id"],
+
+            "product_name":
+                exchange["product_name"],
+
+            "price_points":
+                int(
+                    exchange[
+                        "price_points"
+                    ]
+                ),
+
+            "status":
+                exchange["status"],
+
+            "created_at":
+                exchange[
+                    "created_at"
+                ].isoformat(),
+
+            "completed_at":
+                (
+                    exchange[
+                        "completed_at"
+                    ].isoformat()
+
+                    if exchange[
+                        "completed_at"
+                    ]
+
+                    else None
+                ),
+        }
+
+        for exchange
+        in exchanges
+    ]
+
+# =========================
+# ADMIN POINT SHOP
+# 교환 처리 완료
+# =========================
+
+@app.patch(
+    "/api/admin/point-shop/exchanges/{exchange_id}/complete"
+)
+def complete_admin_point_shop_exchange(
+    exchange_id: int,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 교환 신청 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    user_id,
+                    product_name,
+                    price_points,
+                    status,
+                    created_at,
+                    completed_at
+
+                FROM point_shop_exchanges
+
+                WHERE
+                    id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    exchange_id,
+                ),
+            )
+
+
+            exchange = (
+                cursor.fetchone()
+            )
+
+
+            if not exchange:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "교환 신청을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                exchange["status"]
+                == "completed"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 처리 완료된 교환 신청입니다."
+                    ),
+                )
+
+
+            if (
+                exchange["status"]
+                != "requested"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "처리할 수 없는 교환 상태입니다."
+                    ),
+                )
+
+
+            # =========================
+            # 완료 처리
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE point_shop_exchanges
+
+                SET
+                    status = 'completed',
+                    completed_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    user_id,
+                    product_name,
+                    price_points,
+                    status,
+                    created_at,
+                    completed_at
+                """,
+                (
+                    exchange_id,
+                ),
+            )
+
+
+            completed_exchange = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "status":
+            "success",
+
+        "message":
+            "교환 신청이 처리 완료되었습니다.",
+
+        "exchange": {
+            "id":
+                completed_exchange["id"],
+
+            "user_id":
+                completed_exchange["user_id"],
+
+            "product_name":
+                completed_exchange["product_name"],
+
+            "price_points":
+                int(
+                    completed_exchange[
+                        "price_points"
+                    ]
+                ),
+
+            "status":
+                completed_exchange["status"],
+
+            "created_at":
+                completed_exchange[
+                    "created_at"
+                ].isoformat(),
+
+            "completed_at":
+                completed_exchange[
+                    "completed_at"
+                ].isoformat(),
+        },
+    }
+
+# =========================
+# ADMIN POINT SHOP
+# 상품 전체 조회
+# =========================
+
+@app.get(
+    "/api/admin/point-shop/products"
+)
+def get_admin_point_shop_products(
+    admin_token = Depends(
+        require_admin
+    )
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    category,
+                    description,
+                    price_points,
+                    image_url,
+                    is_active,
+                    sort_order,
+                    created_at,
+                    updated_at
+
+                FROM point_shop_products
+
+                ORDER BY
+                    sort_order ASC,
+                    id ASC
+                """
+            )
+
+
+            products = (
+                cursor.fetchall()
+            )
+
+
+    return [
+        {
+            "id":
+                product["id"],
+
+            "name":
+                product["name"],
+
+            "category":
+                product["category"],
+
+            "description":
+                product["description"],
+
+            "price_points":
+                int(
+                    product[
+                        "price_points"
+                    ]
+                ),
+
+            "image_url":
+                product["image_url"],
+
+            "is_active":
+                product["is_active"],
+
+            "sort_order":
+                product["sort_order"],
+
+            "created_at":
+                product[
+                    "created_at"
+                ].isoformat(),
+
+            "updated_at":
+                product[
+                    "updated_at"
+                ].isoformat(),
+        }
+
+        for product
+        in products
+    ]
+
+
+# =========================
+# ADMIN POINT SHOP
+# 상품 등록
+# =========================
+
+@app.post(
+    "/api/admin/point-shop/products"
+)
+def create_admin_point_shop_product(
+    request:
+        AdminPointShopProductCreateRequest,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    name = (
+        request.name.strip()
+    )
+
+
+    if not name:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "상품명을 입력해주세요."
+            ),
+        )
+
+
+    if (
+        request.price_points
+        <= 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "상품 가격은 1P 이상이어야 합니다."
+            ),
+        )
+
+
+    if (
+        request.sort_order
+        < 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "정렬 순서는 0 이상이어야 합니다."
+            ),
+        )
+
+
+    category = (
+        request.category.strip()
+        if request.category
+        else None
+    )
+
+
+    description = (
+        request.description.strip()
+        if request.description
+        else None
+    )
+
+
+    image_url = (
+        request.image_url.strip()
+        if request.image_url
+        else None
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    point_shop_products (
+                        name,
+                        category,
+                        description,
+                        price_points,
+                        image_url,
+                        is_active,
+                        sort_order
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    name,
+                    category,
+                    description,
+                    price_points,
+                    image_url,
+                    is_active,
+                    sort_order,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    name,
+                    category,
+                    description,
+                    request.price_points,
+                    image_url,
+                    request.is_active,
+                    request.sort_order,
+                ),
+            )
+
+
+            product = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "status":
+            "success",
+
+        "message":
+            "교환 상품이 등록되었습니다.",
+
+        "product": {
+            "id":
+                product["id"],
+
+            "name":
+                product["name"],
+
+            "category":
+                product["category"],
+
+            "description":
+                product["description"],
+
+            "price_points":
+                int(
+                    product[
+                        "price_points"
+                    ]
+                ),
+
+            "image_url":
+                product["image_url"],
+
+            "is_active":
+                product["is_active"],
+
+            "sort_order":
+                product["sort_order"],
+        },
+    }
+
+
+# =========================
+# ADMIN POINT SHOP
+# 상품 수정 / 판매 상태 변경
+# =========================
+
+@app.patch(
+    "/api/admin/point-shop/products/{product_id}"
+)
+def update_admin_point_shop_product(
+    product_id: int,
+
+    request:
+        AdminPointShopProductUpdateRequest,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    name = (
+        request.name.strip()
+    )
+
+
+    if not name:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "상품명을 입력해주세요."
+            ),
+        )
+
+
+    if (
+        request.price_points
+        <= 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "상품 가격은 1P 이상이어야 합니다."
+            ),
+        )
+
+
+    if (
+        request.sort_order
+        < 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "정렬 순서는 0 이상이어야 합니다."
+            ),
+        )
+
+
+    category = (
+        request.category.strip()
+        if request.category
+        else None
+    )
+
+
+    description = (
+        request.description.strip()
+        if request.description
+        else None
+    )
+
+
+    image_url = (
+        request.image_url.strip()
+        if request.image_url
+        else None
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE point_shop_products
+
+                SET
+                    name = %s,
+                    category = %s,
+                    description = %s,
+                    price_points = %s,
+                    image_url = %s,
+                    is_active = %s,
+                    sort_order = %s,
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    name,
+                    category,
+                    description,
+                    price_points,
+                    image_url,
+                    is_active,
+                    sort_order,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    name,
+                    category,
+                    description,
+                    request.price_points,
+                    image_url,
+                    request.is_active,
+                    request.sort_order,
+                    product_id,
+                ),
+            )
+
+
+            product = (
+                cursor.fetchone()
+            )
+
+
+            if not product:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "교환 상품을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "status":
+            "success",
+
+        "message":
+            "교환 상품이 수정되었습니다.",
+
+        "product": {
+            "id":
+                product["id"],
+
+            "name":
+                product["name"],
+
+            "category":
+                product["category"],
+
+            "description":
+                product["description"],
+
+            "price_points":
+                int(
+                    product[
+                        "price_points"
+                    ]
+                ),
+
+            "image_url":
+                product["image_url"],
+
+            "is_active":
+                product["is_active"],
+
+            "sort_order":
+                product["sort_order"],
+        },
+    }
+
+# =========================
+# POINT SHOP
+# 상품 목록
+# =========================
+
+@app.get(
+    "/api/point-shop/products"
+)
+def get_point_shop_products():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    category,
+                    description,
+                    price_points,
+                    image_url,
+                    sort_order
+
+                FROM point_shop_products
+
+                WHERE
+                    is_active = TRUE
+
+                ORDER BY
+                    sort_order ASC,
+                    id ASC
+                """
+            )
+
+
+            products = (
+                cursor.fetchall()
+            )
+
+
+    return [
+        {
+            "id":
+                product["id"],
+
+            "name":
+                product["name"],
+
+            "category":
+                product["category"],
+
+            "description":
+                product["description"],
+
+            "price_points":
+                int(
+                    product[
+                        "price_points"
+                    ]
+                ),
+
+            "image_url":
+                product["image_url"],
+        }
+
+        for product
+        in products
+    ]
+
+
+# =========================
+# POINT SHOP
+# 상품 교환
+# =========================
+
+@app.post(
+    "/api/point-shop/exchanges"
+)
+def create_point_shop_exchange(
+    request:
+        PointShopExchangeRequest,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 상품 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    name,
+                    price_points,
+                    is_active
+
+                FROM point_shop_products
+
+                WHERE
+                    id = %s
+
+                FOR SHARE
+                """,
+                (
+                    request.product_id,
+                ),
+            )
+
+
+            product = (
+                cursor.fetchone()
+            )
+
+
+            if (
+                not product
+                or
+                not product[
+                    "is_active"
+                ]
+            ):
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "교환 가능한 상품을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            price_points = int(
+                product[
+                    "price_points"
+                ]
+            )
+
+
+            # =========================
+            # 교환 내역 먼저 생성
+            #
+            # 뒤 포인트 차감 실패 시
+            # 같은 트랜잭션이므로
+            # 이 INSERT도 자동 롤백
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    point_shop_exchanges (
+                        user_id,
+                        product_id,
+                        product_name,
+                        price_points,
+                        status
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    'requested'
+                )
+
+                RETURNING
+                    id,
+                    created_at
+                """,
+                (
+                    user["id"],
+                    product["id"],
+                    product["name"],
+                    price_points,
+                ),
+            )
+
+
+            exchange = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # 포인트 차감
+            # =========================
+
+            point_transaction = (
+                change_user_points(
+                    cursor,
+
+                    user["id"],
+
+                    -price_points,
+
+                    "point_shop_exchange",
+
+                    reference_type=
+                        "point_shop_exchange",
+
+                    reference_id=
+                        exchange["id"],
+
+                    description=(
+                        "포인트 교환소 - "
+                        f"{product['name']}"
+                    ),
+                )
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "status":
+            "success",
+
+        "message":
+            (
+                f"{product['name']} "
+                "교환 신청이 완료되었습니다."
+            ),
+
+        "exchange": {
+            "id":
+                exchange["id"],
+
+            "product_id":
+                product["id"],
+
+            "product_name":
+                product["name"],
+
+            "price_points":
+                price_points,
+
+            "status":
+                "requested",
+
+            "created_at":
+                exchange[
+                    "created_at"
+                ].isoformat(),
+        },
+
+        "points": {
+            "spent":
+                price_points,
+
+            "balance":
+                point_transaction[
+                    "balance_after"
+                ],
+        },
+    }
+
+
+# =========================
+# POINT SHOP
+# 내 교환 내역
+# =========================
+
+@app.get(
+    "/api/point-shop/exchanges/me"
+)
+def get_my_point_shop_exchanges(
+    user = Depends(
+        require_user
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    product_id,
+                    product_name,
+                    price_points,
+                    status,
+                    created_at,
+                    completed_at
+
+                FROM point_shop_exchanges
+
+                WHERE
+                    user_id = %s
+
+                ORDER BY
+                    created_at DESC,
+                    id DESC
+                """,
+                (
+                    user["id"],
+                ),
+            )
+
+
+            exchanges = (
+                cursor.fetchall()
+            )
+
+
+    return [
+        {
+            "id":
+                exchange["id"],
+
+            "product_id":
+                exchange["product_id"],
+
+            "product_name":
+                exchange["product_name"],
+
+            "price_points":
+                int(
+                    exchange[
+                        "price_points"
+                    ]
+                ),
+
+            "status":
+                exchange["status"],
+
+            "created_at":
+                exchange[
+                    "created_at"
+                ].isoformat(),
+
+            "completed_at":
+                (
+                    exchange[
+                        "completed_at"
+                    ].isoformat()
+
+                    if exchange[
+                        "completed_at"
+                    ]
+
+                    else None
+                ),
+        }
+
+        for exchange
+        in exchanges
+    ]
 
 # =========================
 # PREDICTIONS

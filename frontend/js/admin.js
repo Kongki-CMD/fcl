@@ -62,6 +62,71 @@ const adminResultListElement =
         "#admin-result-list"
     );
 
+const adminPointShopFormElement =
+    document.querySelector(
+        "#admin-point-shop-form"
+    );
+
+
+const adminPointShopNameElement =
+    document.querySelector(
+        "#admin-point-shop-name"
+    );
+
+
+const adminPointShopCategoryElement =
+    document.querySelector(
+        "#admin-point-shop-category"
+    );
+
+
+const adminPointShopPriceElement =
+    document.querySelector(
+        "#admin-point-shop-price"
+    );
+
+
+const adminPointShopSortOrderElement =
+    document.querySelector(
+        "#admin-point-shop-sort-order"
+    );
+
+
+const adminPointShopImageUrlElement =
+    document.querySelector(
+        "#admin-point-shop-image-url"
+    );
+
+
+const adminPointShopDescriptionElement =
+    document.querySelector(
+        "#admin-point-shop-description"
+    );
+
+
+const adminPointShopActiveElement =
+    document.querySelector(
+        "#admin-point-shop-active"
+    );
+
+
+const adminPointShopFormMessageElement =
+    document.querySelector(
+        "#admin-point-shop-form-message"
+    );
+
+
+const adminPointShopCreateButtonElement =
+    document.querySelector(
+        "#admin-point-shop-create-button"
+    );
+
+
+const adminPointShopProductListElement =
+    document.querySelector(
+        "#admin-point-shop-product-list"
+    );
+
 const adminScheduleListElement =
     document.querySelector(
         "#admin-schedule-list"
@@ -134,6 +199,11 @@ const adminResultEditGridElement =
 document.querySelector(
     "#admin-result-edit-grid"
 );
+
+const adminPointShopExchangeListElement =
+    document.querySelector(
+        "#admin-point-shop-exchange-list"
+    );
 
 
 let editingAdminResult = null;
@@ -450,6 +520,17 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminPhotoRequests();
+                }
+
+                if (
+                    targetPage
+                    === "point-shop"
+                ) {
+
+                    loadAdminPointShopProducts();
+
+                    loadAdminPointShopExchanges();
+
                 }
 
             }
@@ -3967,6 +4048,1344 @@ async function changeAdminUserRole(
 
         buttonElement.disabled =
             false;
+
+    }
+
+}
+
+// =========================================
+// POINT SHOP
+// HTML escape
+// =========================================
+
+function escapeAdminHtml(
+    value
+) {
+
+    return String(
+        value ?? ""
+    )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            "\"",
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 상품 조회
+// =========================================
+
+async function loadAdminPointShopProducts() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminPointShopProductListElement
+        .textContent =
+            "상품을 불러오는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/point-shop/products",
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "교환 상품 조회 실패"
+            );
+
+        }
+
+
+        renderAdminPointShopProducts(
+            data
+        );
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        adminPointShopProductListElement
+            .textContent =
+                error.message;
+
+    }
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 상품 출력
+// =========================================
+
+function renderAdminPointShopProducts(
+    products
+) {
+
+    adminPointShopProductListElement
+        .innerHTML = "";
+
+
+    if (
+        products.length
+        === 0
+    ) {
+
+        adminPointShopProductListElement
+            .textContent =
+                "등록된 교환 상품이 없습니다.";
+
+        return;
+
+    }
+
+
+    products.forEach(
+        (product) => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.className =
+                "admin-point-shop-product-card";
+
+
+            cardElement.dataset.productId =
+                product.id;
+
+
+            cardElement.innerHTML = `
+                <div
+                    class="admin-point-shop-product-card-header"
+                >
+
+                    <div>
+
+                        <strong>
+                            ${escapeAdminHtml(
+                                product.name
+                            )}
+                        </strong>
+
+                        <span>
+                            상품 ID #${product.id}
+                        </span>
+
+                    </div>
+
+                    <span
+                        class="
+                            admin-point-shop-status
+                            ${
+                                product.is_active
+                                    ? "active"
+                                    : "inactive"
+                            }
+                        "
+                    >
+                        ${
+                            product.is_active
+                                ? "판매 중"
+                                : "판매 중지"
+                        }
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="admin-point-shop-edit-grid"
+                >
+
+                    <label>
+                        상품명
+
+                        <input
+                            type="text"
+                            class="admin-point-shop-edit-name"
+                            value="${escapeAdminHtml(
+                                product.name
+                            )}"
+                        >
+                    </label>
+
+
+                    <label>
+                        카테고리
+
+                        <input
+                            type="text"
+                            class="admin-point-shop-edit-category"
+                            value="${escapeAdminHtml(
+                                product.category
+                                ?? ""
+                            )}"
+                        >
+                    </label>
+
+
+                    <label>
+                        필요 포인트
+
+                        <input
+                            type="number"
+                            min="1"
+                            class="admin-point-shop-edit-price"
+                            value="${product.price_points}"
+                        >
+                    </label>
+
+
+                    <label>
+                        정렬 순서
+
+                        <input
+                            type="number"
+                            min="0"
+                            class="admin-point-shop-edit-sort-order"
+                            value="${product.sort_order}"
+                        >
+                    </label>
+
+
+                    <label
+                        class="admin-point-shop-wide"
+                    >
+                        이미지 경로 / URL
+
+                        <input
+                            type="text"
+                            class="admin-point-shop-edit-image-url"
+                            value="${escapeAdminHtml(
+                                product.image_url
+                                ?? ""
+                            )}"
+                        >
+                    </label>
+
+
+                    <label
+                        class="admin-point-shop-wide"
+                    >
+                        상품 설명
+
+                        <textarea
+                            rows="3"
+                            class="admin-point-shop-edit-description"
+                        >${escapeAdminHtml(
+                            product.description
+                            ?? ""
+                        )}</textarea>
+                    </label>
+
+                </div>
+
+
+                <div
+                    class="admin-point-shop-card-actions"
+                >
+
+                    <label>
+
+                        <input
+                            type="checkbox"
+                            class="admin-point-shop-edit-active"
+                            ${
+                                product.is_active
+                                    ? "checked"
+                                    : ""
+                            }
+                        >
+
+                        판매 중
+
+                    </label>
+
+
+                    <span
+                        class="admin-point-shop-card-message"
+                    ></span>
+
+
+                    <button
+                        type="button"
+                        class="admin-point-shop-save-button"
+                    >
+                        저장
+                    </button>
+
+                </div>
+            `;
+
+
+            const saveButtonElement =
+                cardElement.querySelector(
+                    ".admin-point-shop-save-button"
+                );
+
+
+            saveButtonElement.addEventListener(
+                "click",
+                () => {
+
+                    saveAdminPointShopProduct(
+                        cardElement
+                    );
+
+                }
+            );
+
+
+            adminPointShopProductListElement
+                .appendChild(
+                    cardElement
+                );
+
+        }
+    );
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 상품 등록
+// =========================================
+
+adminPointShopFormElement.addEventListener(
+    "submit",
+    async (
+        event
+    ) => {
+
+        event.preventDefault();
+
+
+        const name =
+            adminPointShopNameElement
+                .value
+                .trim();
+
+
+        const pricePoints =
+            Number(
+                adminPointShopPriceElement
+                    .value
+            );
+
+
+        const sortOrder =
+            Number(
+                adminPointShopSortOrderElement
+                    .value
+            );
+
+
+        if (!name) {
+
+            adminPointShopFormMessageElement
+                .textContent =
+                    "상품명을 입력해주세요.";
+
+            return;
+
+        }
+
+
+        if (
+            !Number.isInteger(
+                pricePoints
+            )
+            ||
+            pricePoints <= 0
+        ) {
+
+            adminPointShopFormMessageElement
+                .textContent =
+                    "필요 포인트를 확인해주세요.";
+
+            return;
+
+        }
+
+
+        if (
+            !Number.isInteger(
+                sortOrder
+            )
+            ||
+            sortOrder < 0
+        ) {
+
+            adminPointShopFormMessageElement
+                .textContent =
+                    "정렬 순서를 확인해주세요.";
+
+            return;
+
+        }
+
+
+        const adminToken =
+            getAdminToken();
+
+
+        adminPointShopCreateButtonElement
+            .disabled = true;
+
+
+        adminPointShopFormMessageElement
+            .textContent =
+                "등록 중...";
+
+
+        try {
+
+            const response =
+                await fetch(
+                    `${apiBaseUrl}`
+                    + "/api/admin/point-shop/products",
+                    {
+                        method:
+                            "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+
+                            "X-Admin-Token":
+                                adminToken,
+                        },
+
+                        body:
+                            JSON.stringify({
+                                name:
+                                    name,
+
+                                category:
+                                    (
+                                        adminPointShopCategoryElement
+                                            .value
+                                            .trim()
+                                        ||
+                                        null
+                                    ),
+
+                                description:
+                                    (
+                                        adminPointShopDescriptionElement
+                                            .value
+                                            .trim()
+                                        ||
+                                        null
+                                    ),
+
+                                price_points:
+                                    pricePoints,
+
+                                image_url:
+                                    (
+                                        adminPointShopImageUrlElement
+                                            .value
+                                            .trim()
+                                        ||
+                                        null
+                                    ),
+
+                                is_active:
+                                    adminPointShopActiveElement
+                                        .checked,
+
+                                sort_order:
+                                    sortOrder,
+                            }),
+                    }
+                );
+
+
+            const data =
+                await response.json();
+
+
+            if (
+                response.status
+                === 401
+            ) {
+
+                sessionStorage.removeItem(
+                    adminTokenStorageKey
+                );
+
+                showAdminLogin();
+
+                return;
+
+            }
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.detail
+                    ??
+                    "상품 등록 실패"
+                );
+
+            }
+
+
+            adminPointShopFormElement
+                .reset();
+
+
+            adminPointShopSortOrderElement
+                .value = "0";
+
+
+            adminPointShopActiveElement
+                .checked = true;
+
+
+            adminPointShopFormMessageElement
+                .textContent =
+                    "상품이 등록되었습니다.";
+
+
+            await loadAdminPointShopProducts();
+
+
+        } catch (
+            error
+        ) {
+
+            console.error(
+                error
+            );
+
+
+            adminPointShopFormMessageElement
+                .textContent =
+                    error.message;
+
+
+        } finally {
+
+            adminPointShopCreateButtonElement
+                .disabled = false;
+
+        }
+
+    }
+);
+
+
+// =========================================
+// POINT SHOP
+// 상품 수정
+// =========================================
+
+async function saveAdminPointShopProduct(
+    cardElement
+) {
+
+    const productId =
+        Number(
+            cardElement.dataset
+                .productId
+        );
+
+
+    const name =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-edit-name"
+            )
+            .value
+            .trim();
+
+
+    const category =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-edit-category"
+            )
+            .value
+            .trim();
+
+
+    const pricePoints =
+        Number(
+            cardElement
+                .querySelector(
+                    ".admin-point-shop-edit-price"
+                )
+                .value
+        );
+
+
+    const sortOrder =
+        Number(
+            cardElement
+                .querySelector(
+                    ".admin-point-shop-edit-sort-order"
+                )
+                .value
+        );
+
+
+    const imageUrl =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-edit-image-url"
+            )
+            .value
+            .trim();
+
+
+    const description =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-edit-description"
+            )
+            .value
+            .trim();
+
+
+    const isActive =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-edit-active"
+            )
+            .checked;
+
+
+    const messageElement =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-card-message"
+            );
+
+
+    const saveButtonElement =
+        cardElement
+            .querySelector(
+                ".admin-point-shop-save-button"
+            );
+
+
+    if (!name) {
+
+        messageElement.textContent =
+            "상품명을 입력해주세요.";
+
+        return;
+
+    }
+
+
+    if (
+        !Number.isInteger(
+            pricePoints
+        )
+        ||
+        pricePoints <= 0
+    ) {
+
+        messageElement.textContent =
+            "포인트를 확인해주세요.";
+
+        return;
+
+    }
+
+
+    if (
+        !Number.isInteger(
+            sortOrder
+        )
+        ||
+        sortOrder < 0
+    ) {
+
+        messageElement.textContent =
+            "정렬 순서를 확인해주세요.";
+
+        return;
+
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    saveButtonElement.disabled =
+        true;
+
+
+    messageElement.textContent =
+        "저장 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/point-shop/products/${productId}`,
+                {
+                    method:
+                        "PATCH",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            name:
+                                name,
+
+                            category:
+                                category
+                                || null,
+
+                            description:
+                                description
+                                || null,
+
+                            price_points:
+                                pricePoints,
+
+                            image_url:
+                                imageUrl
+                                || null,
+
+                            is_active:
+                                isActive,
+
+                            sort_order:
+                                sortOrder,
+                        }),
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "상품 수정 실패"
+            );
+
+        }
+
+
+        await loadAdminPointShopProducts();
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+    } finally {
+
+        saveButtonElement.disabled =
+            false;
+
+    }
+
+}
+
+// =========================================
+// POINT SHOP
+// 교환 상태 표시
+// =========================================
+
+function getPointShopExchangeStatusText(
+    status
+) {
+
+    if (
+        status === "requested"
+    ) {
+        return "처리 대기";
+    }
+
+
+    if (
+        status === "completed"
+    ) {
+        return "처리 완료";
+    }
+
+
+    if (
+        status === "cancelled"
+    ) {
+        return "취소";
+    }
+
+
+    return status;
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 날짜 표시
+// =========================================
+
+function formatPointShopDateTime(
+    dateText
+) {
+
+    if (!dateText) {
+        return "-";
+    }
+
+
+    const date =
+        new Date(
+            dateText
+        );
+
+
+    return date.toLocaleString(
+        "ko-KR"
+    );
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 교환 신청 조회
+// =========================================
+
+async function loadAdminPointShopExchanges() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminPointShopExchangeListElement
+        .textContent =
+            "교환 신청을 불러오는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/point-shop/exchanges",
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "교환 신청 조회 실패"
+            );
+
+        }
+
+
+        renderAdminPointShopExchanges(
+            data
+        );
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        adminPointShopExchangeListElement
+            .textContent =
+                error.message;
+
+    }
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 교환 신청 출력
+// =========================================
+
+function renderAdminPointShopExchanges(
+    exchanges
+) {
+
+    adminPointShopExchangeListElement
+        .innerHTML = "";
+
+
+    if (
+        exchanges.length
+        === 0
+    ) {
+
+        adminPointShopExchangeListElement
+            .textContent =
+                "아직 교환 신청이 없습니다.";
+
+        return;
+
+    }
+
+
+    exchanges.forEach(
+        (exchange) => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.className =
+                "admin-point-shop-exchange-card";
+
+
+            const isRequested =
+                exchange.status
+                === "requested";
+
+
+            cardElement.innerHTML = `
+                <div
+                    class="admin-point-shop-exchange-top"
+                >
+
+                    <div>
+
+                        <span
+                            class="
+                                admin-point-shop-exchange-status
+                                ${exchange.status}
+                            "
+                        >
+                            ${getPointShopExchangeStatusText(
+                                exchange.status
+                            )}
+                        </span>
+
+                        <strong>
+                            ${escapeAdminHtml(
+                                exchange.product_name
+                            )}
+                        </strong>
+
+                    </div>
+
+
+                    <strong
+                        class="admin-point-shop-exchange-price"
+                    >
+                        ${Number(
+                            exchange.price_points
+                        ).toLocaleString(
+                            "ko-KR"
+                        )} P
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="admin-point-shop-exchange-info"
+                >
+
+                    <div>
+                        <span>
+                            신청자
+                        </span>
+
+                        <strong>
+                            ${escapeAdminHtml(
+                                exchange.nickname
+                            )}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            이메일
+                        </span>
+
+                        <strong>
+                            ${escapeAdminHtml(
+                                exchange.email
+                            )}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            신청일
+                        </span>
+
+                        <strong>
+                            ${formatPointShopDateTime(
+                                exchange.created_at
+                            )}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>
+                            처리일
+                        </span>
+
+                        <strong>
+                            ${formatPointShopDateTime(
+                                exchange.completed_at
+                            )}
+                        </strong>
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="admin-point-shop-exchange-actions"
+                >
+
+                    <span
+                        class="admin-point-shop-card-message"
+                    ></span>
+
+
+                    ${
+                        isRequested
+                            ?
+                            `
+                                <button
+                                    type="button"
+                                    class="admin-point-shop-complete-button"
+                                >
+                                    처리 완료
+                                </button>
+                            `
+                            :
+                            ""
+                    }
+
+                </div>
+            `;
+
+
+            if (
+                isRequested
+            ) {
+
+                const completeButtonElement =
+                    cardElement.querySelector(
+                        ".admin-point-shop-complete-button"
+                    );
+
+
+                completeButtonElement
+                    .addEventListener(
+                        "click",
+                        () => {
+
+                            completeAdminPointShopExchange(
+                                exchange,
+                                cardElement
+                            );
+
+                        }
+                    );
+
+            }
+
+
+            adminPointShopExchangeListElement
+                .appendChild(
+                    cardElement
+                );
+
+        }
+    );
+
+}
+
+
+// =========================================
+// POINT SHOP
+// 교환 처리 완료
+// =========================================
+
+async function completeAdminPointShopExchange(
+    exchange,
+    cardElement
+) {
+
+    const confirmed =
+        confirm(
+            `${exchange.nickname}님의\n`
+            +
+            `${exchange.product_name}\n\n`
+            +
+            "상품 전달을 완료했습니까?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const buttonElement =
+        cardElement.querySelector(
+            ".admin-point-shop-complete-button"
+        );
+
+
+    const messageElement =
+        cardElement.querySelector(
+            ".admin-point-shop-card-message"
+        );
+
+
+    buttonElement.disabled =
+        true;
+
+
+    buttonElement.textContent =
+        "처리 중...";
+
+
+    messageElement.textContent =
+        "";
+
+
+    try {
+
+        const adminToken =
+            getAdminToken();
+
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/point-shop/exchanges/`
+                + `${exchange.id}/complete`,
+                {
+                    method:
+                        "PATCH",
+
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "교환 처리 실패"
+            );
+
+        }
+
+
+        await loadAdminPointShopExchanges();
+
+
+    } catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            "처리 완료";
 
     }
 

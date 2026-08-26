@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL - 이벤트</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+                </span>
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu">
+
+                <li class="menu-item">
+                    <a href="#">
+                        경기
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./schedule.html">
+                                경기 일정
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./results.html">
+                                경기 결과
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./rules.html">
+                                경기 규칙
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        기록
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./standings.html">
+                                팀 기록
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./players.html">
+                                선수 기록
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+
+                <li class="menu-item">
+                    <a href="#">
+                        커뮤니티
+                    </a>
+
+                    <ul class="sub-menu">
+                        <li>
+                            <a href="./preseason.html">
+                                친선전 예약
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./community.html">
+                                자유게시판
+                            </a>
+                        </li>
+
+                        <li>
+                            <a href="./player-photo-request.html">
+                                선수 사진 요청
+                            </a>
+                        </li>
+                    </ul>
+                </li>
+
+            </ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="event-page">
+
+    <section class="event-header">
+        <h1>이벤트</h1>
+
+        <p>
+            FCL에서 진행되는 다양한 이벤트에 참여해보세요.
+        </p>
+    </section>
+
+
+    <section class="event-container">
+
+        <nav
+            class="event-tabs"
+            id="event-tabs"
+        >
+            <button
+                type="button"
+                class="event-tab-button active"
+                data-event-tab="attendance"
+            >
+                출석체크
+            </button>
+        </nav>
+
+
+        <div class="event-content">
+
+            <section
+                class="event-panel active"
+                data-event-panel="attendance"
+            >
+
+                <div class="attendance-card">
+
+                    <div class="attendance-card-header">
+
+                        <div>
+                            <span class="attendance-label">
+                                DAILY EVENT
+                            </span>
+
+                            <h2>
+                                출석체크
+                            </h2>
+
+                            <p>
+                                매일 FCL에 방문하고 출석 보상을 받아보세요.
+                            </p>
+                        </div>
+
+                    </div>
+
+
+                    <div class="attendance-status">
+
+                        <div class="attendance-status-item">
+                            <span>
+                                오늘 출석
+                            </span>
+
+                            <strong
+                                id="attendance-today-status"
+                            >
+                                확인 중
+                            </strong>
+                        </div>
+
+
+                        <div class="attendance-status-item">
+                            <span>
+                                누적 출석
+                            </span>
+
+                            <strong
+                                id="attendance-total-count"
+                            >
+                                -
+                            </strong>
+                        </div>
+
+
+                        <div class="attendance-status-item">
+                            <span>
+                                오늘 보상
+                            </span>
+
+                            <strong
+                                id="attendance-reward-points"
+                            >
+                                미정
+                            </strong>
+                        </div>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="attendance-check-button"
+                        id="attendance-check-button"
+                        disabled
+                    >
+                        준비 중
+                    </button>
+                    <div class="attendance-calendar">
+
+                        <div class="attendance-calendar-header">
+
+                            <h3
+                                id="attendance-calendar-title"
+                            >
+                                출석 달력
+                            </h3>
+
+                        </div>
+
+
+                        <div class="attendance-calendar-weekdays">
+
+                            <span>일</span>
+                            <span>월</span>
+                            <span>화</span>
+                            <span>수</span>
+                            <span>목</span>
+                            <span>금</span>
+                            <span>토</span>
+
+                        </div>
+
+
+                        <div
+                            class="attendance-calendar-grid"
+                            id="attendance-calendar-grid"
+                        ></div>
+
+                    </div>
+
+
+
+                    <p
+                        class="attendance-message"
+                        id="attendance-message"
+                    >
+                        출석 보상 정책을 준비하고 있습니다.
+                    </p>
+
+                </div>
+
+            </section>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<footer id="site-footer"></footer>
+
+
+<script
+    type="module"
+    src="./js/event.js?v=attendance-calendar-1"
+></script>
+
+    <script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>

@@ -108,11 +108,18 @@ if (siteMainMenuElement) {
 
         {
             label: "놀이터",
-
             children: [
                 {
                     label: "승부예측",
                     href: "./prediction.html",
+                },
+                {
+                    label: "이벤트",
+                    href: "./event.html",
+                },
+                {
+                    label: "포인트 교환소",
+                    href: "./point-shop.html",
                 },
             ],
         },
