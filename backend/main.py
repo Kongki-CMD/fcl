@@ -13588,32 +13588,78 @@ def get_player_rankings():
 
             cursor.execute(
                 """
-                WITH base_player_rows AS (
+                WITH regular_squad_series AS (
+
+                    SELECT DISTINCT
+                        sssp.participant_id,
+                        s.id AS series_id,
+                        s.completed_at
+
+                    FROM series_set_squad_players
+                        AS sssp
+
+                    JOIN series_sets AS ss
+                        ON ss.id =
+                            sssp.series_set_id
+
+                    JOIN series AS s
+                        ON s.id =
+                            ss.series_id
+
+                    WHERE
+                        s.series_type =
+                            '정규리그'
+
+                        AND
+                        s.status =
+                            'completed'
+
+                        AND
+                        sssp.sp_position
+                            BETWEEN 0 AND 27
+                ),
+
+
+                ranked_regular_series AS (
 
                     SELECT
-                        sssp.participant_id,
-
-                        TRIM(
-                            sssp.player_name
-                        )
-                            AS player_name,
-
-                        sssp.sp_id,
-
-                        sssp.image_url,
+                        participant_id,
+                        series_id,
 
                         ROW_NUMBER() OVER (
                             PARTITION BY
-                                sssp.participant_id,
-                                TRIM(
-                                    sssp.player_name
-                                )
+                                participant_id
 
                             ORDER BY
-                                sssp.created_at DESC,
-                                sssp.id DESC
+                                completed_at DESC
+                                    NULLS LAST,
+                                series_id DESC
                         )
                             AS row_number
+
+                    FROM regular_squad_series
+                ),
+
+
+                latest_regular_series AS (
+
+                    SELECT
+                        participant_id,
+                        series_id
+
+                    FROM ranked_regular_series
+
+                    WHERE
+                        row_number = 1
+                ),
+
+
+                preseason_squad_series AS (
+
+                    SELECT DISTINCT
+                        sssp.participant_id,
+                        s.id AS series_id,
+                        s.completed_at
 
                     FROM series_set_squad_players
                         AS sssp
@@ -13636,10 +13682,152 @@ def get_player_rankings():
 
                         AND
                         sssp.sp_position
-                            BETWEEN 1 AND 27
+                            BETWEEN 0 AND 27
                 ),
 
-                base_players AS (
+
+                ranked_preseason_series AS (
+
+                    SELECT
+                        participant_id,
+                        series_id,
+
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                participant_id
+
+                            ORDER BY
+                                completed_at DESC
+                                    NULLS LAST,
+                                series_id DESC
+                        )
+                            AS row_number
+
+                    FROM preseason_squad_series
+                ),
+
+
+                latest_preseason_series AS (
+
+                    SELECT
+                        participant_id,
+                        series_id
+
+                    FROM ranked_preseason_series
+
+                    WHERE
+                        row_number = 1
+                ),
+
+
+                current_squad_source AS (
+
+                    SELECT
+                        participant_id,
+                        series_id
+
+                    FROM latest_regular_series
+
+
+                    UNION ALL
+
+
+                    SELECT
+                        preseason.participant_id,
+                        preseason.series_id
+
+                    FROM latest_preseason_series
+                        AS preseason
+
+                    WHERE NOT EXISTS (
+                        SELECT 1
+
+                        FROM latest_regular_series
+                            AS regular
+
+                        WHERE
+                            regular.participant_id =
+                                preseason.participant_id
+                    )
+                ),
+
+                latest_squad_set AS (
+
+                    SELECT
+                        source.participant_id,
+                        source.series_id,
+
+                        MAX(
+                            ss.set_number
+                        )
+                            AS set_number
+
+                    FROM current_squad_source
+                        AS source
+
+                    JOIN series_sets AS ss
+                        ON ss.series_id =
+                            source.series_id
+
+                    GROUP BY
+                        source.participant_id,
+                        source.series_id
+                ),
+
+
+                current_squad_rows AS (
+
+                    SELECT
+                        sssp.participant_id,
+
+                        TRIM(
+                            sssp.player_name
+                        )
+                            AS player_name,
+
+                        sssp.sp_id,
+                        sssp.image_url,
+
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                sssp.participant_id,
+                                TRIM(
+                                    sssp.player_name
+                                )
+
+                            ORDER BY
+                                sssp.created_at DESC,
+                                sssp.id DESC
+                        )
+                            AS row_number
+
+                    FROM latest_squad_set
+                        AS latest_set
+
+                    JOIN series_sets AS ss
+                        ON ss.series_id =
+                            latest_set.series_id
+
+                        AND
+                        ss.set_number =
+                            latest_set.set_number
+
+                    JOIN series_set_squad_players
+                        AS sssp
+                        ON sssp.series_set_id =
+                            ss.id
+
+                        AND
+                        sssp.participant_id =
+                            latest_set.participant_id
+
+                    WHERE
+                        sssp.sp_position
+                            BETWEEN 0 AND 27
+                ),
+
+
+                current_squad_players AS (
 
                     SELECT
                         participant_id,
@@ -13647,11 +13835,12 @@ def get_player_rankings():
                         sp_id,
                         image_url
 
-                    FROM base_player_rows
+                    FROM current_squad_rows
 
                     WHERE
                         row_number = 1
                 ),
+
 
                 regular_stats AS (
 
@@ -13662,30 +13851,6 @@ def get_player_rankings():
                             sps.player_name
                         )
                             AS player_name,
-
-                        (
-                            ARRAY_AGG(
-                                sps.sp_id
-
-                                ORDER BY
-                                    s.completed_at DESC
-                                        NULLS LAST,
-                                    s.id DESC
-                            )
-                        )[1]
-                            AS sp_id,
-
-                        (
-                            ARRAY_AGG(
-                                sps.image_url
-
-                                ORDER BY
-                                    s.completed_at DESC
-                                        NULLS LAST,
-                                    s.id DESC
-                            )
-                        )[1]
-                            AS image_url,
 
                         SUM(
                             sps.sets_played
@@ -13729,6 +13894,7 @@ def get_player_rankings():
                         )
                 ),
 
+
                 regular_mvp AS (
 
                     SELECT
@@ -13761,25 +13927,8 @@ def get_player_rankings():
                         TRIM(
                             sm.player_name
                         )
-                ),
-
-
-                all_players AS (
-
-                    SELECT
-                        participant_id,
-                        player_name
-
-                    FROM base_players
-
-                    UNION
-
-                    SELECT
-                        participant_id,
-                        player_name
-
-                    FROM regular_stats
                 )
+
 
                 SELECT
                     p.id
@@ -13790,19 +13939,11 @@ def get_player_rankings():
                     p.fc_nickname
                         AS nickname,
 
-                    ap.player_name,
+                    csp.player_name,
 
-                    COALESCE(
-                        rs.sp_id,
-                        bp.sp_id
-                    )
-                        AS sp_id,
+                    csp.sp_id,
 
-                    COALESCE(
-                        rs.image_url,
-                        bp.image_url
-                    )
-                        AS image_url,
+                    csp.image_url,
 
                     COALESCE(
                         rs.sets_played,
@@ -13834,35 +13975,28 @@ def get_player_rankings():
                     )
                         AS mvp_count
 
-                FROM all_players AS ap
+                FROM current_squad_players
+                    AS csp
 
                 JOIN participants AS p
                     ON p.id =
-                        ap.participant_id
-
-                LEFT JOIN base_players AS bp
-                    ON bp.participant_id =
-                        ap.participant_id
-
-                    AND
-                    bp.player_name =
-                        ap.player_name
+                        csp.participant_id
 
                 LEFT JOIN regular_stats AS rs
                     ON rs.participant_id =
-                        ap.participant_id
+                        csp.participant_id
 
                     AND
                     rs.player_name =
-                        ap.player_name
+                        csp.player_name
 
                 LEFT JOIN regular_mvp AS rm
                     ON rm.participant_id =
-                        ap.participant_id
+                        csp.participant_id
 
                     AND
                     rm.player_name =
-                        ap.player_name
+                        csp.player_name
 
                 ORDER BY
                     COALESCE(
@@ -13880,12 +14014,11 @@ def get_player_rankings():
                         0
                     ) DESC,
 
-                    ap.player_name ASC,
+                    csp.player_name ASC,
 
                     p.id ASC
                 """
             )
-
 
             rows = cursor.fetchall()
 
