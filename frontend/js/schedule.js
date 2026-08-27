@@ -1109,8 +1109,16 @@ function renderSchedule(matches) {
                 <div class="team-box">
 
                     <img
-                        src="${getTeamImagePath(match.team_a)}"
-                        alt="${match.team_a} 로고"
+                        src="${
+                            match.team_a_current_team_logo_path
+                            ?? getTeamImagePath(
+                                match.team_a
+                            )
+                        }"
+                        alt="${
+                            match.team_a_current_team_name
+                            ?? match.team_a
+                        } 로고"
                         class="team-image"
                     >
 
@@ -1129,8 +1137,16 @@ function renderSchedule(matches) {
                 <div class="team-box">
 
                     <img
-                        src="${getTeamImagePath(match.team_b)}"
-                        alt="${match.team_b} 로고"
+                        src="${
+                            match.team_b_current_team_logo_path
+                            ?? getTeamImagePath(
+                                match.team_b
+                            )
+                        }"
+                        alt="${
+                            match.team_b_current_team_name
+                            ?? match.team_b
+                        } 로고"
                         class="team-image"
                     >
 

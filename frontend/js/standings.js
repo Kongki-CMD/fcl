@@ -55,8 +55,14 @@ function renderStandings(standings) {
             <td>
                 <div class="standing-team">
                     <img
-                        src="${getTeamImagePath(team.name)}"
-                        alt=""
+                        src="${
+                            team.current_team_logo_path
+                            ?? getTeamImagePath(team.name)
+                        }"
+                        alt="${
+                            team.current_team_name
+                            ?? team.name
+                        } 로고"
                         class="team-image"
                     >
 

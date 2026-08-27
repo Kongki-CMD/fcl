@@ -4957,6 +4957,109 @@ def admin_update_participant_team(
 
         with connection.cursor() as cursor:
 
+            # =========================
+            # 참가자 존재 확인 + 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    fcl_name
+
+                FROM participants
+
+                WHERE id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    participant_id,
+                ),
+            )
+
+
+            existing_participant = (
+                cursor.fetchone()
+            )
+
+
+            if not existing_participant:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "참가자를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 진행 중 SERIES 보호
+            #
+            # 경기 진행 중에는
+            # 현재 팀 변경 금지
+            #
+            # 시작 순간 저장된 Snapshot과
+            # participants 현재 팀 정보가
+            # 서로 달라지는 상황 방지
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    series_type,
+                    playoff_stage
+
+                FROM series
+
+                WHERE
+                    status = 'active'
+
+                    AND (
+                        team_a_id = %s
+                        OR
+                        team_b_id = %s
+                    )
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    participant_id,
+                    participant_id,
+                ),
+            )
+
+
+            active_series = (
+                cursor.fetchone()
+            )
+
+
+            if active_series:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "진행 중인 경기가 있는 "
+                        "참가자의 팀은 "
+                        "변경할 수 없습니다. "
+                        "경기 종료 후 다시 시도해주세요."
+                    ),
+                )
+
+
+            # =========================
+            # 참가자 현재 팀 변경
+            #
+            # 과거 SERIES Snapshot은
+            # 절대 수정하지 않음
+            # =========================
+
             cursor.execute(
                 """
                 UPDATE participants
@@ -4988,21 +5091,188 @@ def admin_update_participant_team(
             )
 
 
-            if not participant:
-
-                raise HTTPException(
-                    status_code=404,
-                    detail=(
-                        "참가자를 "
-                        "찾을 수 없습니다."
-                    ),
-                )
-
-
         connection.commit()
 
 
     return participant
+
+# =========================
+# ADMIN TEAM LOGO INTEGRITY
+# 현재 / 과거 팀 로고 파일 무결성 검사
+# =========================
+
+@app.get(
+    "/api/admin/team-logo-integrity"
+)
+def admin_check_team_logo_integrity(
+    admin_token: str =
+        Depends(
+            require_admin
+        )
+):
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 현재 참가자 팀 로고
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                    current_team_logo_path
+                        AS logo_path
+
+                FROM participants
+
+                WHERE
+                    current_team_logo_path
+                    IS NOT NULL
+                """
+            )
+
+            current_logo_rows = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # 과거 SERIES Snapshot 로고
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                    logo_path
+
+                FROM (
+                    SELECT
+                        team_a_snapshot_logo_path
+                            AS logo_path
+
+                    FROM series
+
+                    UNION
+
+                    SELECT
+                        team_b_snapshot_logo_path
+                            AS logo_path
+
+                    FROM series
+                ) AS snapshot_logos
+
+                WHERE
+                    logo_path IS NOT NULL
+                """
+            )
+
+            snapshot_logo_rows = (
+                cursor.fetchall()
+            )
+
+
+    referenced_logo_paths = set()
+
+
+    for row in current_logo_rows:
+
+        referenced_logo_paths.add(
+            row["logo_path"]
+        )
+
+
+    for row in snapshot_logo_rows:
+
+        referenced_logo_paths.add(
+            row["logo_path"]
+        )
+
+
+    history_directory = (
+        FRONTEND_DIR
+        / "assets"
+        / "images"
+        / "teams"
+        / "history"
+    ).resolve()
+
+
+    missing_logo_paths = []
+    invalid_logo_paths = []
+
+
+    for logo_path in sorted(
+        referenced_logo_paths
+    ):
+
+        logo_relative_path = Path(
+            logo_path.removeprefix("./")
+        )
+
+
+        logo_file_path = (
+            FRONTEND_DIR
+            / logo_relative_path
+        ).resolve()
+
+
+        # =========================
+        # history 밖의 잘못된 경로
+        # =========================
+
+        if (
+            history_directory
+            not in logo_file_path.parents
+        ):
+
+            invalid_logo_paths.append(
+                logo_path
+            )
+
+            continue
+
+
+        # =========================
+        # 실제 파일 존재 여부
+        # =========================
+
+        if not logo_file_path.is_file():
+
+            missing_logo_paths.append(
+                logo_path
+            )
+
+
+    return {
+        "ok":
+            (
+                len(missing_logo_paths) == 0
+                and
+                len(invalid_logo_paths) == 0
+            ),
+
+        "referenced_count":
+            len(
+                referenced_logo_paths
+            ),
+
+        "missing_count":
+            len(
+                missing_logo_paths
+            ),
+
+        "invalid_count":
+            len(
+                invalid_logo_paths
+            ),
+
+        "missing_logo_paths":
+            missing_logo_paths,
+
+        "invalid_logo_paths":
+            invalid_logo_paths,
+    }
 
 
 @app.get(
@@ -10785,6 +11055,113 @@ def get_matches():
 
     workbook.close()
 
+    # =========================================
+    # 참가자 현재 팀 정보 연결
+    #
+    # 일정 화면은 항상 participants의
+    # 현재 팀 정보를 사용
+    #
+    # 과거 경기 결과 Snapshot과는 별개
+    # =========================================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    fcl_name,
+                    current_team_name,
+                    current_team_logo_path
+
+                FROM participants
+                """
+            )
+
+            participant_team_rows = (
+                cursor.fetchall()
+            )
+
+
+    participant_team_map = {
+        row["fcl_name"]: row
+        for row in participant_team_rows
+    }
+
+
+    for match in matches:
+
+        team_a_current = (
+            participant_team_map.get(
+                match["team_a"]
+            )
+        )
+
+        team_b_current = (
+            participant_team_map.get(
+                match["team_b"]
+            )
+        )
+
+
+        if team_a_current:
+
+            match[
+                "team_a_current_team_name"
+            ] = (
+                team_a_current[
+                    "current_team_name"
+                ]
+            )
+
+            match[
+                "team_a_current_team_logo_path"
+            ] = (
+                team_a_current[
+                    "current_team_logo_path"
+                ]
+            )
+
+        else:
+
+            match[
+                "team_a_current_team_name"
+            ] = None
+
+            match[
+                "team_a_current_team_logo_path"
+            ] = None
+
+
+        if team_b_current:
+
+            match[
+                "team_b_current_team_name"
+            ] = (
+                team_b_current[
+                    "current_team_name"
+                ]
+            )
+
+            match[
+                "team_b_current_team_logo_path"
+            ] = (
+                team_b_current[
+                    "current_team_logo_path"
+                ]
+            )
+
+        else:
+
+            match[
+                "team_b_current_team_name"
+            ] = None
+
+            match[
+                "team_b_current_team_logo_path"
+            ] = None
+
 
     # =========================================
     # 날짜순
@@ -11734,6 +12111,75 @@ def get_standings():
     ):
 
         record["rank"] = index
+
+
+    # =========================
+    # 참가자 현재 팀 정보
+    #
+    # 현재 화면에서 사용하는 팀 정보는
+    # participants 테이블을 기준으로 함
+    #
+    # 과거 SERIES Snapshot은
+    # 절대 수정하지 않음
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    fcl_name,
+                    current_team_name,
+                    current_team_logo_path
+
+                FROM participants
+                """
+            )
+
+            participant_team_rows = (
+                cursor.fetchall()
+            )
+
+
+    participant_team_map = {
+        row["fcl_name"]: row
+        for row in participant_team_rows
+    }
+
+
+    for record in sorted_standings:
+
+        participant_team = (
+            participant_team_map.get(
+                record["name"]
+            )
+        )
+
+        if participant_team:
+
+            record["current_team_name"] = (
+                participant_team[
+                    "current_team_name"
+                ]
+            )
+
+            record[
+                "current_team_logo_path"
+            ] = (
+                participant_team[
+                    "current_team_logo_path"
+                ]
+            )
+
+        else:
+
+            record["current_team_name"] = None
+
+            record[
+                "current_team_logo_path"
+            ] = None
 
 
     return sorted_standings
@@ -16247,8 +16693,20 @@ def activate_fcl_series(
                     team_a.fcl_name
                         AS team_a,
 
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
                     team_b.fcl_name
-                        AS team_b
+                        AS team_b,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path
 
                 FROM series AS s
 
@@ -16403,6 +16861,9 @@ def activate_fcl_series(
 
             # =========================
             # SERIES 시작
+            #
+            # 경기 시작 순간의 현재 팀을
+            # 역사 보존용 Snapshot으로 고정
             # =========================
 
             cursor.execute(
@@ -16415,12 +16876,35 @@ def activate_fcl_series(
                     completed_at = NULL,
                     finished_at = NULL,
                     stats_sync_status =
-                        'pending'
+                        'pending',
+
+                    team_a_snapshot_name = %s,
+                    team_a_snapshot_logo_path = %s,
+
+                    team_b_snapshot_name = %s,
+                    team_b_snapshot_logo_path = %s
 
                 WHERE id = %s
                 """,
                 (
                     now,
+
+                    series[
+                        "team_a_current_team_name"
+                    ],
+
+                    series[
+                        "team_a_current_team_logo_path"
+                    ],
+
+                    series[
+                        "team_b_current_team_name"
+                    ],
+
+                    series[
+                        "team_b_current_team_logo_path"
+                    ],
+
                     series_id,
                 ),
             )
@@ -17305,11 +17789,29 @@ def manual_complete_fcl_series(
                     finished_at = %s,
                     stats_sync_status = 'pending',
 
-                    team_a_snapshot_name = %s,
-                    team_a_snapshot_logo_path = %s,
+                    team_a_snapshot_name =
+                        COALESCE(
+                            team_a_snapshot_name,
+                            %s
+                        ),
 
-                    team_b_snapshot_name = %s,
-                    team_b_snapshot_logo_path = %s
+                    team_a_snapshot_logo_path =
+                        COALESCE(
+                            team_a_snapshot_logo_path,
+                            %s
+                        ),
+
+                    team_b_snapshot_name =
+                        COALESCE(
+                            team_b_snapshot_name,
+                            %s
+                        ),
+
+                    team_b_snapshot_logo_path =
+                        COALESCE(
+                            team_b_snapshot_logo_path,
+                            %s
+                        )
 
                 WHERE id = %s
                 """,

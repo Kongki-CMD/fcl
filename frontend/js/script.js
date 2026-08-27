@@ -652,8 +652,16 @@ function renderTodayMatches(matches) {
             <div class="team-box">
 
                 <img
-                    src="${getTeamImagePath(match.team_a)}"
-                    alt="${match.team_a} 로고"
+                    src="${
+                        match.team_a_current_team_logo_path
+                        ?? getTeamImagePath(
+                            match.team_a
+                        )
+                    }"
+                    alt="${
+                        match.team_a_current_team_name
+                        ?? match.team_a
+                    } 로고"
                     class="team-image"
                 >
 
@@ -669,12 +677,19 @@ function renderTodayMatches(matches) {
                 VS
             </span>
 
-
             <div class="team-box">
 
                 <img
-                    src="${getTeamImagePath(match.team_b)}"
-                    alt="${match.team_b} 로고"
+                    src="${
+                        match.team_b_current_team_logo_path
+                        ?? getTeamImagePath(
+                            match.team_b
+                        )
+                    }"
+                    alt="${
+                        match.team_b_current_team_name
+                        ?? match.team_b
+                    } 로고"
                     class="team-image"
                 >
 
@@ -1279,6 +1294,24 @@ function renderTeamRanking(standings) {
         );
 
 
+        // =========================================
+        // 현재 팀 정보
+        //
+        // 관리자에서 설정한 participants
+        // current_team_* 값을 우선 사용
+        // =========================================
+
+        const currentTeamLogoPath =
+            team.current_team_logo_path
+            ?? getTeamImagePath(
+                team.name
+            );
+
+        const currentTeamName =
+            team.current_team_name
+            ?? team.name;
+
+
         rankingRowElement.innerHTML = `
 
             <span class="dashboard-rank">
@@ -1289,8 +1322,8 @@ function renderTeamRanking(standings) {
             <div class="dashboard-team">
 
                 <img
-                    src="${getTeamImagePath(team.name)}"
-                    alt="${team.name} 로고"
+                    src="${currentTeamLogoPath}"
+                    alt="${currentTeamName} 로고"
                     class="dashboard-team-image"
                 >
 
