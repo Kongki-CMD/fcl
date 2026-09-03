@@ -9,6 +9,14 @@ import secrets
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from backend.player_catalog import (
+    PLAYER_DATABASE_STAT_FILTER_MAP,
+    get_player_catalog_filter_options,
+    get_player_catalog_nations_by_continent,
+    get_player_catalog_teams_by_league,
+    search_player_catalog,
+)
+
 
 import httpx
 import psycopg
@@ -23,6 +31,7 @@ from fastapi import (
     UploadFile,
     Header,
     Depends,
+    Request,
 )
 
 from fastapi.security import (
@@ -2162,6 +2171,505 @@ def initialize_database():
                 ON community_posts (
                     is_notice,
                     created_at DESC
+                )
+                """
+            )
+
+            # =========================
+            # FC ONLINE 선수도감
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fconline_players (
+                    sp_id BIGINT
+                        PRIMARY KEY,
+
+                    player_name VARCHAR(100)
+                        NOT NULL,
+
+                    season_id INTEGER
+                        NOT NULL,
+
+                    position VARCHAR(10),
+
+                    salary SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    ovr SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    height SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    weight SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    left_foot SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    right_foot SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    nation_id INTEGER,
+
+                    nation_name VARCHAR(100),
+
+                    sprint_speed SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    acceleration SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    finishing SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    shot_power SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    long_shots SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    positioning SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    volleys SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    penalties SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    short_pass SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    vision SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    crossing SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    long_pass SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    free_kick SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    curve SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    dribbling SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    ball_control SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    agility SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    balance SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    reactions SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    marking SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    tackle SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    interceptions SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    heading SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    sliding_tackle SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    strength SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    stamina SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    aggression SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    jumping SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    composure SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    gk_diving SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    gk_handling SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    gk_kick SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    gk_reflexes SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    gk_positioning SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    updated_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW()
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                ALTER TABLE fconline_players
+
+                ADD COLUMN IF NOT EXISTS
+                    skill_moves SMALLINT
+                    NOT NULL
+                    DEFAULT 0
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE fconline_players
+
+                ADD COLUMN IF NOT EXISTS
+                    traits TEXT[]
+                    NOT NULL
+                    DEFAULT '{}'::TEXT[]
+                """
+            )
+
+            # =========================
+            # FC ONLINE 선수 이미지 URL
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    fconline_players
+
+                ADD COLUMN IF NOT EXISTS
+                    image_url TEXT
+                """
+            )
+
+
+            # =========================
+            # FC ONLINE 선수 수집 상태
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    fconline_player_sync_state (
+                        sp_id BIGINT PRIMARY KEY,
+
+                        player_name VARCHAR(100)
+                            NOT NULL
+                            DEFAULT '',
+
+                        status VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'pending',
+
+                        attempt_count INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        last_error TEXT,
+
+                        started_at TIMESTAMPTZ,
+
+                        last_attempt_at TIMESTAMPTZ,
+
+                        completed_at TIMESTAMPTZ,
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW()
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_player_sync_state_status
+
+                ON fconline_player_sync_state (
+                    status
+                )
+                """
+            )
+
+
+            # 기존에 이미 저장된 테스트 선수는
+            # completed 상태로 등록
+            cursor.execute(
+                """
+                INSERT INTO
+                    fconline_player_sync_state (
+                        sp_id,
+                        player_name,
+                        status,
+                        attempt_count,
+                        started_at,
+                        last_attempt_at,
+                        completed_at,
+                        updated_at
+                    )
+
+                SELECT
+                    sp_id,
+                    player_name,
+                    'completed',
+                    1,
+                    created_at,
+                    updated_at,
+                    updated_at,
+                    updated_at
+
+                FROM
+                    fconline_players
+
+                ON CONFLICT (
+                    sp_id
+                )
+
+                DO NOTHING
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    fconline_player_nations (
+                        sp_id BIGINT PRIMARY KEY,
+                        nation_id INTEGER NOT NULL,
+                        nation_name VARCHAR(100) NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL
+                            DEFAULT NOW()
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_player_nations_nation_id
+
+                ON fconline_player_nations (
+                    nation_id
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    fconline_nation_sync_state (
+                        nation_id INTEGER PRIMARY KEY,
+                        nation_name VARCHAR(100) NOT NULL,
+
+                        status VARCHAR(20) NOT NULL
+                            DEFAULT 'pending',
+
+                        card_count INTEGER NOT NULL
+                            DEFAULT 0,
+
+                        last_error TEXT,
+
+                        started_at TIMESTAMPTZ,
+                        completed_at TIMESTAMPTZ,
+
+                        updated_at TIMESTAMPTZ NOT NULL
+                            DEFAULT NOW()
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_nation_sync_state_status
+
+                ON fconline_nation_sync_state (
+                    status
+                )
+                """
+            )
+
+            # =========================
+            # FC ONLINE 선수 소속팀
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    fconline_player_teams (
+
+                    id BIGSERIAL
+                        PRIMARY KEY,
+
+                    sp_id BIGINT
+                        NOT NULL
+                        REFERENCES fconline_players(
+                            sp_id
+                        )
+                        ON DELETE CASCADE,
+
+                    team_name VARCHAR(150)
+                        NOT NULL,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    UNIQUE (
+                        sp_id,
+                        team_name
+                    )
+                )
+                """
+            )
+
+            # =========================
+            # FC ONLINE 팀컬러 ID
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    fconline_player_teams
+
+                ADD COLUMN IF NOT EXISTS
+                    team_color_id INTEGER
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_player_teams_color_id
+
+                ON fconline_player_teams (
+                    team_color_id
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_players_name
+
+                ON fconline_players (
+                    player_name
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_players_season
+
+                ON fconline_players (
+                    season_id
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_players_position
+
+                ON fconline_players (
+                    position
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_players_nation
+
+                ON fconline_players (
+                    nation_name
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_fconline_player_teams_name
+
+                ON fconline_player_teams (
+                    team_name
                 )
                 """
             )
@@ -22308,6 +22816,10 @@ def get_fconline_season_snapshot_image(
     season_id: int,
 ):
 
+    # =========================================
+    # 1. 기존 snapshot 확인
+    # =========================================
+
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
@@ -22329,31 +22841,186 @@ def get_fconline_season_snapshot_image(
                 ),
             )
 
-
             snapshot = cursor.fetchone()
 
 
-    if not snapshot:
+    # =========================================
+    # 2. 이미 저장되어 있으면 바로 반환
+    # =========================================
 
-        raise HTTPException(
-            status_code=404,
-            detail="저장된 시즌 이미지가 없습니다.",
+    if (
+        snapshot
+        and
+        snapshot["image_data"]
+    ):
+
+        return Response(
+            content=
+                bytes(
+                    snapshot[
+                        "image_data"
+                    ]
+                ),
+
+            media_type=
+                snapshot[
+                    "image_content_type"
+                ],
         )
 
 
+    # =========================================
+    # 3. snapshot이 없으면 Nexon metadata 조회
+    # =========================================
+
+    season_metadata = get_season_metadata()
+
+
+    season = season_metadata.get(
+            season_id
+        )
+
+
+    if not season:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"시즌 메타데이터를 찾을 수 없습니다: "
+                f"{season_id}"
+            ),
+        )
+
+
+    source_image_url = season[
+            "season_image_url"
+        ]
+
+
+    # =========================================
+    # 4. Nexon 시즌 아이콘 다운로드
+    # =========================================
+
+    image_response = httpx.get(
+            source_image_url,
+            timeout=20.0,
+            follow_redirects=True,
+        )
+
+
+    if (
+        image_response.status_code
+        != 200
+    ):
+
+        raise HTTPException(
+            status_code=
+                image_response.status_code,
+
+            detail=
+                "시즌 이미지 다운로드 실패",
+        )
+
+
+    image_data = image_response.content
+
+
+    if not image_data:
+
+        raise HTTPException(
+            status_code=502,
+            detail=
+                "시즌 이미지 데이터가 없습니다.",
+        )
+
+
+    image_content_type = (
+            image_response
+            .headers
+            .get(
+                "content-type",
+                "image/png",
+            )
+            .split(";")[0]
+            .strip()
+        )
+
+
+    # =========================================
+    # 5. DB snapshot 저장
+    # =========================================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    fconline_season_snapshots (
+                        season_id,
+                        class_name,
+                        source_image_url,
+                        image_data,
+                        image_content_type
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    %s
+                )
+
+                ON CONFLICT (
+                    season_id
+                )
+
+                DO UPDATE SET
+                    class_name =
+                        EXCLUDED.class_name,
+
+                    source_image_url =
+                        EXCLUDED.source_image_url,
+
+                    image_data =
+                        EXCLUDED.image_data,
+
+                    image_content_type =
+                        EXCLUDED.image_content_type
+                """,
+                (
+                    season_id,
+
+                    season[
+                        "class_name"
+                    ],
+
+                    source_image_url,
+
+                    image_data,
+
+                    image_content_type,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    # =========================================
+    # 6. 방금 받은 이미지 반환
+    # =========================================
+
     return Response(
         content=
-            bytes(
-                snapshot[
-                    "image_data"
-                ]
-            ),
+            image_data,
 
         media_type=
-            snapshot[
-                "image_content_type"
-            ],
+            image_content_type,
     )
+
 
 @app.post(
     "/api/admin/fconline/season-snapshots/backfill"
@@ -25172,6 +25839,205 @@ def get_community_attachment(
         ),
         media_type=row["content_type"],
     )
+
+
+@app.get(
+    "/api/player-database/filters"
+)
+def get_player_database_filters():
+
+    return (
+        get_player_catalog_filter_options()
+    )
+
+
+@app.get(
+    "/api/player-database/filters/nations"
+)
+def get_player_database_nations(
+    continent_id: int,
+):
+
+    return {
+        "nations":
+            get_player_catalog_nations_by_continent(
+                continent_id
+            )
+    }
+
+
+@app.get(
+    "/api/player-database/filters/teams"
+)
+def get_player_database_teams(
+    league_id: int,
+):
+
+    return {
+        "teams":
+            get_player_catalog_teams_by_league(
+                league_id
+            )
+    }
+
+
+# =========================================
+# FC ONLINE PLAYER DATABASE
+# =========================================
+
+@app.get(
+    "/api/player-database/search"
+)
+def search_player_database_api(
+    request: Request,
+    player_name: str = "",
+    season_id: int | None = None,
+    season_ids: str = "",
+    nation_id: int | None = None,
+    nation_name: str = "",
+    team_color_id: int | None = None,
+    team_name: str = "",
+    position: str = "",
+    positions: str = "",
+    grade: int = 1,
+    adaptation: int = 1,
+    team_color: int = 0,
+    salary_min: int | None = None,
+    salary_max: int | None = None,
+    ovr_min: int | None = None,
+    height_min: int | None = None,
+    height_max: int | None = None,
+    preferred_foot: str = "",
+    page: int = 1,
+    page_size: int = 20,
+):
+
+    try:
+
+        # =================================
+        # 34개 능력치 최소값
+        # =================================
+
+        stat_mins = {}
+
+
+        for (
+            query_name,
+            stat_column,
+        ) in (
+            PLAYER_DATABASE_STAT_FILTER_MAP
+            .items()
+        ):
+
+            raw_value = (
+                request.query_params.get(
+                    query_name
+                )
+            )
+
+
+            if (
+                raw_value is None
+                or
+                raw_value == ""
+            ):
+                continue
+
+
+            try:
+
+                stat_mins[
+                    stat_column
+                ] = int(
+                    raw_value
+                )
+
+            except ValueError as error:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "능력치 검색값이 "
+                        "올바르지 않습니다."
+                    ),
+                ) from error
+
+
+        return search_player_catalog(
+            player_name=
+                player_name,
+
+            season_id=
+                season_id,
+
+            nation_id=
+                nation_id,
+
+            nation_name=
+                nation_name,
+
+            team_color_id=
+                team_color_id,
+
+            team_name=
+                team_name,
+
+            position=
+                position,
+
+            grade=
+                grade,
+
+            adaptation=
+                adaptation,
+
+            team_color=
+                team_color,
+
+            salary_min=
+                salary_min,
+
+            salary_max=
+                salary_max,
+
+            ovr_min=
+                ovr_min,
+
+            height_min=
+                height_min,
+
+            height_max=
+                height_max,
+
+            preferred_foot=
+                preferred_foot,
+
+            stat_mins=
+                stat_mins,
+
+            page=
+                page,
+
+            page_size=
+                page_size,
+
+            season_ids=
+                season_ids,
+
+            positions=
+                positions,
+
+        )
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(
+                error
+            ),
+        ) from error
+
 
 
 # =========================

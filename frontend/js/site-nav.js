@@ -75,6 +75,24 @@ if (siteMainMenuElement) {
             ],
         },
 
+
+        {
+            label:
+                "선수도감",
+
+            children: [
+                {
+                    label:
+                        "선수 검색",
+
+                    href:
+                        "./player-database.html",
+                },
+            ],
+        },
+
+
+
         {
             label:
                 "커뮤니티",

@@ -12492,19 +12492,3001 @@ body.site-auth-modal-open {
     font-size: 10px;
 }
 
+/* =========================================
+   PLAYER DATABASE
+   SEARCH FILTER
+========================================= */
+
+.player-database-main-filters {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            5,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 12px;
+
+    margin-top: 20px;
+}
+
+
+.player-database-filter {
+    min-width: 0;
+}
+
+
+.player-database-filter select,
+.player-database-filter input {
+    width: 100%;
+
+    box-sizing: border-box;
+
+    height: 42px;
+
+    border:
+        1px solid
+        #333;
+
+    border-radius: 7px;
+
+    background:
+        #181818;
+
+    color:
+        #ddd;
+
+    padding:
+        0
+        12px;
+
+    outline: none;
+}
+
+
+.player-database-filter select:focus,
+.player-database-filter input:focus {
+    border-color:
+        #b79a60;
+}
+
+
+/* =========================================
+   상세 검색
+========================================= */
+
+.player-database-detail {
+    margin-top: 22px;
+
+    padding-top: 18px;
+
+    border-top:
+        1px solid
+        #2b2b2b;
+}
+
+
+.player-database-detail-toggle {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 9px;
+
+    width: 100%;
+
+    border: 0;
+
+    background:
+        transparent;
+
+    color:
+        #aaa;
+
+    padding:
+        8px;
+
+    font-size: 13px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.player-database-detail-toggle:hover {
+    color:
+        #d4af37;
+}
+
+
+.player-database-detail-arrow {
+    color:
+        #8f7a4a;
+
+    font-size: 11px;
+}
+
+
+.player-database-detail-panel {
+    margin-top: 20px;
+
+    border:
+        1px solid
+        #292929;
+
+    border-radius: 10px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.015
+        );
+
+    overflow: hidden;
+}
+
+
+.player-database-detail-panel.hidden {
+    display: none;
+}
+
+
+/* =========================================
+   상세 검색 섹션
+========================================= */
+
+.player-database-detail-section {
+    padding:
+        22px
+        22px
+        24px;
+
+    border-bottom:
+        1px solid
+        #292929;
+}
+
+
+.player-database-detail-section:last-of-type {
+    border-bottom: 0;
+}
+
+
+.player-database-detail-title {
+    display: flex;
+
+    align-items: baseline;
+
+    gap: 10px;
+
+    margin-bottom: 16px;
+}
+
+
+.player-database-detail-title strong {
+    color:
+        #ddd;
+
+    font-size: 14px;
+}
+
+
+.player-database-detail-title span {
+    color:
+        #666;
+
+    font-size: 11px;
+}
+
+
+/* =========================================
+   기본 조건
+========================================= */
+
+.player-database-detail-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        14px
+        12px;
+}
+
+
+/* =========================================
+   능력치 조건
+========================================= */
+
+.player-database-ability-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 10px;
+}
+
+
+.player-database-ability {
+    display: flex;
+
+    align-items: center;
+
+    min-width: 0;
+
+    border:
+        1px solid
+        #303030;
+
+    border-radius: 7px;
+
+    background:
+        #171717;
+
+    overflow: hidden;
+}
+
+
+.player-database-ability span {
+    flex: 1;
+
+    min-width: 0;
+
+    padding-left: 12px;
+
+    color:
+        #aaa;
+
+    font-size: 12px;
+
+    white-space: nowrap;
+}
+
+
+.player-database-ability input {
+    width: 72px;
+    height: 38px;
+
+    box-sizing: border-box;
+
+    border: 0;
+
+    border-left:
+        1px solid
+        #303030;
+
+    background:
+        #1d1d1d;
+
+    color:
+        #fff;
+
+    padding:
+        0
+        8px;
+
+    outline: none;
+
+    text-align: center;
+}
+
+
+.player-database-ability input:focus {
+    background:
+        #222;
+}
+
+
+/* number 화살표 제거 */
+
+.player-database-ability input::-webkit-outer-spin-button,
+.player-database-ability input::-webkit-inner-spin-button {
+    margin: 0;
+
+    appearance: none;
+}
+
+
+.player-database-ability input[type="number"] {
+    -moz-appearance:
+        textfield;
+}
+
+
+/* =========================================
+   상세 검색 하단
+========================================= */
+
+.player-database-detail-actions {
+    display: flex;
+
+    justify-content: flex-end;
+
+    padding:
+        16px
+        22px;
+
+    border-top:
+        1px solid
+        #292929;
+}
+
+
+.player-database-reset-button {
+    border:
+        1px solid
+        #3a3a3a;
+
+    border-radius: 7px;
+
+    background:
+        transparent;
+
+    color:
+        #888;
+
+    padding:
+        9px
+        14px;
+
+    font-size: 12px;
+
+    cursor: pointer;
+}
+
+
+.player-database-reset-button:hover {
+    border-color:
+        #666;
+
+    color:
+        #ddd;
+}
+
+
+/* =========================================
+   PLAYER DATABASE
+   선수명 검색
+========================================= */
+
+.player-database-name-search {
+    width: 100%;
+}
+
+
+.player-database-search-row {
+    display: flex;
+
+    align-items: stretch;
+
+    width: 100%;
+
+    gap: 10px;
+}
+
+
+.player-database-search-input {
+    height: 42px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.13);
+
+    border-radius: 7px;
+
+    background:
+        rgba(8, 8, 8, 0.88);
+
+    color: #fff;
+
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background 0.2s ease;
+}
+
+
+.player-database-search-input:hover {
+    border-color:
+        rgba(190, 141, 48, 0.38);
+}
+
+
+.player-database-search-input:focus {
+    border-color:
+        rgba(201, 149, 52, 0.85);
+
+    background:
+        rgba(16, 13, 8, 0.96);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(201, 149, 52, 0.08);
+
+    outline: none;
+}
+
+
+
+
+.player-database-search-input::placeholder {
+    color:
+        #666;
+}
+
+
+
+.player-database-search-button {
+    flex:
+        0
+        0
+        110px;
+
+    height: 44px;
+
+    border:
+        1px solid
+        #d4af37;
+
+    border-radius: 7px;
+
+    background:
+        #d4af37;
+
+    color:
+        #111;
+
+    font-size: 13px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+
+.player-database-search-button:hover {
+    border-color:
+        #e4c251;
+
+    background:
+        #e4c251;
+}
+
+.player-database-header {
+    margin-bottom: 34px;
+}
+
+
+.player-database-eyebrow {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #b79a60;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    letter-spacing: 1.5px;
+}
+
+
+.player-database-header h1 {
+    margin:
+        0
+        0
+        12px;
+
+    color: #fff;
+
+    font-size: 36px;
+    line-height: 1.15;
+}
+
+
+.player-database-header p {
+    margin: 0;
+
+    color: #aaa;
+
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.player-database-search-card {
+    margin-bottom: 34px;
+
+    border:
+        1px solid
+        #303030;
+
+    border-radius: 12px;
+
+    background:
+        rgba(
+            10,
+            10,
+            10,
+            0.82
+        );
+
+    padding: 28px;
+}
+
+.player-database-label {
+    display: block;
+
+    margin-bottom: 9px;
+
+    color: #bbb;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* =========================================
+   PLAYER DATABASE RESULT
+========================================= */
+
+.player-database-result-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+}
+
+/* =========================================
+   SEARCH RESULT HEADER
+========================================= */
+
+.player-database-results[hidden] {
+    display: none;
+}
+
+
+.player-database-results-header {
+    display: flex;
+
+    align-items: center;
+
+    margin-bottom: 18px;
+}
+
+
+.player-database-results-title {
+    display: flex;
+
+    align-items: baseline;
+
+    gap: 8px;
+
+    margin: 0;
+
+    font-size: 14px;
+    font-weight: 700;
+
+    letter-spacing: 0.05em;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.72
+        );
+}
+
+
+.player-database-results-title > span:first-child {
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.58
+        );
+
+    font-size: 12px;
+    font-weight: 600;
+
+    letter-spacing: 0.08em;
+}
+
+
+.player-database-results-equal {
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.28
+        );
+}
+
+
+#player-database-result-count {
+    color: #d5a342;
+
+    font-size: 16px;
+    font-weight: 800;
+
+    letter-spacing: 0;
+}
+
+@media (max-width: 650px) {
+
+    .player-database-results-header {
+        margin-bottom: 12px;
+    }
+
+
+    .player-database-results-title {
+        gap: 6px;
+
+        font-size: 12px;
+    }
+
+
+    .player-database-results-title > span:first-child {
+        font-size: 10px;
+    }
+
+
+    #player-database-result-count {
+        font-size: 14px;
+    }
+
+}
+
+/* =========================================
+   PLAYER DETAIL LAYOUT
+========================================= */
+
+.player-database-player-detail-layout {
+    display: grid;
+
+    grid-template-columns:
+        180px
+        minmax(
+            0,
+            1fr
+        );
+
+    gap: 24px;
+
+    align-items: start;
+}
+
+
+.player-database-player-detail-content {
+    min-width: 0;
+}
+
+
+/* =========================================
+   PLAYER PHOTO
+========================================= */
+
+.player-database-player-photo-wrap {
+    position: sticky;
+
+    top: 100px;
+
+    display: flex;
+
+    align-items: flex-end;
+    justify-content: center;
+
+    min-height: 220px;
+
+    overflow: hidden;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-radius: 8px;
+
+    background:
+        radial-gradient(
+            circle at center bottom,
+            rgba(193, 146, 53, 0.12),
+            rgba(0, 0, 0, 0.08) 70%
+        );
+}
+
+
+.player-database-player-photo {
+    display: block;
+
+    width: 100%;
+    height: 220px;
+
+    object-fit: contain;
+
+    object-position:
+        center
+        bottom;
+}
+
+/* =========================================
+   FC ONLINE STAT COLORS
+========================================= */
+
+.player-database-player-stat strong,
+.player-database-player-summary-main b {
+    transition:
+        color 0.15s ease;
+}
+
+
+/* 140+ */
+.stat-140 {
+    color: #d5ad3d !important;
+
+    text-shadow:
+        0 0 8px
+        rgba(213, 173, 61, 0.18);
+}
+
+
+/* 130 ~ 139 */
+.stat-130 {
+    color: #e04a55 !important;
+}
+
+
+/* 120 ~ 129 */
+.stat-120 {
+    color: #d64ab8 !important;
+}
+
+
+/* 110 ~ 119 */
+.stat-110 {
+    color: #9567d8 !important;
+}
+
+
+/* 100 ~ 109 */
+.stat-100 {
+    color: #596ed4 !important;
+}
+
+
+/* 90 ~ 99 */
+.stat-90 {
+    color: #3b8bd9 !important;
+}
+
+
+/* 80 ~ 89 */
+.stat-80 {
+    color: #48a9c7 !important;
+}
+
+
+/* 70 ~ 79 */
+.stat-70 {
+    color: #e2e2e2 !important;
+}
+
+
+/* 69 이하 */
+.stat-low {
+    color: #888 !important;
+}
+
+
+@media (max-width: 700px) {
+
+    .player-database-player-detail-layout {
+        grid-template-columns: 1fr;
+
+        gap: 14px;
+    }
+
+
+    .player-database-player-photo-wrap {
+        position: static;
+
+        min-height: 150px;
+    }
+
+
+    .player-database-player-photo {
+        width: auto;
+        max-width: 180px;
+        height: 160px;
+    }
+}
+
+/* =========================================
+   PLAYER ITEM
+========================================= */
+
+.player-database-player-item {
+    overflow: hidden;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.14);
+
+    border-radius: 8px;
+
+    background:
+        rgba(8, 8, 8, 0.82);
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+
+.player-database-player-item:hover {
+    border-color:
+        rgba(191, 143, 46, 0.45);
+}
+
+
+/* =========================================
+   PLAYER ROW
+========================================= */
+
+.player-database-player-row {
+    display: grid;
+
+    grid-template-columns:
+        42px
+        minmax(0, 1fr)
+        24px;
+
+    align-items: center;
+
+    width: 100%;
+
+    min-height: 58px;
+
+    padding:
+        8px
+        16px;
+
+    border: 0;
+
+    background: transparent;
+
+    color: inherit;
+
+    cursor: pointer;
+
+    text-align: left;
+}
+
+
+.player-database-player-row:hover {
+    background:
+        rgba(255, 255, 255, 0.035);
+}
+
+
+.player-database-player-row[aria-expanded="true"] {
+    background:
+        rgba(191, 143, 46, 0.07);
+}
+
+
+/* =========================================
+   SEASON
+========================================= */
+
+.player-database-player-season {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+}
+
+
+.player-database-player-season-icon {
+    display: block;
+
+    max-width: 32px;
+    max-height: 26px;
+
+    object-fit: contain;
+}
+
+
+/* =========================================
+   NAME
+========================================= */
+
+.player-database-player-name {
+    overflow: hidden;
+
+    font-size: 15px;
+    font-weight: 700;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* =========================================
+   ARROW
+========================================= */
+
+.player-database-player-arrow {
+    justify-self: end;
+
+    color:
+        rgba(210, 163, 66, 0.85);
+
+    font-size: 11px;
+}
+
+
+/* =========================================
+   DETAIL
+========================================= */
+
+.player-database-player-detail {
+    padding:
+        18px
+        20px
+        22px;
+
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.1);
+
+    background:
+        rgba(0, 0, 0, 0.22);
+}
+
+
+.player-database-player-detail[hidden] {
+    display: none;
+}
+
+
+/* =========================================
+   SUMMARY
+========================================= */
+
+.player-database-player-summary {
+    display: flex;
+
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 14px;
+
+    border-bottom:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+}
+
+
+.player-database-player-summary-main {
+    display: flex;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    gap: 8px 16px;
+}
+
+
+.player-database-player-summary-main > strong {
+    color: #d3a448;
+
+    font-size: 15px;
+}
+
+
+.player-database-player-summary-main span {
+    font-size: 13px;
+
+    color:
+        rgba(255, 255, 255, 0.72);
+}
+
+
+.player-database-player-summary-main b {
+    margin-left: 4px;
+
+    color: #fff;
+
+    font-size: 15px;
+}
+
+
+.player-database-player-summary-sub {
+    display: flex;
+
+    align-items: center;
+
+    flex-wrap: wrap;
+
+    justify-content: flex-end;
+
+    gap: 6px 12px;
+
+    color:
+        rgba(255, 255, 255, 0.62);
+
+    font-size: 12px;
+}
+
+
+/* =========================================
+   BONUS
+========================================= */
+
+.player-database-player-bonus {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px 22px;
+
+    margin-top: 14px;
+}
+
+
+.player-database-player-bonus span {
+    color:
+        rgba(255, 255, 255, 0.65);
+
+    font-size: 12px;
+}
+
+
+.player-database-player-bonus strong {
+    margin-left: 5px;
+
+    color: #fff;
+}
+
+
+/* =========================================
+   TEAMS
+========================================= */
+
+.player-database-player-teams {
+    display: flex;
+
+    gap: 12px;
+
+    margin-top: 14px;
+
+    font-size: 12px;
+}
+
+
+.player-database-player-teams > span {
+    flex-shrink: 0;
+
+    color:
+        rgba(255, 255, 255, 0.48);
+}
+
+
+.player-database-player-teams p {
+    margin: 0;
+
+    color:
+        rgba(255, 255, 255, 0.78);
+
+    line-height: 1.6;
+}
+
+
+/* =========================================
+   STATS
+========================================= */
+
+.player-database-player-stats {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 8px;
+
+    margin-top: 20px;
+}
+
+
+.player-database-player-stat {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    min-width: 0;
+
+    padding:
+        8px
+        10px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.07);
+
+    border-radius: 6px;
+
+    background:
+        rgba(255, 255, 255, 0.035);
+}
+
+
+.player-database-player-stat span {
+    overflow: hidden;
+
+    color:
+        rgba(255, 255, 255, 0.63);
+
+    font-size: 11px;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.player-database-player-stat strong {
+    flex-shrink: 0;
+
+    color: #fff;
+
+    font-size: 13px;
+}
+
+
+.player-database-player-stats-empty {
+    grid-column:
+        1
+        /
+        -1;
+
+    padding: 20px;
+
+    text-align: center;
+
+    color:
+        rgba(255, 255, 255, 0.5);
+
+    font-size: 12px;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 1000px) {
+
+    .player-database-player-stats {
+        grid-template-columns:
+            repeat(
+                4,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+}
+
+
+@media (max-width: 700px) {
+
+    .player-database-player-row {
+        grid-template-columns:
+            36px
+            minmax(0, 1fr)
+            20px;
+
+        min-height: 52px;
+
+        padding:
+            7px
+            12px;
+    }
+
+
+    .player-database-player-season {
+        width: 30px;
+        height: 30px;
+    }
+
+
+    .player-database-player-season-icon {
+        max-width: 28px;
+        max-height: 22px;
+    }
+
+
+    .player-database-player-detail {
+        padding:
+            14px
+            12px
+            18px;
+    }
+
+
+    .player-database-player-summary {
+        flex-direction: column;
+
+        gap: 9px;
+    }
+
+
+    .player-database-player-summary-sub {
+        justify-content: flex-start;
+    }
+
+
+    .player-database-player-stats {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+}
+
+/* =========================================
+   PLAYER DATABASE PAGINATION
+========================================= */
+
+.player-database-pagination {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    flex-wrap: wrap;
+
+    gap: 6px;
+
+    margin-top: 30px;
+    padding: 12px 0;
+}
+
+
+/* =========================================
+   PAGE BUTTON
+========================================= */
+
+.player-database-page-button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 38px;
+    height: 38px;
+
+    padding: 0 11px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    border-radius: 7px;
+
+    background:
+        rgba(10, 10, 10, 0.82);
+
+    color:
+        rgba(255, 255, 255, 0.72);
+
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    transition:
+        color 0.18s ease,
+        border-color 0.18s ease,
+        background 0.18s ease,
+        transform 0.18s ease;
+}
+
+
+.player-database-page-button:hover:not(:disabled) {
+    border-color:
+        rgba(197, 145, 43, 0.65);
+
+    background:
+        rgba(197, 145, 43, 0.10);
+
+    color: #fff;
+
+    transform:
+        translateY(-1px);
+}
+
+
+/* =========================================
+   CURRENT PAGE
+========================================= */
+
+.player-database-page-button.active {
+    border-color:
+        rgba(207, 151, 37, 0.85);
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(151, 94, 0, 0.95),
+            rgba(92, 51, 0, 0.95)
+        );
+
+    color: #fff;
+
+    box-shadow:
+        0 0 14px
+        rgba(207, 151, 37, 0.12);
+
+    cursor: default;
+}
+
+
+.player-database-page-button.active:hover {
+    transform: none;
+}
+
+
+/* =========================================
+   PREV / NEXT
+========================================= */
+
+.player-database-page-nav {
+    gap: 6px;
+
+    min-width: 68px;
+
+    padding:
+        0
+        13px;
+}
+
+
+.player-database-page-nav > span:first-child,
+.player-database-page-nav > span:last-child {
+    font-size: 18px;
+    line-height: 1;
+}
+
+
+/* =========================================
+   DISABLED
+========================================= */
+
+.player-database-page-button:disabled {
+    border-color:
+        rgba(255, 255, 255, 0.05);
+
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    color:
+        rgba(255, 255, 255, 0.20);
+
+    cursor: default;
+
+    transform: none;
+}
+
+
+/* =========================================
+   ELLIPSIS
+========================================= */
+
+.player-database-page-ellipsis {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 28px;
+    height: 38px;
+
+    color:
+        rgba(255, 255, 255, 0.35);
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
 
 @media (max-width: 600px) {
 
-    .mypage-exchange-item {
-        align-items: flex-start;
-        flex-direction: column;
+    .player-database-pagination {
+        gap: 4px;
+
+        margin-top: 22px;
     }
 
 
-    .mypage-exchange-info {
-        align-items: flex-start;
+    .player-database-page-button {
+        min-width: 34px;
+        height: 34px;
 
-        text-align: left;
+        padding:
+            0
+            8px;
+
+        font-size: 12px;
     }
 
+
+    .player-database-page-nav {
+        min-width: 34px;
+    }
+
+
+    .player-database-page-nav-text {
+        display: none;
+    }
+
+
+    .player-database-page-ellipsis {
+        width: 20px;
+        height: 34px;
+    }
+}
+
+/* =========================================
+   PLAYER DATABASE MAIN FILTERS
+========================================= */
+
+.player-database-main-filters {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap:
+        16px
+        12px;
+
+    margin-top: 18px;
+}
+
+
+/* =========================================
+   FILTER ITEM
+========================================= */
+
+.player-database-filter {
+    position: relative;
+
+    min-width: 0;
+}
+
+
+.player-database-label {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color:
+        rgba(255, 255, 255, 0.48);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    letter-spacing: 0.02em;
+
+    transition:
+        color 0.2s ease;
+}
+
+
+/* 포커스된 필터 라벨 강조 */
+.player-database-filter:focus-within
+.player-database-label {
+    color: #c99535;
+}
+
+
+/* =========================================
+   SELECT
+========================================= */
+
+.player-database-filter select {
+    appearance: none;
+    -webkit-appearance: none;
+
+    width: 100%;
+    height: 42px;
+
+    padding:
+        0
+        42px
+        0
+        13px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.13);
+
+    border-radius: 7px;
+
+    outline: none;
+
+    background-color:
+        rgba(8, 8, 8, 0.88);
+
+    background-image:
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%23b88a35' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+    background-repeat:
+        no-repeat;
+
+    background-position:
+        right 14px center;
+
+    background-size:
+        11px
+        auto;
+
+    color:
+        rgba(255, 255, 255, 0.86);
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        background-color 0.2s ease,
+        box-shadow 0.2s ease,
+        color 0.2s ease;
+}
+
+
+/* =========================================
+   SELECT HOVER
+========================================= */
+
+.player-database-filter select:hover {
+    border-color:
+        rgba(190, 141, 48, 0.45);
+
+    background-color:
+        rgba(15, 13, 9, 0.94);
+
+    color: #fff;
+}
+
+
+/* =========================================
+   SELECT FOCUS
+========================================= */
+
+.player-database-filter select:focus {
+    border-color:
+        rgba(201, 149, 52, 0.85);
+
+    background-color:
+        rgba(16, 13, 8, 0.96);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(201, 149, 52, 0.08);
+
+    color: #fff;
+}
+
+
+/* =========================================
+   OPTION
+========================================= */
+
+.player-database-filter select option {
+    background: #111;
+
+    color: #eee;
+}
+
+
+/* =========================================
+   SPECIAL FILTERS
+   강화 / 적응도 / 팀컬러
+========================================= */
+
+#player-database-grade,
+#player-database-adaptation,
+#player-database-team-color-bonus {
+    color: #e6bd69;
+
+    font-weight: 800;
+}
+
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 900px) {
+
+    .player-database-main-filters {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+}
+
+
+@media (max-width: 650px) {
+
+    .player-database-main-filters {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+
+        gap:
+            13px
+            9px;
+    }
+
+
+    .player-database-filter select {
+        height: 40px;
+
+        padding-left: 11px;
+
+        font-size: 11px;
+    }
+}
+
+/* =========================================
+   PLAYER NAME SEARCH
+========================================= */
+
+.player-database-search-row {
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        96px;
+
+    gap: 10px;
+}
+
+
+.player-database-search-input {
+    width: 100%;
+}
+
+
+/* =========================================
+   CUSTOM MULTI FILTER
+========================================= */
+
+.player-database-multi-filter {
+    position: relative;
+
+    min-width: 0;
+}
+
+
+.player-database-multi-toggle {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+    height: 42px;
+
+    padding:
+        0
+        14px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.13);
+
+    border-radius: 7px;
+
+    background:
+        rgba(8, 8, 8, 0.9);
+
+    color:
+        rgba(255, 255, 255, 0.85);
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+
+.player-database-multi-toggle:hover,
+.player-database-multi-toggle[aria-expanded="true"] {
+    border-color:
+        rgba(198, 147, 47, 0.65);
+
+    background:
+        rgba(19, 15, 8, 0.95);
+}
+
+
+/* =========================================
+   MULTI PANEL
+========================================= */
+
+.player-database-multi-panel {
+    position: absolute;
+
+    top: calc(100% + 8px);
+    left: 0;
+
+    z-index: 30;
+
+    padding: 12px;
+
+    border:
+        1px solid
+        rgba(201, 149, 52, 0.25);
+
+    border-radius: 8px;
+
+    background:
+        rgba(5, 5, 5, 0.97);
+
+    box-shadow:
+        0 14px 30px
+        rgba(0, 0, 0, 0.35);
+}
+
+
+.player-database-multi-panel[hidden] {
+    display: none;
+}
+
+/* =========================================
+   POSITION PANEL
+========================================= */
+
+#player-database-position-panel {
+    right: 0;
+    left: auto;
+
+    width: 360px;
+    max-width: 360px;
+}
+
+
+.player-database-position-options {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 8px;
+}
+
+
+.player-database-position-option {
+    height: 36px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.09);
+
+    border-radius: 6px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    color:
+        rgba(255, 255, 255, 0.72);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        color 0.18s ease;
+}
+
+
+.player-database-position-option:hover {
+    border-color:
+        rgba(198, 147, 47, 0.5);
+
+    color: #fff;
+}
+
+
+.player-database-position-option.selected {
+    border-color: #c89331;
+
+    background:
+        rgba(200, 147, 49, 0.16);
+
+    color: #f2ce82;
+}
+
+/* =========================================
+   NATION / TEAM HIERARCHY PANEL
+========================================= */
+
+.player-database-hierarchy-panel {
+    width: 520px;
+    max-width: min(
+        520px,
+        calc(100vw - 40px)
+    );
+
+    padding: 0;
+
+    overflow: hidden;
+}
+
+
+#player-database-team-panel {
+    width: 600px;
+    max-width: min(
+        600px,
+        calc(100vw - 40px)
+    );
+}
+
+
+/* =========================================
+   HEADER
+========================================= */
+
+.player-database-hierarchy-header {
+    display: flex;
+
+    justify-content: flex-end;
+
+    padding:
+        10px
+        12px;
+
+    border-bottom:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+}
+
+
+.player-database-hierarchy-clear {
+    height: 30px;
+
+    padding:
+        0
+        12px;
+
+    border:
+        1px solid
+        rgba(198, 147, 47, 0.35);
+
+    border-radius: 5px;
+
+    background:
+        rgba(198, 147, 47, 0.07);
+
+    color:
+        rgba(239, 203, 128, 0.9);
+
+    font-size: 11px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.player-database-hierarchy-clear:hover {
+    border-color:
+        rgba(198, 147, 47, 0.7);
+
+    background:
+        rgba(198, 147, 47, 0.13);
+
+    color: #fff;
+}
+
+
+/* =========================================
+   BODY
+========================================= */
+
+.player-database-hierarchy-body {
+    display: grid;
+
+    grid-template-columns:
+        150px
+        minmax(
+            0,
+            1fr
+        );
+
+    height: 330px;
+}
+
+
+/* =========================================
+   LEFT GROUP
+========================================= */
+
+.player-database-hierarchy-groups {
+    overflow-y: auto;
+
+    padding: 8px;
+
+    border-right:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    background:
+        rgba(0, 0, 0, 0.22);
+}
+
+
+.player-database-hierarchy-group {
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+    min-height: 36px;
+
+    padding:
+        7px
+        10px;
+
+    border: 0;
+    border-radius: 5px;
+
+    background: transparent;
+
+    color:
+        rgba(255, 255, 255, 0.58);
+
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 700;
+
+    text-align: left;
+
+    cursor: pointer;
+}
+
+
+.player-database-hierarchy-group:hover {
+    background:
+        rgba(255, 255, 255, 0.04);
+
+    color: #fff;
+}
+
+
+.player-database-hierarchy-group.active {
+    background:
+        rgba(198, 147, 47, 0.12);
+
+    color: #e9c271;
+
+    box-shadow:
+        inset 2px 0 0
+        #c6932f;
+}
+
+
+/* =========================================
+   RIGHT ITEMS
+========================================= */
+
+.player-database-hierarchy-items {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    align-content: start;
+
+    gap: 6px;
+
+    overflow-y: auto;
+
+    padding: 10px;
+}
+
+
+.player-database-hierarchy-item {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    min-width: 0;
+    height: 36px;
+
+    padding:
+        0
+        10px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.07);
+
+    border-radius: 5px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    color:
+        rgba(255, 255, 255, 0.72);
+
+    font-family: inherit;
+    font-size: 11px;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.16s ease,
+        background 0.16s ease,
+        color 0.16s ease;
+}
+
+
+.player-database-hierarchy-item > span {
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.player-database-hierarchy-item small {
+    flex-shrink: 0;
+
+    color:
+        rgba(255, 255, 255, 0.28);
+
+    font-size: 9px;
+}
+
+
+.player-database-hierarchy-item:hover {
+    border-color:
+        rgba(198, 147, 47, 0.42);
+
+    background:
+        rgba(198, 147, 47, 0.06);
+
+    color: #fff;
+}
+
+
+.player-database-hierarchy-item.selected {
+    border-color:
+        rgba(198, 147, 47, 0.78);
+
+    background:
+        rgba(198, 147, 47, 0.14);
+
+    color: #f0cb80;
+}
+
+/* =========================================
+   MOBILE - NATION / TEAM PANEL
+========================================= */
+
+@media (max-width: 650px) {
+
+    /* =====================================
+       패널 자체를 화면 안에 고정
+    ===================================== */
+
+    .player-database-hierarchy-panel,
+    #player-database-team-panel {
+        position: fixed;
+
+        top: 50%;
+        right: 10px;
+        left: 10px;
+
+        z-index: 1000;
+
+        width: auto;
+        max-width: none;
+
+        height:
+            min(
+                560px,
+                calc(
+                    100dvh
+                    -
+                    20px
+                )
+            );
+
+        max-height:
+            calc(
+                100dvh
+                -
+                20px
+            );
+
+        transform:
+            translateY(
+                -50%
+            );
+
+        border-radius: 10px;
+
+        overflow: hidden;
+
+        background:
+            rgba(
+                5,
+                5,
+                5,
+                0.99
+            );
+
+        box-shadow:
+            0
+            18px
+            50px
+            rgba(
+                0,
+                0,
+                0,
+                0.65
+            );
+    }
+
+
+    /* hidden일 때는 반드시 숨김 */
+    .player-database-hierarchy-panel[hidden] {
+        display: none;
+    }
+
+
+    /* =====================================
+       상단 전체선택 영역
+    ===================================== */
+
+    .player-database-hierarchy-header {
+        flex-shrink: 0;
+
+        height: 48px;
+
+        padding:
+            8px
+            10px;
+
+        align-items: center;
+
+        background:
+            rgba(
+                0,
+                0,
+                0,
+                0.3
+            );
+    }
+
+
+    .player-database-hierarchy-clear {
+        height: 32px;
+
+        padding:
+            0
+            12px;
+
+        font-size: 11px;
+    }
+
+
+    /* =====================================
+       본문
+    ===================================== */
+
+    .player-database-hierarchy-body {
+        display: grid;
+
+        grid-template-columns:
+            108px
+            minmax(
+                0,
+                1fr
+            );
+
+        width: 100%;
+
+        height:
+            calc(
+                100%
+                -
+                48px
+            );
+
+        min-height: 0;
+    }
+
+
+    /* 소속팀은 리그명이 길어서
+       왼쪽을 조금 더 넓게 */
+    #player-database-team-panel
+    .player-database-hierarchy-body {
+        grid-template-columns:
+            132px
+            minmax(
+                0,
+                1fr
+            );
+    }
+
+
+    /* =====================================
+       왼쪽 - 대륙 / 리그
+    ===================================== */
+
+    .player-database-hierarchy-groups {
+        min-height: 0;
+
+        overflow-x: hidden;
+        overflow-y: auto;
+
+        overscroll-behavior:
+            contain;
+
+        padding: 6px;
+
+        scrollbar-width:
+            thin;
+    }
+
+
+    .player-database-hierarchy-group {
+        min-height: 38px;
+
+        padding:
+            7px
+            8px;
+
+        font-size: 10px;
+
+        line-height: 1.25;
+
+        white-space: normal;
+
+        word-break: keep-all;
+    }
+
+
+    /* =====================================
+       오른쪽 - 국적 / 클럽
+    ===================================== */
+
+    .player-database-hierarchy-items {
+        display: grid;
+
+        grid-template-columns:
+            1fr;
+
+        align-content: start;
+
+        gap: 5px;
+
+        min-width: 0;
+        min-height: 0;
+
+        padding: 7px;
+
+        overflow-x: hidden;
+        overflow-y: auto;
+
+        overscroll-behavior:
+            contain;
+
+        scrollbar-width:
+            thin;
+    }
+
+
+    .player-database-hierarchy-item {
+        width: 100%;
+        height: 38px;
+
+        padding:
+            0
+            9px;
+
+        font-size: 10px;
+    }
+
+
+    .player-database-hierarchy-item small {
+        font-size: 8px;
+    }
+
+
+    /* =====================================
+       긴 이름 처리
+    ===================================== */
+
+    .player-database-hierarchy-item > span {
+        min-width: 0;
+
+        overflow: hidden;
+
+        text-overflow:
+            ellipsis;
+
+        white-space:
+            nowrap;
+    }
+
+}
+
+
+
+/* =========================================
+   POSITION COLORS
+========================================= */
+
+
+/* =========================================
+   FW
+========================================= */
+
+.player-database-position-option.position-fw {
+    border-color:
+        rgba(214, 76, 76, 0.30);
+
+    color: #e36d6d;
+}
+
+
+.player-database-position-option.position-fw:hover {
+    border-color:
+        rgba(227, 109, 109, 0.65);
+
+    background:
+        rgba(214, 76, 76, 0.08);
+
+    color: #f18a8a;
+}
+
+
+.player-database-position-option.position-fw.selected {
+    border-color: #d94f4f;
+
+    background:
+        rgba(217, 79, 79, 0.18);
+
+    color: #ff9696;
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(217, 79, 79, 0.10);
+}
+
+
+/* =========================================
+   MF
+========================================= */
+
+.player-database-position-option.position-mf {
+    border-color:
+        rgba(70, 166, 103, 0.30);
+
+    color: #65bd82;
+}
+
+
+.player-database-position-option.position-mf:hover {
+    border-color:
+        rgba(101, 189, 130, 0.65);
+
+    background:
+        rgba(70, 166, 103, 0.08);
+
+    color: #85d69f;
+}
+
+
+.player-database-position-option.position-mf.selected {
+    border-color: #4cac6d;
+
+    background:
+        rgba(76, 172, 109, 0.18);
+
+    color: #91e4ad;
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(76, 172, 109, 0.10);
+}
+
+
+/* =========================================
+   DF
+========================================= */
+
+.player-database-position-option.position-df {
+    border-color:
+        rgba(69, 122, 196, 0.30);
+
+    color: #6999da;
+}
+
+
+.player-database-position-option.position-df:hover {
+    border-color:
+        rgba(105, 153, 218, 0.65);
+
+    background:
+        rgba(69, 122, 196, 0.08);
+
+    color: #8ab4eb;
+}
+
+
+.player-database-position-option.position-df.selected {
+    border-color: #527fc4;
+
+    background:
+        rgba(82, 127, 196, 0.18);
+
+    color: #9ac2f2;
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(82, 127, 196, 0.10);
+}
+
+
+/* =========================================
+   GK
+========================================= */
+
+.player-database-position-option.position-gk {
+    border-color:
+        rgba(214, 170, 58, 0.32);
+
+    color: #dcb84f;
+}
+
+
+.player-database-position-option.position-gk:hover {
+    border-color:
+        rgba(220, 184, 79, 0.68);
+
+    background:
+        rgba(214, 170, 58, 0.08);
+
+    color: #ecd16f;
+}
+
+
+.player-database-position-option.position-gk.selected {
+    border-color: #d1a530;
+
+    background:
+        rgba(209, 165, 48, 0.18);
+
+    color: #f0d975;
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(209, 165, 48, 0.10);
+}
+
+/* =========================================
+   SEASON PANEL
+========================================= */
+
+#player-database-season-panel {
+    width: 420px;
+    max-width: 420px;
+}
+
+
+.player-database-season-options {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(
+                48px,
+                1fr
+            )
+        );
+
+    gap: 8px;
+
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.player-database-search-card,
+.player-database-main-filters {
+    overflow: visible;
+}
+
+
+/* =========================================
+   SEASON
+========================================= */
+
+.player-database-season-options {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(
+                46px,
+                1fr
+            )
+        );
+
+    gap: 7px;
+
+    max-height: 260px;
+
+    overflow-y: auto;
+}
+
+
+.player-database-season-option {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 0;
+    height: 42px;
+
+    padding: 5px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-radius: 6px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    cursor: pointer;
+}
+
+
+.player-database-season-option img {
+    max-width: 34px;
+    max-height: 28px;
+
+    object-fit: contain;
+}
+
+
+.player-database-season-option:hover {
+    border-color:
+        rgba(198, 147, 47, 0.45);
+}
+
+
+.player-database-season-option.selected {
+    border-color:
+        #c89331;
+
+    background:
+        rgba(200, 147, 49, 0.15);
+
+    box-shadow:
+        inset 0 0 0 1px
+        rgba(200, 147, 49, 0.16);
+}
+
+
+/* =========================================
+   POSITION
+========================================= */
+
+.player-database-position-options {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fill,
+            minmax(
+                55px,
+                1fr
+            )
+        );
+
+    gap: 6px;
+}
+
+
+.player-database-position-option {
+    height: 34px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.09);
+
+    border-radius: 6px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+
+    color:
+        rgba(255, 255, 255, 0.7);
+
+    font-size: 11px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.player-database-position-option:hover {
+    border-color:
+        rgba(198, 147, 47, 0.5);
+
+    color: #fff;
+}
+
+
+/* =========================================
+   GRADE OPTIONS
+========================================= */
+
+.player-database-grade-options {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 8px;
+}
+
+
+.player-database-grade-options button {
+    min-width: 44px;
+    height: 34px;
+
+    padding:
+        0
+        10px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.11);
+
+    border-radius: 6px;
+
+    background:
+        rgba(7, 7, 7, 0.9);
+
+    color:
+        rgba(255, 255, 255, 0.72);
+
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease;
+}
+
+
+/* hover */
+.player-database-grade-options button:hover {
+    color: #fff;
+}
+
+
+/* 선택 상태 */
+.player-database-grade-options button.selected {
+    box-shadow:
+        0 0 10px
+        rgba(200, 148, 50, 0.08);
+}
+
+
+/* =========================================
+   BRONZE : +1 ~ +4
+========================================= */
+
+.player-database-grade-options button[data-grade="1"],
+.player-database-grade-options button[data-grade="2"],
+.player-database-grade-options button[data-grade="3"],
+.player-database-grade-options button[data-grade="4"] {
+    border-color:
+        rgba(140, 84, 42, 0.45);
+
+    color: #dba97d;
+}
+
+
+.player-database-grade-options button[data-grade="1"].selected,
+.player-database-grade-options button[data-grade="2"].selected,
+.player-database-grade-options button[data-grade="3"].selected,
+.player-database-grade-options button[data-grade="4"].selected {
+    border-color: #9b5e33;
+
+    background:
+        rgba(155, 94, 51, 0.18);
+
+    color: #f1c39f;
+}
+
+
+/* =========================================
+   SILVER : +5 ~ +7
+========================================= */
+
+.player-database-grade-options button[data-grade="5"],
+.player-database-grade-options button[data-grade="6"],
+.player-database-grade-options button[data-grade="7"] {
+    border-color:
+        rgba(122, 134, 145, 0.45);
+
+    color: #d8e0e7;
+}
+
+
+.player-database-grade-options button[data-grade="5"].selected,
+.player-database-grade-options button[data-grade="6"].selected,
+.player-database-grade-options button[data-grade="7"].selected {
+    border-color: #98a7b4;
+
+    background:
+        rgba(152, 167, 180, 0.16);
+
+    color: #f0f5f8;
+}
+
+
+/* =========================================
+   GOLD : +8 ~ +10
+========================================= */
+
+.player-database-grade-options button[data-grade="8"],
+.player-database-grade-options button[data-grade="9"],
+.player-database-grade-options button[data-grade="10"] {
+    border-color:
+        rgba(187, 140, 35, 0.5);
+
+    color: #f1ca62;
+}
+
+
+.player-database-grade-options button[data-grade="8"].selected,
+.player-database-grade-options button[data-grade="9"].selected,
+.player-database-grade-options button[data-grade="10"].selected {
+    border-color: #c89432;
+
+    background:
+        rgba(200, 148, 50, 0.18);
+
+    color: #ffd97d;
+}
+
+
+/* =========================================
+   PLATINUM : +11 ~ +13
+========================================= */
+
+.player-database-grade-options button[data-grade="11"],
+.player-database-grade-options button[data-grade="12"],
+.player-database-grade-options button[data-grade="13"] {
+    border-color:
+        rgba(179, 198, 206, 0.45);
+
+    color: #d9edf2;
+}
+
+
+.player-database-grade-options button[data-grade="11"].selected,
+.player-database-grade-options button[data-grade="12"].selected,
+.player-database-grade-options button[data-grade="13"].selected {
+    border-color: #c8d7dd;
+
+    background:
+        rgba(200, 215, 221, 0.16);
+
+    color: #f5fbfd;
+}
+
+
+/* =========================================
+   ADAPTATION
+========================================= */
+
+/* =========================================
+   ADAPTATION
+========================================= */
+
+.player-database-simple-options {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+
+.player-database-simple-options button {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 48px;
+    height: 34px;
+
+    padding:
+        0
+        13px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    border-radius: 6px;
+
+    background:
+        rgba(7, 7, 7, 0.9);
+
+    color:
+        rgba(255, 255, 255, 0.62);
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 800;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.18s ease,
+        background 0.18s ease,
+        color 0.18s ease,
+        box-shadow 0.18s ease,
+        transform 0.18s ease;
+}
+
+
+.player-database-simple-options button:hover {
+    border-color:
+        rgba(196, 145, 47, 0.48);
+
+    background:
+        rgba(196, 145, 47, 0.07);
+
+    color: #fff;
+
+    transform:
+        translateY(-1px);
+}
+
+
+.player-database-simple-options button.selected {
+    border-color:
+        #c58f2f;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(133, 78, 0, 0.55),
+            rgba(80, 44, 0, 0.48)
+        );
+
+    color:
+        #f4d28b;
+
+    box-shadow:
+        0 0 12px
+        rgba(197, 143, 47, 0.12);
+
+    transform: none;
 }

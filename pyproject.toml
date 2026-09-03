@@ -3,6 +3,7 @@ name = "fcweb"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "beautifulsoup4>=4.15.0",
     "fastapi>=0.141.1",
     "httpx>=0.28.1",
     "openpyxl>=3.1.5",

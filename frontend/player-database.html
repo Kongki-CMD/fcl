@@ -1,0 +1,1345 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL 선수도감</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+<body>
+
+    <header>
+        <div class="header-container">
+
+            <div class="logo">
+                <a href="./index.html">
+
+                    <span class="logo-title">
+                        FCL
+                    </span>
+
+                    <span class="logo-bottom">
+                        <span class="logo-line"></span>
+
+                        <span class="logo-season">
+                            SEASON 1
+                        </span>
+
+                        <span class="logo-line"></span>
+                    </span>
+
+                </a>
+            </div>
+
+            <nav>
+                <ul class="main-menu"></ul>
+            </nav>
+
+        </div>
+    </header>
+
+
+    <main class="player-database-page">
+
+        <section class="player-database-header">
+
+            <span class="player-database-eyebrow">
+                FC ONLINE PLAYER DATABASE
+            </span>
+
+            <h1>
+                선수 검색
+            </h1>
+
+            <p>
+                FC온라인 선수의 시즌,
+                포지션과 능력치를 검색하고
+                비교할 수 있습니다.
+            </p>
+
+        </section>
+
+
+        <section class="player-database-search-card">
+
+            <!-- =====================================
+                선수명 검색
+            ====================================== -->
+
+            <div class="player-database-name-search">
+
+                <label
+                    for="player-database-name"
+                    class="player-database-label"
+                >
+                    선수명
+                </label>
+
+                <div class="player-database-search-row">
+
+                    <input
+                        type="search"
+                        id="player-database-name"
+                        class="player-database-search-input"
+                        placeholder="메시, 호날두처럼 쉼표로 여러 명 검색"
+                        autocomplete="off"
+                    >
+
+                    <button
+                        type="button"
+                        id="player-database-search-button"
+                        class="player-database-search-button"
+                    >
+                        검색
+                    </button>
+
+                </div>
+
+            </div>
+
+
+        <div class="player-database-main-filters">
+
+            <!-- =====================================
+                시즌
+            ====================================== -->
+
+            <div
+                class="
+                    player-database-filter
+                    player-database-multi-filter
+                "
+            >
+
+                <span class="player-database-label">
+                    시즌
+                </span>
+
+
+                <button
+                    type="button"
+                    id="player-database-season-toggle"
+                    class="player-database-multi-toggle"
+                    aria-expanded="false"
+                    aria-controls="player-database-season-panel"
+                >
+
+                    <span
+                        id="player-database-season-summary"
+                    >
+                        전체 시즌
+                    </span>
+
+                    <span aria-hidden="true">
+                        ▼
+                    </span>
+
+                </button>
+
+
+                <div
+                    id="player-database-season-panel"
+                    class="player-database-multi-panel"
+                    hidden
+                >
+
+                    <div
+                        id="player-database-season-options"
+                        class="player-database-season-options"
+                    ></div>
+
+                </div>
+
+            </div>
+
+
+    <!-- =====================================
+        국적
+    ====================================== -->
+
+    <div
+        class="
+            player-database-filter
+            player-database-multi-filter
+            player-database-hierarchy-filter
+        "
+    >
+
+        <span class="player-database-label">
+            국적
+        </span>
+
+
+        <button
+            type="button"
+            id="player-database-nation-toggle"
+            class="player-database-multi-toggle"
+            aria-expanded="false"
+            aria-controls="player-database-nation-panel"
+        >
+
+            <span
+                id="player-database-nation-summary"
+            >
+                전체 국적
+            </span>
+
+            <span aria-hidden="true">
+                ▼
+            </span>
+
+        </button>
+
+
+        <div
+            id="player-database-nation-panel"
+            class="
+                player-database-multi-panel
+                player-database-hierarchy-panel
+            "
+            hidden
+        >
+
+            <div
+                class="player-database-hierarchy-header"
+            >
+
+                <button
+                    type="button"
+                    id="player-database-nation-clear"
+                    class="player-database-hierarchy-clear"
+                >
+                    전체 국적
+                </button>
+
+            </div>
+
+
+            <div
+                class="player-database-hierarchy-body"
+            >
+
+                <div
+                    id="player-database-continent-options"
+                    class="player-database-hierarchy-groups"
+                ></div>
+
+
+                <div
+                    id="player-database-nation-options"
+                    class="player-database-hierarchy-items"
+                ></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =====================================
+        소속팀
+    ====================================== -->
+
+    <div
+        class="
+            player-database-filter
+            player-database-multi-filter
+            player-database-hierarchy-filter
+        "
+    >
+
+        <span class="player-database-label">
+            소속팀
+        </span>
+
+
+        <button
+            type="button"
+            id="player-database-team-toggle"
+            class="player-database-multi-toggle"
+            aria-expanded="false"
+            aria-controls="player-database-team-panel"
+        >
+
+            <span
+                id="player-database-team-summary"
+            >
+                전체 팀
+            </span>
+
+            <span aria-hidden="true">
+                ▼
+            </span>
+
+        </button>
+
+
+        <div
+            id="player-database-team-panel"
+            class="
+                player-database-multi-panel
+                player-database-hierarchy-panel
+            "
+            hidden
+        >
+
+            <div
+                class="player-database-hierarchy-header"
+            >
+
+                <button
+                    type="button"
+                    id="player-database-team-clear"
+                    class="player-database-hierarchy-clear"
+                >
+                    전체 팀
+                </button>
+
+            </div>
+
+
+            <div
+                class="player-database-hierarchy-body"
+            >
+
+                <div
+                    id="player-database-league-options"
+                    class="player-database-hierarchy-groups"
+                ></div>
+
+
+                <div
+                    id="player-database-team-options"
+                    class="player-database-hierarchy-items"
+                ></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+            <!-- =====================================
+                포지션
+            ====================================== -->
+
+            <div
+                class="
+                    player-database-filter
+                    player-database-multi-filter
+                "
+            >
+
+                <span class="player-database-label">
+                    포지션
+                </span>
+
+
+                <button
+                    type="button"
+                    id="player-database-position-toggle"
+                    class="player-database-multi-toggle"
+                    aria-expanded="false"
+                    aria-controls="player-database-position-panel"
+                >
+
+                    <span
+                        id="player-database-position-summary"
+                    >
+                        전체 포지션
+                    </span>
+
+                    <span aria-hidden="true">
+                        ▼
+                    </span>
+
+                </button>
+
+
+                <div
+                    id="player-database-position-panel"
+                    class="player-database-multi-panel"
+                    hidden
+                >
+
+                    <div
+                        id="player-database-position-options"
+                        class="player-database-position-options"
+                    ></div>
+
+                </div>
+
+            </div>
+
+
+            <!-- =====================================
+                강화
+            ====================================== -->
+
+            <div
+                class="
+                    player-database-filter
+                    player-database-grade-filter
+                "
+            >
+
+                <span class="player-database-label">
+                    강화
+                </span>
+
+            <div
+                id="player-database-grade-options"
+                class="player-database-grade-options"
+            >
+
+                <button
+                    type="button"
+                    data-grade="1"
+                    class="selected"
+                >
+                    +1
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="2"
+                >
+                    +2
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="3"
+                >
+                    +3
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="4"
+                >
+                    +4
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="5"
+                >
+                    +5
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="6"
+                >
+                    +6
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="7"
+                >
+                    +7
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="8"
+                >
+                    +8
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="9"
+                >
+                    +9
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="10"
+                >
+                    +10
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="11"
+                >
+                    +11
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="12"
+                >
+                    +12
+                </button>
+
+                <button
+                    type="button"
+                    data-grade="13"
+                >
+                    +13
+                </button>
+
+            </div>
+
+            </div>
+
+
+            <!-- =====================================
+                적응도
+            ====================================== -->
+
+            <div class="player-database-filter">
+
+                <span class="player-database-label">
+                    적응도
+                </span>
+
+
+                <div
+                    id="player-database-adaptation-options"
+                    class="player-database-simple-options"
+                >
+
+                    <button
+                        type="button"
+                        data-adaptation="1"
+                        class="selected"
+                    >
+                        +1
+                    </button>
+
+                    <button
+                        type="button"
+                        data-adaptation="5"
+                    >
+                        +5
+                    </button>
+
+                </div>
+            </div>
+
+            <!-- =====================================
+                팀컬러
+            ====================================== -->
+
+            <div class="player-database-filter">
+
+                <label
+                    for="player-database-team-color-bonus"
+                    class="player-database-label"
+                >
+                    팀컬러
+                </label>
+
+
+                <select
+                    id="player-database-team-color-bonus"
+                >
+
+                    <option value="0">+0</option>
+                    <option value="1">+1</option>
+                    <option value="2">+2</option>
+                    <option value="3">+3</option>
+                    <option value="4">+4</option>
+                    <option value="5">+5</option>
+                    <option value="6">+6</option>
+                    <option value="7">+7</option>
+                    <option value="8">+8</option>
+                    <option value="9">+9</option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+            <!-- =====================================
+                상세 검색 버튼
+            ====================================== -->
+
+            <div class="player-database-detail">
+
+                <button
+                    type="button"
+                    id="player-database-detail-toggle"
+                    class="player-database-detail-toggle"
+                    aria-expanded="false"
+                >
+                    <span>
+                        상세 검색
+                    </span>
+
+                    <span
+                        id="player-database-detail-arrow"
+                        class="player-database-detail-arrow"
+                    >
+                        ▼
+                    </span>
+                </button>
+
+
+                <!-- =================================
+                    상세 검색 패널
+                ================================== -->
+
+                <div
+                    id="player-database-detail-panel"
+                    class="
+                        player-database-detail-panel
+                        hidden
+                    "
+                >
+
+                    <!-- =============================
+                        기본 조건
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                기본 조건
+                            </strong>
+
+                            <span>
+                                급여 · OVR · 신체 조건
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-detail-grid">
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-salary-min"
+                                    class="player-database-label"
+                                >
+                                    최소 급여
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="player-database-salary-min"
+                                    min="0"
+                                    max="99"
+                                    placeholder="제한 없음"
+                                >
+
+                            </div>
+
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-salary-max"
+                                    class="player-database-label"
+                                >
+                                    최대 급여
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="player-database-salary-max"
+                                    min="0"
+                                    max="99"
+                                    placeholder="제한 없음"
+                                >
+
+                            </div>
+
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-ovr-min"
+                                    class="player-database-label"
+                                >
+                                    최소 OVR
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="player-database-ovr-min"
+                                    min="0"
+                                    max="200"
+                                    placeholder="제한 없음"
+                                >
+
+                            </div>
+
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-height-min"
+                                    class="player-database-label"
+                                >
+                                    최소 키
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="player-database-height-min"
+                                    min="140"
+                                    max="250"
+                                    placeholder="cm"
+                                >
+
+                            </div>
+
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-height-max"
+                                    class="player-database-label"
+                                >
+                                    최대 키
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="player-database-height-max"
+                                    min="140"
+                                    max="250"
+                                    placeholder="cm"
+                                >
+
+                            </div>
+
+
+                            <div class="player-database-filter">
+
+                                <label
+                                    for="player-database-foot"
+                                    class="player-database-label"
+                                >
+                                    주발
+                                </label>
+
+                                <select id="player-database-foot">
+
+                                    <option value="">
+                                        전체
+                                    </option>
+
+                                    <option value="right">
+                                        오른발
+                                    </option>
+
+                                    <option value="left">
+                                        왼발
+                                    </option>
+
+                                    <option value="both">
+                                        양발
+                                    </option>
+
+                                </select>
+
+                            </div>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        공격
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                공격
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>속력</span>
+                                <input
+                                    type="number"
+                                    id="player-database-sprint-speed-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>가속력</span>
+                                <input
+                                    type="number"
+                                    id="player-database-acceleration-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>골 결정력</span>
+                                <input
+                                    type="number"
+                                    id="player-database-finishing-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>슛 파워</span>
+                                <input
+                                    type="number"
+                                    id="player-database-shot-power-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>중거리 슛</span>
+                                <input
+                                    type="number"
+                                    id="player-database-long-shots-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>위치 선정</span>
+                                <input
+                                    type="number"
+                                    id="player-database-positioning-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>발리슛</span>
+                                <input
+                                    type="number"
+                                    id="player-database-volleys-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>페널티 킥</span>
+                                <input
+                                    type="number"
+                                    id="player-database-penalties-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        패스
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                패스
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>짧은 패스</span>
+                                <input
+                                    type="number"
+                                    id="player-database-short-pass-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>시야</span>
+                                <input
+                                    type="number"
+                                    id="player-database-vision-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>크로스</span>
+                                <input
+                                    type="number"
+                                    id="player-database-crossing-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>긴 패스</span>
+                                <input
+                                    type="number"
+                                    id="player-database-long-pass-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>프리킥</span>
+                                <input
+                                    type="number"
+                                    id="player-database-free-kick-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>커브</span>
+                                <input
+                                    type="number"
+                                    id="player-database-curve-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        드리블
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                드리블
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>드리블</span>
+                                <input
+                                    type="number"
+                                    id="player-database-dribbling-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>볼 컨트롤</span>
+                                <input
+                                    type="number"
+                                    id="player-database-ball-control-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>민첩성</span>
+                                <input
+                                    type="number"
+                                    id="player-database-agility-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>밸런스</span>
+                                <input
+                                    type="number"
+                                    id="player-database-balance-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>반응 속도</span>
+                                <input
+                                    type="number"
+                                    id="player-database-reactions-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        수비
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                수비
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>대인 수비</span>
+                                <input
+                                    type="number"
+                                    id="player-database-marking-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>태클</span>
+                                <input
+                                    type="number"
+                                    id="player-database-tackle-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>가로채기</span>
+                                <input
+                                    type="number"
+                                    id="player-database-interceptions-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>헤더</span>
+                                <input
+                                    type="number"
+                                    id="player-database-heading-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>슬라이딩 태클</span>
+                                <input
+                                    type="number"
+                                    id="player-database-sliding-tackle-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        피지컬
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                피지컬
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>몸싸움</span>
+                                <input
+                                    type="number"
+                                    id="player-database-strength-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>스태미너</span>
+                                <input
+                                    type="number"
+                                    id="player-database-stamina-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>적극성</span>
+                                <input
+                                    type="number"
+                                    id="player-database-aggression-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>점프</span>
+                                <input
+                                    type="number"
+                                    id="player-database-jumping-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>침착성</span>
+                                <input
+                                    type="number"
+                                    id="player-database-composure-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- =============================
+                        골키퍼
+                    ============================== -->
+
+                    <section class="player-database-detail-section">
+
+                        <div class="player-database-detail-title">
+
+                            <strong>
+                                골키퍼
+                            </strong>
+
+                            <span>
+                                최소 능력치
+                            </span>
+
+                        </div>
+
+
+                        <div class="player-database-ability-grid">
+
+                            <label class="player-database-ability">
+                                <span>GK 다이빙</span>
+                                <input
+                                    type="number"
+                                    id="player-database-gk-diving-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>GK 핸들링</span>
+                                <input
+                                    type="number"
+                                    id="player-database-gk-handling-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>GK 킥</span>
+                                <input
+                                    type="number"
+                                    id="player-database-gk-kick-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>GK 반응속도</span>
+                                <input
+                                    type="number"
+                                    id="player-database-gk-reflexes-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+
+                            <label class="player-database-ability">
+                                <span>GK 위치 선정</span>
+                                <input
+                                    type="number"
+                                    id="player-database-gk-positioning-min"
+                                    placeholder="최소"
+                                >
+                            </label>
+
+                        </div>
+
+                    </section>
+
+
+                    <!-- 상세 검색 하단 -->
+
+                    <div class="player-database-detail-actions">
+
+                        <button
+                            type="button"
+                            id="player-database-reset-button"
+                            class="player-database-reset-button"
+                        >
+                            검색 조건 초기화
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </section>
+ 
+<!-- =====================================
+    검색 결과
+====================================== -->
+
+<section
+    id="player-database-results"
+    class="player-database-results"
+    hidden
+>
+
+    <div class="player-database-results-header">
+
+        <h2 class="player-database-results-title">
+
+            <span>
+                SEARCH RESULT
+            </span>
+
+            <span
+                class="player-database-results-equal"
+                aria-hidden="true"
+            >
+                =
+            </span>
+
+            <strong
+                id="player-database-result-count"
+            >
+                0명
+            </strong>
+
+        </h2>
+
+    </div>
+
+
+    <div
+        id="player-database-result-list"
+        class="player-database-result-list"
+    ></div>
+
+
+    <div
+        id="player-database-pagination"
+        class="player-database-pagination"
+    ></div>
+
+</section>
+
+
+    </main>
+
+    <footer id="site-footer"></footer>
+
+
+    <script
+        type="module"
+        src="./js/site-nav.js"
+    ></script>
+
+    <script
+        type="module"
+        src="./js/player-database.js"
+    ></script>
+
+</body>
+
+</html>
