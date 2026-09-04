@@ -2,6 +2,27 @@ import {
     apiBaseUrl,
 } from "./config.js";
 
+const playerCompareModalElement =
+    document.querySelector(
+        "#player-compare-modal"
+    );
+
+
+const playerCompareContentElement =
+    document.querySelector(
+        "#player-compare-content"
+    );
+
+const playerRecommendModalElement =
+    document.querySelector(
+        "#player-recommend-modal"
+    );
+
+const playerRecommendContentElement =
+    document.querySelector(
+        "#player-recommend-content"
+    );
+
 
 // =========================================
 // ELEMENTS
@@ -185,6 +206,48 @@ const selectedPositions =
 const playerCardStates =
     new Map();
 
+const compareState = {
+    basePlayerSpId: null,
+    targetPlayerSpId: null,
+    activePosition: "all",
+};
+
+const recommendState = {
+    basePlayerSpId: null,
+
+    currentPage: 1,
+
+    selectedPosition:
+        "same",
+
+    selectedSalaryMode:
+        "any",
+
+    ovrMin:
+        null,
+
+    ovrMax:
+        null,
+
+    limit:
+        10,
+};
+
+const compareControlState = {
+
+    left: {
+        grade: 1,
+        adaptation: 1,
+        teamColor: 0,
+    },
+
+    right: {
+        grade: 1,
+        adaptation: 1,
+        teamColor: 0,
+    },
+
+};
 
 const playerDataBySpId =
     new Map();
@@ -2341,53 +2404,101 @@ function createPlayerCardHtml(
 
     return `
         <article
-            class="player-database-player-item"
+            class="
+                player-database-player-item
+                ${
+                    compareState.basePlayerSpId
+                    === Number(player.sp_id)
+                        ? "compare-base"
+                        : ""
+                }
+            "
             data-sp-id="${player.sp_id}"
         >
 
-            <!-- =========================
-                목록
-            ========================== -->
+        <!-- =========================
+            목록
+        ========================== -->
+        <div
+            class="player-database-player-row"
+            aria-expanded="false"
+        >
 
-            <button
-                type="button"
-                class="player-database-player-row"
-                aria-expanded="false"
+            <span
+                class="player-database-player-season"
             >
 
-                <span
-                    class="player-database-player-season"
+                <img
+                    src="${escapeHtml(
+                        seasonImageUrl
+                    )}"
+                    alt=""
+                    class="player-database-player-season-icon"
+                    loading="lazy"
                 >
 
-                    <img
-                        src="${escapeHtml(
-                            seasonImageUrl
-                        )}"
-                        alt=""
-                        class="player-database-player-season-icon"
-                        loading="lazy"
+            </span>
+
+
+            <strong
+                class="player-database-player-name"
+            >
+                ${escapeHtml(
+                    player.player_name
+                )}
+            </strong>
+
+
+                <div class="player-database-player-row-actions">
+
+                    <button
+                        type="button"
+                        class="
+                            player-database-recommend-button
+                            player-database-recommend-button-row
+                        "
+                        data-recommend-player
+                        data-sp-id="${player.sp_id}"
+                    >
+                        추천
+                    </button>
+
+                    <button
+                        type="button"
+                        class="
+                            player-database-compare-button
+                            player-database-compare-button-row
+                            ${
+                                compareState.basePlayerSpId
+                                === Number(player.sp_id)
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-compare-player
+                        data-sp-id="${player.sp_id}"
                     >
 
-                </span>
+                        ${
+                            compareState.basePlayerSpId
+                            === Number(player.sp_id)
+                                ? "비교 기준"
+                                : "비교"
+                        }
+
+                    </button>
 
 
-                <strong
-                    class="player-database-player-name"
-                >
-                    ${escapeHtml(
-                        player.player_name
-                    )}
-                </strong>
+                    <span
+                        class="player-database-player-arrow"
+                        aria-hidden="true"
+                    >
+                        ▼
+                    </span>
 
+                </div>
 
-                <span
-                    class="player-database-player-arrow"
-                    aria-hidden="true"
-                >
-                    ▼
-                </span>
-
-            </button>
+        </div>
 
 
             <!-- =========================
@@ -2734,6 +2845,3507 @@ function rerenderPlayerCard(
     }
 }
 
+function moveCompareBasePlayerToTop() {
+
+    if (
+        compareState.basePlayerSpId
+        === null
+    ) {
+        return;
+    }
+
+
+    const basePlayerElement =
+        playerResultListElement
+            .querySelector(
+                (
+                    `.player-database-player-item`
+                    +
+                    `[data-sp-id="${compareState.basePlayerSpId}"]`
+                )
+            );
+
+
+    if (!basePlayerElement) {
+        return;
+    }
+
+
+    playerResultListElement.prepend(
+        basePlayerElement
+    );
+}
+
+function getComparePlayer(
+    spId,
+    side
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    const originalPlayer =
+        playerDataBySpId.get(
+            numericSpId
+        );
+
+
+    if (!originalPlayer) {
+        return null;
+    }
+
+
+    const state =
+        compareControlState[
+            side
+        ];
+
+
+    if (!state) {
+        return null;
+    }
+
+
+    const gradeBonus =
+        enhancementBonusMap[
+            state.grade
+        ]
+        ?? 0;
+
+
+    const adaptationBonus =
+        adaptationBonusMap[
+            state.adaptation
+        ]
+        ?? 0;
+
+
+    const teamColorBonus =
+        Number(
+            state.teamColor
+            ?? 0
+        );
+
+
+    const newAbilityBonus =
+        gradeBonus
+        +
+        adaptationBonus
+        +
+        teamColorBonus;
+
+
+    const sourceAbilityBonus =
+        Number(
+            originalPlayer.ability_bonus
+            ?? 0
+        );
+
+
+    const adjustedStats =
+        Object.fromEntries(
+            Object.entries(
+                originalPlayer.stats
+                ?? {}
+            )
+                .map(
+                    (
+                        [
+                            statName,
+                            statValue,
+                        ]
+                    ) => {
+
+                        const baseStat =
+                            Number(
+                                statValue
+                            )
+                            -
+                            sourceAbilityBonus;
+
+
+                        return [
+                            statName,
+                            baseStat
+                            +
+                            newAbilityBonus,
+                        ];
+                    }
+                )
+        );
+
+
+    const baseOvr =
+        Number(
+            originalPlayer.base_ovr
+            ??
+            (
+                Number(
+                    originalPlayer.ovr
+                    ?? 0
+                )
+                -
+                sourceAbilityBonus
+            )
+        );
+
+
+    return {
+        ...originalPlayer,
+
+        grade:
+            state.grade,
+
+        adaptation:
+            state.adaptation,
+
+        team_color_bonus:
+            state.teamColor,
+
+        ability_bonus:
+            newAbilityBonus,
+
+        ovr:
+            baseOvr
+            +
+            newAbilityBonus,
+
+        stats:
+            adjustedStats,
+    };
+}
+
+function getRecommendBasePlayer(
+    spId
+) {
+    const numericSpId =
+        Number(spId);
+
+    const originalPlayer =
+        playerDataBySpId.get(
+            numericSpId
+        );
+
+    if (!originalPlayer) {
+        return null;
+    }
+
+    const state =
+        getPlayerCardState(
+            numericSpId
+        );
+
+    const gradeBonus =
+        enhancementBonusMap[
+            Number(
+                state.grade ?? 1
+            )
+        ] ?? 0;
+
+    const adaptationBonus =
+        adaptationBonusMap[
+            Number(
+                state.adaptation ?? 1
+            )
+        ] ?? 0;
+
+    const teamColorBonus =
+        Number(
+            state.teamColor ?? 0
+        );
+
+    const newAbilityBonus =
+        gradeBonus +
+        adaptationBonus +
+        teamColorBonus;
+
+    const sourceAbilityBonus =
+        Number(
+            originalPlayer.ability_bonus
+            ?? 0
+        );
+
+    const adjustedStats =
+        Object.fromEntries(
+            Object.entries(
+                originalPlayer.stats ?? {}
+            ).map(
+                ([statName, statValue]) => {
+                    const baseStat =
+                        Number(statValue) -
+                        sourceAbilityBonus;
+
+                    return [
+                        statName,
+                        baseStat +
+                        newAbilityBonus,
+                    ];
+                }
+            )
+        );
+
+    const baseOvr =
+        Number(
+            originalPlayer.base_ovr
+            ?? (
+                Number(
+                    originalPlayer.ovr ?? 0
+                ) - sourceAbilityBonus
+            )
+        );
+
+    return {
+        ...originalPlayer,
+        grade:
+            Number(
+                state.grade ?? 1
+            ),
+        adaptation:
+            Number(
+                state.adaptation ?? 1
+            ),
+        team_color_bonus:
+            teamColorBonus,
+        ability_bonus:
+            newAbilityBonus,
+        ovr:
+            baseOvr +
+            newAbilityBonus,
+        stats:
+            adjustedStats,
+    };
+}
+
+let recommendationRows = [];
+
+function createRecommendBasePlayerHtml(
+    player
+) {
+    const seasonImageUrl =
+        `${apiBaseUrl}/api/fconline/metadata/seasons/${player.season_id}/image`;
+
+    const speedValue =
+        getCompareSummaryValue(
+            player,
+            ["속력", "가속력"]
+        );
+
+    const shotValue =
+        getCompareSummaryValue(
+            player,
+            [
+                "골 결정력",
+                "슛 파워",
+                "중거리 슛",
+                "위치 선정",
+                "발리슛",
+            ]
+        );
+
+    const passValue =
+        getCompareSummaryValue(
+            player,
+            [
+                "짧은 패스",
+                "긴 패스",
+                "시야",
+                "크로스",
+                "커브",
+            ]
+        );
+
+    const dribbleValue =
+        getCompareSummaryValue(
+            player,
+            [
+                "드리블",
+                "볼 컨트롤",
+                "민첩성",
+                "밸런스",
+                "반응 속도",
+            ]
+        );
+
+    const defenseValue =
+        getCompareSummaryValue(
+            player,
+            [
+                "대인 수비",
+                "태클",
+                "가로채기",
+                "슬라이딩 태클",
+            ]
+        );
+
+    const physicalValue =
+        getCompareSummaryValue(
+            player,
+            [
+                "몸싸움",
+                "스태미너",
+                "적극성",
+                "점프",
+                "헤더",
+            ]
+        );
+
+    return `
+        <section class="player-recommend-panel player-recommend-base-panel">
+
+            <div class="player-recommend-panel-title">
+                기준 선수
+            </div>
+
+            <div class="player-recommend-base-card">
+
+                <div class="player-recommend-base-top">
+                    <div class="player-recommend-base-info">
+
+                        <div class="player-recommend-base-name-row">
+                            <img
+                                src="${escapeHtml(seasonImageUrl)}"
+                                alt=""
+                                class="player-recommend-season-icon"
+                            >
+
+                            <strong class="player-recommend-base-name">
+                                ${escapeHtml(player.player_name)}
+                            </strong>
+                        </div>
+
+                        <div class="player-recommend-base-meta-row">
+                            <span class="player-recommend-base-position">
+                                ${escapeHtml(player.position)}
+                            </span>
+
+                            <strong class="player-recommend-base-ovr">
+                                ${player.ovr}
+                            </strong>
+                        </div>
+
+                        <div class="player-recommend-base-meta-text">
+                            <span>${escapeHtml(player.nation_name ?? "-")}</span>
+                            <span>급여 ${player.salary}</span>
+                            <span>${player.height}cm</span>
+                            <span>${player.weight}kg</span>
+                        </div>
+
+                        <div class="player-recommend-base-foot-row">
+                            ${createCompareFootHtml(player)}
+                        </div>
+
+                    </div>
+
+                    <div class="player-recommend-base-photo-wrap">
+                        <img
+                            src="${escapeHtml(player.image_url)}"
+                            alt="${escapeHtml(player.player_name)}"
+                            class="player-recommend-base-photo"
+                        >
+                    </div>
+                </div>
+
+                <div class="player-recommend-base-controls">
+                    <label>
+                        <span>강화</span>
+                        <select
+                            data-recommend-base-grade
+                        >
+                            ${createCompareGradeSelectOptionsHtml(
+                                player.grade
+                            )}
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>적응도</span>
+                        <select
+                            data-recommend-base-adaptation
+                        >
+                            ${createCompareAdaptationSelectOptionsHtml(
+                                player.adaptation
+                            )}
+                        </select>
+                    </label>
+
+                    <label>
+                        <span>팀컬러</span>
+                        <select
+                            data-recommend-base-team-color
+                        >
+                            ${createPlayerTeamColorOptionsHtml(
+                                player.team_color_bonus
+                            )}
+                        </select>
+                    </label>
+                </div>
+
+                <div class="player-recommend-base-summary">
+                    <div><span>스피드</span><strong>${speedValue}</strong></div>
+                    <div><span>슛</span><strong>${shotValue}</strong></div>
+                    <div><span>패스</span><strong>${passValue}</strong></div>
+                    <div><span>드리블</span><strong>${dribbleValue}</strong></div>
+                    <div><span>수비</span><strong>${defenseValue}</strong></div>
+                    <div><span>피지컬</span><strong>${physicalValue}</strong></div>
+                    <div><span>OVR</span><strong>${player.ovr}</strong></div>
+                </div>
+
+            </div>
+        </section>
+    `;
+}
+
+function createRecommendFilterPanelHtml(
+    player
+) {
+
+    const playerOvr =
+        Number(
+            player.ovr
+            ?? 0
+        );
+
+
+    const rangeMin =
+        Math.max(
+            0,
+            playerOvr - 20
+        );
+
+
+    const rangeMax =
+        playerOvr + 20;
+
+
+    return `
+        <section
+            class="
+                player-recommend-panel
+                player-recommend-filter-panel
+            "
+        >
+
+            <div class="player-recommend-panel-title">
+                추천 조건
+            </div>
+
+
+            <!-- =================================
+                 POSITION
+            ================================== -->
+
+            <div class="player-recommend-filter-group">
+
+                <span class="player-recommend-filter-label">
+                    포지션
+                </span>
+
+
+                <div
+                    class="player-recommend-chip-row"
+                    data-recommend-position-group
+                >
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedPosition
+                                === "same"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-position="same"
+                    >
+                        동일 포지션
+                        (${escapeHtml(
+                            player.position
+                        )})
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedPosition
+                                === "all"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-position="all"
+                    >
+                        모든 포지션
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================
+                 SALARY
+            ================================== -->
+
+            <div class="player-recommend-filter-group">
+
+                <span class="player-recommend-filter-label">
+                    급여 범위
+                </span>
+
+
+                <div
+                    class="player-recommend-chip-row"
+                    data-recommend-salary-group
+                >
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedSalaryMode
+                                === "any"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-salary-mode="any"
+                    >
+                        상한없음
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedSalaryMode
+                                === "same_or_below"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-salary-mode="same_or_below"
+                    >
+                        이하
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedSalaryMode
+                                === "plus_1"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-salary-mode="plus_1"
+                    >
+                        +1
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            player-recommend-chip
+                            ${
+                                recommendState.selectedSalaryMode
+                                === "plus_2"
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-salary-mode="plus_2"
+                    >
+                        +2
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================
+                 OVR
+            ================================== -->
+
+            <div class="player-recommend-filter-group">
+
+                <span class="player-recommend-filter-label">
+                    OVR 범위
+                </span>
+
+
+                <div class="player-recommend-range-row">
+
+                    <input
+                        type="range"
+                        min="${rangeMin}"
+                        max="${rangeMax}"
+                        value="${recommendState.ovrMin}"
+                        data-recommend-ovr-min
+                    >
+
+
+                    <input
+                        type="range"
+                        min="${rangeMin}"
+                        max="${rangeMax}"
+                        value="${recommendState.ovrMax}"
+                        data-recommend-ovr-max
+                    >
+
+                </div>
+
+
+                <div class="player-recommend-range-values">
+
+                    <span data-recommend-ovr-min-value>
+                        ${recommendState.ovrMin}
+                    </span>
+
+                    <span data-recommend-ovr-max-value>
+                        ${recommendState.ovrMax}
+                    </span>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================
+                 LIMIT
+            ================================== -->
+
+            <div class="player-recommend-filter-group">
+
+                <span class="player-recommend-filter-label">
+                    추천 수
+                </span>
+
+
+                <select
+                    class="player-recommend-limit-select"
+                    data-recommend-limit
+                >
+
+                    <option
+                        value="5"
+                        ${
+                            recommendState.limit === 5
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        5명
+                    </option>
+
+
+                    <option
+                        value="10"
+                        ${
+                            recommendState.limit === 10
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        10명
+                    </option>
+
+
+                    <option
+                        value="20"
+                        ${
+                            recommendState.limit === 20
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        20명
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- =================================
+                 SEARCH
+            ================================== -->
+
+            <div class="player-recommend-filter-actions">
+
+                <button
+                    type="button"
+                    class="player-recommend-refresh-button"
+                    data-recommend-refresh
+                >
+                    재검색
+                </button>
+
+            </div>
+
+        </section>
+    `;
+}
+
+function createRecommendGuidePanelHtml() {
+    return `
+        <section class="player-recommend-panel player-recommend-guide-panel">
+
+            <div class="player-recommend-panel-title">
+                비교 기준 설명
+            </div>
+
+            <div class="player-recommend-radar-wrap">
+                <canvas
+                    id="player-recommend-radar-canvas"
+                    width="280"
+                    height="220"
+                ></canvas>
+            </div>
+
+            <p class="player-recommend-guide-text">
+                기준 선수의 6개 대표 능력치를 기준으로
+                유사한 선수들을 추천합니다.
+            </p>
+        </section>
+    `;
+}
+
+function createRecommendStarsHtml(
+    count
+) {
+    return "★".repeat(count);
+}
+
+function createRecommendListHtml(
+    rows = recommendationRows,
+    options = {}
+) {
+
+    const loading =
+        Boolean(
+            options.loading
+        );
+
+
+    const errorMessage =
+        String(
+            options.errorMessage
+            ?? ""
+        );
+
+
+    if (loading) {
+
+        return `
+            <section
+                class="player-recommend-list-panel"
+                id="player-recommend-list-panel"
+            >
+
+                <div class="player-recommend-list-header">
+                    추천 선수 검색 중
+                </div>
+
+                <div class="player-recommend-empty">
+                    실제 선수 데이터를 분석하고 있습니다.
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    if (errorMessage) {
+
+        return `
+            <section
+                class="player-recommend-list-panel"
+                id="player-recommend-list-panel"
+            >
+
+                <div class="player-recommend-list-header">
+                    추천 선수 목록
+                </div>
+
+                <div class="player-recommend-empty">
+                    ${escapeHtml(
+                        errorMessage
+                    )}
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    if (
+        rows.length
+        === 0
+    ) {
+
+        return `
+            <section
+                class="player-recommend-list-panel"
+                id="player-recommend-list-panel"
+            >
+
+                <div class="player-recommend-list-header">
+                    추천 선수 목록 (0명)
+                </div>
+
+                <div class="player-recommend-empty">
+                    현재 조건에 맞는 추천 선수가 없습니다.
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    return `
+        <section
+            class="player-recommend-list-panel"
+            id="player-recommend-list-panel"
+        >
+
+            <div class="player-recommend-list-header">
+                추천 선수 목록 (${rows.length}명)
+            </div>
+
+
+            <div class="player-recommend-table-wrap">
+
+                <table class="player-recommend-table">
+
+                    <thead>
+
+                        <tr>
+                            <th>순위</th>
+                            <th>선수 정보</th>
+                            <th>유사도</th>
+                            <th>급여</th>
+                            <th>OVR</th>
+                            <th>스피드</th>
+                            <th>슛</th>
+                            <th>패스</th>
+                            <th>드리블</th>
+                            <th>피지컬</th>
+                            <th>주발</th>
+                            <th>특징 요약</th>
+                            <th>비교</th>
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            rows
+                                .map(
+                                    row => {
+
+                                        const seasonImageUrl =
+                                            (
+                                                `${apiBaseUrl}`
+                                                +
+                                                `/api/fconline/metadata/seasons/`
+                                                +
+                                                `${row.season_id}/image`
+                                            );
+
+
+                                        return `
+                                            <tr>
+
+                                                <td class="rank">
+
+                                                    ${row.rank}
+
+                                                </td>
+
+
+                                                <td class="player-cell">
+
+                                                    <div class="player-main">
+
+                                                        <div class="season-badge">
+
+                                                            <img
+                                                                src="${escapeHtml(
+                                                                    seasonImageUrl
+                                                                )}"
+                                                                alt=""
+                                                                class="player-recommend-season-icon"
+                                                            >
+
+                                                        </div>
+
+
+                                                        <div class="player-text">
+
+                                                            <strong>
+
+                                                                ${escapeHtml(
+                                                                    row.player_name
+                                                                )}
+
+                                                            </strong>
+
+
+                                                            <div>
+
+                                                                ${escapeHtml(
+                                                                    row.position
+                                                                )}
+                                                                ·
+                                                                OVR
+                                                                ${row.ovr}
+
+                                                            </div>
+
+
+                                                            <div>
+
+                                                                ${escapeHtml(
+                                                                    row.nation_name
+                                                                    ?? ""
+                                                                )}
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </td>
+
+
+                                                <td class="similarity">
+
+                                                    ${row.similarity}%
+
+                                                    <div class="stars">
+
+                                                        ${createRecommendStarsHtml(
+                                                            row.stars
+                                                        )}
+
+                                                    </div>
+
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.salary}
+                                                </td>
+
+
+                                                <td>
+
+                                                    ${row.ovr}
+
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.speed}
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.shot}
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.pass}
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.dribble}
+                                                </td>
+
+
+                                                <td>
+                                                    ${row.physical}
+                                                </td>
+
+
+                                                <td>
+
+                                                    ${escapeHtml(
+                                                        row.foot
+                                                    )}
+
+                                                </td>
+
+
+                                                <td class="summary-cell">
+
+                                                    <div class="pros">
+
+                                                        + ${
+                                                            (
+                                                                row.pros
+                                                                ?? []
+                                                            )
+                                                                .join(
+                                                                    ", "
+                                                                )
+                                                        }
+
+                                                    </div>
+
+
+                                                    ${
+                                                        (
+                                                            row.cons
+                                                            ?? []
+                                                        ).length > 0
+                                                            ? `
+                                                                <div class="cons">
+
+                                                                    - ${
+                                                                        row.cons.join(
+                                                                            ", "
+                                                                        )
+                                                                    }
+
+                                                                </div>
+                                                            `
+                                                            : ""
+                                                    }
+
+                                                </td>
+
+
+                                                <td>
+
+                                                    <button
+                                                        type="button"
+                                                        class="player-recommend-compare-button"
+                                                        data-recommend-compare
+                                                        data-sp-id="${row.sp_id}"
+                                                    >
+                                                        비교하기
+                                                    </button>
+
+                                                </td>
+
+                                            </tr>
+                                        `;
+                                    }
+                                )
+                                .join(
+                                    ""
+                                )
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+    `;
+}
+
+async function loadPlayerRecommendations(
+    basePlayer
+) {
+
+    const listPanelElement =
+        playerRecommendContentElement
+            .querySelector(
+                "#player-recommend-list-panel"
+            );
+
+
+    if (listPanelElement) {
+
+        listPanelElement.outerHTML =
+            createRecommendListHtml(
+                [],
+                {
+                    loading:
+                        true,
+                }
+            );
+    }
+
+
+    const params =
+        new URLSearchParams();
+
+
+    params.set(
+        "base_sp_id",
+        String(
+            basePlayer.sp_id
+        )
+    );
+
+
+    params.set(
+        "grade",
+        String(
+            basePlayer.grade
+            ?? 1
+        )
+    );
+
+
+    params.set(
+        "adaptation",
+        String(
+            basePlayer.adaptation
+            ?? 1
+        )
+    );
+
+
+    params.set(
+        "team_color",
+        String(
+            basePlayer.team_color_bonus
+            ?? 0
+        )
+    );
+
+
+    params.set(
+        "position_mode",
+        recommendState
+            .selectedPosition
+    );
+
+
+    params.set(
+        "salary_mode",
+        recommendState
+            .selectedSalaryMode
+    );
+
+
+    if (
+        recommendState.ovrMin
+        !== null
+    ) {
+
+        params.set(
+            "ovr_min",
+            String(
+                recommendState.ovrMin
+            )
+        );
+    }
+
+
+    if (
+        recommendState.ovrMax
+        !== null
+    ) {
+
+        params.set(
+            "ovr_max",
+            String(
+                recommendState.ovrMax
+            )
+        );
+    }
+
+
+    params.set(
+        "limit",
+        String(
+            recommendState.limit
+        )
+    );
+
+
+    try {
+
+        const response =
+            await fetch(
+                (
+                    `${apiBaseUrl}`
+                    +
+                    "/api/player-database/recommend?"
+                    +
+                    params.toString()
+                )
+            );
+
+
+        if (!response.ok) {
+
+            const errorData =
+                await response
+                    .json()
+                    .catch(
+                        () => null
+                    );
+
+
+            throw new Error(
+                errorData?.detail
+                ??
+                "추천 선수 검색에 실패했습니다."
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        recommendationRows =
+            data.players
+            ?? [];
+
+
+        const currentListPanelElement =
+            playerRecommendContentElement
+                .querySelector(
+                    "#player-recommend-list-panel"
+                );
+
+
+        if (
+            currentListPanelElement
+        ) {
+
+            currentListPanelElement.outerHTML =
+                createRecommendListHtml(
+                    recommendationRows
+                );
+        }
+
+    }
+
+    catch (
+        error
+    ) {
+
+        console.error(
+            error
+        );
+
+
+        const currentListPanelElement =
+            playerRecommendContentElement
+                .querySelector(
+                    "#player-recommend-list-panel"
+                );
+
+
+        if (
+            currentListPanelElement
+        ) {
+
+            currentListPanelElement.outerHTML =
+                createRecommendListHtml(
+                    [],
+                    {
+                        errorMessage:
+                            (
+                                error.message
+                                ??
+                                "추천 선수 검색에 실패했습니다."
+                            ),
+                    }
+                );
+        }
+    }
+}
+
+function renderPlayerRecommendModal() {
+
+    const basePlayer =
+        getRecommendBasePlayer(
+            recommendState
+                .basePlayerSpId
+        );
+
+
+    if (!basePlayer) {
+
+        playerRecommendContentElement
+            .innerHTML =
+                `
+                    <div class="player-recommend-empty">
+
+                        기준 선수 정보를 불러오지 못했습니다.
+
+                    </div>
+                `;
+
+        return;
+    }
+
+
+    recommendationRows =
+        [];
+
+
+    playerRecommendContentElement
+        .innerHTML =
+            `
+                <div class="player-recommend-top-grid">
+
+                    ${createRecommendBasePlayerHtml(
+                        basePlayer
+                    )}
+
+                    ${createRecommendFilterPanelHtml(
+                        basePlayer
+                    )}
+
+                    ${createRecommendGuidePanelHtml()}
+
+                </div>
+
+
+                ${createRecommendListHtml(
+                    [],
+                    {
+                        loading:
+                            true,
+                    }
+                )}
+            `;
+
+
+    requestAnimationFrame(
+        () => {
+
+            drawRecommendRadarChart(
+                basePlayer
+            );
+        }
+    );
+
+
+    loadPlayerRecommendations(
+        basePlayer
+    );
+}
+
+function openPlayerRecommendModal(
+    spId
+) {
+
+    recommendState.basePlayerSpId =
+        Number(
+            spId
+        );
+
+
+    recommendState
+        .selectedPosition =
+            "same";
+
+
+    recommendState
+        .selectedSalaryMode =
+            "any";
+
+
+    recommendState.limit =
+        10;
+
+
+    const basePlayer =
+        getRecommendBasePlayer(
+            spId
+        );
+
+
+    if (
+        basePlayer
+    ) {
+
+        recommendState.ovrMin =
+            Math.max(
+                0,
+                Number(
+                    basePlayer.ovr
+                    ?? 0
+                )
+                -
+                10
+            );
+
+
+        recommendState.ovrMax =
+            (
+                Number(
+                    basePlayer.ovr
+                    ?? 0
+                )
+                +
+                10
+            );
+    }
+
+
+    renderPlayerRecommendModal();
+
+
+    playerRecommendModalElement.hidden =
+        false;
+
+
+    document.body
+        .classList
+        .add(
+            "player-recommend-open"
+        );
+}
+
+function closePlayerRecommendModal() {
+    playerRecommendModalElement.hidden =
+        true;
+
+    document.body.classList.remove(
+        "player-recommend-open"
+    );
+}
+
+function openRecommendedPlayerCompare(
+    targetSpId
+) {
+
+    // =====================================
+    // 기준 선수 / 비교 선수 ID
+    // =====================================
+
+    const baseSpId =
+        Number(
+            recommendState
+                .basePlayerSpId
+        );
+
+
+    const numericTargetSpId =
+        Number(
+            targetSpId
+        );
+
+
+    if (
+        !Number.isFinite(
+            baseSpId
+        )
+        ||
+        !Number.isFinite(
+            numericTargetSpId
+        )
+    ) {
+
+        return;
+    }
+
+
+    // =====================================
+    // 추천 목록에서 비교 선수 찾기
+    // =====================================
+
+    const targetPlayer =
+        recommendationRows.find(
+            player =>
+                Number(
+                    player.sp_id
+                )
+                ===
+                numericTargetSpId
+        );
+
+
+    if (!targetPlayer) {
+
+        return;
+    }
+
+
+    // =====================================
+    // 기준 선수의 현재 설정값
+    //
+    // 추천창에서 사용자가 선택한
+    // 강화 / 적응도 / 팀컬러
+    // =====================================
+
+    const baseCardState =
+        getPlayerCardState(
+            baseSpId
+        );
+
+
+    const sharedGrade =
+        Number(
+            baseCardState.grade
+            ?? 1
+        );
+
+
+    const sharedAdaptation =
+        Number(
+            baseCardState.adaptation
+            ?? 1
+        );
+
+
+    const sharedTeamColor =
+        Number(
+            baseCardState.teamColor
+            ?? 0
+        );
+
+
+    // =====================================
+    // 추천 선수를 비교 시스템에 등록
+    // =====================================
+
+    const existingTargetPlayer =
+        playerDataBySpId.get(
+            numericTargetSpId
+        );
+
+
+    playerDataBySpId.set(
+        numericTargetSpId,
+        {
+            ...(
+                existingTargetPlayer
+                ?? {}
+            ),
+
+            ...targetPlayer,
+        }
+    );
+
+
+    // =====================================
+    // 비교 선수도 기준 선수와
+    // 완전히 동일한 조건으로 시작
+    // =====================================
+
+    const targetCardState =
+        getPlayerCardState(
+            numericTargetSpId
+        );
+
+
+    targetCardState.grade =
+        sharedGrade;
+
+
+    targetCardState.adaptation =
+        sharedAdaptation;
+
+
+    targetCardState.teamColor =
+        sharedTeamColor;
+
+
+    // =====================================
+    // 포지션 비교 탭 초기화
+    // =====================================
+
+    compareState.activePosition =
+        "all";
+
+
+    // =====================================
+    // 추천창 닫기
+    // =====================================
+
+    closePlayerRecommendModal();
+
+
+    // =====================================
+    // 기존 선수 비교창 열기
+    // =====================================
+
+    openPlayerCompareModal(
+        baseSpId,
+        numericTargetSpId
+    );
+}
+
+function drawRecommendRadarChart(
+    player
+) {
+    const canvas =
+        document.querySelector(
+            "#player-recommend-radar-canvas"
+        );
+
+    if (!canvas) {
+        return;
+    }
+
+    const context =
+        canvas.getContext("2d");
+
+    const width =
+        canvas.width;
+
+    const height =
+        canvas.height;
+
+    context.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+    const categories = [
+        {
+            label: "스피드",
+            value: getCompareSummaryValue(
+                player,
+                ["속력", "가속력"]
+            ),
+        },
+        {
+            label: "슛",
+            value: getCompareSummaryValue(
+                player,
+                [
+                    "골 결정력",
+                    "슛 파워",
+                    "중거리 슛",
+                    "위치 선정",
+                    "발리슛",
+                ]
+            ),
+        },
+        {
+            label: "패스",
+            value: getCompareSummaryValue(
+                player,
+                [
+                    "짧은 패스",
+                    "긴 패스",
+                    "시야",
+                    "크로스",
+                    "커브",
+                ]
+            ),
+        },
+        {
+            label: "드리블",
+            value: getCompareSummaryValue(
+                player,
+                [
+                    "드리블",
+                    "볼 컨트롤",
+                    "민첩성",
+                    "밸런스",
+                    "반응 속도",
+                ]
+            ),
+        },
+        {
+            label: "수비",
+            value: getCompareSummaryValue(
+                player,
+                [
+                    "대인 수비",
+                    "태클",
+                    "가로채기",
+                    "슬라이딩 태클",
+                ]
+            ),
+        },
+        {
+            label: "피지컬",
+            value: getCompareSummaryValue(
+                player,
+                [
+                    "몸싸움",
+                    "스태미너",
+                    "적극성",
+                    "점프",
+                    "헤더",
+                ]
+            ),
+        },
+    ];
+
+    const centerX = width / 2;
+    const centerY = height / 2 + 6;
+    const radius = 72;
+    const steps = 5;
+    const startAngle = -Math.PI / 2;
+
+    context.strokeStyle =
+        "rgba(255,255,255,0.10)";
+    context.lineWidth = 1;
+
+    for (
+        let step = 1;
+        step <= steps;
+        step += 1
+    ) {
+        const currentRadius =
+            (radius / steps) * step;
+
+        context.beginPath();
+
+        categories.forEach(
+            (_category, index) => {
+                const angle =
+                    startAngle +
+                    (
+                        (Math.PI * 2) /
+                        categories.length
+                    ) *
+                    index;
+
+                const x =
+                    centerX +
+                    Math.cos(angle) *
+                    currentRadius;
+
+                const y =
+                    centerY +
+                    Math.sin(angle) *
+                    currentRadius;
+
+                if (index === 0) {
+                    context.moveTo(x, y);
+                } else {
+                    context.lineTo(x, y);
+                }
+            }
+        );
+
+        context.closePath();
+        context.stroke();
+    }
+
+    categories.forEach(
+        (category, index) => {
+            const angle =
+                startAngle +
+                (
+                    (Math.PI * 2) /
+                    categories.length
+                ) *
+                index;
+
+            const x =
+                centerX +
+                Math.cos(angle) * radius;
+
+            const y =
+                centerY +
+                Math.sin(angle) * radius;
+
+            context.beginPath();
+            context.moveTo(centerX, centerY);
+            context.lineTo(x, y);
+            context.stroke();
+
+            const labelX =
+                centerX +
+                Math.cos(angle) * (radius + 18);
+
+            const labelY =
+                centerY +
+                Math.sin(angle) * (radius + 18);
+
+            context.fillStyle =
+                "rgba(255,255,255,0.75)";
+            context.font =
+                "11px sans-serif";
+            context.textAlign =
+                "center";
+            context.fillText(
+                category.label,
+                labelX,
+                labelY
+            );
+        }
+    );
+
+    context.beginPath();
+
+    categories.forEach(
+        (category, index) => {
+            const normalized =
+                Math.max(
+                    0,
+                    Math.min(
+                        1,
+                        category.value / 160
+                    )
+                );
+
+            const currentRadius =
+                radius * normalized;
+
+            const angle =
+                startAngle +
+                (
+                    (Math.PI * 2) /
+                    categories.length
+                ) *
+                index;
+
+            const x =
+                centerX +
+                Math.cos(angle) *
+                currentRadius;
+
+            const y =
+                centerY +
+                Math.sin(angle) *
+                currentRadius;
+
+            if (index === 0) {
+                context.moveTo(x, y);
+            } else {
+                context.lineTo(x, y);
+            }
+        }
+    );
+
+    context.closePath();
+    context.fillStyle =
+        "rgba(174, 79, 255, 0.28)";
+    context.strokeStyle =
+        "rgba(174, 79, 255, 0.9)";
+    context.lineWidth = 2;
+    context.fill();
+    context.stroke();
+}
+
+function createCompareAdaptationOptionsHtml(
+    side,
+    selectedAdaptation
+) {
+
+    return `
+        <button
+            type="button"
+            class="
+                player-compare-adaptation-button
+                ${
+                    selectedAdaptation === 1
+                        ? "selected"
+                        : ""
+                }
+            "
+            data-compare-adaptation="1"
+            data-compare-side="${side}"
+        >
+            1
+        </button>
+
+
+        <button
+            type="button"
+            class="
+                player-compare-adaptation-button
+                ${
+                    selectedAdaptation === 5
+                        ? "selected"
+                        : ""
+                }
+            "
+            data-compare-adaptation="5"
+            data-compare-side="${side}"
+        >
+            5
+        </button>
+    `;
+}
+
+function initializeCompareControlState() {
+
+    const leftState =
+        getPlayerCardState(
+            compareState.basePlayerSpId
+        );
+
+
+    const rightState =
+        getPlayerCardState(
+            compareState.targetPlayerSpId
+        );
+
+
+    compareControlState.left = {
+        grade:
+            Number(
+                leftState.grade
+                ?? 1
+            ),
+
+        adaptation:
+            Number(
+                leftState.adaptation
+                ?? 1
+            ),
+
+        teamColor:
+            Number(
+                leftState.teamColor
+                ?? 0
+            ),
+    };
+
+
+    compareControlState.right = {
+        grade:
+            Number(
+                rightState.grade
+                ?? 1
+            ),
+
+        adaptation:
+            Number(
+                rightState.adaptation
+                ?? 1
+            ),
+
+        teamColor:
+            Number(
+                rightState.teamColor
+                ?? 0
+            ),
+    };
+}
+
+function createCompareGradeOptionsHtml(
+    side,
+    selectedGrade
+) {
+
+    return Array
+        .from(
+            {
+                length: 13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const grade =
+                    index + 1;
+
+
+                const tierClass =
+                    getGradeTierClass(
+                        grade
+                    );
+
+
+                return `
+                    <button
+                        type="button"
+                        class="
+                            player-compare-grade-button
+                            ${tierClass}
+                            ${
+                                grade === selectedGrade
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-compare-grade="${grade}"
+                        data-compare-side="${side}"
+                    >
+                        +${grade}
+                    </button>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function createCompareFootHtml(
+    player
+) {
+
+    const leftFoot =
+        Number(
+            player.left_foot
+            ?? 0
+        );
+
+
+    const rightFoot =
+        Number(
+            player.right_foot
+            ?? 0
+        );
+
+
+    const leftMain =
+        leftFoot >= rightFoot;
+
+
+    const rightMain =
+        rightFoot >= leftFoot;
+
+
+    return `
+        <div class="player-compare-foot">
+
+            <span
+                class="
+                    player-compare-foot-item
+                    ${
+                        leftFoot === 5
+                            ? "active"
+                            : ""
+                    }
+                "
+            >
+
+                ${
+                    leftMain
+                        ? `
+                            <small>
+                                ★
+                            </small>
+                        `
+                        : ""
+                }
+
+                L${leftFoot}
+
+            </span>
+
+
+            <span
+                class="
+                    player-compare-foot-item
+                    ${
+                        rightFoot === 5
+                            ? "active"
+                            : ""
+                    }
+                "
+            >
+
+                ${
+                    rightMain
+                        ? `
+                            <small>
+                                ★
+                            </small>
+                        `
+                        : ""
+                }
+
+                R${rightFoot}
+
+            </span>
+
+        </div>
+    `;
+}
+
+function createCompareGradeSelectOptionsHtml(
+    selectedGrade
+) {
+
+    return Array
+        .from(
+            {
+                length: 13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const grade =
+                    index + 1;
+
+
+                return `
+                    <option
+                        value="${grade}"
+                        ${
+                            grade
+                            === Number(selectedGrade)
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        +${grade}
+                    </option>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function createCompareAdaptationSelectOptionsHtml(
+    selectedAdaptation
+) {
+
+    return [
+        1,
+        5,
+    ]
+        .map(
+            adaptation => {
+
+                return `
+                    <option
+                        value="${adaptation}"
+                        ${
+                            adaptation
+                            === Number(selectedAdaptation)
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        ${adaptation}
+                    </option>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+function createComparePlayerSummaryHtml(
+    player,
+    side
+) {
+
+    const seasonImageUrl =
+        (
+            `${apiBaseUrl}`
+            +
+            `/api/fconline/metadata/seasons/`
+            +
+            `${player.season_id}/image`
+        );
+
+
+    const isBasePlayer =
+        side === "left";
+
+
+    return `
+        <article
+            class="
+                player-compare-player
+                player-compare-player-${side}
+            "
+        >
+
+            ${
+                isBasePlayer
+                    ? `
+                        <span class="player-compare-base-badge">
+                            비교 기준
+                        </span>
+                    `
+                    : ""
+            }
+
+
+            <div class="player-compare-card-main">
+
+
+                <!-- =================================
+                     PLAYER INFO
+                ================================== -->
+
+                <div class="player-compare-card-info">
+
+
+                    <div class="player-compare-card-identity">
+
+                        <img
+                            src="${escapeHtml(
+                                seasonImageUrl
+                            )}"
+                            alt=""
+                            class="player-compare-season"
+                        >
+
+
+                        <strong class="player-compare-name">
+                            ${escapeHtml(
+                                player.player_name
+                            )}
+                        </strong>
+
+                    </div>
+
+
+                    <div class="player-compare-card-position-row">
+
+                        <strong class="player-compare-card-position">
+                            ${escapeHtml(
+                                player.position
+                            )}
+                        </strong>
+
+
+                        <div class="player-compare-card-ovr">
+
+                            <span>
+                                OVR
+                            </span>
+
+                            <strong
+                                class="${getPlayerStatColorClass(
+                                    player.ovr
+                                )}"
+                            >
+                                ${player.ovr}
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="player-compare-basic-info">
+
+                        <span>
+                            ${escapeHtml(
+                                player.nation_name
+                                ?? "-"
+                            )}
+                        </span>
+
+                        <span>
+                            급여 ${player.salary}
+                        </span>
+
+                        <span>
+                            ${player.height}cm
+                        </span>
+
+                        <span>
+                            ${player.weight}kg
+                        </span>
+
+                    </div>
+
+
+                    ${createCompareFootHtml(
+                        player
+                    )}
+
+                </div>
+
+
+                <!-- =================================
+                     PLAYER PHOTO
+                ================================== -->
+
+                <div class="player-compare-photo-wrap">
+
+                    <img
+                        src="${escapeHtml(
+                            player.image_url
+                        )}"
+                        alt="${escapeHtml(
+                            player.player_name
+                        )}"
+                        class="player-compare-photo"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================
+                 CONTROLS
+            ================================== -->
+
+            <div class="player-compare-compact-controls">
+
+
+                <label class="player-compare-compact-control">
+
+                    <span>
+                        강화
+                    </span>
+
+                    <select
+                        data-compare-grade
+                        data-compare-side="${side}"
+                    >
+
+                        ${createCompareGradeSelectOptionsHtml(
+                            player.grade
+                        )}
+
+                    </select>
+
+                </label>
+
+
+                <label class="player-compare-compact-control">
+
+                    <span>
+                        적응도
+                    </span>
+
+                    <select
+                        data-compare-adaptation
+                        data-compare-side="${side}"
+                    >
+
+                        ${createCompareAdaptationSelectOptionsHtml(
+                            player.adaptation
+                        )}
+
+                    </select>
+
+                </label>
+
+
+                <label class="player-compare-compact-control">
+
+                    <span>
+                        팀컬러
+                    </span>
+
+                    <select
+                        data-compare-team-color
+                        data-compare-side="${side}"
+                    >
+
+                        ${createPlayerTeamColorOptionsHtml(
+                            player.team_color_bonus
+                        )}
+
+                    </select>
+
+                </label>
+
+            </div>
+
+        </article>
+    `;
+}
+
+const compareSummaryCategories = [
+
+    {
+        label:
+            "스피드",
+
+        stats: [
+            "속력",
+            "가속력",
+        ],
+    },
+
+
+    {
+        label:
+            "슛",
+
+        stats: [
+            "골 결정력",
+            "슛 파워",
+            "중거리 슛",
+            "위치 선정",
+            "발리슛",
+        ],
+    },
+
+
+    {
+        label:
+            "패스",
+
+        stats: [
+            "짧은 패스",
+            "긴 패스",
+            "시야",
+            "크로스",
+            "커브",
+        ],
+    },
+
+
+    {
+        label:
+            "드리블",
+
+        stats: [
+            "드리블",
+            "볼 컨트롤",
+            "민첩성",
+            "밸런스",
+            "반응 속도",
+        ],
+    },
+
+
+    {
+        label:
+            "수비",
+
+        stats: [
+            "대인 수비",
+            "태클",
+            "가로채기",
+            "슬라이딩 태클",
+        ],
+    },
+
+
+    {
+        label:
+            "피지컬",
+
+        stats: [
+            "몸싸움",
+            "스태미너",
+            "적극성",
+            "점프",
+            "헤더",
+        ],
+    },
+
+];
+
+
+function getCompareSummaryValue(
+    player,
+    statNames
+) {
+
+    const values =
+        statNames
+            .map(
+                statName =>
+                    Number(
+                        player.stats?.[
+                            statName
+                        ]
+                    )
+            )
+            .filter(
+                value =>
+                    Number.isFinite(
+                        value
+                    )
+            );
+
+
+    if (
+        values.length
+        === 0
+    ) {
+
+        return 0;
+    }
+
+
+    return Math.round(
+        values.reduce(
+            (
+                total,
+                value
+            ) =>
+                total + value,
+            0
+        )
+        /
+        values.length
+    );
+}
+
+
+function createCompareSummaryHtml(
+    basePlayer,
+    targetPlayer
+) {
+
+    return `
+        <div class="player-compare-summary">
+
+            ${
+                compareSummaryCategories
+                    .map(
+                        category => {
+
+                            const leftValue =
+                                getCompareSummaryValue(
+                                    basePlayer,
+                                    category.stats
+                                );
+
+
+                            const rightValue =
+                                getCompareSummaryValue(
+                                    targetPlayer,
+                                    category.stats
+                                );
+
+
+                            return `
+                                <div class="player-compare-summary-item">
+
+                                    <span class="player-compare-summary-label">
+                                        ${category.label}
+                                    </span>
+
+
+                                    <div class="player-compare-summary-values">
+
+                                        <strong
+                                            class="
+                                                player-compare-summary-left
+                                                ${
+                                                    leftValue > rightValue
+                                                        ? "higher"
+                                                        : ""
+                                                }
+                                            "
+                                        >
+                                            ${leftValue}
+                                        </strong>
+
+
+                                        <strong
+                                            class="
+                                                player-compare-summary-right
+                                                ${
+                                                    rightValue > leftValue
+                                                        ? "higher"
+                                                        : ""
+                                                }
+                                            "
+                                        >
+                                            ${rightValue}
+                                        </strong>
+
+                                    </div>
+
+                                </div>
+                            `;
+                        }
+                    )
+                    .join(
+                        ""
+                    )
+            }
+
+        </div>
+    `;
+}
+
+// =========================================
+// COMPARE POSITION STAT PRIORITY
+// =========================================
+
+function getComparePositionStatPriority(
+    position
+) {
+
+    const positionValue =
+        String(
+            position
+            ?? ""
+        )
+            .trim()
+            .toUpperCase();
+
+
+    // =====================================
+    // GK
+    // =====================================
+
+    if (
+        positionValue === "GK"
+    ) {
+
+        return [
+            "GK 반응속도",
+            "GK 다이빙",
+            "GK 위치 선정",
+            "GK 핸들링",
+            "GK 킥",
+            "반응 속도",
+            "점프",
+            "침착성",
+        ];
+    }
+
+
+    // =====================================
+    // CB / SW
+    // =====================================
+
+    if (
+        [
+            "SW",
+            "RCB",
+            "CB",
+            "LCB",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "대인 수비",
+            "태클",
+            "가로채기",
+            "헤더",
+            "몸싸움",
+            "적극성",
+            "점프",
+            "속력",
+            "가속력",
+            "반응 속도",
+            "스태미너",
+            "짧은 패스",
+            "긴 패스",
+            "침착성",
+        ];
+    }
+
+
+    // =====================================
+    // FB / WB
+    // =====================================
+
+    if (
+        [
+            "RWB",
+            "RB",
+            "LB",
+            "LWB",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "속력",
+            "가속력",
+            "스태미너",
+            "태클",
+            "가로채기",
+            "대인 수비",
+            "크로스",
+            "짧은 패스",
+            "긴 패스",
+            "적극성",
+            "드리블",
+            "볼 컨트롤",
+            "민첩성",
+            "몸싸움",
+        ];
+    }
+
+
+    // =====================================
+    // CDM
+    // =====================================
+
+    if (
+        [
+            "RDM",
+            "CDM",
+            "LDM",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "가로채기",
+            "대인 수비",
+            "태클",
+            "몸싸움",
+            "적극성",
+            "스태미너",
+            "짧은 패스",
+            "긴 패스",
+            "반응 속도",
+            "헤더",
+            "점프",
+            "볼 컨트롤",
+            "시야",
+            "침착성",
+        ];
+    }
+
+
+    // =====================================
+    // CM
+    // =====================================
+
+    if (
+        [
+            "RCM",
+            "CM",
+            "LCM",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "짧은 패스",
+            "긴 패스",
+            "시야",
+            "볼 컨트롤",
+            "스태미너",
+            "반응 속도",
+            "드리블",
+            "민첩성",
+            "중거리 슛",
+            "가로채기",
+            "몸싸움",
+            "침착성",
+            "커브",
+            "슛 파워",
+        ];
+    }
+
+
+    // =====================================
+    // RM / LM
+    // =====================================
+
+    if (
+        [
+            "RM",
+            "LM",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "속력",
+            "가속력",
+            "스태미너",
+            "크로스",
+            "드리블",
+            "볼 컨트롤",
+            "민첩성",
+            "짧은 패스",
+            "시야",
+            "커브",
+            "골 결정력",
+            "위치 선정",
+            "반응 속도",
+        ];
+    }
+
+
+    // =====================================
+    // CAM
+    // =====================================
+
+    if (
+        [
+            "RAM",
+            "CAM",
+            "LAM",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "시야",
+            "짧은 패스",
+            "볼 컨트롤",
+            "드리블",
+            "민첩성",
+            "중거리 슛",
+            "골 결정력",
+            "커브",
+            "프리킥",
+            "위치 선정",
+            "반응 속도",
+            "침착성",
+            "가속력",
+            "속력",
+        ];
+    }
+
+
+    // =====================================
+    // WING
+    // =====================================
+
+    if (
+        [
+            "RW",
+            "LW",
+            "RF",
+            "LF",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "속력",
+            "가속력",
+            "드리블",
+            "민첩성",
+            "볼 컨트롤",
+            "크로스",
+            "골 결정력",
+            "위치 선정",
+            "커브",
+            "짧은 패스",
+            "시야",
+            "반응 속도",
+            "침착성",
+            "슛 파워",
+        ];
+    }
+
+
+    // =====================================
+    // CF
+    // =====================================
+
+    if (
+        positionValue === "CF"
+    ) {
+
+        return [
+            "골 결정력",
+            "위치 선정",
+            "볼 컨트롤",
+            "짧은 패스",
+            "시야",
+            "드리블",
+            "반응 속도",
+            "침착성",
+            "속력",
+            "가속력",
+            "슛 파워",
+            "중거리 슛",
+            "몸싸움",
+            "헤더",
+        ];
+    }
+
+
+    // =====================================
+    // ST
+    // =====================================
+
+    if (
+        [
+            "RS",
+            "ST",
+            "LS",
+        ].includes(
+            positionValue
+        )
+    ) {
+
+        return [
+            "골 결정력",
+            "위치 선정",
+            "속력",
+            "가속력",
+            "슛 파워",
+            "헤더",
+            "몸싸움",
+            "반응 속도",
+            "볼 컨트롤",
+            "침착성",
+            "점프",
+            "드리블",
+            "중거리 슛",
+            "발리슛",
+        ];
+    }
+
+
+    return [];
+}
+
+function getCompareStatNames(
+    basePlayer,
+    targetPlayer,
+    position
+) {
+
+    const baseStats =
+        basePlayer.stats
+        ?? {};
+
+
+    const targetStats =
+        targetPlayer.stats
+        ?? {};
+
+
+    const allStatNames =
+        Array.from(
+            new Set([
+                ...Object.keys(
+                    baseStats
+                ),
+
+                ...Object.keys(
+                    targetStats
+                ),
+            ])
+        );
+
+
+    if (
+        position === "all"
+    ) {
+
+        return allStatNames;
+    }
+
+
+    const priorityStats =
+        getComparePositionStatPriority(
+            position
+        );
+
+
+    const existingPriorityStats =
+        priorityStats.filter(
+            statName =>
+                allStatNames.includes(
+                    statName
+                )
+        );
+
+
+    const remainingStats =
+        allStatNames.filter(
+            statName =>
+                !existingPriorityStats.includes(
+                    statName
+                )
+        );
+
+
+    return [
+        ...existingPriorityStats,
+        ...remainingStats,
+    ];
+}
+
+function createComparePositionTabsHtml(
+    basePlayer,
+    targetPlayer
+) {
+
+    const positions =
+        Array.from(
+            new Set([
+                basePlayer.position,
+                targetPlayer.position,
+            ]
+                .filter(
+                    Boolean
+                )
+                .map(
+                    position =>
+                        String(
+                            position
+                        )
+                            .trim()
+                            .toUpperCase()
+                )
+            )
+        );
+
+
+    const tabs = [
+        {
+            value: "all",
+            label: "총 능력치",
+        },
+
+        ...positions.map(
+            position => ({
+                value:
+                    position,
+
+                label:
+                    position,
+            })
+        ),
+    ];
+
+
+    return tabs
+        .map(
+            tab => {
+
+                const selected =
+                    compareState.activePosition
+                    === tab.value;
+
+
+                const positionClass =
+                    tab.value === "all"
+                        ? ""
+                        : getPositionGroupClass(
+                            tab.value
+                        );
+
+
+                return `
+                    <button
+                        type="button"
+                        class="
+                            player-compare-position-tab
+                            ${positionClass}
+                            ${
+                                selected
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-compare-position="${tab.value}"
+                        aria-pressed="${
+                            selected
+                                ? "true"
+                                : "false"
+                        }"
+                    >
+                        ${escapeHtml(
+                            tab.label
+                        )}
+                    </button>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+function createCompareStatsHtml(
+    basePlayer,
+    targetPlayer,
+    position = "all"
+) {
+
+    const baseStats =
+        basePlayer.stats
+        ?? {};
+
+
+    const targetStats =
+        targetPlayer.stats
+        ?? {};
+
+
+    const statNames =
+        getCompareStatNames(
+            basePlayer,
+            targetPlayer,
+            position
+        );
+
+
+    const priorityStats =
+        position === "all"
+            ? []
+            : getComparePositionStatPriority(
+                position
+            );
+
+
+    return statNames
+        .map(
+            statName => {
+
+                const baseValue =
+                    Number(
+                        baseStats[
+                            statName
+                        ]
+                        ?? 0
+                    );
+
+
+                const targetValue =
+                    Number(
+                        targetStats[
+                            statName
+                        ]
+                        ?? 0
+                    );
+
+
+                const difference =
+                    baseValue
+                    -
+                    targetValue;
+
+
+                const leftDifference =
+                    difference > 0
+                        ? `+${difference}`
+                        : "";
+
+
+                const rightDifference =
+                    difference < 0
+                        ? `+${Math.abs(
+                            difference
+                        )}`
+                        : "";
+
+
+                const isPriorityStat =
+                    position !== "all"
+                    &&
+                    priorityStats.includes(
+                        statName
+                    );
+
+
+                return `
+                    <div
+                        class="
+                            player-compare-stat-row
+                            ${
+                                isPriorityStat
+                                    ? "priority"
+                                    : ""
+                            }
+                        "
+                    >
+
+                        <div
+                            class="
+                                player-compare-stat-value
+                                left
+                            "
+                        >
+
+                            <strong
+                                class="${getPlayerStatColorClass(
+                                    baseValue
+                                )}"
+                            >
+                                ${baseValue}
+                            </strong>
+
+                        </div>
+
+
+                        <div class="player-compare-stat-center">
+
+                            <span
+                                class="
+                                    player-compare-stat-difference
+                                    left
+                                "
+                            >
+                                ${leftDifference}
+                            </span>
+
+
+                            <span class="player-compare-stat-name">
+
+                                ${escapeHtml(
+                                    statName
+                                )}
+
+                            </span>
+
+
+                            <span
+                                class="
+                                    player-compare-stat-difference
+                                    right
+                                "
+                            >
+                                ${rightDifference}
+                            </span>
+
+                        </div>
+
+
+                        <div
+                            class="
+                                player-compare-stat-value
+                                right
+                            "
+                        >
+
+                            <strong
+                                class="${getPlayerStatColorClass(
+                                    targetValue
+                                )}"
+                            >
+                                ${targetValue}
+                            </strong>
+
+                        </div>
+
+                    </div>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+function renderPlayerCompareModal() {
+
+    const basePlayer =
+        getComparePlayer(
+            compareState.basePlayerSpId,
+            "left"
+        );
+
+
+    const targetPlayer =
+        getComparePlayer(
+            compareState.targetPlayerSpId,
+            "right"
+        );
+
+
+    if (
+        !basePlayer
+        ||
+        !targetPlayer
+    ) {
+
+        return;
+    }
+
+
+    playerCompareContentElement
+        .innerHTML = `
+
+            <div class="player-compare-versus">
+
+                ${createComparePlayerSummaryHtml(
+                    basePlayer,
+                    "left"
+                )}
+
+
+                <div class="player-compare-vs">
+
+                    <span>
+                        VS
+                    </span>
+
+                </div>
+
+
+                ${createComparePlayerSummaryHtml(
+                    targetPlayer,
+                    "right"
+                )}
+
+            </div>
+
+            ${createCompareSummaryHtml(
+                basePlayer,
+                targetPlayer
+            )}
+
+            <div class="player-compare-position-tabs">
+
+                ${createComparePositionTabsHtml(
+                    basePlayer,
+                    targetPlayer
+                )}
+
+            </div>
+
+
+            <section class="player-compare-stats-section">
+
+                <div class="player-compare-stats-title">
+
+                    <span>
+                        ${escapeHtml(
+                            basePlayer.player_name
+                        )}
+                    </span>
+
+                    <strong>
+                        ${
+                            compareState.activePosition
+                            === "all"
+                                ? "상세 능력치"
+                                : `${escapeHtml(
+                                    compareState.activePosition
+                                )} 기준`
+                        }
+                    </strong>
+
+                    <span>
+                        ${escapeHtml(
+                            targetPlayer.player_name
+                        )}
+                    </span>
+
+                </div>
+
+
+                <div class="player-compare-stats">
+
+                    ${createCompareStatsHtml(
+                        basePlayer,
+                        targetPlayer,
+                        compareState.activePosition
+                    )}
+
+                </div>
+
+            </section>
+
+        `;
+}
+
+function openPlayerCompareModal(
+    baseSpId,
+    targetSpId
+) {
+
+    compareState.basePlayerSpId =
+        Number(
+            baseSpId
+        );
+
+
+    compareState.targetPlayerSpId =
+        Number(
+            targetSpId
+        );
+
+    compareState.activePosition =
+        "all";
+
+
+    initializeCompareControlState();
+    renderPlayerCompareModal();
+
+
+    playerCompareModalElement.hidden =
+        false;
+
+
+    document.body
+        .classList
+        .add(
+            "player-compare-open"
+        );
+}
+
+
+function closePlayerCompareModal() {
+
+    playerCompareModalElement.hidden =
+        true;
+
+
+    document.body
+        .classList
+        .remove(
+            "player-compare-open"
+        );
+}
+
+function selectCompareBasePlayer(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    const previousBaseSpId =
+        compareState.basePlayerSpId;
+
+
+    compareState.basePlayerSpId =
+        numericSpId;
+
+
+    compareState.targetPlayerSpId =
+        null;
+
+
+    // 기존 기준 선수 UI 원상복구
+    if (
+        previousBaseSpId !== null
+        &&
+        previousBaseSpId !== numericSpId
+    ) {
+
+        rerenderPlayerCard(
+            previousBaseSpId
+        );
+    }
+
+
+    // 새 기준 선수 다시 렌더링
+    rerenderPlayerCard(
+        numericSpId
+    );
+
+
+    // 검색결과 최상단 이동
+    moveCompareBasePlayerToTop();
+}
+
 // =========================================
 // RENDER RESULTS
 // =========================================
@@ -2786,6 +6398,9 @@ function renderPlayers(
                 .join(
                     ""
                 );
+
+
+    moveCompareBasePlayerToTop();
 
 
     renderPagination(
@@ -3127,14 +6742,117 @@ async function searchPlayers(
 
 function resetSearchConditions() {
 
+    // =====================================
+    // 선수명
+    // =====================================
+
     playerNameInputElement.value =
         "";
+
+
+    // =====================================
+    // 시즌
+    // =====================================
+
+    selectedSeasonIds.clear();
+
+
+    playerSeasonOptionsElement
+        .querySelectorAll(
+            ".selected"
+        )
+        .forEach(
+            element => {
+
+                element.classList.remove(
+                    "selected"
+                );
+            }
+        );
+
+
+    updateSeasonSummary();
+
+
+    playerSeasonPanelElement.hidden =
+        true;
+
+
+    playerSeasonToggleElement
+        .setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+
+    // =====================================
+    // 포지션
+    // =====================================
+
+    selectedPositions.clear();
+
+
+    playerPositionOptionsElement
+        .querySelectorAll(
+            ".selected"
+        )
+        .forEach(
+            element => {
+
+                element.classList.remove(
+                    "selected"
+                );
+            }
+        );
+
+
+    updatePositionSummary();
+
+
+    playerPositionPanelElement.hidden =
+        true;
+
+
+    playerPositionToggleElement
+        .setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+
+    // =====================================
+    // 국적
+    // =====================================
 
     selectedNationId =
         null;
 
     selectedNationName =
         "";
+
+
+    playerNationSummaryElement
+        .textContent =
+            "전체 국적";
+
+
+    renderNationOptions();
+
+
+    playerNationPanelElement.hidden =
+        true;
+
+
+    playerNationToggleElement
+        .setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+
+    // =====================================
+    // 소속팀
+    // =====================================
 
     selectedTeamColorId =
         null;
@@ -3143,52 +6861,28 @@ function resetSearchConditions() {
         "";
 
 
-    playerNationSummaryElement
-        .textContent =
-            "전체 국적";
-
     playerTeamSummaryElement
         .textContent =
             "전체 팀";
 
 
-    renderNationOptions();
     renderTeamOptions();
 
 
-    closeNationPanel();
-    closeTeamPanel();
+    playerTeamPanelElement.hidden =
+        true;
 
-    selectedSeasonIds.clear();
-    selectedPositions.clear();
 
-    playerSeasonOptionsElement
-        .querySelectorAll(
-            ".selected"
-        )
-        .forEach(
-            element =>
-                element.classList.remove(
-                    "selected"
-                )
+    playerTeamToggleElement
+        .setAttribute(
+            "aria-expanded",
+            "false"
         );
 
 
-    playerPositionOptionsElement
-        .querySelectorAll(
-            ".selected"
-        )
-        .forEach(
-            element =>
-                element.classList.remove(
-                    "selected"
-                )
-        );
-
-
-    updateSeasonSummary();
-    updatePositionSummary();
-
+    // =====================================
+    // 상세검색 숫자 조건
+    // =====================================
 
     document
         .querySelectorAll(
@@ -3205,6 +6899,11 @@ function resetSearchConditions() {
                     "";
             }
         );
+
+
+    // =====================================
+    // 왼발 / 오른발
+    // =====================================
 
     const leftFootElement =
         document.querySelector(
@@ -3232,9 +6931,37 @@ function resetSearchConditions() {
     }
 
 
+    // =====================================
+    // 선수 카드 개별 상태
+    // =====================================
+
+    playerCardStates.clear();
+
+    playerDataBySpId.clear();
+
+
+    // =====================================
+    // 비교 상태
+    // =====================================
+
+    compareState.basePlayerSpId =
+        null;
+
+    compareState.targetPlayerSpId =
+        null;
+
+    compareState.activePosition =
+        "all";
+
+
+    // =====================================
+    // 검색 결과
+    // =====================================
+
     currentPage =
         1;
-        
+
+
     playerResultsElement.hidden =
         true;
 
@@ -3289,6 +7016,616 @@ function toggleDetailPanel() {
 // =========================================
 // EVENTS
 // =========================================
+
+playerResultListElement
+    .addEventListener(
+        "click",
+        event => {
+
+            const recommendButtonElement =
+                event.target.closest(
+                    "button[data-recommend-player]"
+                );
+
+
+            if (!recommendButtonElement) {
+                return;
+            }
+
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+
+            const spId =
+                Number(
+                    recommendButtonElement
+                        .dataset
+                        .spId
+                );
+
+
+            openPlayerRecommendModal(
+                spId
+            );
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+            const closeElement =
+                event.target.closest(
+                    "[data-player-recommend-close]"
+                );
+
+            if (!closeElement) {
+                return;
+            }
+
+            closePlayerRecommendModal();
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const positionButtonElement =
+                event.target.closest(
+                    "button[data-recommend-position]"
+                );
+
+
+            if (!positionButtonElement) {
+                return;
+            }
+
+
+            recommendState.selectedPosition =
+                positionButtonElement
+                    .dataset
+                    .recommendPosition;
+
+
+            const groupElement =
+                positionButtonElement.closest(
+                    "[data-recommend-position-group]"
+                );
+
+
+            groupElement
+                ?.querySelectorAll(
+                    "button[data-recommend-position]"
+                )
+                .forEach(
+                    buttonElement => {
+
+                        buttonElement
+                            .classList
+                            .toggle(
+                                "selected",
+                                buttonElement
+                                ===
+                                positionButtonElement
+                            );
+                    }
+                );
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const salaryButtonElement =
+                event.target.closest(
+                    "button[data-recommend-salary-mode]"
+                );
+
+
+            if (!salaryButtonElement) {
+                return;
+            }
+
+
+            recommendState.selectedSalaryMode =
+                salaryButtonElement
+                    .dataset
+                    .recommendSalaryMode;
+
+
+            const groupElement =
+                salaryButtonElement.closest(
+                    "[data-recommend-salary-group]"
+                );
+
+
+            groupElement
+                ?.querySelectorAll(
+                    "button[data-recommend-salary-mode]"
+                )
+                .forEach(
+                    buttonElement => {
+
+                        buttonElement
+                            .classList
+                            .toggle(
+                                "selected",
+                                buttonElement
+                                ===
+                                salaryButtonElement
+                            );
+                    }
+                );
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "input",
+        event => {
+
+            const minInputElement =
+                event.target.closest(
+                    "input[data-recommend-ovr-min]"
+                );
+
+
+            const maxInputElement =
+                event.target.closest(
+                    "input[data-recommend-ovr-max]"
+                );
+
+
+            if (
+                !minInputElement
+                &&
+                !maxInputElement
+            ) {
+
+                return;
+            }
+
+
+            const currentMinElement =
+                playerRecommendModalElement
+                    .querySelector(
+                        "input[data-recommend-ovr-min]"
+                    );
+
+
+            const currentMaxElement =
+                playerRecommendModalElement
+                    .querySelector(
+                        "input[data-recommend-ovr-max]"
+                    );
+
+
+            if (
+                !currentMinElement
+                ||
+                !currentMaxElement
+            ) {
+
+                return;
+            }
+
+
+            let minimumValue =
+                Number(
+                    currentMinElement.value
+                );
+
+
+            let maximumValue =
+                Number(
+                    currentMaxElement.value
+                );
+
+
+            if (
+                minimumValue
+                >
+                maximumValue
+            ) {
+
+                if (
+                    minInputElement
+                ) {
+
+                    minimumValue =
+                        maximumValue;
+
+
+                    currentMinElement.value =
+                        String(
+                            minimumValue
+                        );
+
+                } else {
+
+                    maximumValue =
+                        minimumValue;
+
+
+                    currentMaxElement.value =
+                        String(
+                            maximumValue
+                        );
+                }
+            }
+
+
+            recommendState.ovrMin =
+                minimumValue;
+
+
+            recommendState.ovrMax =
+                maximumValue;
+
+
+            const minimumTextElement =
+                playerRecommendModalElement
+                    .querySelector(
+                        "[data-recommend-ovr-min-value]"
+                    );
+
+
+            const maximumTextElement =
+                playerRecommendModalElement
+                    .querySelector(
+                        "[data-recommend-ovr-max-value]"
+                    );
+
+
+            if (
+                minimumTextElement
+            ) {
+
+                minimumTextElement.textContent =
+                    String(
+                        minimumValue
+                    );
+            }
+
+
+            if (
+                maximumTextElement
+            ) {
+
+                maximumTextElement.textContent =
+                    String(
+                        maximumValue
+                    );
+            }
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "change",
+        event => {
+
+            const limitSelectElement =
+                event.target.closest(
+                    "select[data-recommend-limit]"
+                );
+
+
+            if (!limitSelectElement) {
+                return;
+            }
+
+
+            recommendState.limit =
+                Number(
+                    limitSelectElement.value
+                );
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "change",
+        event => {
+
+            const gradeSelectElement =
+                event.target.closest(
+                    "select[data-recommend-base-grade]"
+                );
+
+
+            const adaptationSelectElement =
+                event.target.closest(
+                    "select[data-recommend-base-adaptation]"
+                );
+
+
+            const teamColorSelectElement =
+                event.target.closest(
+                    "select[data-recommend-base-team-color]"
+                );
+
+
+            if (
+                !gradeSelectElement
+                &&
+                !adaptationSelectElement
+                &&
+                !teamColorSelectElement
+            ) {
+
+                return;
+            }
+
+
+            const baseSpId =
+                Number(
+                    recommendState
+                        .basePlayerSpId
+                );
+
+
+            const cardState =
+                getPlayerCardState(
+                    baseSpId
+                );
+
+
+            // =================================
+            // 강화
+            // =================================
+
+            if (
+                gradeSelectElement
+            ) {
+
+                cardState.grade =
+                    Number(
+                        gradeSelectElement.value
+                    );
+            }
+
+
+            // =================================
+            // 적응도
+            // =================================
+
+            if (
+                adaptationSelectElement
+            ) {
+
+                cardState.adaptation =
+                    Number(
+                        adaptationSelectElement.value
+                    );
+            }
+
+
+            // =================================
+            // 팀컬러
+            // =================================
+
+            if (
+                teamColorSelectElement
+            ) {
+
+                cardState.teamColor =
+                    Number(
+                        teamColorSelectElement.value
+                    );
+            }
+
+
+            // =================================
+            // 변경된 기준 선수
+            // =================================
+
+            const adjustedBasePlayer =
+                getRecommendBasePlayer(
+                    baseSpId
+                );
+
+
+            if (
+                adjustedBasePlayer
+            ) {
+
+                recommendState.ovrMin =
+                    Math.max(
+                        0,
+                        Number(
+                            adjustedBasePlayer.ovr
+                            ?? 0
+                        )
+                        -
+                        10
+                    );
+
+
+                recommendState.ovrMax =
+                    (
+                        Number(
+                            adjustedBasePlayer.ovr
+                            ?? 0
+                        )
+                        +
+                        10
+                    );
+            }
+
+
+            // =================================
+            // 추천창 전체 다시 계산
+            // =================================
+
+            renderPlayerRecommendModal();
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const refreshButtonElement =
+                event.target.closest(
+                    "button[data-recommend-refresh]"
+                );
+
+
+            if (!refreshButtonElement) {
+                return;
+            }
+
+
+            const basePlayer =
+                getRecommendBasePlayer(
+                    recommendState
+                        .basePlayerSpId
+                );
+
+
+            if (!basePlayer) {
+                return;
+            }
+
+
+            loadPlayerRecommendations(
+                basePlayer
+            );
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const compareButtonElement =
+                event.target.closest(
+                    "button[data-recommend-compare]"
+                );
+
+
+            if (!compareButtonElement) {
+
+                return;
+            }
+
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+
+            const targetSpId =
+                Number(
+                    compareButtonElement
+                        .dataset
+                        .spId
+                );
+
+
+            openRecommendedPlayerCompare(
+                targetSpId
+            );
+        }
+    );
+
+
+
+playerResultListElement
+    .addEventListener(
+        "click",
+        event => {
+
+            const compareButtonElement =
+                event.target.closest(
+                    "button[data-compare-player]"
+                );
+
+
+            if (!compareButtonElement) {
+                return;
+            }
+
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+
+            const spId =
+                Number(
+                    compareButtonElement
+                        .dataset
+                        .spId
+                );
+
+
+            // =================================
+            // 이미 기준 선수면 비교 해제
+            // =================================
+
+            if (
+                compareState.basePlayerSpId
+                === spId
+            ) {
+
+                compareState.basePlayerSpId =
+                    null;
+
+
+                compareState.targetPlayerSpId =
+                    null;
+
+
+                rerenderPlayerCard(
+                    spId
+                );
+
+
+                return;
+            }
+
+
+            // =================================
+            // 첫 번째 선수 선택
+            // =================================
+
+            if (
+                compareState.basePlayerSpId
+                === null
+            ) {
+
+                selectCompareBasePlayer(
+                    spId
+                );
+
+
+                return;
+            }
+
+
+            // =================================
+            // 두 번째 선수 선택
+            // =================================
+
+            compareState.targetPlayerSpId =
+                spId;
+
+            openPlayerCompareModal(
+                compareState.basePlayerSpId,
+                compareState.targetPlayerSpId
+            );
+        }
+    );
 
 playerResultListElement
     .addEventListener(
@@ -3449,6 +7786,18 @@ playerResultListElement
                 return;
             }
 
+            if (
+                event.target.closest(
+                    (
+                        "button[data-compare-player],"
+                        +
+                        "button[data-recommend-player]"
+                    )
+                )
+            ) {
+                return;
+            }
+
 
             const itemElement =
                 rowElement.closest(
@@ -3558,6 +7907,12 @@ playerSearchButtonElement
             playerCardStates.clear();
             playerDataBySpId.clear();
 
+            compareState.basePlayerSpId =
+                null;
+
+            compareState.targetPlayerSpId =
+                null;
+
 
             searchPlayers(
                 1
@@ -3577,6 +7932,12 @@ playerNameInputElement
 
                 playerCardStates.clear();
                 playerDataBySpId.clear();
+
+                compareState.basePlayerSpId =
+                    null;
+
+                compareState.targetPlayerSpId =
+                    null;
 
 
                 searchPlayers(
@@ -3655,6 +8016,271 @@ resetButtonElement
     ?.addEventListener(
         "click",
         resetSearchConditions
+    );
+
+playerCompareModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const closeElement =
+                event.target.closest(
+                    "[data-player-compare-close]"
+                );
+
+
+            if (!closeElement) {
+                return;
+            }
+
+
+            closePlayerCompareModal();
+        }
+    );
+
+
+document.addEventListener(
+    "keydown",
+    event => {
+
+        if (
+            event.key
+            !== "Escape"
+        ) {
+            return;
+        }
+
+
+        if (
+            playerCompareModalElement.hidden
+        ) {
+            return;
+        }
+
+
+        closePlayerCompareModal();
+    }
+);
+
+playerCompareModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            // =================================
+            // 강화
+            // =================================
+
+            const gradeButtonElement =
+                event.target.closest(
+                    "button[data-compare-grade]"
+                );
+
+
+            if (gradeButtonElement) {
+
+                const side =
+                    gradeButtonElement
+                        .dataset
+                        .compareSide;
+
+
+                const grade =
+                    Number(
+                        gradeButtonElement
+                            .dataset
+                            .compareGrade
+                    );
+
+
+                if (
+                    !compareControlState[
+                        side
+                    ]
+                ) {
+                    return;
+                }
+
+
+                compareControlState[
+                    side
+                ].grade =
+                    grade;
+
+
+                renderPlayerCompareModal();
+
+
+                return;
+            }
+
+
+            // =================================
+            // 적응도
+            // =================================
+
+            const adaptationButtonElement =
+                event.target.closest(
+                    "button[data-compare-adaptation]"
+                );
+
+
+            if (!adaptationButtonElement) {
+                return;
+            }
+
+
+            const side =
+                adaptationButtonElement
+                    .dataset
+                    .compareSide;
+
+
+            const adaptation =
+                Number(
+                    adaptationButtonElement
+                        .dataset
+                        .compareAdaptation
+                );
+
+
+            if (
+                !compareControlState[
+                    side
+                ]
+            ) {
+                return;
+            }
+
+
+            compareControlState[
+                side
+            ].adaptation =
+                adaptation;
+
+
+            renderPlayerCompareModal();
+        }
+    );
+
+playerCompareModalElement
+    ?.addEventListener(
+        "change",
+        event => {
+
+            const selectElement =
+                event.target.closest(
+                    (
+                        "select[data-compare-grade],"
+                        +
+                        "select[data-compare-adaptation],"
+                        +
+                        "select[data-compare-team-color]"
+                    )
+                );
+
+
+            if (!selectElement) {
+                return;
+            }
+
+
+            const side =
+                selectElement
+                    .dataset
+                    .compareSide;
+
+
+            const state =
+                compareControlState[
+                    side
+                ];
+
+
+            if (!state) {
+                return;
+            }
+
+
+            // =================================
+            // 강화
+            // =================================
+
+            if (
+                selectElement.hasAttribute(
+                    "data-compare-grade"
+                )
+            ) {
+
+                state.grade =
+                    Number(
+                        selectElement.value
+                    );
+            }
+
+
+            // =================================
+            // 적응도
+            // =================================
+
+            if (
+                selectElement.hasAttribute(
+                    "data-compare-adaptation"
+                )
+            ) {
+
+                state.adaptation =
+                    Number(
+                        selectElement.value
+                    );
+            }
+
+
+            // =================================
+            // 팀컬러
+            // =================================
+
+            if (
+                selectElement.hasAttribute(
+                    "data-compare-team-color"
+                )
+            ) {
+
+                state.teamColor =
+                    Number(
+                        selectElement.value
+                    );
+            }
+
+
+            renderPlayerCompareModal();
+        }
+    );
+
+playerCompareModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const positionButtonElement =
+                event.target.closest(
+                    "button[data-compare-position]"
+                );
+
+
+            if (!positionButtonElement) {
+                return;
+            }
+
+
+            compareState.activePosition =
+                positionButtonElement
+                    .dataset
+                    .comparePosition;
+
+
+            renderPlayerCompareModal();
+        }
     );
 
 

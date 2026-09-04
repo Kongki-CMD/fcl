@@ -86,6 +86,7 @@
                     선수명
                 </label>
 
+
                 <div class="player-database-search-row">
 
                     <input
@@ -96,12 +97,25 @@
                         autocomplete="off"
                     >
 
+
                     <button
                         type="button"
                         id="player-database-search-button"
                         class="player-database-search-button"
                     >
                         검색
+                    </button>
+
+
+                    <button
+                        type="button"
+                        id="player-database-reset-button"
+                        class="
+                            player-database-reset-button
+                            player-database-search-reset-button
+                        "
+                    >
+                        초기화
                     </button>
 
                 </div>
@@ -1128,21 +1142,6 @@
 
                     </section>
 
-
-                    <!-- 상세 검색 하단 -->
-
-                    <div class="player-database-detail-actions">
-
-                        <button
-                            type="button"
-                            id="player-database-reset-button"
-                            class="player-database-reset-button"
-                        >
-                            검색 조건 초기화
-                        </button>
-
-                    </div>
-
                 </div>
 
             </div>
@@ -1200,6 +1199,107 @@
 
 
     </main>
+
+        <!-- =========================================
+            PLAYER COMPARE MODAL
+        ========================================== -->
+
+        <div
+            id="player-compare-modal"
+            class="player-compare-modal"
+            hidden
+        >
+
+            <div
+                class="player-compare-backdrop"
+                data-player-compare-close
+            ></div>
+
+
+            <section
+                class="player-compare-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="player-compare-title"
+            >
+
+                <header class="player-compare-header">
+
+                    <div>
+
+                        <span class="player-compare-eyebrow">
+                            PLAYER DATABASE
+                        </span>
+
+                        <h2 id="player-compare-title">
+                            선수 비교
+                        </h2>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        class="player-compare-close"
+                        data-player-compare-close
+                        aria-label="비교창 닫기"
+                    >
+                        ×
+                    </button>
+
+                </header>
+
+
+                <div
+                    id="player-compare-content"
+                    class="player-compare-content"
+                ></div>
+
+            </section>
+
+        </div>
+
+        <!-- =========================================
+            PLAYER RECOMMEND MODAL
+        ========================================== -->
+
+        <div
+            id="player-recommend-modal"
+            class="player-recommend-modal"
+            hidden
+        >
+            <div
+                class="player-recommend-backdrop"
+                data-player-recommend-close
+            ></div>
+
+            <section
+                class="player-recommend-dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="player-recommend-title"
+            >
+                <header class="player-recommend-header">
+                    <h2 id="player-recommend-title">
+                        대체 선수 추천
+                    </h2>
+
+                    <button
+                        type="button"
+                        class="player-recommend-close"
+                        data-player-recommend-close
+                        aria-label="추천창 닫기"
+                    >
+                        ×
+                    </button>
+                </header>
+
+                <div
+                    id="player-recommend-content"
+                    class="player-recommend-content"
+                ></div>
+            </section>
+        </div>
 
     <footer id="site-footer"></footer>
 

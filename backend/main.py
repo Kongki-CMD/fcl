@@ -15,6 +15,7 @@ from backend.player_catalog import (
     get_player_catalog_nations_by_continent,
     get_player_catalog_teams_by_league,
     search_player_catalog,
+    recommend_player_catalog,
 )
 
 
@@ -26042,7 +26043,65 @@ def search_player_database_api(
             ),
         ) from error
 
+# =========================================
+# FC ONLINE PLAYER RECOMMENDATION
+# =========================================
 
+@app.get(
+    "/api/player-database/recommend"
+)
+def recommend_player_database_api(
+    base_sp_id: int,
+    grade: int = 1,
+    adaptation: int = 1,
+    team_color: int = 0,
+    position_mode: str = "same",
+    salary_mode: str = "any",
+    ovr_min: int | None = None,
+    ovr_max: int | None = None,
+    limit: int = 10,
+):
+
+    try:
+
+        return recommend_player_catalog(
+            base_sp_id=
+                base_sp_id,
+
+            grade=
+                grade,
+
+            adaptation=
+                adaptation,
+
+            team_color=
+                team_color,
+
+            position_mode=
+                position_mode,
+
+            salary_mode=
+                salary_mode,
+
+            ovr_min=
+                ovr_min,
+
+            ovr_max=
+                ovr_max,
+
+            limit=
+                limit,
+        )
+
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(
+                error
+            ),
+        ) from error
 
 # =========================
 # 프론트엔드

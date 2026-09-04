@@ -4193,6 +4193,1627 @@ def search_player_catalog(
             players,
     }
 
+# =========================================
+# PLAYER RECOMMENDATION
+# =========================================
+
+PLAYER_RECOMMEND_SUMMARY_GROUPS = {
+
+    "speed": [
+        "속력",
+        "가속력",
+    ],
+
+    "shot": [
+        "골 결정력",
+        "슛 파워",
+        "중거리 슛",
+        "위치 선정",
+        "발리슛",
+    ],
+
+    "pass": [
+        "짧은 패스",
+        "긴 패스",
+        "시야",
+        "크로스",
+        "커브",
+    ],
+
+    "dribble": [
+        "드리블",
+        "볼 컨트롤",
+        "민첩성",
+        "밸런스",
+        "반응 속도",
+    ],
+
+    "defense": [
+        "대인 수비",
+        "태클",
+        "가로채기",
+        "슬라이딩 태클",
+    ],
+
+    "physical": [
+        "몸싸움",
+        "스태미너",
+        "적극성",
+        "점프",
+        "헤더",
+    ],
+}
+
+
+PLAYER_RECOMMEND_SUMMARY_LABELS = {
+    "speed":
+        "스피드",
+
+    "shot":
+        "슛",
+
+    "pass":
+        "패스",
+
+    "dribble":
+        "드리블",
+
+    "defense":
+        "수비",
+
+    "physical":
+        "피지컬",
+}
+
+
+def get_player_recommend_position_group(
+    position,
+):
+
+    position = (
+        str(
+            position or ""
+        )
+        .strip()
+        .upper()
+    )
+
+
+    if position == "GK":
+        return "GK"
+
+
+    if position in {
+        "SW",
+        "RCB",
+        "CB",
+        "LCB",
+    }:
+        return "CB"
+
+
+    if position in {
+        "RWB",
+        "RB",
+        "LB",
+        "LWB",
+    }:
+        return "FB"
+
+
+    if position in {
+        "RDM",
+        "CDM",
+        "LDM",
+    }:
+        return "CDM"
+
+
+    if position in {
+        "RCM",
+        "CM",
+        "LCM",
+    }:
+        return "CM"
+
+
+    if position in {
+        "RAM",
+        "CAM",
+        "LAM",
+    }:
+        return "CAM"
+
+
+    if position in {
+        "RM",
+        "LM",
+        "RW",
+        "LW",
+        "RF",
+        "LF",
+    }:
+        return "WING"
+
+
+    if position == "CF":
+        return "CF"
+
+
+    if position in {
+        "RS",
+        "ST",
+        "LS",
+    }:
+        return "ST"
+
+
+    return "DEFAULT"
+
+
+def get_player_recommend_stat_weights(
+    position,
+):
+
+    position_group = (
+        get_player_recommend_position_group(
+            position
+        )
+    )
+
+
+    position_stats = {
+
+        "ST": {
+            "core": [
+                "골 결정력",
+                "위치 선정",
+                "속력",
+                "가속력",
+                "슛 파워",
+                "헤더",
+                "몸싸움",
+            ],
+
+            "secondary": [
+                "반응 속도",
+                "볼 컨트롤",
+                "침착성",
+                "점프",
+                "드리블",
+                "중거리 슛",
+                "발리슛",
+            ],
+        },
+
+
+        "CF": {
+            "core": [
+                "골 결정력",
+                "위치 선정",
+                "볼 컨트롤",
+                "짧은 패스",
+                "시야",
+                "드리블",
+            ],
+
+            "secondary": [
+                "반응 속도",
+                "침착성",
+                "속력",
+                "가속력",
+                "슛 파워",
+                "중거리 슛",
+                "몸싸움",
+            ],
+        },
+
+
+        "WING": {
+            "core": [
+                "속력",
+                "가속력",
+                "드리블",
+                "민첩성",
+                "볼 컨트롤",
+                "크로스",
+            ],
+
+            "secondary": [
+                "골 결정력",
+                "위치 선정",
+                "커브",
+                "짧은 패스",
+                "시야",
+                "반응 속도",
+                "침착성",
+            ],
+        },
+
+
+        "CAM": {
+            "core": [
+                "시야",
+                "짧은 패스",
+                "볼 컨트롤",
+                "드리블",
+                "민첩성",
+                "중거리 슛",
+            ],
+
+            "secondary": [
+                "골 결정력",
+                "커브",
+                "위치 선정",
+                "반응 속도",
+                "침착성",
+                "가속력",
+                "속력",
+            ],
+        },
+
+
+        "CM": {
+            "core": [
+                "짧은 패스",
+                "긴 패스",
+                "시야",
+                "볼 컨트롤",
+                "스태미너",
+                "반응 속도",
+            ],
+
+            "secondary": [
+                "드리블",
+                "민첩성",
+                "중거리 슛",
+                "가로채기",
+                "몸싸움",
+                "침착성",
+                "커브",
+            ],
+        },
+
+
+        "CDM": {
+            "core": [
+                "가로채기",
+                "대인 수비",
+                "태클",
+                "몸싸움",
+                "스태미너",
+                "적극성",
+            ],
+
+            "secondary": [
+                "짧은 패스",
+                "긴 패스",
+                "반응 속도",
+                "헤더",
+                "점프",
+                "볼 컨트롤",
+                "시야",
+            ],
+        },
+
+
+        "FB": {
+            "core": [
+                "속력",
+                "가속력",
+                "스태미너",
+                "태클",
+                "가로채기",
+                "대인 수비",
+                "크로스",
+            ],
+
+            "secondary": [
+                "짧은 패스",
+                "긴 패스",
+                "적극성",
+                "드리블",
+                "볼 컨트롤",
+                "민첩성",
+                "몸싸움",
+            ],
+        },
+
+
+        "CB": {
+            "core": [
+                "대인 수비",
+                "태클",
+                "가로채기",
+                "헤더",
+                "몸싸움",
+                "적극성",
+                "점프",
+            ],
+
+            "secondary": [
+                "속력",
+                "가속력",
+                "반응 속도",
+                "스태미너",
+                "짧은 패스",
+                "긴 패스",
+                "침착성",
+            ],
+        },
+
+
+        "GK": {
+            "core": [
+                "GK 반응속도",
+                "GK 다이빙",
+                "GK 위치 선정",
+                "GK 핸들링",
+                "GK 킥",
+            ],
+
+            "secondary": [
+                "반응 속도",
+                "점프",
+                "침착성",
+            ],
+        },
+
+
+        "DEFAULT": {
+            "core": [
+                "속력",
+                "가속력",
+                "볼 컨트롤",
+                "반응 속도",
+                "스태미너",
+            ],
+
+            "secondary": [
+                "짧은 패스",
+                "드리블",
+                "몸싸움",
+                "침착성",
+            ],
+        },
+    }
+
+
+    selected_stats = (
+        position_stats.get(
+            position_group,
+            position_stats["DEFAULT"],
+        )
+    )
+
+
+    weights = {}
+
+
+    for stat_name in (
+        selected_stats["core"]
+    ):
+
+        weights[
+            stat_name
+        ] = 3.0
+
+
+    for stat_name in (
+        selected_stats["secondary"]
+    ):
+
+        if (
+            stat_name
+            not in weights
+        ):
+
+            weights[
+                stat_name
+            ] = 1.5
+
+
+    return weights
+
+
+def build_player_recommend_stats(
+    player_row,
+    ability_bonus,
+):
+
+    stats = {}
+
+
+    for (
+        stat_name,
+        stat_column,
+    ) in (
+        PLAYER_STAT_COLUMN_MAP
+        .items()
+    ):
+
+        stats[
+            stat_name
+        ] = (
+            int(
+                player_row.get(
+                    stat_column
+                )
+                or 0
+            )
+            +
+            ability_bonus
+        )
+
+
+    return stats
+
+
+def get_player_recommend_summary(
+    stats,
+):
+
+    summary = {}
+
+
+    for (
+        category_name,
+        stat_names,
+    ) in (
+        PLAYER_RECOMMEND_SUMMARY_GROUPS
+        .items()
+    ):
+
+        values = [
+            int(
+                stats.get(
+                    stat_name,
+                    0,
+                )
+                or 0
+            )
+
+            for stat_name
+            in stat_names
+        ]
+
+
+        if not values:
+
+            summary[
+                category_name
+            ] = 0
+
+            continue
+
+
+        summary[
+            category_name
+        ] = round(
+            sum(
+                values
+            )
+            /
+            len(
+                values
+            )
+        )
+
+
+    return summary
+
+
+def get_player_recommend_foot_side(
+    left_foot,
+    right_foot,
+):
+
+    left_foot = int(
+        left_foot or 0
+    )
+
+    right_foot = int(
+        right_foot or 0
+    )
+
+
+    if (
+        left_foot
+        ==
+        right_foot
+    ):
+
+        return "both"
+
+
+    if (
+        left_foot
+        >
+        right_foot
+    ):
+
+        return "left"
+
+
+    return "right"
+
+
+def get_player_recommend_foot_similarity(
+    base_row,
+    candidate_row,
+):
+
+    base_left = int(
+        base_row.get(
+            "left_foot"
+        )
+        or 0
+    )
+
+    base_right = int(
+        base_row.get(
+            "right_foot"
+        )
+        or 0
+    )
+
+    candidate_left = int(
+        candidate_row.get(
+            "left_foot"
+        )
+        or 0
+    )
+
+    candidate_right = int(
+        candidate_row.get(
+            "right_foot"
+        )
+        or 0
+    )
+
+
+    if (
+        base_left
+        ==
+        candidate_left
+        and
+        base_right
+        ==
+        candidate_right
+    ):
+
+        return 100.0
+
+
+    base_side = (
+        get_player_recommend_foot_side(
+            base_left,
+            base_right,
+        )
+    )
+
+    candidate_side = (
+        get_player_recommend_foot_side(
+            candidate_left,
+            candidate_right,
+        )
+    )
+
+
+    if (
+        base_side
+        ==
+        candidate_side
+    ):
+
+        return 85.0
+
+
+    if (
+        base_side == "both"
+        or
+        candidate_side == "both"
+    ):
+
+        return 75.0
+
+
+    return 55.0
+
+
+def get_player_recommend_features(
+    base_summary,
+    candidate_summary,
+):
+
+    differences = {
+        category_name:
+            (
+                int(
+                    candidate_summary.get(
+                        category_name,
+                        0,
+                    )
+                )
+                -
+                int(
+                    base_summary.get(
+                        category_name,
+                        0,
+                    )
+                )
+            )
+
+        for category_name
+        in PLAYER_RECOMMEND_SUMMARY_GROUPS
+    }
+
+
+    positive_items = sorted(
+        [
+            (
+                category_name,
+                difference,
+            )
+
+            for (
+                category_name,
+                difference,
+            ) in differences.items()
+
+            if difference >= 2
+        ],
+        key=lambda item:
+            item[1],
+        reverse=True,
+    )
+
+
+    negative_items = sorted(
+        [
+            (
+                category_name,
+                difference,
+            )
+
+            for (
+                category_name,
+                difference,
+            ) in differences.items()
+
+            if difference <= -2
+        ],
+        key=lambda item:
+            item[1],
+    )
+
+
+    pros = [
+        (
+            f"{PLAYER_RECOMMEND_SUMMARY_LABELS[category_name]} "
+            f"+{difference}"
+        )
+
+        for (
+            category_name,
+            difference,
+        ) in positive_items[:3]
+    ]
+
+
+    cons = [
+        (
+            f"{PLAYER_RECOMMEND_SUMMARY_LABELS[category_name]} "
+            f"{difference}"
+        )
+
+        for (
+            category_name,
+            difference,
+        ) in negative_items[:3]
+    ]
+
+
+    if not pros:
+
+        pros = [
+            "기준 선수와 능력치 구성이 유사"
+        ]
+
+
+    return (
+        differences,
+        pros,
+        cons,
+    )
+
+
+def recommend_player_catalog(
+    base_sp_id,
+    grade=1,
+    adaptation=1,
+    team_color=0,
+    position_mode="same",
+    salary_mode="any",
+    ovr_min=None,
+    ovr_max=None,
+    limit=10,
+):
+
+    if not DATABASE_URL:
+
+        raise RuntimeError(
+            "DATABASE_URL이 설정되지 않았습니다."
+        )
+
+
+    base_sp_id = int(
+        base_sp_id
+    )
+
+    grade = int(
+        grade
+    )
+
+    adaptation = int(
+        adaptation
+    )
+
+    team_color = int(
+        team_color
+    )
+
+
+    position_mode = (
+        str(
+            position_mode
+            or "same"
+        )
+        .strip()
+        .lower()
+    )
+
+
+    salary_mode = (
+        str(
+            salary_mode
+            or "any"
+        )
+        .strip()
+        .lower()
+    )
+
+
+    if (
+        position_mode
+        not in {
+            "same",
+            "all",
+        }
+    ):
+
+        raise ValueError(
+            "추천 포지션 조건이 올바르지 않습니다."
+        )
+
+
+    if (
+        salary_mode
+        not in {
+            "any",
+            "same_or_below",
+            "plus_1",
+            "plus_2",
+        }
+    ):
+
+        raise ValueError(
+            "추천 급여 조건이 올바르지 않습니다."
+        )
+
+
+    limit = max(
+        1,
+        min(
+            int(
+                limit
+            ),
+            30,
+        ),
+    )
+
+
+    ability_bonus = (
+        get_player_catalog_ability_bonus(
+            grade=
+                grade,
+
+            adaptation=
+                adaptation,
+
+            team_color=
+                team_color,
+        )
+    )
+
+
+    with psycopg.connect(
+        DATABASE_URL,
+        row_factory=dict_row,
+    ) as connection:
+
+        with connection.cursor() as cursor:
+
+            # =================================
+            # 기준 선수
+            # =================================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.*
+
+                FROM
+                    fconline_players AS p
+
+                WHERE
+                    p.sp_id = %s
+                """,
+                (
+                    base_sp_id,
+                ),
+            )
+
+
+            base_row = (
+                cursor.fetchone()
+            )
+
+
+            if not base_row:
+
+                raise ValueError(
+                    "기준 선수를 찾을 수 없습니다."
+                )
+
+
+            base_position = (
+                str(
+                    base_row.get(
+                        "position"
+                    )
+                    or ""
+                )
+                .strip()
+                .upper()
+            )
+
+
+            base_salary = int(
+                base_row.get(
+                    "salary"
+                )
+                or 0
+            )
+
+
+            base_ovr = (
+                int(
+                    base_row.get(
+                        "ovr"
+                    )
+                    or 0
+                )
+                +
+                ability_bonus
+            )
+
+
+            if ovr_min is None:
+
+                ovr_min = (
+                    base_ovr
+                    -
+                    10
+                )
+
+
+            if ovr_max is None:
+
+                ovr_max = (
+                    base_ovr
+                    +
+                    10
+                )
+
+
+            ovr_min = int(
+                ovr_min
+            )
+
+            ovr_max = int(
+                ovr_max
+            )
+
+
+            if (
+                ovr_min
+                >
+                ovr_max
+            ):
+
+                (
+                    ovr_min,
+                    ovr_max,
+                ) = (
+                    ovr_max,
+                    ovr_min,
+                )
+
+
+            # =================================
+            # 후보 WHERE
+            # =================================
+
+            where_clauses = [
+                "p.sp_id <> %s",
+
+                """
+                (
+                    p.ovr
+                    +
+                    %s
+                )
+                >=
+                %s
+                """,
+
+                """
+                (
+                    p.ovr
+                    +
+                    %s
+                )
+                <=
+                %s
+                """,
+            ]
+
+
+            query_params = [
+                base_sp_id,
+
+                ability_bonus,
+                ovr_min,
+
+                ability_bonus,
+                ovr_max,
+            ]
+
+
+            if (
+                position_mode
+                ==
+                "same"
+                and
+                base_position
+            ):
+
+                where_clauses.append(
+                    """
+                    p.position = %s
+                    """
+                )
+
+                query_params.append(
+                    base_position
+                )
+
+
+            if (
+                salary_mode
+                ==
+                "same_or_below"
+            ):
+
+                where_clauses.append(
+                    """
+                    p.salary <= %s
+                    """
+                )
+
+                query_params.append(
+                    base_salary
+                )
+
+
+            elif (
+                salary_mode
+                ==
+                "plus_1"
+            ):
+
+                where_clauses.append(
+                    """
+                    p.salary <= %s
+                    """
+                )
+
+                query_params.append(
+                    base_salary + 1
+                )
+
+
+            elif (
+                salary_mode
+                ==
+                "plus_2"
+            ):
+
+                where_clauses.append(
+                    """
+                    p.salary <= %s
+                    """
+                )
+
+                query_params.append(
+                    base_salary + 2
+                )
+
+
+            where_sql = (
+                "\nAND\n".join(
+                    where_clauses
+                )
+            )
+
+
+            candidate_pool_limit = max(
+                300,
+                min(
+                    2500,
+                    limit * 120,
+                ),
+            )
+
+
+            cursor.execute(
+                f"""
+                SELECT
+                    p.*
+
+                FROM
+                    fconline_players AS p
+
+                WHERE
+                    {where_sql}
+
+                ORDER BY
+                    ABS(
+                        (
+                            p.ovr
+                            +
+                            %s
+                        )
+                        -
+                        %s
+                    ) ASC,
+
+                    p.ovr DESC,
+
+                    p.salary ASC,
+
+                    p.sp_id DESC
+
+                LIMIT %s
+                """,
+                [
+                    *query_params,
+
+                    ability_bonus,
+                    base_ovr,
+
+                    candidate_pool_limit,
+                ],
+            )
+
+
+            candidate_rows = (
+                cursor.fetchall()
+            )
+
+
+    # =====================================
+    # 기준 선수 계산
+    # =====================================
+
+    base_stats = (
+        build_player_recommend_stats(
+            base_row,
+            ability_bonus,
+        )
+    )
+
+
+    base_summary = (
+        get_player_recommend_summary(
+            base_stats
+        )
+    )
+
+
+    stat_weights = (
+        get_player_recommend_stat_weights(
+            base_position
+        )
+    )
+
+
+    total_stat_weight = sum(
+        stat_weights.values()
+    )
+
+
+    recommendations = []
+
+
+    # =====================================
+    # 유사도
+    #
+    # 능력치 70%
+    # OVR    10%
+    # 급여   10%
+    # 주발   10%
+    # =====================================
+
+    for candidate_row in (
+        candidate_rows
+    ):
+
+        candidate_stats = (
+            build_player_recommend_stats(
+                candidate_row,
+                ability_bonus,
+            )
+        )
+
+
+        weighted_stat_gap = 0.0
+
+
+        for (
+            stat_name,
+            stat_weight,
+        ) in stat_weights.items():
+
+            weighted_stat_gap += (
+                abs(
+                    int(
+                        base_stats.get(
+                            stat_name,
+                            0,
+                        )
+                    )
+                    -
+                    int(
+                        candidate_stats.get(
+                            stat_name,
+                            0,
+                        )
+                    )
+                )
+                *
+                stat_weight
+            )
+
+
+        if total_stat_weight:
+
+            weighted_stat_gap = (
+                weighted_stat_gap
+                /
+                total_stat_weight
+            )
+
+
+        stat_similarity = max(
+            0.0,
+            (
+                100.0
+                -
+                (
+                    weighted_stat_gap
+                    *
+                    3.0
+                )
+            ),
+        )
+
+
+        candidate_ovr = (
+            int(
+                candidate_row.get(
+                    "ovr"
+                )
+                or 0
+            )
+            +
+            ability_bonus
+        )
+
+
+        ovr_similarity = max(
+            0.0,
+            (
+                100.0
+                -
+                (
+                    abs(
+                        base_ovr
+                        -
+                        candidate_ovr
+                    )
+                    *
+                    5.0
+                )
+            ),
+        )
+
+
+        candidate_salary = int(
+            candidate_row.get(
+                "salary"
+            )
+            or 0
+        )
+
+
+        salary_similarity = max(
+            0.0,
+            (
+                100.0
+                -
+                (
+                    abs(
+                        base_salary
+                        -
+                        candidate_salary
+                    )
+                    *
+                    7.0
+                )
+            ),
+        )
+
+
+        foot_similarity = (
+            get_player_recommend_foot_similarity(
+                base_row,
+                candidate_row,
+            )
+        )
+
+
+        similarity = (
+            stat_similarity
+            *
+            0.70
+            +
+            ovr_similarity
+            *
+            0.10
+            +
+            salary_similarity
+            *
+            0.10
+            +
+            foot_similarity
+            *
+            0.10
+        )
+
+
+        candidate_summary = (
+            get_player_recommend_summary(
+                candidate_stats
+            )
+        )
+
+
+        (
+            summary_differences,
+            pros,
+            cons,
+        ) = (
+            get_player_recommend_features(
+                base_summary,
+                candidate_summary,
+            )
+        )
+
+
+        similarity = round(
+            similarity
+        )
+
+
+        if similarity >= 90:
+
+            stars = 5
+
+        elif similarity >= 80:
+
+            stars = 4
+
+        elif similarity >= 70:
+
+            stars = 3
+
+        elif similarity >= 60:
+
+            stars = 2
+
+        else:
+
+            stars = 1
+
+
+        left_foot = int(
+            candidate_row.get(
+                "left_foot"
+            )
+            or 0
+        )
+
+        right_foot = int(
+            candidate_row.get(
+                "right_foot"
+            )
+            or 0
+        )
+
+
+        recommendations.append(
+            {
+                "sp_id":
+                    int(
+                        candidate_row[
+                            "sp_id"
+                        ]
+                    ),
+
+                "player_name":
+                    candidate_row[
+                        "player_name"
+                    ],
+
+                "season_id":
+                    int(
+                        candidate_row[
+                            "season_id"
+                        ]
+                    ),
+
+                "image_url":
+                    candidate_row.get(
+                        "image_url"
+                    )
+                    or "",
+
+                "position":
+                    candidate_row.get(
+                        "position"
+                    )
+                    or "",
+
+                "salary":
+                    candidate_salary,
+
+                "base_ovr":
+                    int(
+                        candidate_row.get(
+                            "ovr"
+                        )
+                        or 0
+                    ),
+
+                "ovr":
+                    candidate_ovr,
+
+                "ovr_difference":
+                    (
+                        candidate_ovr
+                        -
+                        base_ovr
+                    ),
+
+                "nation_id":
+                    candidate_row.get(
+                        "nation_id"
+                    ),
+
+                "nation_name":
+                    candidate_row.get(
+                        "nation_name"
+                    )
+                    or "",
+
+                "height":
+                    int(
+                        candidate_row.get(
+                            "height"
+                        )
+                        or 0
+                    ),
+
+                "weight":
+                    int(
+                        candidate_row.get(
+                            "weight"
+                        )
+                        or 0
+                    ),
+
+                "left_foot":
+                    left_foot,
+
+                "right_foot":
+                    right_foot,
+
+                "foot":
+                    (
+                        f"L{left_foot}"
+                        f" / "
+                        f"R{right_foot}"
+                    ),
+
+                "grade":
+                    grade,
+
+                "adaptation":
+                    adaptation,
+
+                "team_color_bonus":
+                    team_color,
+
+                "ability_bonus":
+                    ability_bonus,
+
+                "similarity":
+                    similarity,
+
+                "stars":
+                    stars,
+
+                "stats":
+                    candidate_stats,
+
+                "summary":
+                    candidate_summary,
+
+                "summary_differences":
+                    summary_differences,
+
+                "speed":
+                    candidate_summary[
+                        "speed"
+                    ],
+
+                "shot":
+                    candidate_summary[
+                        "shot"
+                    ],
+
+                "pass":
+                    candidate_summary[
+                        "pass"
+                    ],
+
+                "dribble":
+                    candidate_summary[
+                        "dribble"
+                    ],
+
+                "defense":
+                    candidate_summary[
+                        "defense"
+                    ],
+
+                "physical":
+                    candidate_summary[
+                        "physical"
+                    ],
+
+                "pros":
+                    pros,
+
+                "cons":
+                    cons,
+            }
+        )
+
+
+    recommendations.sort(
+        key=lambda player: (
+            -player[
+                "similarity"
+            ],
+
+            abs(
+                player[
+                    "ovr_difference"
+                ]
+            ),
+
+            abs(
+                player[
+                    "salary"
+                ]
+                -
+                base_salary
+            ),
+
+            -player[
+                "ovr"
+            ],
+        )
+    )
+
+
+    recommendations = (
+        recommendations[
+            :limit
+        ]
+    )
+
+
+    for (
+        index,
+        player,
+    ) in enumerate(
+        recommendations,
+        start=1,
+    ):
+
+        player[
+            "rank"
+        ] = index
+
+
+    return {
+        "base_sp_id":
+            base_sp_id,
+
+        "base_position":
+            base_position,
+
+        "base_ovr":
+            base_ovr,
+
+        "base_salary":
+            base_salary,
+
+        "position_mode":
+            position_mode,
+
+        "salary_mode":
+            salary_mode,
+
+        "ovr_min":
+            ovr_min,
+
+        "ovr_max":
+            ovr_max,
+
+        "count":
+            len(
+                recommendations
+            ),
+
+        "players":
+            recommendations,
+    }
+
 
 def text_or_empty(
     soup,
