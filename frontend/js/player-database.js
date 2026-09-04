@@ -86,11 +86,6 @@ const playerTeamOptionsElement =
         "#player-database-team-options"
     );
 
-const playerTeamColorBonusElement =
-    document.querySelector(
-        "#player-database-team-color-bonus"
-    );
-
 const playerResultsElement =
     document.querySelector(
         "#player-database-results"
@@ -173,18 +168,6 @@ const playerPositionSummaryElement =
     );
 
 
-const playerGradeOptionsElement =
-    document.querySelector(
-        "#player-database-grade-options"
-    );
-
-
-const playerAdaptationOptionsElement =
-    document.querySelector(
-        "#player-database-adaptation-options"
-    );
-
-
 // =========================================
 // STATE
 // =========================================
@@ -199,11 +182,35 @@ const selectedSeasonIds =
 const selectedPositions =
     new Set();
 
-let selectedGrade =
-    1;
+const playerCardStates =
+    new Map();
 
-let selectedAdaptation =
-    1;
+
+const playerDataBySpId =
+    new Map();
+
+
+const enhancementBonusMap = {
+    1: 0,
+    2: 1,
+    3: 2,
+    4: 4,
+    5: 6,
+    6: 8,
+    7: 11,
+    8: 15,
+    9: 17,
+    10: 19,
+    11: 21,
+    12: 24,
+    13: 27,
+};
+
+
+const adaptationBonusMap = {
+    1: 0,
+    5: 4,
+};
 
 // =========================================
 // NATION / TEAM STATE
@@ -1124,84 +1131,6 @@ playerTeamOptionsElement
         }
     );
 
-
-playerGradeOptionsElement
-    .addEventListener(
-        "click",
-        event => {
-
-            const buttonElement =
-                event.target.closest(
-                    "button[data-grade]"
-                );
-
-
-            if (!buttonElement) {
-                return;
-            }
-
-
-            selectedGrade =
-                Number(
-                    buttonElement.dataset.grade
-                );
-
-
-            playerGradeOptionsElement
-                .querySelectorAll(
-                    "button[data-grade]"
-                )
-                .forEach(
-                    element => {
-
-                        element.classList.toggle(
-                            "selected",
-                            element === buttonElement
-                        );
-                    }
-                );
-        }
-    );
-
-
-playerAdaptationOptionsElement
-    .addEventListener(
-        "click",
-        event => {
-
-            const buttonElement =
-                event.target.closest(
-                    "button[data-adaptation]"
-                );
-
-
-            if (!buttonElement) {
-                return;
-            }
-
-
-            selectedAdaptation =
-                Number(
-                    buttonElement.dataset.adaptation
-                );
-
-
-            playerAdaptationOptionsElement
-                .querySelectorAll(
-                    "button[data-adaptation]"
-                )
-                .forEach(
-                    element => {
-
-                        element.classList.toggle(
-                            "selected",
-                            element === buttonElement
-                        );
-                    }
-                );
-        }
-    );
-
 // =========================================
 // SEASON / POSITION PANEL
 // =========================================
@@ -1684,24 +1613,7 @@ function buildSearchParams(
             )
         );
     }
-
-
-    params.set(
-        "grade",
-        String(
-            selectedGrade
-        )
-    );
-
-
-    params.set(
-        "adaptation",
-        String(
-            selectedAdaptation
-        )
-    );
-
-            
+           
 
     if (playerName) {
 
@@ -1737,12 +1649,6 @@ function buildSearchParams(
             )
         );
     }
-
-    params.set(
-        "team_color",
-        playerTeamColorBonusElement.value
-        || "0"
-    );
 
     // =====================================
     // 상세검색 숫자 조건
@@ -1787,27 +1693,46 @@ function buildSearchParams(
         );
 
 
-    // =====================================
-    // 주발
-    // =====================================
+        // =====================================
+        // 왼발 / 오른발
+        // =====================================
 
-    const footElement =
-        document.querySelector(
-            "#player-database-foot"
-        );
+        const leftFootElement =
+            document.querySelector(
+                "#player-database-left-foot"
+            );
 
 
-    if (
-        footElement
-        &&
-        footElement.value
-    ) {
+        const rightFootElement =
+            document.querySelector(
+                "#player-database-right-foot"
+            );
 
-        params.set(
-            "preferred_foot",
-            footElement.value
-        );
-    }
+
+        if (
+            leftFootElement
+            &&
+            leftFootElement.value
+        ) {
+
+            params.set(
+                "left_foot",
+                leftFootElement.value
+            );
+        }
+
+
+        if (
+            rightFootElement
+            &&
+            rightFootElement.value
+        ) {
+
+            params.set(
+                "right_foot",
+                rightFootElement.value
+            );
+        }
 
 
 
@@ -1837,6 +1762,13 @@ function getPlayerStatColorClass(
         Number(
             value
         );
+
+
+    if (
+        statValue >= 160
+    ) {
+        return "stat-160";
+    }
 
 
     if (
@@ -1902,6 +1834,311 @@ function getPlayerStatColorClass(
 // =========================================
 // PLAYER RESULT
 // =========================================
+
+function getPlayerCardState(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    if (
+        !playerCardStates.has(
+            numericSpId
+        )
+    ) {
+
+        playerCardStates.set(
+            numericSpId,
+            {
+                grade: 1,
+                adaptation: 1,
+                teamColor: 0,
+            }
+        );
+    }
+
+
+    return playerCardStates.get(
+        numericSpId
+    );
+}
+
+
+function getGradeTierClass(
+    grade
+) {
+
+    if (grade <= 4) {
+        return "bronze";
+    }
+
+
+    if (grade <= 7) {
+        return "silver";
+    }
+
+
+    if (grade <= 10) {
+        return "gold";
+    }
+
+
+    return "platinum";
+}
+
+
+function createPlayerGradeButtonsHtml(
+    spId,
+    selectedGrade
+) {
+
+    return Array
+        .from(
+            {
+                length: 13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const grade =
+                    index + 1;
+
+
+                const gradeTier =
+                    getGradeTierClass(
+                        grade
+                    );
+
+
+                return `
+                    <button
+                        type="button"
+                        class="
+                            player-database-card-grade
+                            ${gradeTier}
+                            ${
+                                grade === selectedGrade
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-card-grade="${grade}"
+                        data-sp-id="${spId}"
+                    >
+                        +${grade}
+                    </button>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function createPlayerAdaptationButtonsHtml(
+    spId,
+    selectedAdaptation
+) {
+
+    return `
+        <button
+            type="button"
+            class="
+                player-database-card-adaptation
+                ${
+                    selectedAdaptation === 1
+                        ? "selected"
+                        : ""
+                }
+            "
+            data-card-adaptation="1"
+            data-sp-id="${spId}"
+        >
+            1
+        </button>
+
+        <button
+            type="button"
+            class="
+                player-database-card-adaptation
+                ${
+                    selectedAdaptation === 5
+                        ? "selected"
+                        : ""
+                }
+            "
+            data-card-adaptation="5"
+            data-sp-id="${spId}"
+        >
+            5
+        </button>
+    `;
+}
+
+function createPlayerTeamColorOptionsHtml(
+    selectedTeamColor
+) {
+
+    return Array
+        .from(
+            {
+                length: 10,
+            },
+            (
+                _,
+                bonus
+            ) => {
+
+                return `
+                    <option
+                        value="${bonus}"
+                        ${
+                            bonus
+                            === selectedTeamColor
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        +${bonus}
+                    </option>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+function getAdjustedPlayer(
+    player
+) {
+
+    const state =
+        getPlayerCardState(
+            player.sp_id
+        );
+
+
+    const gradeBonus =
+        enhancementBonusMap[
+            state.grade
+        ]
+        ?? 0;
+
+
+    const adaptationBonus =
+        adaptationBonusMap[
+            state.adaptation
+        ]
+        ?? 0;
+
+
+    const teamColorBonus =
+        Number(
+            state.teamColor
+            ?? 0
+        );
+
+
+    const newAbilityBonus =
+        gradeBonus
+        +
+        adaptationBonus
+        +
+        teamColorBonus;
+
+
+    /*
+     * API에서 내려온 stats에는
+     * 검색 당시 ability_bonus가 들어가 있으므로
+     * 먼저 원본값으로 되돌린다.
+     */
+    const sourceAbilityBonus =
+        Number(
+            player.ability_bonus
+            ?? 0
+        );
+
+
+    const adjustedStats =
+        Object.fromEntries(
+            Object.entries(
+                player.stats
+                ?? {}
+            )
+                .map(
+                    (
+                        [
+                            statName,
+                            statValue,
+                        ]
+                    ) => {
+
+                        const baseStat =
+                            Number(
+                                statValue
+                            )
+                            -
+                            sourceAbilityBonus;
+
+
+                        return [
+                            statName,
+                            baseStat
+                            +
+                            newAbilityBonus,
+                        ];
+                    }
+                )
+        );
+
+
+    const baseOvr =
+        Number(
+            player.base_ovr
+            ??
+            (
+                Number(
+                    player.ovr
+                    ?? 0
+                )
+                -
+                sourceAbilityBonus
+            )
+        );
+
+
+    return {
+        ...player,
+
+        grade:
+            state.grade,
+
+        adaptation:
+            state.adaptation,
+
+        team_color_bonus:
+            state.teamColor,
+
+        ability_bonus:
+            newAbilityBonus,
+
+        ovr:
+            baseOvr
+            +
+            newAbilityBonus,
+
+        stats:
+            adjustedStats,
+    };
+}
 
 function createPlayerStatsHtml(
     player
@@ -1970,6 +2207,26 @@ function createPlayerCardHtml(
     player
 ) {
 
+    playerDataBySpId.set(
+        Number(
+            player.sp_id
+        ),
+        player
+    );
+
+
+    player =
+        getAdjustedPlayer(
+            player
+        );
+
+
+    const playerCardState =
+        getPlayerCardState(
+            player.sp_id
+        );
+
+
     const seasonImageUrl =
         (
             `${apiBaseUrl}`
@@ -1996,22 +2253,90 @@ function createPlayerCardHtml(
                 " · "
             );
 
+    const leftFoot =
+        Number(
+            player.left_foot
+            ?? 0
+        );
 
-    const preferredFootText = {
 
-        right:
-            "오른발",
+    const rightFoot =
+        Number(
+            player.right_foot
+            ?? 0
+        );
 
-        left:
-            "왼발",
 
-        both:
-            "양발",
+    const leftFootIsMain =
+        leftFoot >= rightFoot;
 
-    }[
-        player.preferred_foot
-    ]
-    ?? "-";
+
+    const rightFootIsMain =
+        rightFoot >= leftFoot;
+
+
+    const footDisplayHtml = `
+        <span class="player-database-foot-display">
+
+            <span
+                class="
+                    player-database-foot
+                    player-database-foot-left
+                    ${leftFoot === 5 ? "active" : "inactive"}
+                "
+                title="왼발 ${leftFoot}"
+            >
+
+                ${
+                    leftFootIsMain
+                        ? `
+                            <span
+                                class="player-database-foot-star"
+                                aria-label="주발"
+                            >
+                                ★
+                            </span>
+                        `
+                        : ""
+                }
+
+                <span class="player-database-foot-value">
+                    L${leftFoot}
+                </span>
+
+            </span>
+
+
+            <span
+                class="
+                    player-database-foot
+                    player-database-foot-right
+                    ${rightFoot === 5 ? "active" : "inactive"}
+                "
+                title="오른발 ${rightFoot}"
+            >
+
+                ${
+                    rightFootIsMain
+                        ? `
+                            <span
+                                class="player-database-foot-star"
+                                aria-label="주발"
+                            >
+                                ★
+                            </span>
+                        `
+                        : ""
+                }
+
+                <span class="player-database-foot-value">
+                    R${rightFoot}
+                </span>
+
+            </span>
+
+        </span>
+    `;
 
 
     return `
@@ -2166,9 +2491,7 @@ function createPlayerCardHtml(
                                     ${player.weight}kg
                                 </span>
 
-                                <span>
-                                    ${preferredFootText}
-                                </span>
+                                ${footDisplayHtml}
 
                             </div>
 
@@ -2179,35 +2502,68 @@ function createPlayerCardHtml(
                             강화 / 적응도 / 팀컬러
                         ========================== -->
 
-                        <div
-                            class="player-database-player-bonus"
-                        >
+                        <div class="player-database-card-settings">
 
-                            <span>
-                                강화
+                            <div class="player-database-card-setting">
 
-                                <strong>
-                                    +${player.grade}
-                                </strong>
-                            </span>
+                                <span class="player-database-card-setting-title">
+                                    강화
+                                </span>
 
+                                <div class="player-database-card-grade-options">
 
-                            <span>
-                                적응도
+                                    ${createPlayerGradeButtonsHtml(
+                                        player.sp_id,
+                                        playerCardState.grade
+                                    )}
 
-                                <strong>
-                                    ${player.adaptation}
-                                </strong>
-                            </span>
+                                </div>
+
+                            </div>
 
 
-                            <span>
-                                팀컬러
+                            <div
+                                class="
+                                    player-database-card-setting
+                                    player-database-card-setting-bottom
+                                "
+                            >
 
-                                <strong>
-                                    +${player.team_color_bonus}
-                                </strong>
-                            </span>
+                                <span class="player-database-card-setting-title">
+                                    적응도
+                                </span>
+
+                                <div class="player-database-card-adaptation-options">
+
+                                    ${createPlayerAdaptationButtonsHtml(
+                                        player.sp_id,
+                                        playerCardState.adaptation
+                                    )}
+
+                                </div>
+
+
+                                <label class="player-database-card-team-color">
+
+                                    <span>
+                                        팀컬러
+                                    </span>
+
+                                    <select
+                                        class="player-database-card-team-color-select"
+                                        data-card-team-color
+                                        data-sp-id="${player.sp_id}"
+                                    >
+
+                                        ${createPlayerTeamColorOptionsHtml(
+                                            playerCardState.teamColor
+                                        )}
+
+                                    </select>
+
+                                </label>
+
+                            </div>
 
                         </div>
 
@@ -2259,6 +2615,123 @@ function createPlayerCardHtml(
 
         </article>
     `;
+}
+
+function rerenderPlayerCard(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    const player =
+        playerDataBySpId.get(
+            numericSpId
+        );
+
+
+    if (!player) {
+        return;
+    }
+
+
+    const oldItemElement =
+        playerResultListElement
+            .querySelector(
+                (
+                    `.player-database-player-item`
+                    +
+                    `[data-sp-id="${numericSpId}"]`
+                )
+            );
+
+
+    if (!oldItemElement) {
+        return;
+    }
+
+
+    const oldDetailElement =
+        oldItemElement.querySelector(
+            ".player-database-player-detail"
+        );
+
+
+    const wasOpen =
+        oldDetailElement
+        &&
+        !oldDetailElement.hidden;
+
+
+    oldItemElement.outerHTML =
+        createPlayerCardHtml(
+            player
+        );
+
+
+    if (!wasOpen) {
+        return;
+    }
+
+
+    const newItemElement =
+        playerResultListElement
+            .querySelector(
+                (
+                    `.player-database-player-item`
+                    +
+                    `[data-sp-id="${numericSpId}"]`
+                )
+            );
+
+
+    if (!newItemElement) {
+        return;
+    }
+
+
+    const newDetailElement =
+        newItemElement.querySelector(
+            ".player-database-player-detail"
+        );
+
+
+    const newRowElement =
+        newItemElement.querySelector(
+            ".player-database-player-row"
+        );
+
+
+    const newArrowElement =
+        newItemElement.querySelector(
+            ".player-database-player-arrow"
+        );
+
+
+    if (newDetailElement) {
+
+        newDetailElement.hidden =
+            false;
+    }
+
+
+    if (newRowElement) {
+
+        newRowElement.setAttribute(
+            "aria-expanded",
+            "true"
+        );
+    }
+
+
+    if (newArrowElement) {
+
+        newArrowElement.textContent =
+            "▲";
+    }
 }
 
 // =========================================
@@ -2686,18 +3159,8 @@ function resetSearchConditions() {
     closeNationPanel();
     closeTeamPanel();
 
-    playerTeamColorBonusElement.value =
-        "0";
-
     selectedSeasonIds.clear();
     selectedPositions.clear();
-
-    selectedGrade =
-        1;
-
-    selectedAdaptation =
-        1;
-
 
     playerSeasonOptionsElement
         .querySelectorAll(
@@ -2723,36 +3186,6 @@ function resetSearchConditions() {
         );
 
 
-    playerGradeOptionsElement
-        .querySelectorAll(
-            "button[data-grade]"
-        )
-        .forEach(
-            element => {
-
-                element.classList.toggle(
-                    "selected",
-                    element.dataset.grade === "1"
-                );
-            }
-        );
-
-
-    playerAdaptationOptionsElement
-        .querySelectorAll(
-            "button[data-adaptation]"
-        )
-        .forEach(
-            element => {
-
-                element.classList.toggle(
-                    "selected",
-                    element.dataset.adaptation === "1"
-                );
-            }
-        );
-
-
     updateSeasonSummary();
     updatePositionSummary();
 
@@ -2773,15 +3206,28 @@ function resetSearchConditions() {
             }
         );
 
-
-    const footElement =
+    const leftFootElement =
         document.querySelector(
-            "#player-database-foot"
+            "#player-database-left-foot"
         );
 
-    if (footElement) {
 
-        footElement.value =
+    const rightFootElement =
+        document.querySelector(
+            "#player-database-right-foot"
+        );
+
+
+    if (leftFootElement) {
+
+        leftFootElement.value =
+            "";
+    }
+
+
+    if (rightFootElement) {
+
+        rightFootElement.value =
             "";
     }
 
@@ -2843,6 +3289,150 @@ function toggleDetailPanel() {
 // =========================================
 // EVENTS
 // =========================================
+
+playerResultListElement
+    .addEventListener(
+        "change",
+        event => {
+
+            const teamColorSelectElement =
+                event.target.closest(
+                    "select[data-card-team-color]"
+                );
+
+
+            if (!teamColorSelectElement) {
+                return;
+            }
+
+
+            const spId =
+                Number(
+                    teamColorSelectElement
+                        .dataset
+                        .spId
+                );
+
+
+            const teamColor =
+                Number(
+                    teamColorSelectElement
+                        .value
+                );
+
+
+            const state =
+                getPlayerCardState(
+                    spId
+                );
+
+
+            state.teamColor =
+                teamColor;
+
+
+            rerenderPlayerCard(
+                spId
+            );
+        }
+    );
+
+playerResultListElement
+    .addEventListener(
+        "click",
+        event => {
+
+            // =================================
+            // 강화
+            // =================================
+
+            const gradeButtonElement =
+                event.target.closest(
+                    "button[data-card-grade]"
+                );
+
+
+            if (gradeButtonElement) {
+
+                const spId =
+                    Number(
+                        gradeButtonElement
+                            .dataset
+                            .spId
+                    );
+
+
+                const grade =
+                    Number(
+                        gradeButtonElement
+                            .dataset
+                            .cardGrade
+                    );
+
+
+                const state =
+                    getPlayerCardState(
+                        spId
+                    );
+
+
+                state.grade =
+                    grade;
+
+
+                rerenderPlayerCard(
+                    spId
+                );
+
+
+                return;
+            }
+
+
+            // =================================
+            // 적응도
+            // =================================
+
+            const adaptationButtonElement =
+                event.target.closest(
+                    "button[data-card-adaptation]"
+                );
+
+
+            if (adaptationButtonElement) {
+
+                const spId =
+                    Number(
+                        adaptationButtonElement
+                            .dataset
+                            .spId
+                    );
+
+
+                const adaptation =
+                    Number(
+                        adaptationButtonElement
+                            .dataset
+                            .cardAdaptation
+                    );
+
+
+                const state =
+                    getPlayerCardState(
+                        spId
+                    );
+
+
+                state.adaptation =
+                    adaptation;
+
+
+                rerenderPlayerCard(
+                    spId
+                );
+            }
+        }
+    );
 
 playerResultListElement
     .addEventListener(
@@ -2960,11 +3550,14 @@ playerResultListElement
         }
     );
 
-
 playerSearchButtonElement
     .addEventListener(
         "click",
         () => {
+
+            playerCardStates.clear();
+            playerDataBySpId.clear();
+
 
             searchPlayers(
                 1
@@ -2977,11 +3570,14 @@ playerNameInputElement
     .addEventListener(
         "keydown",
         event => {
-
             if (
                 event.key
                 === "Enter"
             ) {
+
+                playerCardStates.clear();
+                playerDataBySpId.clear();
+
 
                 searchPlayers(
                     1

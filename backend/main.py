@@ -25907,7 +25907,8 @@ def search_player_database_api(
     ovr_min: int | None = None,
     height_min: int | None = None,
     height_max: int | None = None,
-    preferred_foot: str = "",
+    left_foot: int | None = None,
+    right_foot: int | None = None,
     page: int = 1,
     page_size: int = 20,
 ):
@@ -26009,8 +26010,11 @@ def search_player_database_api(
             height_max=
                 height_max,
 
-            preferred_foot=
-                preferred_foot,
+            left_foot=
+                left_foot,
+
+            right_foot=
+                right_foot,
 
             stat_mins=
                 stat_mins,

@@ -13243,6 +13243,14 @@ body.site-auth-modal-open {
         color 0.15s ease;
 }
 
+.stat-160 {
+    color: #55ead0;
+
+    text-shadow:
+        0 0 5px
+        rgba(85, 234, 208, 0.30);
+}
+
 
 /* 140+ */
 .stat-140 {
@@ -15489,4 +15497,592 @@ body.site-auth-modal-open {
         rgba(197, 143, 47, 0.12);
 
     transform: none;
+}
+
+/* =========================================
+   PLAYER FOOT FILTER
+========================================= */
+
+.player-database-foot-selects {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 8px;
+}
+
+
+.player-database-foot-select {
+    display: grid;
+
+    grid-template-columns:
+        24px
+        minmax(
+            0,
+            1fr
+        );
+
+    align-items: center;
+
+    gap: 6px;
+}
+
+
+.player-database-foot-select > span {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    height: 34px;
+
+    border:
+        1px solid
+        rgba(
+            213,
+            163,
+            66,
+            0.28
+        );
+
+    border-radius: 5px;
+
+    color: #d5a342;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+
+.player-database-foot-select select {
+    width: 100%;
+}
+
+/* =========================================
+   PLAYER FOOT DISPLAY
+========================================= */
+
+.player-database-foot-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    vertical-align: middle;
+}
+
+
+/* =========================================
+   FOOT BASE
+========================================= */
+
+.player-database-foot {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 28px;
+    height: 38px;
+
+    box-sizing: border-box;
+
+    color: #ffffff;
+
+    background:
+        linear-gradient(
+            180deg,
+            #737773 0%,
+            #4f534f 100%
+        );
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    box-shadow:
+        inset 0 1px 1px
+        rgba(255, 255, 255, 0.10);
+}
+
+
+/* =========================================
+   LEFT FOOT SHAPE
+========================================= */
+
+.player-database-foot-left {
+    border-radius:
+        55% 40% 48% 45%
+        /
+        26% 32% 70% 74%;
+
+    transform:
+        rotate(-5deg);
+}
+
+
+/* =========================================
+   RIGHT FOOT SHAPE
+========================================= */
+
+.player-database-foot-right {
+    border-radius:
+        40% 55% 45% 48%
+        /
+        32% 26% 74% 70%;
+
+    transform:
+        rotate(5deg);
+}
+
+
+/* =========================================
+   ACTIVE = FOOT VALUE 5
+========================================= */
+
+.player-database-foot.active {
+    background:
+        linear-gradient(
+            180deg,
+            #39bd62 0%,
+            #168a40 100%
+        );
+
+    border-color:
+        rgba(117, 239, 151, 0.62);
+
+    box-shadow:
+        0 0 5px
+        rgba(49, 213, 95, 0.55),
+
+        0 0 12px
+        rgba(49, 213, 95, 0.25),
+
+        inset 0 1px 1px
+        rgba(255, 255, 255, 0.25);
+}
+
+
+/* =========================================
+   INACTIVE = 1 ~ 4
+========================================= */
+
+.player-database-foot.inactive {
+    background:
+        linear-gradient(
+            180deg,
+            #757975 0%,
+            #505450 100%
+        );
+}
+
+
+/* =========================================
+   L5 / R5
+========================================= */
+
+.player-database-foot-value {
+    position: relative;
+    z-index: 1;
+
+    color: #ffffff;
+
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+
+    text-shadow:
+        0 1px 2px
+        rgba(0, 0, 0, 0.55);
+}
+
+
+/* 발 모양 회전과 반대로 글자 보정 */
+
+.player-database-foot-left
+.player-database-foot-value {
+    transform:
+        rotate(5deg);
+}
+
+
+.player-database-foot-right
+.player-database-foot-value {
+    transform:
+        rotate(-5deg);
+}
+
+
+/* =========================================
+   MAIN FOOT STAR
+========================================= */
+
+.player-database-foot-star {
+    position: absolute;
+
+    top: 4px;
+    left: 50%;
+
+    z-index: 2;
+
+    color: #ffffff;
+
+    font-size: 7px;
+    line-height: 1;
+
+    transform:
+        translateX(-50%);
+
+    text-shadow:
+        0 1px 2px
+        rgba(0, 0, 0, 0.55);
+}
+
+
+/* 별이 있을 때 글자를 조금 아래로 */
+
+.player-database-foot-star
++
+.player-database-foot-value {
+    margin-top: 9px;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 650px) {
+
+    .player-database-foot-display {
+        gap: 4px;
+    }
+
+
+    .player-database-foot {
+        width: 25px;
+        height: 35px;
+    }
+
+
+    .player-database-foot-value {
+        font-size: 9px;
+    }
+
+
+    .player-database-foot-star {
+        top: 4px;
+
+        font-size: 6px;
+    }
+
+}
+
+/* =========================================
+   PLAYER CARD SETTINGS
+========================================= */
+
+.player-database-card-settings {
+    display: flex;
+    flex-direction: column;
+
+    gap: 12px;
+
+    margin-top: 14px;
+    padding: 12px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-radius: 8px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+}
+
+
+.player-database-card-setting {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+
+.player-database-card-setting-title {
+    flex-shrink: 0;
+
+    width: 46px;
+
+    color:
+        rgba(255, 255, 255, 0.55);
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+/* =========================================
+   GRADE
+========================================= */
+
+.player-database-card-grade-options {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 4px;
+}
+
+
+.player-database-card-grade {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-width: 34px;
+    height: 28px;
+
+    padding: 0 7px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.10);
+
+    border-radius: 5px;
+
+    color:
+        rgba(255, 255, 255, 0.72);
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.player-database-card-grade.bronze {
+    border-color:
+        rgba(176, 113, 72, 0.45);
+}
+
+
+.player-database-card-grade.silver {
+    border-color:
+        rgba(190, 198, 204, 0.48);
+}
+
+
+.player-database-card-grade.gold {
+    border-color:
+        rgba(213, 163, 66, 0.52);
+}
+
+
+.player-database-card-grade.platinum {
+    border-color:
+        rgba(147, 206, 220, 0.55);
+}
+
+
+.player-database-card-grade.selected {
+    color: #111;
+
+    background: #d5a342;
+
+    border-color: #d5a342;
+
+    box-shadow:
+        0 0 9px
+        rgba(213, 163, 66, 0.26);
+}
+
+
+/* =========================================
+   ADAPTATION
+========================================= */
+
+.player-database-card-adaptation-options {
+    display: flex;
+
+    gap: 5px;
+}
+
+
+.player-database-card-adaptation {
+    min-width: 42px;
+    height: 28px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    border-radius: 5px;
+
+    color:
+        rgba(255, 255, 255, 0.68);
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.player-database-card-adaptation.selected {
+    color: #111;
+
+    background: #d5a342;
+
+    border-color: #d5a342;
+}
+
+
+/* =========================================
+   CARD TEAM COLOR
+========================================= */
+
+.player-database-card-team-color {
+    display: inline-flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    margin-left: auto;
+
+    color:
+        rgba(255, 255, 255, 0.52);
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+
+.player-database-card-team-color-select {
+    width: 58px;
+    height: 28px;
+
+    padding:
+        0
+        7px;
+
+    border:
+        1px solid
+        rgba(213, 163, 66, 0.34);
+
+    border-radius: 5px;
+
+    outline: none;
+
+    color: #d5a342;
+
+    background:
+        rgba(255, 255, 255, 0.05);
+
+    font-size: 10px;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+
+.player-database-card-team-color-select:focus {
+    border-color:
+        rgba(213, 163, 66, 0.72);
+
+    box-shadow:
+        0 0 0 2px
+        rgba(213, 163, 66, 0.08);
+}
+
+
+@media (max-width: 650px) {
+
+    .player-database-card-team-color {
+        margin-left: auto;
+
+        gap: 5px;
+    }
+
+
+    .player-database-card-team-color-select {
+        width: 54px;
+        height: 27px;
+
+        padding:
+            0
+            5px;
+    }
+
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 650px) {
+
+    .player-database-card-settings {
+        gap: 10px;
+
+        padding: 10px;
+    }
+
+
+    .player-database-card-setting {
+        align-items: flex-start;
+    }
+
+
+    .player-database-card-grade-options {
+        flex: 1;
+    }
+
+
+    .player-database-card-grade {
+        min-width: 30px;
+        height: 27px;
+
+        padding: 0 5px;
+
+        font-size: 9px;
+    }
+
+
+    .player-database-card-setting-bottom {
+        align-items: center;
+    }
+
+}
+
+/* =========================================
+   STAT 160+
+========================================= */
+
+.player-database-player-stat strong.stat-160,
+.player-database-player-summary-main b.stat-160,
+.stat-160 {
+    color: #56ead1 !important;
+
+    text-shadow:
+        0 0 5px
+        rgba(86, 234, 209, 0.38);
 }

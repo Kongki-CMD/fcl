@@ -3281,7 +3281,8 @@ def search_player_catalog(
     ovr_min=None,
     height_min=None,
     height_max=None,
-    preferred_foot="",
+    left_foot=None,
+    right_foot=None,
     stat_mins=None,
     page=1,
     page_size=20,
@@ -3367,26 +3368,42 @@ def search_player_catalog(
         )
     )
 
-    preferred_foot = (
-        str(
-            preferred_foot or ""
-        )
-        .strip()
-        .lower()
-    )
+    if left_foot is not None:
 
-    if (
-        preferred_foot
-        not in {
-            "",
-            "left",
-            "right",
-            "both",
-        }
-    ):
-        raise ValueError(
-            "주발 조건이 올바르지 않습니다."
+        left_foot = int(
+            left_foot
         )
+
+        if left_foot not in {
+            1,
+            2,
+            3,
+            4,
+            5,
+        }:
+
+            raise ValueError(
+                "왼발 수치는 1~5만 가능합니다."
+            )
+
+
+    if right_foot is not None:
+
+        right_foot = int(
+            right_foot
+        )
+
+        if right_foot not in {
+            1,
+            2,
+            3,
+            4,
+            5,
+        }:
+
+            raise ValueError(
+                "오른발 수치는 1~5만 가능합니다."
+            )
 
     stat_mins = (
         stat_mins
@@ -3708,41 +3725,33 @@ def search_player_catalog(
             )
         )
 
-
     # =====================================
-    # 주발
+    # 왼발 / 오른발 수치
     # =====================================
 
-    if preferred_foot == "left":
+    if left_foot is not None:
 
         where_clauses.append(
             """
-            p.left_foot
-            >
-            p.right_foot
+            p.left_foot = %s
             """
         )
 
-
-    elif preferred_foot == "right":
-
-        where_clauses.append(
-            """
-            p.right_foot
-            >
-            p.left_foot
-            """
+        query_params.append(
+            left_foot
         )
 
 
-    elif preferred_foot == "both":
+    if right_foot is not None:
 
         where_clauses.append(
             """
-            p.left_foot
-            =
-            p.right_foot
+            p.right_foot = %s
             """
+        )
+
+        query_params.append(
+            right_foot
         )
 
 
@@ -5430,12 +5439,10 @@ def get_player_ability(
     left_foot = 0
     right_foot = 0
 
-
     foot_match = re.search(
-        r"L(\d+)\s*[-–]\s*R(\d+)",
+        r"L\s*([1-5])\s*[–—-]\s*R\s*([1-5])",
         foot_text,
     )
-
 
     if foot_match:
 
