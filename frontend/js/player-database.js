@@ -2525,11 +2525,13 @@ function createPlayerCardHtml(
                         <img
                             src="${escapeHtml(
                                 player.image_url
+                                ?? ""
                             )}"
                             alt="${escapeHtml(
                                 player.player_name
                             )}"
                             class="player-database-player-photo"
+                            data-player-image
                             loading="lazy"
                         >
 
@@ -3241,9 +3243,15 @@ function createRecommendBasePlayerHtml(
 
                     <div class="player-recommend-base-photo-wrap">
                         <img
-                            src="${escapeHtml(player.image_url)}"
-                            alt="${escapeHtml(player.player_name)}"
+                            src="${escapeHtml(
+                                player.image_url
+                                ?? ""
+                            )}"
+                            alt="${escapeHtml(
+                                player.player_name
+                            )}"
                             class="player-recommend-base-photo"
+                            data-player-image
                         >
                     </div>
                 </div>
@@ -3284,13 +3292,97 @@ function createRecommendBasePlayerHtml(
                 </div>
 
                 <div class="player-recommend-base-summary">
-                    <div><span>스피드</span><strong>${speedValue}</strong></div>
-                    <div><span>슛</span><strong>${shotValue}</strong></div>
-                    <div><span>패스</span><strong>${passValue}</strong></div>
-                    <div><span>드리블</span><strong>${dribbleValue}</strong></div>
-                    <div><span>수비</span><strong>${defenseValue}</strong></div>
-                    <div><span>피지컬</span><strong>${physicalValue}</strong></div>
-                    <div><span>OVR</span><strong>${player.ovr}</strong></div>
+
+                    <div>
+                        <span>스피드</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                speedValue
+                            )}"
+                        >
+                            ${speedValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>슛</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                shotValue
+                            )}"
+                        >
+                            ${shotValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>패스</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                passValue
+                            )}"
+                        >
+                            ${passValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>드리블</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                dribbleValue
+                            )}"
+                        >
+                            ${dribbleValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>수비</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                defenseValue
+                            )}"
+                        >
+                            ${defenseValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>피지컬</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                physicalValue
+                            )}"
+                        >
+                            ${physicalValue}
+                        </strong>
+                    </div>
+
+
+                    <div>
+                        <span>OVR</span>
+
+                        <strong
+                            class="${getPlayerStatColorClass(
+                                player.ovr
+                            )}"
+                        >
+                            ${player.ovr}
+                        </strong>
+                    </div>
+
                 </div>
 
             </div>
@@ -4233,6 +4325,10 @@ function renderPlayerRecommendModal() {
                     }
                 )}
             `;
+
+    initializePlayerImageFallbacks(
+        playerRecommendContentElement
+    );
 
 
     requestAnimationFrame(
@@ -5181,11 +5277,13 @@ function createComparePlayerSummaryHtml(
                     <img
                         src="${escapeHtml(
                             player.image_url
+                            ?? ""
                         )}"
                         alt="${escapeHtml(
                             player.player_name
                         )}"
                         class="player-compare-photo"
+                        data-player-image
                     >
 
                 </div>
@@ -5838,6 +5936,12 @@ function getCompareStatNames(
         );
 
 
+    // =====================================
+    // 총 능력치
+    //
+    // 모든 상세 능력치 표시
+    // =====================================
+
     if (
         position === "all"
     ) {
@@ -5845,6 +5949,10 @@ function getCompareStatNames(
         return allStatNames;
     }
 
+
+    // =====================================
+    // 선택 포지션 핵심 능력치
+    // =====================================
 
     const priorityStats =
         getComparePositionStatPriority(
@@ -5861,19 +5969,26 @@ function getCompareStatNames(
         );
 
 
-    const remainingStats =
-        allStatNames.filter(
-            statName =>
-                !existingPriorityStats.includes(
-                    statName
-                )
-        );
+    // =====================================
+    // 혹시 정의되지 않은 포지션이면
+    // 빈 화면 대신 전체 능력치 표시
+    // =====================================
+
+    if (
+        existingPriorityStats.length
+        === 0
+    ) {
+
+        return allStatNames;
+    }
 
 
-    return [
-        ...existingPriorityStats,
-        ...remainingStats,
-    ];
+    // =====================================
+    // 포지션 선택 시
+    // 핵심 능력치만 표시
+    // =====================================
+
+    return existingPriorityStats;
 }
 
 function createComparePositionTabsHtml(
@@ -6250,6 +6365,10 @@ function renderPlayerCompareModal() {
             </section>
 
         `;
+
+    initializePlayerImageFallbacks(
+        playerCompareContentElement
+    );
 }
 
 function openPlayerCompareModal(
@@ -6380,6 +6499,10 @@ function renderPlayers(
 
                     </div>
                 `;
+
+        initializePlayerImageFallbacks(
+            playerResultListElement
+        );
 
         renderPagination(
             data
@@ -7010,6 +7133,116 @@ function toggleDetailPanel() {
         isHidden
             ? "▼"
             : "▲";
+}
+
+// =========================================
+// PLAYER IMAGE FALLBACK
+// =========================================
+
+function applyPlayerImageFallback(
+    imageElement
+) {
+
+    if (
+        !imageElement
+        ||
+        imageElement.dataset
+            .fallbackApplied
+        === "true"
+    ) {
+
+        return;
+    }
+
+
+    imageElement.dataset
+        .fallbackApplied =
+            "true";
+
+
+    imageElement
+        .classList
+        .add(
+            "player-image-load-error"
+        );
+
+
+    const wrapperElement =
+        imageElement.parentElement;
+
+
+    if (
+        wrapperElement
+    ) {
+
+        wrapperElement
+            .classList
+            .add(
+                "player-image-fallback"
+            );
+    }
+}
+
+document.addEventListener(
+    "error",
+    event => {
+
+        const imageElement =
+            event.target;
+
+
+        if (
+            !(imageElement instanceof HTMLImageElement)
+            ||
+            !imageElement.matches(
+                "img[data-player-image]"
+            )
+        ) {
+
+            return;
+        }
+
+
+        applyPlayerImageFallback(
+            imageElement
+        );
+
+    },
+    true
+);
+
+function initializePlayerImageFallbacks(
+    rootElement = document
+) {
+
+    rootElement
+        .querySelectorAll(
+            "img[data-player-image]"
+        )
+        .forEach(
+            imageElement => {
+
+                const source =
+                    String(
+                        imageElement
+                            .getAttribute(
+                                "src"
+                            )
+                        ?? ""
+                    )
+                    .trim();
+
+
+                if (
+                    !source
+                ) {
+
+                    applyPlayerImageFallback(
+                        imageElement
+                    );
+                }
+            }
+        );
 }
 
 

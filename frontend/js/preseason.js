@@ -127,6 +127,17 @@ const manualResultMessageElement =
         "#manual-result-message"
     );
 
+const preseasonIncludeExtraTimeElement =
+    document.querySelector(
+        "#preseason-include-extra-time"
+    );
+
+
+const historyIncludeExtraTimeElement =
+    document.querySelector(
+        "#history-include-extra-time"
+    );
+
 const preseasonDateInputElement =
     document.querySelector(
         "#preseason-date-input"
@@ -322,14 +333,23 @@ async function startSeries() {
                 },
 
                 body: JSON.stringify({
-                    team_a: teamA,
-                    team_b: teamB,
+                    team_a:
+                        teamA,
+
+                    team_b:
+                        teamB,
 
                     series_type:
                         "프리시즌",
 
                     scheduled_date:
-                        scheduledDate
+                        scheduledDate,
+
+                    include_extra_time_result:
+                        Boolean(
+                            preseasonIncludeExtraTimeElement
+                                ?.checked
+                        )
                 })
             }
         );
@@ -474,7 +494,13 @@ async function importHistorySeries() {
                         teamB,
 
                     match_date:
-                        matchDate
+                        matchDate,
+
+                    include_extra_time_result:
+                        Boolean(
+                            historyIncludeExtraTimeElement
+                                ?.checked
+                        )
                 })
             }
         );

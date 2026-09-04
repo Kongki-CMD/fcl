@@ -1178,6 +1178,78 @@ footer p {
     color: #aaa;
 }
 
+.set-result-method-wrap {
+    grid-column: 3;
+
+    padding-left: 25px;
+
+    text-align: left;
+}
+
+
+.set-result-method {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    min-height: 22px;
+
+    padding:
+        3px
+        8px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.10);
+
+    border-radius: 999px;
+
+    background:
+        rgba(255, 255, 255, 0.035);
+
+    color:
+        rgba(255, 255, 255, 0.65);
+
+    font-size: 9px;
+    font-weight: 800;
+
+    white-space: nowrap;
+}
+
+
+.set-result-method.regulation {
+    border-color:
+        rgba(180, 154, 90, 0.28);
+
+    color:
+        #d7bc78;
+}
+
+
+.set-result-method.extra-time {
+    border-color:
+        rgba(111, 168, 255, 0.28);
+
+    color:
+        #8db9ff;
+}
+
+
+.set-result-method.penalties {
+    border-color:
+        rgba(209, 151, 255, 0.30);
+
+    color:
+        #d6a8ff;
+}
+
+
+.set-result-method.draw {
+    color:
+        rgba(255, 255, 255, 0.46);
+}
+
 .set-score {
     grid-column: 2;
     display: grid;
@@ -2002,6 +2074,121 @@ footer p {
 input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
     opacity: 0.8;
+}
+
+/* =========================================
+   PRE-SEASON EXTRA TIME OPTION
+========================================= */
+
+.preseason-extra-time-option {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    width:
+        min(
+            100%,
+            420px
+        );
+
+    margin:
+        -18px
+        auto
+        24px;
+
+    padding:
+        11px
+        13px;
+
+    box-sizing: border-box;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.08);
+
+    border-radius: 7px;
+
+    background:
+        rgba(255, 255, 255, 0.02);
+
+    cursor: pointer;
+}
+
+
+.preseason-extra-time-option input {
+    flex-shrink: 0;
+
+    width: 17px;
+    height: 17px;
+
+    accent-color: #b49a5a;
+
+    cursor: pointer;
+}
+
+
+.preseason-extra-time-copy {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    min-width: 0;
+}
+
+
+.preseason-extra-time-copy strong {
+    color:
+        rgba(255, 255, 255, 0.86);
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+.preseason-extra-time-copy small {
+    color:
+        rgba(255, 255, 255, 0.43);
+
+    font-size: 9px;
+    line-height: 1.45;
+}
+
+
+.history-extra-time-option {
+    margin:
+        24px
+        auto
+        8px;
+
+    border-color:
+        rgba(180, 154, 90, 0.20);
+
+    background:
+        rgba(180, 154, 90, 0.025);
+}
+
+
+@media (max-width: 650px) {
+
+    .preseason-extra-time-option {
+        width: 100%;
+
+        margin-top: -8px;
+
+        padding:
+            10px
+            11px;
+    }
+
+
+    .history-extra-time-option {
+        margin-top: 20px;
+    }
+
 }
 
 /* MATCH STATUS */
@@ -2959,6 +3146,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .result-detail-set-tab span {
     color: #aaa;
     font-size: 13px;
+}
+
+.result-detail-set-method {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    padding:
+        2px
+        6px;
+
+    border-radius: 999px;
+
+    font-size: 8px;
+    font-style: normal;
+    font-weight: 800;
+
+    line-height: 1.2;
+
+    white-space: nowrap;
+
+    background:
+        rgba(255, 255, 255, 0.045);
+
+    color:
+        rgba(255, 255, 255, 0.55);
+}
+
+
+.result-detail-set-method.regulation {
+    color:
+        #d7bc78;
+}
+
+
+.result-detail-set-method.extra-time {
+    color:
+        #8db9ff;
+}
+
+
+.result-detail-set-method.penalties {
+    color:
+        #d6a8ff;
+}
+
+
+.result-detail-set-method.draw {
+    color:
+        rgba(255, 255, 255, 0.45);
 }
 
 .result-detail-squad-placeholder {
@@ -8159,22 +8397,60 @@ body.site-auth-modal-open {
     }
 
     .result-detail-set-tabs {
-        gap: 5px;
-        margin-bottom: 8px;
+        gap: 8px;
+        margin-bottom: 10px;
     }
 
     .result-detail-set-tab {
-        min-height: 40px;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+
+        min-width: 0;
+        min-height: 66px;
+
         gap: 4px;
-        padding: 5px 4px;
+
+        padding: 7px 4px;
     }
 
     .result-detail-set-tab strong {
-        font-size: 10px;
+        display: block;
+
+        width: 100%;
+
+        font-size: 9px;
+        line-height: 1;
+
+        text-align: center;
+        white-space: nowrap;
     }
 
     .result-detail-set-tab span {
-        font-size: 10px;
+        display: block;
+
+        width: 100%;
+
+        font-size: 12px;
+        font-weight: 800;
+        line-height: 1;
+
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .result-detail-set-tab
+    .result-detail-set-method {
+        display: inline-flex;
+
+        width: auto;
+
+        padding: 2px 5px;
+
+        font-size: 7px;
+        line-height: 1.1;
+
+        white-space: nowrap;
     }
 
     .result-detail-squad {
@@ -9955,6 +10231,75 @@ body.site-auth-modal-open {
     min-width: 0;
 }
 
+/* =========================================
+   PLAYER IMAGE FALLBACK
+========================================= */
+
+.player-database-player-photo-wrap,
+.player-compare-photo-wrap,
+.player-recommend-base-photo-wrap {
+    position: relative;
+}
+
+
+.player-image-load-error {
+    display: none !important;
+}
+
+
+.player-image-fallback {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    overflow: hidden;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,0.035),
+            rgba(255,255,255,0.012)
+        );
+}
+
+
+.player-image-fallback::before {
+    content: "";
+
+    position: absolute;
+
+    width: 42%;
+    aspect-ratio: 1;
+
+    top: 22%;
+
+    border-radius: 50%;
+
+    background:
+        rgba(255, 255, 255, 0.08);
+}
+
+
+.player-image-fallback::after {
+    content: "NO IMAGE";
+
+    position: absolute;
+
+    right: 0;
+    bottom: 14%;
+    left: 0;
+
+    color:
+        rgba(255, 255, 255, 0.26);
+
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+
+    text-align: center;
+}
+
 .player-database-player-photo-wrap {
     position: sticky;
     top: 100px;
@@ -11631,6 +11976,233 @@ body.site-auth-modal-open {
     .player-database-player-arrow {
         margin-left: 5px;
     }
+
+    /* 순위 */
+
+    .player-recommend-table tbody td:nth-child(1) {
+        grid-column: 1;
+
+        grid-row:
+            1
+            /
+            5;
+
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        font-size: 16px;
+        font-weight: 900;
+    }
+
+    /* 선수 정보 */
+
+    .player-recommend-table tbody td:nth-child(2) {
+        grid-column: 2;
+        grid-row: 1;
+
+        min-width: 0;
+    }
+
+
+    .player-recommend-table .player-main {
+        display: flex;
+
+        align-items: center;
+
+        gap: 7px;
+
+        min-width: 0;
+    }
+
+
+    .player-recommend-table .player-text {
+        min-width: 0;
+    }
+
+
+    .player-recommend-table .player-text strong {
+        display: block;
+
+        max-width: 100%;
+
+        overflow: hidden;
+
+        font-size: 12px;
+        font-weight: 900;
+
+        text-overflow: ellipsis;
+
+        white-space: nowrap;
+    }
+
+
+    .player-recommend-table .player-text div {
+        overflow: hidden;
+
+        font-size: 9px;
+        line-height: 1.35;
+
+        text-overflow: ellipsis;
+
+        white-space: nowrap;
+    }
+
+    /* 유사도 */
+
+    .player-recommend-table tbody td:nth-child(3) {
+        grid-column: 3;
+        grid-row: 1;
+
+        align-self: center;
+
+        text-align: right;
+    }
+
+
+    .player-recommend-table .similarity {
+        font-size: 19px;
+        font-weight: 900;
+
+        white-space: nowrap;
+    }
+
+
+    .player-recommend-table .stars {
+        margin-top: 2px;
+
+        font-size: 8px;
+
+        white-space: nowrap;
+    }
+
+    /* 급여 */
+
+    .player-recommend-table tbody td:nth-child(4) {
+        grid-column: 2;
+        grid-row: 2;
+
+        font-size: 9px;
+    }
+
+
+    .player-recommend-table tbody td:nth-child(4)::before {
+        content: "급여 ";
+
+        color:
+            rgba(255, 255, 255, 0.40);
+    }
+
+
+    /* OVR */
+
+    .player-recommend-table tbody td:nth-child(5) {
+        grid-column: 3;
+        grid-row: 2;
+
+        font-size: 9px;
+
+        text-align: right;
+    }
+
+
+    .player-recommend-table tbody td:nth-child(5)::before {
+        content: "OVR ";
+
+        color:
+            rgba(255, 255, 255, 0.40);
+    }
+
+    /* 스피드 / 슛 / 패스 / 드리블 / 피지컬 */
+
+    .player-recommend-table tbody td:nth-child(6),
+    .player-recommend-table tbody td:nth-child(7),
+    .player-recommend-table tbody td:nth-child(8),
+    .player-recommend-table tbody td:nth-child(9),
+    .player-recommend-table tbody td:nth-child(10) {
+        display: none;
+    }
+
+    /* 주발 */
+
+    .player-recommend-table tbody td:nth-child(11) {
+        grid-column: 2;
+        grid-row: 3;
+
+        align-self: center;
+
+        font-size: 9px;
+    }
+
+
+    .player-recommend-table tbody td:nth-child(11)::before {
+        content: "주발 ";
+
+        color:
+            rgba(255, 255, 255, 0.40);
+    }
+
+
+    /* 비교 */
+
+    .player-recommend-table tbody td:nth-child(13) {
+        grid-column: 3;
+        grid-row: 3;
+
+        text-align: right;
+    }
+
+
+    .player-recommend-compare-button {
+        width: auto;
+        min-width: 64px;
+
+        height: 27px;
+
+        padding:
+            0
+            7px;
+
+        font-size: 8px;
+
+        white-space: nowrap;
+    }
+
+    /* 특징 요약 */
+
+    .player-recommend-table tbody td:nth-child(12) {
+        grid-column:
+            2
+            /
+            4;
+
+        grid-row: 4;
+
+        min-width: 0;
+
+        margin-top: 2px;
+
+        padding-top: 6px;
+
+        border-top:
+            1px solid
+            rgba(255, 255, 255, 0.055);
+
+        font-size: 9px;
+        line-height: 1.45;
+
+        white-space: normal;
+    }
+
+
+    .player-recommend-table .summary-cell .pros,
+    .player-recommend-table .summary-cell .cons {
+        white-space: normal;
+
+        overflow-wrap: anywhere;
+    }
+
 }
 
 @media (max-width: 700px) {
@@ -11775,19 +12347,61 @@ body.site-auth-modal-open {
         width: 20px;
         height: 34px;
     }
-}
 
-@media (max-width: 900px) {
-    .player-database-main-filters {
-        grid-template-columns: repeat(
+    /* =====================================
+    RECOMMEND BASE PLAYER SUMMARY
+    ===================================== */
+
+    .player-recommend-summary-grid,
+    .player-recommend-base-stats,
+    .player-recommend-base-summary {
+        grid-template-columns:
+            repeat(
                 3,
-                minmax(
-                    0,
-                    1fr
-                )
+                minmax(0, 1fr)
             );
+
+        gap:
+            10px
+            4px;
+    }
+
+
+    .player-recommend-summary-item,
+    .player-recommend-base-stat,
+    .player-recommend-base-summary > div {
+        min-width: 0;
+
+        padding:
+            6px
+            2px;
+
+        text-align: center;
+    }
+
+
+    .player-recommend-summary-item span,
+    .player-recommend-base-stat span,
+    .player-recommend-base-summary > div span {
+        display: block;
+
+        margin-bottom: 3px;
+
+        font-size: 9px;
+        line-height: 1.2;
+    }
+
+
+    .player-recommend-summary-item strong,
+    .player-recommend-base-stat strong,
+    .player-recommend-base-summary > div strong {
+        display: block;
+
+        font-size: 18px;
+        line-height: 1.1;
     }
 }
+
 
 /* PLAYER COMPARE */
 
@@ -13762,7 +14376,7 @@ body.player-recommend-open {
         overflow: hidden;
 
         color:
-            rgba(255, 255, 255, 0.70);
+            rgba(255, 255, 255, 0.72);
 
         font-size: 9px;
 
@@ -14129,4 +14743,103 @@ body.player-recommend-open {
 
         font-size: 9px;
     }
+
+    /* =====================================
+    RECOMMEND LIST - MOBILE CARD MODE
+    ===================================== */
+
+    .player-recommend-table-wrap {
+        width: 100%;
+
+        overflow-x: visible;
+        overflow-y: visible;
+    }
+
+
+    .player-recommend-table {
+        display: block;
+
+        width: 100%;
+        min-width: 0 !important;
+
+        table-layout: auto;
+
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+
+    /* PC용 헤더는 모바일에서 숨김 */
+
+    .player-recommend-table thead {
+        display: none;
+    }
+
+
+    .player-recommend-table tbody {
+        display: grid;
+
+        width: 100%;
+
+        gap: 8px;
+    }
+
+
+    /* =====================================
+    ONE PLAYER CARD
+    ===================================== */
+
+    .player-recommend-table tbody tr {
+        display: grid;
+
+        grid-template-columns:
+            28px
+            minmax(0, 1fr)
+            auto;
+
+        grid-template-rows:
+            auto
+            auto
+            auto
+            auto;
+
+        column-gap: 8px;
+        row-gap: 5px;
+
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding:
+            10px
+            9px;
+
+        border:
+            1px solid
+            rgba(255, 255, 255, 0.075);
+
+        border-radius: 7px;
+
+        background:
+            rgba(255, 255, 255, 0.018);
+    }
+
+
+    .player-recommend-table tbody td {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+
+        height: auto;
+
+        padding: 0;
+
+        border: 0;
+
+        text-align: left;
+        vertical-align: middle;
+
+        white-space: normal;
+    }
+
 }

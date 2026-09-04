@@ -1741,6 +1741,10 @@ def initialize_database():
                         NOT NULL
                         DEFAULT 40,
 
+                    include_extra_time_result BOOLEAN
+                        NOT NULL
+                        DEFAULT FALSE,
+
                     scheduled_date DATE,
 
                     round_number INTEGER,
@@ -1854,6 +1858,17 @@ def initialize_database():
                 """
             )
 
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ADD COLUMN IF NOT EXISTS
+                    include_extra_time_result BOOLEAN
+                    NOT NULL
+                    DEFAULT FALSE
+                """
+            )
+
 
 
             cursor.execute(
@@ -1905,6 +1920,8 @@ def initialize_database():
                         DEFAULT 'nexon',
 
                     winner_side VARCHAR(10),
+
+                    result_method VARCHAR(20),
 
                     created_at TIMESTAMPTZ
                         NOT NULL
@@ -2836,11 +2853,236 @@ def get_match_detail(
 
     return response.json()
 
+# =========================
+# FC ONLINE SCORE MODE
+#
+# goalTime 구간
+#
+# 0 = 전반
+# 1 = 후반
+# 2 = 연장 전반
+# 3 = 연장 후반
+# 4 = 승부차기
+# =========================
+
+NEXON_GOAL_TIME_BLOCK = (
+    2 ** 24
+)
+
+
+def get_match_score_pair(
+    match_data,
+    nickname_a,
+    nickname_b,
+    include_extra_time_result=False,
+):
+
+    participant_map = {
+        match_info["nickname"]:
+            match_info
+
+        for match_info
+        in match_data.get(
+            "matchInfo",
+            [],
+        )
+    }
+
+
+    team_a_info = (
+        participant_map.get(
+            nickname_a
+        )
+    )
+
+
+    team_b_info = (
+        participant_map.get(
+            nickname_b
+        )
+    )
+
+
+    if (
+        team_a_info is None
+        or
+        team_b_info is None
+    ):
+
+        return None
+
+
+    def get_total_score(
+        match_info
+    ):
+
+        return int(
+            match_info
+            .get(
+                "shoot",
+                {},
+            )
+            .get(
+                "goalTotal",
+                0,
+            )
+            or 0
+        )
+
+
+    team_a_total_score = (
+        get_total_score(
+            team_a_info
+        )
+    )
+
+
+    team_b_total_score = (
+        get_total_score(
+            team_b_info
+        )
+    )
+
+
+    # =========================
+    # 연장 포함
+    #
+    # goalTotal 그대로 사용
+    # 승부차기는 별도 winner_side 처리
+    # =========================
+
+    if include_extra_time_result:
+
+        return (
+            team_a_total_score,
+            team_b_total_score,
+        )
+
+
+    # =========================
+    # 정규시간만
+    #
+    # goalTotal에서
+    # 연장전 득점만 제거
+    #
+    # 승부차기 득점은 goalTotal과
+    # 별도로 관리되므로 제거 대상 아님
+    # =========================
+
+    def count_extra_time_goals(
+        match_info
+    ):
+
+        extra_time_goals = 0
+
+
+        for shot in (
+            match_info.get(
+                "shootDetail",
+                [],
+            )
+            or []
+        ):
+
+            try:
+
+                shot_result = int(
+                    shot.get(
+                        "result",
+                        0,
+                    )
+                    or 0
+                )
+
+
+                goal_time = int(
+                    shot.get(
+                        "goalTime",
+                        0,
+                    )
+                    or 0
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                continue
+
+
+            # result 3 = GOAL
+
+            if shot_result != 3:
+                continue
+
+
+            period_index = (
+                goal_time
+                //
+                NEXON_GOAL_TIME_BLOCK
+            )
+
+
+            # 2 = 연장 전반
+            # 3 = 연장 후반
+
+            if period_index in (
+                2,
+                3,
+            ):
+
+                extra_time_goals += 1
+
+
+        return extra_time_goals
+
+
+    team_a_extra_goals = (
+        count_extra_time_goals(
+            team_a_info
+        )
+    )
+
+
+    team_b_extra_goals = (
+        count_extra_time_goals(
+            team_b_info
+        )
+    )
+
+
+    team_a_regulation_score = max(
+        0,
+        (
+            team_a_total_score
+            -
+            team_a_extra_goals
+        ),
+    )
+
+
+    team_b_regulation_score = max(
+        0,
+        (
+            team_b_total_score
+            -
+            team_b_extra_goals
+        ),
+    )
+
+
+    return (
+        team_a_regulation_score,
+        team_b_regulation_score,
+    )
+
 def get_match_winner_side(
     match_data,
     nickname_a,
     nickname_b,
     series_type=None,
+    include_extra_time_result=False,
 ):
 
     participant_map = {
@@ -2875,42 +3117,45 @@ def get_match_winner_side(
 
 
     # =========================
-    # 실제 경기 점수
+    # 플레이오프는 기존처럼
+    # 항상 최종 승패 사용
     #
-    # FCL 경기 스코어 기준은
-    # NEXON goalTotal 사용
+    # 프리시즌은 옵션에 따름
     # =========================
 
-    team_a_score = int(
-        team_a_info
-        .get(
-            "shoot",
-            {},
+    use_final_result = (
+        series_type
+        == "플레이오프"
+        or
+        bool(
+            include_extra_time_result
         )
-        .get(
-            "goalTotal",
-            0,
-        )
-        or 0
     )
 
 
-    team_b_score = int(
-        team_b_info
-        .get(
-            "shoot",
-            {},
+    score_pair = (
+        get_match_score_pair(
+            match_data,
+            nickname_a,
+            nickname_b,
+            include_extra_time_result=
+                use_final_result,
         )
-        .get(
-            "goalTotal",
-            0,
-        )
-        or 0
     )
 
 
+    if score_pair is None:
+        return None
+
+
+    (
+        team_a_score,
+        team_b_score,
+    ) = score_pair
+
+
     # =========================
-    # 점수로 승자가 명확한 경우
+    # 점수로 승자 결정
     # =========================
 
     if (
@@ -2932,23 +3177,20 @@ def get_match_winner_side(
 
 
     # =========================
-    # 프리시즌 / 정규리그
+    # 정규시간만 사용하는 경우
     #
-    # 스코어가 같으면 무승부
+    # 동점이면 그대로 DRAW
     # =========================
 
-    if (
-        series_type
-        != "플레이오프"
-    ):
+    if not use_final_result:
 
         return "draw"
 
 
     # =========================
-    # 플레이오프 동점
+    # 연장 포함인데 점수도 동점
     #
-    # 연장 / 승부차기 결과는
+    # 승부차기 승패 등은
     # NEXON matchResult 사용
     # =========================
 
@@ -2994,10 +3236,166 @@ def get_match_winner_side(
         return "team_b"
 
 
-    # 플레이오프인데
-    # 동점 스코어 + 승자 판별 실패
+    if (
+        team_a_result == "무"
+        and
+        team_b_result == "무"
+    ):
+
+        return "draw"
+
 
     return None
+
+# =========================
+# FC ONLINE 경기 종료 방식
+#
+# regulation = 정규시간
+# extra_time = 연장전
+# penalties  = 승부차기
+# draw       = 무승부
+# =========================
+
+def get_match_result_method(
+    match_data,
+    nickname_a,
+    nickname_b,
+    series_type=None,
+    include_extra_time_result=False,
+):
+
+    use_final_result = (
+        series_type == "플레이오프"
+        or
+        bool(
+            include_extra_time_result
+        )
+    )
+
+
+    regulation_score_pair = (
+        get_match_score_pair(
+            match_data,
+            nickname_a,
+            nickname_b,
+            include_extra_time_result=False,
+        )
+    )
+
+
+    if regulation_score_pair is None:
+        return None
+
+
+    (
+        regulation_team_a_score,
+        regulation_team_b_score,
+    ) = regulation_score_pair
+
+
+    # =========================
+    # 정규시간 결과만 사용하는 경기
+    # =========================
+
+    if not use_final_result:
+
+        if (
+            regulation_team_a_score
+            ==
+            regulation_team_b_score
+        ):
+
+            return "draw"
+
+
+        return "regulation"
+
+
+    # =========================
+    # 최종 스코어
+    # =========================
+
+    final_score_pair = (
+        get_match_score_pair(
+            match_data,
+            nickname_a,
+            nickname_b,
+            include_extra_time_result=True,
+        )
+    )
+
+
+    if final_score_pair is None:
+        return None
+
+
+    (
+        final_team_a_score,
+        final_team_b_score,
+    ) = final_score_pair
+
+
+    winner_side = (
+        get_match_winner_side(
+            match_data,
+            nickname_a,
+            nickname_b,
+            series_type,
+            include_extra_time_result,
+        )
+    )
+
+
+    if winner_side is None:
+        return None
+
+
+    # =========================
+    # 90분 안에 승부 결정
+    # =========================
+
+    if (
+        regulation_team_a_score
+        !=
+        regulation_team_b_score
+    ):
+
+        return "regulation"
+
+
+    # =========================
+    # 90분 동점
+    # 최종 스코어가 달라짐
+    #
+    # → 연장전 득점으로 결정
+    # =========================
+
+    if (
+        final_team_a_score
+        !=
+        final_team_b_score
+    ):
+
+        return "extra_time"
+
+
+    # =========================
+    # 최종 스코어도 동점인데
+    # 승자가 존재
+    #
+    # → 승부차기
+    # =========================
+
+    if winner_side in (
+        "team_a",
+        "team_b",
+    ):
+
+        return "penalties"
+
+
+    return "draw"
+
 
 # =========================
 # FC Online 경기 데이터 정합성 검증
@@ -4057,6 +4455,8 @@ class SeriesStartRequest(BaseModel):
 
     scheduled_date: str | None = None
 
+    include_extra_time_result: bool = False
+
 class ManualSeriesCompleteRequest(BaseModel):
 
     set1_team_a: int
@@ -4122,6 +4522,8 @@ class HistorySeriesImportRequest(BaseModel):
     team_a: str
     team_b: str
     match_date: str
+
+    include_extra_time_result: bool = False
 
 class PlayoffInitializeRequest(
     BaseModel
@@ -16473,6 +16875,8 @@ def start_fcl_series(
 
                     match_type,
 
+                    include_extra_time_result,
+
                     scheduled_date,
                     round_number,
 
@@ -16483,9 +16887,14 @@ def start_fcl_series(
                     '프리시즌',
                     %s,
                     %s,
+
                     40,
+
+                    %s,
+
                     %s,
                     NULL,
+
                     'scheduled'
                 )
 
@@ -16495,10 +16904,14 @@ def start_fcl_series(
                     team_a["id"],
                     team_b["id"],
 
+                    bool(
+                        request
+                            .include_extra_time_result
+                    ),
+
                     scheduled_date,
                 ),
             )
-
 
             series_row = (
                 cursor.fetchone()
@@ -16534,6 +16947,12 @@ def start_fcl_series(
 
         "match_type":
             40,
+
+        "include_extra_time_result":
+            bool(
+                request
+                    .include_extra_time_result
+            ),
 
         "started_at":
             None,
@@ -16602,13 +17021,13 @@ def import_history_series(
     ).date()
 
 
-    if target_date >= today:
+    if target_date > today:
 
         raise HTTPException(
             status_code=400,
             detail=(
-                "과거 경기 등록은 "
-                "지난 날짜만 가능합니다."
+                "경기 불러오기는 "
+                "오늘 또는 지난 날짜만 가능합니다."
             ),
         )
 
@@ -17024,6 +17443,8 @@ def import_history_series(
 
                     match_type,
 
+                    include_extra_time_result,
+
                     scheduled_date,
                     round_number,
 
@@ -17044,6 +17465,8 @@ def import_history_series(
                     40,
 
                     %s,
+
+                    %s,
                     NULL,
 
                     %s,
@@ -17060,6 +17483,11 @@ def import_history_series(
                     team_a["id"],
                     team_b["id"],
 
+                    bool(
+                        request
+                            .include_extra_time_result
+                    ),
+
                     target_date,
 
                     started_at,
@@ -17068,7 +17496,6 @@ def import_history_series(
                 ),
             )
 
-
             series_row = (
                 cursor.fetchone()
             )
@@ -17076,7 +17503,6 @@ def import_history_series(
             series_id = (
                 series_row["id"]
             )
-
 
             for (
                 set_number,
@@ -17090,6 +17516,7 @@ def import_history_series(
                     detected_match["data"]
                 )
 
+
                 played_at = (
                     detected_match[
                         "played_at"
@@ -17097,86 +17524,123 @@ def import_history_series(
                 )
 
 
-                participant_info_map = {
-                    match_info["nickname"]:
-                        match_info
-
-                    for match_info
-                    in match_data["matchInfo"]
-                }
-
-
-                team_a_info = (
-                    participant_info_map[
-                        nickname_a
-                    ]
-                )
-
-                team_b_info = (
-                    participant_info_map[
-                        nickname_b
-                    ]
+                score_pair = (
+                    get_match_score_pair(
+                        match_data,
+                        nickname_a,
+                        nickname_b,
+                        include_extra_time_result=
+                            bool(
+                                request
+                                    .include_extra_time_result
+                            ),
+                    )
                 )
 
 
-                team_a_score = (
-                    team_a_info[
-                        "shoot"
-                    ][
-                        "goalTotal"
-                    ]
+                if score_pair is None:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{set_number}세트의 "
+                            "점수를 확인할 수 없습니다."
+                        ),
+                    )
+
+
+                (
+                    team_a_score,
+                    team_b_score,
+                ) = score_pair
+
+
+                winner_side = (
+                    get_match_winner_side(
+                        match_data,
+                        nickname_a,
+                        nickname_b,
+                        "프리시즌",
+                        bool(
+                            request
+                                .include_extra_time_result
+                        ),
+                    )
                 )
 
-                team_b_score = (
-                    team_b_info[
-                        "shoot"
-                    ][
-                        "goalTotal"
-                    ]
+                result_method = (
+                    get_match_result_method(
+                        match_data,
+                        nickname_a,
+                        nickname_b,
+                        "프리시즌",
+                        bool(
+                            request
+                                .include_extra_time_result
+                        ),
+                    )
                 )
 
 
-        cursor.execute(
-            """
-            INSERT INTO series_sets (
-                series_id,
+                if winner_side is None:
 
-                set_number,
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{set_number}세트의 "
+                            "승패를 확인할 수 없습니다."
+                        ),
+                    )
 
-                nexon_match_id,
-                played_at,
 
-                team_a_score,
-                team_b_score,
+                cursor.execute(
+                    """
+                    INSERT INTO series_sets (
+                        series_id,
 
-                score_source
-            )
+                        set_number,
+                        nexon_match_id,
+                        played_at,
 
-            VALUES (
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                'nexon'
-            )
-            """,
-            (
-                series_id,
-                set_number,
+                        team_a_score,
+                        team_b_score,
 
-                match_data[
-                    "matchId"
-                ],
+                        score_source,
+                        winner_side,
+                        result_method
+                    )
 
-                played_at,
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
 
-                team_a_score,
-                team_b_score,
-            ),
-        )
+                        %s,
+                        %s,
 
+                        'nexon',
+                        %s,
+                        %s
+                    )
+                    """,
+                    (
+                        series_id,
+                        set_number,
+
+                        match_data[
+                            "matchId"
+                        ],
+
+                        played_at,
+
+                        team_a_score,
+                        team_b_score,
+
+                        winner_side,
+                        result_method,
+                    ),
+                )
 
         connection.commit()
 
@@ -18920,6 +19384,7 @@ def sync_fcl_series_status(
                     s.id,
                     s.series_type,
                     s.match_type,
+                    s.include_extra_time_result,
                     s.scheduled_date,
 
                     s.playoff_stage,
@@ -19312,6 +19777,22 @@ def sync_fcl_series_status(
                 "winner_side"
             ] = winner_side
 
+            detected_match[
+                "result_method"
+            ],
+
+            detected_match[
+                "result_method"
+            ] = (
+                get_match_result_method(
+                    detected_match["data"],
+                    nickname_a,
+                    nickname_b,
+                    series["series_type"],
+                    True,
+                )
+            )
+
 
             playoff_matches.append(
                 detected_match
@@ -19452,6 +19933,28 @@ def sync_fcl_series_status(
                     nickname_a,
                     nickname_b,
                     series["series_type"],
+                    bool(
+                        series[
+                            "include_extra_time_result"
+                        ]
+                    ),
+                )
+            )
+
+
+            detected_match[
+                "result_method"
+            ] = (
+                get_match_result_method(
+                    detected_match["data"],
+                    nickname_a,
+                    nickname_b,
+                    series["series_type"],
+                    bool(
+                        series[
+                            "include_extra_time_result"
+                        ]
+                    ),
                 )
             )
 
@@ -19766,22 +20269,43 @@ def sync_fcl_series_status(
             )
 
 
-            team_a_score = (
-                team_a_info[
-                    "shoot"
-                ][
-                    "goalTotal"
-                ]
+            score_pair = (
+                get_match_score_pair(
+                    match_data,
+                    nickname_a,
+                    nickname_b,
+                    include_extra_time_result=
+                        (
+                            series[
+                                "series_type"
+                            ]
+                            == "플레이오프"
+                            or
+                            bool(
+                                series[
+                                    "include_extra_time_result"
+                                ]
+                            )
+                        ),
+                )
             )
 
 
-            team_b_score = (
-                team_b_info[
-                    "shoot"
-                ][
-                    "goalTotal"
-                ]
-            )
+            if score_pair is None:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "NEXON 경기 점수를 "
+                        "확인할 수 없습니다."
+                    ),
+                )
+
+
+            (
+                team_a_score,
+                team_b_score,
+            ) = score_pair
 
 
             nexon_scores.append(
@@ -19962,9 +20486,15 @@ def sync_fcl_series_status(
 
                         SET
                             nexon_match_id = %s,
+
                             played_at = %s,
+
                             score_source =
-                                'nexon'
+                                'nexon',
+
+                            winner_side = %s,
+
+                            result_method = %s
 
                         WHERE
                             series_id = %s
@@ -19981,6 +20511,14 @@ def sync_fcl_series_status(
 
                             detected_match[
                                 "played_at"
+                            ],
+
+                            detected_match[
+                                "winner_side"
+                            ],
+
+                            detected_match[
+                                "result_method"
                             ],
 
                             series_id,
@@ -20361,26 +20899,44 @@ def sync_fcl_series_status(
                 }
 
 
-                team_a_score = (
-                    participant_map[
-                        nickname_a
-                    ][
-                        "shoot"
-                    ][
-                        "goalTotal"
-                    ]
+                score_pair = (
+                    get_match_score_pair(
+                        match_data,
+                        nickname_a,
+                        nickname_b,
+                        include_extra_time_result=
+                            (
+                                series[
+                                    "series_type"
+                                ]
+                                == "플레이오프"
+                                or
+                                bool(
+                                    series[
+                                        "include_extra_time_result"
+                                    ]
+                                )
+                            ),
+                    )
                 )
 
 
-                team_b_score = (
-                    participant_map[
-                        nickname_b
-                    ][
-                        "shoot"
-                    ][
-                        "goalTotal"
-                    ]
-                )
+                if score_pair is None:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"{index}세트의 "
+                            "NEXON 점수를 "
+                            "확인할 수 없습니다."
+                        ),
+                    )
+
+
+                (
+                    team_a_score,
+                    team_b_score,
+                ) = score_pair
 
 
                 cursor.execute(
@@ -20393,7 +20949,8 @@ def sync_fcl_series_status(
                         team_a_score,
                         team_b_score,
                         score_source,
-                        winner_side
+                        winner_side,
+                        result_method
                     )
 
                     VALUES (
@@ -20404,6 +20961,7 @@ def sync_fcl_series_status(
                         %s,
                         %s,
                         'nexon',
+                        %s,
                         %s
                     )
 
@@ -20429,7 +20987,10 @@ def sync_fcl_series_status(
                             'nexon',
 
                         winner_side =
-                            EXCLUDED.winner_side
+                            EXCLUDED.winner_side,
+
+                        result_method =
+                            EXCLUDED.result_method
                     """,
                     (
                         series_id,
@@ -20446,6 +21007,10 @@ def sync_fcl_series_status(
 
                         detected_match[
                             "winner_side"
+                        ],
+
+                        detected_match[
+                            "result_method"
                         ],
                     ),
                 )
@@ -21433,6 +21998,437 @@ def get_season_champion():
             final_mvp,
     }
 
+# =========================
+# 기존 NEXON 경기
+# RESULT METHOD BACKFILL
+#
+# 기존 SERIES / MVP / 스쿼드는
+# 전혀 삭제하지 않고
+#
+# series_sets의
+# winner_side / result_method만
+# NEXON 원본으로 복구
+# =========================
+
+@app.post(
+    "/api/fconline/result-methods/backfill"
+)
+def backfill_fconline_result_methods(
+    limit: int = 10,
+):
+
+    # =========================
+    # 한 번에 너무 많은
+    # NEXON API 호출 방지
+    # =========================
+
+    safe_limit = max(
+        1,
+        min(
+            int(limit),
+            50,
+        ),
+    )
+
+
+    # =========================
+    # 아직 판별되지 않은 SET 조회
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    ss.id
+                        AS series_set_id,
+
+                    ss.series_id,
+                    ss.set_number,
+
+                    ss.nexon_match_id,
+
+                    ss.team_a_score,
+                    ss.team_b_score,
+
+                    ss.winner_side,
+                    ss.result_method,
+
+                    s.series_type,
+
+                    team_a.fc_nickname
+                        AS nickname_a,
+
+                    team_b.fc_nickname
+                        AS nickname_b
+
+                FROM series_sets AS ss
+
+                JOIN series AS s
+                    ON s.id =
+                        ss.series_id
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    ss.nexon_match_id
+                        IS NOT NULL
+
+                    AND
+                    ss.nexon_match_id
+                        <> ''
+
+                    AND
+                    ss.result_method
+                        IS NULL
+
+                ORDER BY
+                    ss.series_id ASC,
+                    ss.set_number ASC
+
+                LIMIT %s
+                """,
+                (
+                    safe_limit,
+                ),
+            )
+
+
+            target_sets = (
+                cursor.fetchall()
+            )
+
+
+    updated_count = 0
+    skipped_count = 0
+    failed_count = 0
+
+    details = []
+
+
+    # =========================
+    # NEXON 경기 상세 재조회
+    # =========================
+
+    for target_set in target_sets:
+
+        series_set_id = (
+            target_set[
+                "series_set_id"
+            ]
+        )
+
+
+        series_id = (
+            target_set[
+                "series_id"
+            ]
+        )
+
+
+        set_number = (
+            target_set[
+                "set_number"
+            ]
+        )
+
+
+        match_id = (
+            target_set[
+                "nexon_match_id"
+            ]
+        )
+
+
+        nickname_a = (
+            target_set[
+                "nickname_a"
+            ]
+        )
+
+
+        nickname_b = (
+            target_set[
+                "nickname_b"
+            ]
+        )
+
+
+        series_type = (
+            target_set[
+                "series_type"
+            ]
+        )
+
+
+        try:
+
+            # =========================
+            # NEXON 원본
+            # =========================
+
+            match_data = (
+                get_match_detail(
+                    match_id
+                )
+            )
+
+
+            # =========================
+            # 실제 경기 종료 방식
+            #
+            # 기존 SERIES의
+            # include_extra_time_result는
+            # 보지 않는다.
+            #
+            # 과거 실제 경기 자체가
+            # 연장/승부차기였는지를
+            # 복구하는 작업이므로 True
+            # =========================
+
+            result_method = (
+                get_match_result_method(
+                    match_data,
+                    nickname_a,
+                    nickname_b,
+                    series_type,
+                    True,
+                )
+            )
+
+
+            # =========================
+            # 실제 최종 승자
+            #
+            # 승부차기 경기의
+            # 기존 draw도 여기서 수정
+            # =========================
+
+            winner_side = (
+                get_match_winner_side(
+                    match_data,
+                    nickname_a,
+                    nickname_b,
+                    series_type,
+                    True,
+                )
+            )
+
+
+            if (
+                result_method is None
+                or
+                winner_side is None
+            ):
+
+                skipped_count += 1
+
+
+                details.append(
+                    {
+                        "series_id":
+                            series_id,
+
+                        "set":
+                            set_number,
+
+                        "match_id":
+                            match_id,
+
+                        "status":
+                            "skipped",
+
+                        "reason":
+                            (
+                                "경기 종료 방식 또는 "
+                                "승자 판별 실패"
+                            ),
+                    }
+                )
+
+
+                continue
+
+
+            # =========================
+            # 기존 SET 행만 UPDATE
+            #
+            # 점수 / MVP / 선수기록 /
+            # 스쿼드는 변경하지 않음
+            # =========================
+
+            with get_db_connection() as connection:
+
+                with connection.cursor() as cursor:
+
+                    cursor.execute(
+                        """
+                        UPDATE series_sets
+
+                        SET
+                            winner_side = %s,
+                            result_method = %s
+
+                        WHERE id = %s
+                        """,
+                        (
+                            winner_side,
+                            result_method,
+                            series_set_id,
+                        ),
+                    )
+
+
+                connection.commit()
+
+
+            updated_count += 1
+
+
+            details.append(
+                {
+                    "series_id":
+                        series_id,
+
+                    "set":
+                        set_number,
+
+                    "match_id":
+                        match_id,
+
+                    "status":
+                        "updated",
+
+                    "winner_side":
+                        winner_side,
+
+                    "result_method":
+                        result_method,
+                }
+            )
+
+
+        except Exception as error:
+
+            failed_count += 1
+
+
+            error_detail = (
+                getattr(
+                    error,
+                    "detail",
+                    None,
+                )
+                or
+                str(
+                    error
+                )
+                or
+                error.__class__.__name__
+            )
+
+
+            details.append(
+                {
+                    "series_id":
+                        series_id,
+
+                    "set":
+                        set_number,
+
+                    "match_id":
+                        match_id,
+
+                    "status":
+                        "failed",
+
+                    "reason":
+                        error_detail,
+                }
+            )
+
+
+        # NEXON API 연속 호출 간격
+        time.sleep(
+            0.1
+        )
+
+
+    # =========================
+    # 아직 남은 대상 수
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) AS count
+
+                FROM series_sets
+
+                WHERE
+                    nexon_match_id
+                        IS NOT NULL
+
+                    AND
+                    nexon_match_id
+                        <> ''
+
+                    AND
+                    result_method
+                        IS NULL
+                """
+            )
+
+
+            remaining_row = (
+                cursor.fetchone()
+            )
+
+
+    remaining_count = int(
+        remaining_row[
+            "count"
+        ]
+    )
+
+
+    return {
+        "status":
+            "success",
+
+        "processed_count":
+            len(
+                target_sets
+            ),
+
+        "updated_count":
+            updated_count,
+
+        "skipped_count":
+            skipped_count,
+
+        "failed_count":
+            failed_count,
+
+        "remaining_count":
+            remaining_count,
+
+        "details":
+            details,
+    }
+
 
 # =========================
 # 완료된 SERIES 결과 조회
@@ -21554,7 +22550,8 @@ def get_completed_series_results():
                         set_number,
                         team_a_score,
                         team_b_score,
-                        winner_side
+                        winner_side,
+                        result_method
                     FROM series_sets
 
                     WHERE series_id = %s
@@ -21625,6 +22622,11 @@ def get_completed_series_results():
                             "winner_side":
                                 set_row[
                                     "winner_side"
+                                ],
+
+                            "result_method":
+                                set_row[
+                                    "result_method"
                                 ],
                         }
                     )
@@ -22000,6 +23002,7 @@ def get_series_squads(
                     ss.team_a_score,
                     ss.team_b_score,
                     ss.winner_side,
+                    ss.result_method,
 
                     sssp.side,
                     sssp.source_order,
@@ -22085,6 +23088,11 @@ def get_series_squads(
                 "winner_side":
                     row[
                         "winner_side"
+                    ],
+
+                "result_method":
+                    row[
+                        "result_method"
                     ],
 
                 "team_a_squad": [],

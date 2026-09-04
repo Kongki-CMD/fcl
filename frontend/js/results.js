@@ -1487,26 +1487,60 @@ async function openResultDetail(
             data;
 
 
-        const setTabHtml =
-            data.sets.map(
-                (setData) => `
-                    <button
-                        type="button"
-                        class="result-detail-set-tab"
-                        data-result-detail-set="${setData.set}"
-                    >
-                        <strong>
-                            SET ${setData.set}
-                        </strong>
+    const setTabHtml =
+        data.sets
+            .map(
+                setData => {
 
-                        <span>
-                            ${setData.team_a_score}
-                            :
-                            ${setData.team_b_score}
-                        </span>
-                    </button>
-                `
-            ).join("");
+                    const resultMethodText =
+                        getSetResultMethodText(
+                            setData
+                        );
+
+
+                    const resultMethodClass =
+                        getSetResultMethodClass(
+                            setData
+                        );
+
+
+                    return `
+                        <button
+                            type="button"
+                            class="result-detail-set-tab"
+                            data-result-detail-set="${setData.set}"
+                        >
+
+                            <strong>
+                                SET ${setData.set}
+                            </strong>
+
+                            <span>
+                                ${setData.team_a_score}
+                                :
+                                ${setData.team_b_score}
+                            </span>
+
+                            ${
+                                resultMethodText
+                                    ? `
+                                        <em
+                                            class="
+                                                result-detail-set-method
+                                                ${resultMethodClass}
+                                            "
+                                        >
+                                            ${resultMethodText}
+                                        </em>
+                                    `
+                                    : ""
+                            }
+
+                        </button>
+                    `;
+                }
+            )
+            .join("");
 
 
         resultDetailContentElement.innerHTML = `
@@ -1605,6 +1639,155 @@ async function openResultDetail(
                 data.sets[0].set
             );
         }
+    }
+}
+
+// =========================================
+// SET RESULT
+// =========================================
+
+function getSetWinnerSide(
+    setResult
+) {
+
+    const winnerSide =
+        String(
+            setResult
+                ?.winner_side
+            ?? ""
+        );
+
+
+    if (
+        winnerSide === "team_a"
+        ||
+        winnerSide === "team_b"
+        ||
+        winnerSide === "draw"
+    ) {
+
+        return winnerSide;
+    }
+
+
+    const teamAScore =
+        Number(
+            setResult
+                ?.team_a_score
+            ?? 0
+        );
+
+
+    const teamBScore =
+        Number(
+            setResult
+                ?.team_b_score
+            ?? 0
+        );
+
+
+    if (
+        teamAScore > teamBScore
+    ) {
+
+        return "team_a";
+    }
+
+
+    if (
+        teamBScore > teamAScore
+    ) {
+
+        return "team_b";
+    }
+
+
+    return "draw";
+}
+
+
+function getSetResultMethodText(
+    setResult
+) {
+
+    const resultMethod =
+        String(
+            setResult
+                ?.result_method
+            ?? ""
+        );
+
+
+    switch (
+        resultMethod
+    ) {
+
+        case "regulation":
+
+            return "정규승";
+
+
+        case "extra_time":
+
+            return "연장승";
+
+
+        case "penalties":
+
+            return "승부차기승";
+
+
+        case "draw":
+
+            return "무승부";
+
+
+        default:
+
+            return "";
+    }
+}
+
+
+function getSetResultMethodClass(
+    setResult
+) {
+
+    const resultMethod =
+        String(
+            setResult
+                ?.result_method
+            ?? ""
+        );
+
+
+    switch (
+        resultMethod
+    ) {
+
+        case "regulation":
+
+            return "regulation";
+
+
+        case "extra_time":
+
+            return "extra-time";
+
+
+        case "penalties":
+
+            return "penalties";
+
+
+        case "draw":
+
+            return "draw";
+
+
+        default:
+
+            return "";
     }
 }
 
@@ -1735,11 +1918,27 @@ function renderResults(
                 let teamAResult = "";
                 let teamBResult = "";
 
+                const winnerSide =
+                    getSetWinnerSide(
+                        setResult
+                    );
+
+
+                const resultMethodText =
+                    getSetResultMethodText(
+                        setResult
+                    );
+
+
+                const resultMethodClass =
+                    getSetResultMethodClass(
+                        setResult
+                    );
+
 
                 // 팀A 승리
                 if (
-                    setResult.team_a_score >
-                    setResult.team_b_score
+                    winnerSide === "team_a"
                 ) {
 
                     teamAResult = `
@@ -1757,8 +1956,7 @@ function renderResults(
 
                 // 팀B 승리
                 } else if (
-                    setResult.team_a_score <
-                    setResult.team_b_score
+                    winnerSide === "team_b"
                 ) {
 
                     teamAResult = `
@@ -1827,6 +2025,25 @@ function renderResults(
                                 ${teamBResult}
 
                             </span>
+
+                        </div>
+
+                        <div class="set-result-method-wrap">
+
+                            ${
+                                resultMethodText
+                                    ? `
+                                        <span
+                                            class="
+                                                set-result-method
+                                                ${resultMethodClass}
+                                            "
+                                        >
+                                            ${resultMethodText}
+                                        </span>
+                                    `
+                                    : ""
+                            }
 
                         </div>
 
