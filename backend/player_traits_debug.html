@@ -1,0 +1,1105 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta charset="utf-8" />
+        <title>선수 검색 | FC온라인 데이터센터</title>
+    <meta name="viewport" content="width=1200" />
+    <meta name="robots" content="index,follow" />
+    <meta name="description" content="FC온라인 전체 선수의 능력치, 스탯, 클래스 특성 시세 정보를 검색하고 비교해 보세요." />
+    <meta name="author" content="NEXON Korea" />
+    <meta name="keywords" content="NEXON, 넥슨, NEXON Korea, 넥슨코리아, FC ONLINE, FC 온라인, FC, EA, EA Sports, 스포츠" />
+
+    <meta property="og:title" content="선수 검색 | FC온라인 데이터센터" />
+    <meta property="og:description" content="FC온라인 전체 선수의 능력치, 스탯, 클래스 특성 시세 정보를 검색하고 비교해 보세요.." />
+    <meta property="og:image" content="https://ssl.nexon.com/s2/game/fc/online/obt/banner_facebook.jpg">
+    <meta property="og:url" content="http://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=4&amp;spid=508200104">
+
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="선수 검색 | FC온라인 데이터센터">
+    <meta name="twitter:url" content="http://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=4&amp;spid=508200104">
+    <meta name="twitter:image" content="https://ssl.nexon.com/s2/game/fc/online/obt/mobile_180.png">
+    <meta name="twitter:description" content="FC온라인 전체 선수의 능력치, 스탯, 클래스 특성 시세 정보를 검색하고 비교해 보세요.">
+
+    <link rel="shortcut Icon" href="https://ssl.nexon.com/s2/game/fc/online/common/favicon.ico" type="image/x-icon" />
+    <link rel="icon" href="https://ssl.nexon.com/s2/game/fc/online/common/favicon.ico" type="image/x-icon" />
+    <link rel="canonical" href="http://fconline.nexon.com/DataCenter/PlayerInfo?n1Strong=4&amp;spid=508200104">
+
+    <script src="https://signin.nexon.com/sdk/inface.js"></script>
+
+    <script type="text/javascript" src="https://js.nexon.com/s1/global/ngb_head.js"></script>
+
+    <script src="https://js.nexon.com/s1/fc/online/common/ga.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/common/gtm.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/library/jquery.min.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/library/TweenMax.min.js"></script>
+    <!--[if lte IE 10]>
+    <script>location.href = "https://fconline.nexon.com/common/ie9";</script>
+    <![endif]-->
+
+    <script src="https://js.nexon.com/s1/fc/online/obt/fObject.min.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/obt/fo4.min.js"></script>
+
+    <script type="text/javascript" src="https://js.nexon.com/s1/p2/ps.min.js" charset="utf-8" data-name="PS" data-ngm="true" data-nxlogin="true"></script>
+    <script type="text/javascript" src="https://js.nexon.com/s1/global/ngb_activex.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="https://js.nexon.com/s3/fc/online/obt/fonts_ssl.css" media="all" />
+    <link rel="stylesheet" type="text/css" href="https://js.nexon.com/s3/fc/online/obt/fo4_ssl.css?2026090523" media="all" />
+    <link rel="stylesheet" type="text/css" href="https://js.nexon.com/s3/fc/online/obt/seasons_ssl.css?2026090523" media="all" />
+
+    <link rel="stylesheet" href="https://js.nexon.com/s3/fc/online/obt/swiper.min.css">
+    <script src="https://js.nexon.com/s1/fc/online/obt/swiper.min.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/obt/masonry.pkgd.min.js"></script>
+
+    <script type="text/javascript" src="/Scripts/boardnew.js?202609052305"></script>
+    <script type="text/javascript" src="/Scripts/event.js"></script>
+    
+
+    <!-- Criteo 로더 파일 -->
+    <script type="text/javascript" src="//dynamic.criteo.com/js/ld/ld.js?a=93167" async="true"></script>
+    <!-- END Criteo 로더 파일 -->
+
+    <script type="text/javascript" charset="UTF-8" src="//t1.daumcdn.net/kas/static/kp.js"></script>
+    <script type="text/javascript">
+        kakaoPixel('1192263020173609587').pageView();
+        kakaoPixel('6182444101096946025').pageView();        
+    </script>
+
+    
+    <script src="/Scripts/datacenter/datacenter.js?20260905230526"></script>
+    <script src="https://js.nexon.com/s1/fc/online/library/jquery-ui.js"></script>
+    <script src="https://js.nexon.com/s1/fc/online/obt/Chart.min.js"></script>    
+    <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.1/kakao.min.js" integrity="sha384-OL+ylM/iuPLtW5U3XcvLSGhE8JzReKDank5InqlHGWPhb4140/yrBw0bg0y7+C9J" crossorigin="anonymous"></script>
+    <script>
+    Kakao.init('a7c5673df64e584118a4f8b54ca2d401');
+    </script>
+
+    <script>
+        (function () {
+            try {
+                var KEY = '__hop__';
+                var data = {};
+                try {
+                    data = JSON.parse(window.name || '{}');
+                } catch (e) {
+                    data = {};
+                }
+                var hop = data[KEY] || { previous: null, current: null, t: 0 };
+                var cur = location.origin;
+                data[KEY] = { previous: hop.current || null, current: cur, t: Date.now() };
+                window.name = JSON.stringify(data);
+            } catch (e) {
+                // fail-safe: 아무 것도 하지 않음
+            }
+        })();
+    </script>
+</head>
+<body class="default">
+    <script type="text/javascript" src="https://js.nexon.com/s1/global/ngb_bodystart.js" charset="euc-kr"></script>
+
+    <!-- Criteo 홈페이지 태그 -->
+    <script type="text/javascript">
+        window.criteo_q = window.criteo_q || [];
+        var deviceType = /iPad/.test(navigator.userAgent) ? "t" : /Mobile|iP(hone|od)|Android|BlackBerry|IEMobile|Silk/.test(navigator.userAgent) ? "m" : "d";
+        window.criteo_q.push(
+            { event: "setAccount", account: 93167 },
+            { event: "setEmail", email: "", hash_method: "" },
+            { event: "setZipcode", zipcode: "" },
+            { event: "setSiteType", type: deviceType },
+            { event: "viewHome" });
+
+        function GameStart_Criteo() {
+            window.criteo_q.push(
+                { event: "setAccount", account: 93167 },
+                { event: "setEmail", email: "", hash_method: "" },
+                { event: "setZipcode", zipcode: "" },
+                { event: "setSiteType", type: deviceType },
+                { event: "trackTransaction", id: Math.floor(Math.random() * 99999999999), item: [{ id: "FC_GAMESTART", price: 1, quantity: 1 }] }
+            );
+        }
+
+    </script>
+    <!-- END Criteo 홈페이지 태그 -->
+
+    
+
+    <div id="wrapper" class="sub">
+        <!-- 공통 GNB -->
+        
+
+
+<header id="header" class="after_0517">
+    <h1 class="logo"><a href="/main/index" data-weblog-object="gnb-logo">FC ONLINE</a></h1>
+    <div class="header_nav">
+        <div class="header_nav_wrap">
+            <ul>
+                <li class="depth1 nav_cate1 ">
+                    <a href="/Profile/squad" class="btn_depth1" data-weblog-object="gnb-main-navi-01"><span>프로필</span></a>
+                </li>
+                <li class="depth1 nav_cate2 ">
+                    <a href="/news/notice/list" class="btn_depth1" data-weblog-object="gnb-main-navi-02"><span>게임소식</span></a>
+                </li>
+                <li class="depth1 nav_cate3 ">
+                    <a href="/community/recommend" class="btn_depth1" data-weblog-object="gnb-main-navi-03"><span>커뮤니티</span></a>
+                </li>
+                <li class="depth1 nav_cate5">
+                    <a href="https://shop.fconline.nexon.com" target="_blank" class="btn_depth1" data-weblog-object="gnb-main-navi-05"><span>웹 상점</span></a>
+                </li>
+                <li class="depth1 nav_cate6 active">
+                    <a href="/datacenter/dailysquad" class="btn_depth1" data-weblog-object="gnb-main-navi-06"><span>데이터센터</span></a>
+                </li>
+                <li class="depth1 nav_cate7 ">
+                    <a href="/pds/download" class="btn_depth1" data-weblog-object="gnb-main-navi-07"><span>자료실</span></a>
+                </li>
+                <li class="depth1 nav_cate8">
+                    <a href="https://esports.fconline.nexon.com/FSL/Index" target="_blank" class="btn_depth1" data-weblog-object="gnb-main-navi-08"><span>SPORTS</span></a>
+                </li>
+            </ul>
+        </div>
+    </div>
+    <div class="slide_menu">
+        <div class="slide_menu_wrap">
+            <ul>
+                <li class="nav_cate_wrap" data-target="nav_cate1">
+                    <ul>
+                        <li class="depth2 nav_cate1"><a href="/profile/squad" data-weblog-object="gnb-sub-navi-01-01">스쿼드</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/stat" data-weblog-object="gnb-sub-navi-01-02">경기 기록</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/trade" data-weblog-object="gnb-sub-navi-01-03">이적시장</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/community" data-weblog-object="gnb-sub-navi-01-04">커뮤니티</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/friends" data-weblog-object="gnb-sub-navi-01-05">친구</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/guestbook" data-weblog-object="gnb-sub-navi-01-06">방명록</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/owner" data-weblog-object="gnb-sub-navi-01-07">구단주 정보</a></li>
+                        <li class="depth2 nav_cate1"><a href="/profile/setting" data-weblog-object="gnb-sub-navi-01-08">설정</a></li>
+                    </ul>
+                </li>
+
+                <li class="nav_cate_wrap" data-target="nav_cate2">
+                    <ul>
+                        <li class="depth2 nav_cate2"><a href="/news/notice/list" data-weblog-object="gnb-sub-navi-02-01">공지사항</a></li>
+                        <li class="depth2 nav_cate2"><a href="/news/play/list" data-weblog-object="gnb-sub-navi-02-02">개발자 노트</a></li>
+                        <li class="depth2 nav_cate2"><a href="/news/nf/list" data-weblog-object="gnb-sub-navi-02-03">NEXT FIELD</a></li>
+                        <li class="depth2 nav_cate2"><a href="/news/update/list" data-weblog-object="gnb-sub-navi-02-04">업데이트</a></li>
+                        <li class="depth2 nav_cate2"><a href="/news/events/list" data-weblog-object="gnb-sub-navi-02-05">이벤트</a></li>
+                        <li class="depth2 nav_cate2"><a href="/news/guide/list" data-weblog-object="gnb-sub-navi-02-06">유저 가이드</a></li>
+                        <li class="depth2 nav_cate2"><a href="https://fco.vod.nexoncdn.co.kr/list/2023/9/note_FCO_202307_sdkfjcv3423.html" data-weblog-object="gnb-sub-navi-02-07" target="_blank">신규 전술 가이드<span class="ico ico_outlink"></span></a></li>
+                        <li class="depth2 nav_cate2"><a href="https://yourfield.nexon.com/" target="_blank" data-weblog-object="gnb-sub-navi-02-08">YOUR FIELD<span class="ico ico_outlink"></span></a></li>
+                    </ul>
+                </li>
+                <li class="nav_cate_wrap" data-target="nav_cate3">
+                    <ul>
+                        <li class="depth2 nav_cate3"><a href="/community/recommend" data-weblog-object="gnb-sub-navi-03-01">추천</a></li>
+                        <li class="depth2 nav_cate3"><a href="/community/free/list" data-weblog-object="gnb-sub-navi-03-02">자유</a></li>
+                        <li class="depth2 nav_cate3"><a href="/community/tip/list" data-weblog-object="gnb-sub-navi-03-03">팁</a></li>
+                        <li class="depth2 nav_cate3"><a href="/community/qa/list" data-weblog-object="gnb-sub-navi-03-04">질문</a></li>
+                        <li class="depth2 nav_cate3"><a href="/community/club/list" data-weblog-object="gnb-sub-navi-03-05">클럽홍보</a></li>
+                        <li class="depth2 nav_cate3"><a href="/community/bug/list" data-weblog-object="gnb-sub-navi-03-06">게임 플레이 버그 제보</a></li>
+                        <li class="depth2 nav_cate3"><a href="https://new-playtalk.nexon.com/list/2396" data-weblog-object="gnb-sub-navi-03-07" target="_blank">FC톡<span class="ico ico_outlink"></span></a></li>
+                    </ul>
+                </li>
+                <li class="nav_cate_wrap" data-target="nav_cate5">
+                    <ul>
+                        <li class="depth2 nav_cate5"><a href="https://shop.fconline.nexon.com/" target="_blank" data-weblog-object="gnb-sub-navi-05-01">웹 상점</a></li>
+                        <li class="depth2 nav_cate5"><a href="https://shop.fconline.nexon.com/Membership" target="_blank" data-weblog-object="gnb-sub-navi-05-02">멤버십</a></li>
+                        <li class="depth2 nav_cate5"><a href="https://shop.fconline.nexon.com/ShopEvent/Index" target="_blank" data-weblog-object="gnb-sub-navi-05-03">스페셜 상점</a></li>
+                        <li class="depth2 nav_cate5"><a href="https://shop.fconline.nexon.com/mypage" target="_blank" data-weblog-object="gnb-sub-navi-05-04">마이페이지</a></li>
+                        <li class="depth2 nav_cate5"><a href="https://shop.fconline.nexon.com/shop/PaidItemPolicy" target="_blank" data-weblog-object="gnb-sub-navi-05-05">추가 정보</a></li>
+                    </ul>
+                </li>
+                <li class="nav_cate_wrap" data-target="nav_cate6">
+                    <ul>
+                        <li class="depth2 nav_cate6"><a href="/datacenter/dailysquad" data-weblog-object="gnb-sub-navi-06-01">데일리 차트</a></li>
+                        <li class="depth2 nav_cate6"><a href="/datacenter" data-weblog-object="gnb-sub-navi-06-02">선수</a></li>
+                        <li class="depth2 nav_cate6"><a href="/datacenter/teamcolor" data-weblog-object="gnb-sub-navi-06-03">팀컬러/감독</a></li>
+                        <li class="depth2 nav_cate6"><a href="/datacenter/rank" data-weblog-object="gnb-sub-navi-06-04">랭킹</a></li>
+                        <li class="depth2 nav_cate6"><a href="/datacenter/playergrow" data-weblog-object="gnb-sub-navi-06-05">강화 부스트 도우미</a></li>
+                        <li class="depth2 nav_cate6"><a href="/datacenter/coachhelper" data-weblog-object="gnb-sub-navi-06-06">훈련코치/특성 도우미</a></li>
+                        <li class="depth2 nav_cate6"><a href="/squadmaker" target="_blank" data-weblog-object="gnb-sub-navi-06-07">스쿼드 메이커<span class="ico ico_outlink"></span></a></li>
+                        <li class="depth2 nav_cate6"><a href="/SquadMaker/feed" target="_blank" data-weblog-object="gnb-sub-navi-06-08">스쿼드 피드<span class="ico ico_outlink"></span></a></li>
+                    </ul>
+                </li>
+                <li class="nav_cate_wrap" data-target="nav_cate7">
+                    <ul>
+                        <li class="depth2 nav_cate7"><a href="http://fconline.nexon.com/pds/download" data-weblog-object="gnb-sub-navi-07-01">다운로드/설치</a></li>
+                        <li class="depth2 nav_cate7"><a href="https://fconline.nexon.com/testarena" target="_blank">테스트 구장</a></li>
+                        <li class="depth2 nav_cate7"><a href="https://openapi.nexon.com/ko/game/fconline/" target="_blank" data-weblog-object="gnb-sub-navi-07-06">Nexon Open API<span class="ico ico_outlink"></span></a></li>
+                    </ul>
+                </li>
+                <li class="nav_cate_wrap" data-target="nav_cate8">
+                    <ul>
+                        <li class="depth2 nav_cate8"><a href="https://esports.fconline.nexon.com/FSL/Index" target="_blank" data-weblog-object="gnb-sub-navi-08-01">FSL</a></li>
+                        <li class="depth2 nav_cate8"><a href="https://fconline.nexon.com/NexonFootball" data-weblog-object="gnb-sub-navi-08-02">넥슨 풋볼</a></li>
+                        <li class="depth2 nav_cate8"><a href="https://esports.fconline.nexon.com/_260507/FcaApply" target="_blank" data-weblog-object="gnb-sub-navi-08-03">FCA 대회 신청</a></li>
+
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+    
+    <a href="https://events.fconline.nexon.com/260730/Join?utm_source=pc&utm_medium=maingnb_event&utm_campaign=260730_join" class="btn_out_event" target="_blank">
+        <span class="img" style="background: url('https://ssl.nexon.com/s2/game/fc/online/obt/banner/main/260730_intro/banner_top_intro.png') 0 0 no-repeat;"></span>
+        <span class="txt"><span>30일 접속으로<br/>백금 키퍼 확정 획득!</span></span>
+    </a>
+
+    <a href="/customer" class="btn_cc"><span class="hidden">고객센터</span></a>
+
+    <button class="btnGamestart" onclick="GnxGameStartOnClick();" data-clickbtn="btn_Gamestart">
+        <span class="txt"></span>
+        <span class="bg"></span>
+        <video
+            class="hoverVideoLarge"
+            muted
+            playsinline
+            loop
+            preload="metadata"
+        >
+            <source src="https://ssl.nexon.com/s2/game/fc/online/obt/gamestart/animation/home_GameStart.webm" type="video/webm" />
+            <source src="https://ssl.nexon.com/s2/game/fc/online/obt/gamestart/animation/home_GameStart.mp4" type="video/mp4" />
+        </video>
+        <video
+            class="hoverVideoSmall"
+            muted
+            playsinline
+            loop
+            preload="metadata"
+        >
+            <source src="https://ssl.nexon.com/s2/game/fc/online/obt/gamestart/animation/home_GameStart_short.webm" type="video/webm" />
+            <source src="https://ssl.nexon.com/s2/game/fc/online/obt/gamestart/animation/home_GameStart_short.mp4" type="video/mp4" />
+        </video>
+    </button>
+    
+    <script type="text/javascript">
+
+        $(function () {
+            $(".nav_cate_wrap li a").each(function () {
+                if(",게임소식,공지사항,이벤트,데일리 차트,랭킹,YOUR FIELD,데이터센터,자유,추천,업데이트,스쿼드 메이커,스쿼드 피드,".indexOf("," + $(this).html().replace("<i class=\"ico ico_web_shop\"></i>","").replace("<span class=\"ico ico_outlink\"></span>","") + ",") > -1)
+                {
+
+                    $(this).addClass("new");
+                }
+
+            });
+
+            $(".header_nav_wrap li a span").each(function () {
+                if (",게임소식,공지사항,이벤트,데일리 차트,랭킹,YOUR FIELD,데이터센터,자유,추천,업데이트,스쿼드 메이커,스쿼드 피드,".indexOf("," + $(this).html().replace("<i class=\"ico ico_web_shop\"></i>", "").replace("<span class=\"ico ico_outlink\"></span>","") + ",") > -1) {
+                    $(this).parent().addClass("new");
+                }
+
+            });
+        });
+
+        function GnxGameStartOnClick(argument) {
+                
+                inface.auth.gotoSignIn();
+                
+        }
+    </script>
+</header>
+        <!-- //공통 GNB -->
+        <!-- 띠 공지 배너-->
+        
+
+
+
+
+        <!-- 띠 공지 배너-->
+        <!-- MAIN -->
+        
+
+
+
+
+<script type="text/javascript">
+    $(document).ready(function () {
+        DataCenter.GetPlayerAbility(508200104, 4, 0, 0, 0, 0, 0, 0, 0);
+    });
+</script>
+
+
+<!-- MAIN -->
+<main id="middle" class="sub">
+    <input type="hidden" id="PlayerVs1" value="508200104" />
+    <!-- 데이터센터 -->
+    <div class="datacenter">        
+        <input type="hidden" name="LivePer508200104" value="0" />
+        <div class="wrap">
+            <div class="board_header">
+                
+
+<div class="tit">
+    <h1>데이터센터</h1>
+    <div class="desc">EA SPORTS FC ONLINE의 다양한 데이터를 만나보세요.</div>
+    
+
+<script type="text/javascript">
+</script>
+
+<div class="coach_area">
+</div>
+</div>
+
+<div class="tab_list large">
+    <ul>
+        <li class="tab7 "><a href="/datacenter/dailysquad">데일리차트</a></li>
+        <li class="tab7 active"><a href="/datacenter">선수</a></li>
+        <li class="tab7 "><a href="/datacenter/teamcolor">팀컬러/감독</a></li>
+        <li class="tab7 "><a href="/datacenter/rank">랭킹</a></li>
+        
+        <li class="tab7 "><a href="/datacenter/playergrow">강화 부스트 도우미</a></li>
+        <li class="tab7 "><a href="/datacenter/coachhelper">훈련코치/특성 도우미</a></li>
+        <li class="tab7 "><a href="/datacenter/squadmaker">스쿼드 메이커</a></li>
+    </ul>
+</div>
+            </div>
+            <div class="player_view">
+                <div class="header">
+                    <div class="tit">선수 상세 정보</div>
+                    <div class="utils">
+                        <div class="view_back">
+                            <a href="/datacenter"
+                                class="btn_back_list">
+                                <em class="tm"><span class="ico ico_return"></span></em>
+                                <span class="txt">목록으로 돌아가기</span>
+                            </a>
+                            <div class="form_wrap">
+                                <input type="text" id="txtSearchProfile" class="input_coach"  name="strPlayerName" placeholder="선수 검색">
+                                <button class="btn_search_coach"><span class="ico ico_search"></span></button>
+                                <div class="common_quick_list">
+                                    <ul>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="content data_detail">
+                    <div class="wrap _area_player_ability">
+                    </div>
+                </div>
+            </div>
+
+            <div class="ranker_record">
+                <div class="header">
+                    <div class="tit">
+                        상위 랭커가 어제 기록한 해당 선수 플레이 평균 기록
+                    </div>
+                    <div class="advice">
+                        업데이트 일시 : -<a href="/DataCenter/PlayerStat" class="btn_more">다른 선수 기록
+                            더보기<span></span></a>
+                    </div>
+                </div>
+                <div class="content">
+                    <div class="list_wrap">
+                        <div class="thead">
+                            <div class="tr">
+                                <span class="th">출전</span>
+                                <span class="th">득점</span>
+                                <span class="th">도움</span>
+                                <span class="th">유효 슈팅</span>
+                                <span class="th">일반 슈팅</span>
+                                <span class="th usebr">패스<br>성공률</span>
+                                <span class="th usebr">드리블<br>성공률</span>
+                                <span class="th usebr">공중볼 경합<br>성공률</span>
+                                <span class="th">가로채기</span>
+                                <span class="th usebr">태클<br>성공률</span>
+                                <span class="th usebr">차단<br>성공률</span>
+                                <span class="th usebr">선방<br />(골 차단)</span>
+                                <span class="th">평점</span>
+                            </div>
+                        </div>
+                        <div class="tbody">
+                                <!-- 없는경우 -->
+                                <div class="tr empty">
+                                    <span class="txt">
+                                        랭커 정보를 불러올 수 없습니다.
+                                    </span>
+                                </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="view_wrap">
+                <div class="player_view view_triple">
+                    <div class="header">
+                        <div class="tit">클럽 경력</div>
+                    </div>
+                    <div class="content data_detail_club">
+                        <div class="data_header">
+                            <div class="th year">연도</div>
+                            <div class="th club">클럽</div>
+                            <div class="th rent">임대 여부</div>
+                        </div>
+                        <div class="data_table">
+                            <ul>
+                                    <li>
+                                        <div class="td year">2025 ~ </div>
+                                        <div class="td club">LA FC </div>
+                                        <div class="td rent"></div>
+                                    </li>
+                                    <li>
+                                        <div class="td year">2015 ~ 2025</div>
+                                        <div class="td club">토트넘 홋스퍼</div>
+                                        <div class="td rent"></div>
+                                    </li>
+                                    <li>
+                                        <div class="td year">2013 ~ 2015</div>
+                                        <div class="td club">바이엘 04 레버쿠젠</div>
+                                        <div class="td rent"></div>
+                                    </li>
+                                    <li>
+                                        <div class="td year">2010 ~ 2013</div>
+                                        <div class="td club">함부르크 SV</div>
+                                        <div class="td rent"></div>
+                                    </li>
+                                    <li>
+                                        <div class="td year">2009 ~ 2010</div>
+                                        <div class="td club">함부르크 SV II</div>
+                                        <div class="td rent"></div>
+                                    </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="player_view view_triple wide" id="priceToggle">
+
+                    <div class="toggle_content active _area_PlayerPriceGraph" id="priceContent">
+
+                    </div>
+
+
+                    <div class="toggle_content" id="liveContent">
+                        <div class="header">
+                            <div class="tit">라이브 퍼포먼스</div>
+                            <div class="add_info">
+                                <div class="txt">
+                                    <span>현재</span>
+                                    <strong>0</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="content data_detail_live">
+                            <div class="data_header">
+                                <div class="price_tab">
+                                    <ul>
+                                        <li class="max">최고 <strong>0</strong></li>
+                                        <li class="min">최저 <strong>0</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="data_chart chartjs2">
+
+
+                                <canvas id="chartjs2" width="760" height="320"></canvas>
+
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="player_view">
+                <div class="header">
+                    <div class="tit">선수 평가</div>
+                    <div class="toggle" id="ownToggle">
+                        <div class="txt">보유 구단주 평가 보기</div>
+                        <div class="select_check_box">
+                            <input name="rdPlayerGetPlayerChk" id="rdPlayerGetPlayerChk" type="checkbox" value="0" class="checkbox grCheck" onchange="Article.PlayerCommentList(1, '#divCommentList', '3625', -1);">
+                            <label for="rdPlayerGetPlayerChk">
+                                <span></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="content data_evaluation">
+                    <div class="comment">
+                        <div class="wrap_comment">
+                            <div class="comment_info">
+                                <div class="total">
+                                    <div class="txt">구단주 평가 평균 점수<span>(평가 수)</span></div>
+                                    <div class="num _area_assenssment">
+                                        7.5<span>(4)</span>
+                                    </div>
+                                    <div class="num _area_assenssment_user" style="display:none">
+                                        0.0<span>(0)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment_write">
+
+                                <div class="button_wrap">
+                                    <p class="sco_txt">-</p>
+                                    <button class="btn_sco_minus" onclick="CalAssessment(1);">+</button>
+                                    <button class="btn_sco_plus" onclick="CalAssessment(2);">-</button>
+                                </div>
+
+                                    <textarea name="" id="" cols="30" rows="10" placeholder="로그인후 글쓰기 가능합니다."
+                                        disabled="disabled"></textarea>
+                                    <button onclick="FO4.Events.Login();">등록</button>
+
+                                <span class="limit"><strong>0</strong>/200</span>
+                            </div>
+                        </div>
+
+                        <div id="divCommentList"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- //데이터센터 -->
+
+    <script>
+
+        var json2 = {
+            "time": [
+            
+                        "8.8",
+            
+            
+                        "8.15",
+            
+            
+                        "8.22",
+            
+            
+                        "8.29",
+            
+            
+                        "9.5",
+            
+            ],
+            "value": [
+                "0", "0", "0", "0", "0"
+            ]
+        }
+
+        var option = {
+            type: 'line',
+            data: {
+                labels: null,
+                datasets: [{
+                    data: null,
+                    fill: false,
+                    borderColor: "#3e3d55",
+                    borderWidth: 2,
+                    pointBorderColor: "#25c7f5",
+                    pointStyle: "rect",
+                    radius: 3,
+                    backgroundColor: "#25c7f5",
+                }]
+            },
+            options: {
+                elements: {
+                    line: {
+                        tension: 0,
+                        borderWidth: 2,
+                        offsetGridLines: true
+                    }
+                },
+                scales: {
+                    yAxes: [{
+                        ticks: {
+                            display: false,
+                            beginAtZero: true,
+                        },
+                        gridLines: {
+                            lineWidth: 1,
+                        },
+                    }],
+                    xAxes: [{
+                        ticks: {
+                            fontColor: "#919199",
+                            fontSize: 14,
+                            autoSkip: true,
+                            maxTicksLimit: 5,
+                        },
+                        gridLines: {
+                            display: false,
+                        }
+                    }]
+                },
+                legend: {
+                    display: false,
+                },
+                title: {
+                    display: false,
+                },
+                tooltips: {
+                    enabled: false,
+                    mode: 'index',
+                    position: 'nearest',
+                    custom: customTooltips
+                }
+            }
+        };
+
+        function comma(num) {
+            var len, point, str;
+            num = num + "";
+            point = num.length % 3;
+            len = num.length;
+
+            str = num.substring(0, point);
+            while (point < len) {
+                if (str != "") str += ",";
+                str += num.substring(point, point + 3);
+                point += 3;
+            }
+            return str;
+        }
+
+        function customTooltips(tooltip) {
+
+            // Tooltip Element
+            var tooltipEl = document.querySelector('.' + this._chart.canvas.id + ' ._tooltop');
+
+            console.log('.' + this._chart.canvas.id + ' _tooltop')
+            console.log(tooltipEl)
+
+            if (!tooltipEl) {
+                tooltipEl = document.createElement('div');
+                tooltipEl.className = '_tooltop';
+                tooltipEl.innerHTML = '<span></span>';
+                this._chart.canvas.parentNode.appendChild(tooltipEl);
+            }
+
+            // Hide if no tooltip
+            if (tooltip.opacity === 0) {
+                tooltipEl.style.opacity = 0;
+                return;
+            }
+
+            function getBody(bodyItem) {
+                return bodyItem.lines;
+            }
+
+            if (tooltip.body) {
+                var bodyLines = tooltip.body.map(getBody);
+                var innerHtml = '';
+
+                bodyLines.forEach(function (body, i) {
+                    innerHtml += '<span class="date">' + tooltip.dataPoints[0].xLabel + '</span>';
+                    innerHtml += '<span class="bp">' + comma(tooltip.dataPoints[0].yLabel) + '</span>';
+                });
+
+                var spanBody = tooltipEl.querySelector('span');
+                spanBody.innerHTML = innerHtml;
+            }
+
+            var positionY = this._chart.canvas.offsetTop;
+            var positionX = this._chart.canvas.offsetLeft;
+
+            // Display, position, and set styles for font
+            tooltipEl.style.opacity = 1;
+            tooltipEl.style.left = positionX + tooltip.caretX + 'px';
+            tooltipEl.style.top = positionY + -65 + tooltip.caretY + 'px';
+        }
+
+        var bar_ctx2 = document.getElementById('chartjs2').getContext('2d');
+
+        var bar_chart2 = new Chart(bar_ctx2, $.extend(true, {}, option, {
+            data: {
+                labels: json2.time,
+                datasets: [{
+                    data: json2.value
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+            }
+        })
+        );
+
+
+        function fn_PositionTabChagePlayerInfo(obj, type) {
+            $(".position_tabs li a").each(function () {
+                if (obj == this) {
+                    $(this).parent().addClass("active");
+                } else {
+                    $(this).parent().removeClass("active");
+                }
+            });
+
+            if (type != 99) {
+                $(".data_wrap_playerinfo").find("li").each(function () {
+                    if ($(this).data("positon").indexOf("," + type + ",") >= 0) {
+                        $(this).show();
+                    }
+                    else {
+                        $(this).hide();
+                    }
+                });
+            } else {
+                $(".data_wrap_playerinfo").find("li").each(function () {
+                    $(this).show();
+                });
+            }
+        }
+
+        $(document).ready(function () {            
+        });
+    </script>
+
+</main>
+<!-- //MAIN -->
+<!-- 미리보기 팝업 -->
+<div id="playerPreview" class="pointer_popup layer_preview" style="display:none">
+
+</div>
+<script>
+    $(".btn_preview").click(function () {
+        if ($(this).hasClass("active")) {
+            $("#playerPreview").hide();
+        } else {
+            DataCenter.GetPlayerPreview(this, $(this).data("no"));
+        }
+
+    });
+
+    function SetSkill(n1strong) {
+        var skillpoint = 3;
+        var skillHtml = "";
+
+        if (n1strong >= 5) {
+            skillpoint += 1;
+        }
+
+        if (n1strong >= 8) {
+            skillpoint += 1;
+        }
+
+
+        if (skillpoint > 5) {
+            skillpoint = 5;
+        }
+
+        skillHtml += "<span>";
+        for (var i = 0; i <= skillpoint; i++) {
+            skillHtml += "★";
+        }
+        skillHtml += "</span>";
+
+        for (var i = skillpoint; i < 5; i++) {
+            skillHtml += "☆";
+        }
+        $(".skill").html(skillHtml);
+    }
+
+    Article.PlayerCommentList(1, "#divCommentList", "3625", 0);
+
+</script>
+
+<div id="playerCompare" class="compare_popup layer_compare">
+</div>
+
+<!-- 메시지 알럿 팝업 두가지 -->
+<div id="messageConfirm" class="players_alert_confirm layer_message collect_508200104">
+    <div class="pop_collect">
+        <span class="ico ico_dt_arr_big"></span>
+        <p><span class="player">손흥민 <strong>0</strong>강 선수</span>(이)가<br>구독 선수로 등록 되었습니다.</p>
+    </div>
+</div>
+
+<div id="messageAlert" class="players_alert_false layer_message alert_508200104">
+    <div class="pop_alert">
+        <span class="ico ico_dt_ap_big"></span>
+        <p>구독 선수가 가득 차서 더 이상<br>등록이 안됩니다.</p>
+    </div>
+</div>
+
+<div id="messageDelAlert" class="players_alert_false layer_message alert_del_508200104">
+    <div class="pop_alert">
+        <span class="ico ico_dt_ap_big"></span>
+        <p><span class="player">손흥민 <strong>0</strong>강 선수</span>(이)가<br>구독 선수에서 삭제 되었습니다.</p>
+    </div>
+</div>
+<!-- //메시지 알럿 팝업 두가지 -->
+
+<script>
+    
+    function CalAssessment(n1type) {
+
+        var n4point = 0;
+
+        if ($(".sco_txt").html() == "-") {
+            n4point = 5;
+        }
+        else {
+            n4point = parseInt($(".sco_txt").html());
+
+            if (n1type == 1) {
+                n4point += 1;
+            }
+            else {
+                n4point -= 1;
+            }
+
+            if (n4point >= 10) {
+                n4point = 10;
+            }
+            else if (n4point <= 0) {
+                n4point = 1;
+            }            
+        }
+
+        $(".sco_txt").html(n4point);
+    }
+
+    function setTextLength(obj) {
+        var len = obj.value.length;
+        if (len >= 201) {
+            val.value = val.value.substring(0, 201);
+        } else {
+            $(obj).closest(".comment_write").find(".limit strong").text(len);
+        }
+    }
+</script>
+
+<script>
+    let _quickSearchValue;
+    let _quickFinding = false;
+    let _currentSearchValue = "";
+    let _currentTime;
+    let _ajaxStart = false;
+
+    function quickMakeCard(target, json, searchString) {
+        let html = "";
+
+        if (json["players"] != "") {
+            $.each(json["players"], function (index, value) {
+            html += `<li class="quick_player" tabindex="2"><a href="https://fconline.nexon.com/DataCenter/PlayerInfo?spid=${value.spid}" target="_blank" onclick="$('.common_quick_list').hide();"><span class="season"><img src="https://ssl.nexon.com/s2/game/fc/online/obt/externalAssets/new/season/${
+                value.seasonImgSmall
+            }.png"></span><span class="pay_q">${value.pay}</span><span class="ovr">${
+                parseInt(value.ovr) + 3
+            }</span><span class="name">${value.name.replace(
+                searchString,
+                `<strong>${searchString}</strong>`
+            )}</span></a></li>`; //선택된클래스의선수는 select 클래스추가
+            });
+        }
+
+        $(target).closest(".form_wrap").find(".common_quick_list ul").html(html);
+    }
+
+    function quickSearchCall(target, text) {
+
+        $(target)
+        .closest(".form_wrap")
+        .find(".common_quick_list").show();
+
+        $(target)
+            .closest(".form_wrap")
+            .find(".common_quick_list ul")
+            .html("<li class='loading'><span class='loader'></span></li>");
+        if (_ajaxStart) return;
+
+        _ajaxStart = true;
+
+        const request = $.ajax({
+            type: "get",
+            url:
+            "/DataCenter/SquadMakerPlayerList?strPlayerName=" +
+            text +
+            "&rd=" +
+            Math.random(),
+            dataType: "text",
+        });
+        request.done(function (msg) {
+            let _msg = msg;
+
+            _quickSearchValue = "";
+            _currentSearchValue = text;
+
+            quickMakeCard(target, JSON.parse(_msg), text);
+            _quickFinding = false;
+            _ajaxStart = false;
+        });
+    }
+
+    function checkTime(target) {
+        if (_quickFinding) return;
+
+        let callback = function () {
+            let ts = new Date().getTime();
+            if (ts - 1000 > _currentTime) {
+            if (_quickSearchValue.length > 1) {
+                quickSearchCall(target, _quickSearchValue);
+            }
+            _quickFinding = false;
+            } else {
+            requestAnimationFrame(callback);
+            }
+        };
+        requestAnimationFrame(callback);
+    }
+
+    //퀵 검색
+    $("#txtSearchProfile").on("keyup", function (e) {
+        e.preventDefault();
+
+        if (e.keyCode === 13) {
+            window.location.href = "https://fconline.nexon.com/datacenter/index?strPlayerName=" + $("#txtSearchProfile").val();
+            $(this).val("");
+            _quickSearchValue = "";
+            $(".common_quick_list").hide();
+        } else {
+            _quickSearchValue = $(this).val();
+            checkTime(this);
+            _currentTime = new Date().getTime();
+        }
+        _quickFinding = true;
+
+    });
+
+    $(".btn_search_coach").on("click", function(e){
+        e.preventDefault();
+        window.location.href = "https://fconline.nexon.com/datacenter/index?strPlayerName=" + $("#txtSearchProfile").val();
+        $(this).prev("input").val("");
+        $(".common_quick_list").hide();
+    });
+
+    $("#txtSearchProfile").on("focus", function(e){
+        $(e.target).val("");
+    })    
+</script>
+
+        <!-- //MAIN -->
+        <!-- 공통 FOOTER -->
+        <footer id="footer" role="contentinfo">
+    <div class="inner">
+        <h2 class="logo"><a href="https://fconline.nexon.com"><img src="https://ssl.nexon.com/s2/game/fc/online/CBT/common/logo_fo4.png" alt="NEXON Korea - EA SPORTS FC ONLINE"></a></h2>
+        <nav class="nav">
+            <ul>
+                <li class="menu1"><a href="http://company.nexon.com/" target="_blank" title="새창">회사소개</a></li>
+                <li class="menu2"><a href="https://careers.nexon.com/" target="_blank" title="새창">채용안내</a></li>
+                <li class="menu3"><a href="https://member.nexon.com/policy/stipulation.aspx"  target="_blank">이용약관</a></li>
+                <li class="menu4"><a href="#none" title="새창" onclick="$f.popup('/Content/common/gameuser.html', 500, 440); return false;">게임이용등급안내</a></li>
+                <li class="menu5"><a href="https://member.nexon.com/policy/privacy.aspx" target="_blank" title="새창">개인정보처리방침</a></li>
+                <li class="menu6"><a href="https://member.nexon.com/policy/youthprotection.aspx" target="_blank" title="새창">청소년보호정책</a></li>
+                <li class="menu7"><a href="http://pcbang.nexon.com/" target="_blank" title="새창">넥슨PC방</a></li>
+                <li class="menu8"><a href="#none" title="새창" onclick="$f.popup('/Content/common/rule_operation.html', 800, 800); return false;">운영정책</a></li>
+            </ul>
+        </nav>
+        <address>
+            <span>(주)넥슨코리아 대표이사 강대현·김정욱 경기도 성남시 분당구 판교로 256번길 7 전화 : 1588-7701 팩스 : 0502-258-8322</span><br>
+            <span>E-mail : contact-us@nexon.co.kr 사업자등록번호 : 220-87-17483호 통신판매업 신고번호 : 제2013-경기성남-1659호 <a href="#none" onclick="$f.popup('http://www.ftc.go.kr/info/bizinfo/communicationViewPopup.jsp?wrkr_no=2208717483',800,480); return false;">사업자정보확인</a></span>
+        </address>
+        <p class="nx-copyright">ⓒ NEXON Korea Corporation All Rights Reserved.</p>
+        <p class="copyright">
+            © 2026 Electronic Arts Inc. Electronic Arts, EA, EA SPORTS, the EA SPORTS logo, EA SPORTS FC, and the EA SPORTS FC logo are trademarks of Electronic Arts Inc. Manufactured under license by Electronic Arts. The word(s) UEFA, CHAMPIONS LEAGUE, WOMEN’S CHAMPIONS LEAGUE, EUROPA LEAGUE, EUROPA CONFERENCE LEAGUE, SUPER CUP, the UEFA logo and all marks related to the UEFA Champions League,UEFA Women’s Champions League, UEFA Europa League, UEFA Europa Conference League and UEFA Super Cup (including, but not limited to, logos, designs, mascots, products, trophies and names) are owned and protected as registered trademarks, designs and/or as copyright works by UEFA. All rights reserved.
+        </p>
+        <div class="company">
+            <h2 class="hidden">관련사 링크</h2>
+            <a href="http://www.nexon.com/" target="_blank" class="btn-nexon"><img src="https://ssl.nexon.com/s2/game/fc/online/CBT/common/logo_nexon.png" alt="넥슨코리아"></a>
+            <a href="http://www.easports.com/" target="_blank" class="btn-ea"><img src="https://ssl.nexon.com/s2/game/fc/online/CBT/common/logo_ea.png" alt="EA SPORTS"></a>
+        </div>
+    </div>
+</footer>
+        <!-- //공통 FOOTER -->
+
+                <div class="list_aside">
+                    <ul>
+                        <li><a style="cursor:pointer;" class="btn_list_top"><span class="ico ico_btn_top">위로</span></a></li>
+                        <li><a style="cursor:pointer;" class="btn_list_bottom"><span class="ico ico_btn_down">목록으로</span></a></li>
+                    </ul>
+                </div>
+
+
+        <!-- 공통 레이어 프로필 -->
+        <div class="hidden_player_info" id="hiddenPopCommonPlayerInfoArea">
+
+        </div>
+
+        <script>
+            var IsFo4CommonCallOwnerProfileInfo = false;
+
+            function SetCoachProfileInfo(n8NexonSN) {
+                if (!IsFo4CommonCallOwnerProfileInfo) {
+                    IsFo4CommonCallOwnerProfileInfo = true;
+
+                    setTimeout(function () {
+                        $.ajax({
+                            url: '/Profile/Common/ToolTip/' + n8NexonSN,
+                            type: 'POST',
+                            data: ({ "rd": Math.random() }),
+                            success: function (result) {
+                                $("#hiddenPopCommonPlayerInfoArea").html(result);
+                                $(".hidden_player_info").show();
+                            },
+                            error: function (xhr, status, exception) {
+                                alert("유저 정보 호출에 실패하였습니다.");
+                            }
+                        });
+                    }, 300);
+
+                    setTimeout(function () {
+                        IsFo4CommonCallOwnerProfileInfo = false;
+                    }, 1000);
+                }
+            }
+
+            $(document).on("click", ".profile_pointer", function (e) {
+                var n8NexonSN = $(this).data("sn");
+                SetCoachProfileInfo(n8NexonSN);
+            });
+        </script>
+        <!-- 공통 레이어 프로필 -->
+
+        
+
+        <div class="hidden_info_popup">
+            <span>
+            </span>
+        </div>
+    </div>
+
+
+        <script src="https://rs.nxfs.nexon.com/common/js/gnb.min.js" data-gamecode="106566" data-ispublicbanner="false"></script>
+    <script>
+        function GetCashChargePop() {
+                
+                inface.auth.gotoSignIn();
+                
+        }
+    </script>
+
+    <script type="text/javascript" src="https://js.nexon.com/s1/global/ngb_bodyend.js" charset="euc-kr"></script>
+    <!-- WEBLOG -->
+    <script>
+        $f.weblog({
+            url: window.location.origin + window.location.pathname,
+            service: "STATIC",
+            title: "FO4",
+            date: "2018"
+        });
+    </script>
+    <!-- //WEBLOG -->
+
+    
+
+    <script type="text/javascript">
+        // AD trace
+        window.addEventListener('load', function () {
+
+            const params = window.location.pathname.toLowerCase() + window.location.search.toLowerCase();
+
+            $.ajax({
+                type: "POST",
+                url: "/ad/trace",
+                dataType: "json",
+                data: { param: encodeURIComponent(params) }, 
+                success: function (data) {
+                },
+                error: function (xhr, status, error) {
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>

@@ -6951,19 +6951,70 @@ def get_player_ability(
     # 특성
     # =====================================
 
+    trait_items = []
+
+
+    for trait_element in soup.select(
+        "div.skill_wrap > span"
+    ):
+
+        description_element = (
+            trait_element.select_one(
+                "span.desc"
+            )
+        )
+
+
+        if not description_element:
+            continue
+
+
+        trait_name = (
+            description_element.get_text(
+                strip=True
+            )
+        )
+
+
+        if not trait_name:
+            continue
+
+
+        image_element = (
+            trait_element.select_one(
+                "img[src]"
+            )
+        )
+
+
+        image_url = (
+            image_element.get(
+                "src",
+                "",
+            )
+            if image_element
+            else ""
+        )
+
+
+        trait_items.append(
+            {
+                "name":
+                    trait_name,
+
+                "image_url":
+                    image_url,
+            }
+        )
+
+
     traits = [
-        element.get_text(
-            strip=True
-        )
+        trait_item[
+            "name"
+        ]
 
-        for element
-        in soup.select(
-            "div.skill_wrap span.desc"
-        )
-
-        if element.get_text(
-            strip=True
-        )
+        for trait_item
+        in trait_items
     ]
 
 
@@ -7253,6 +7304,9 @@ def get_player_ability(
 
         "traits":
             traits,
+
+        "trait_items":
+            trait_items,
 
         "team_colors":
             team_colors,

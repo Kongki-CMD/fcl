@@ -264,6 +264,17 @@ const playerMarketPriceLoadingSpIds =
 const playerMarketPriceErrorBySpId =
     new Map();
 
+const playerTraitsBySpId =
+    new Map();
+
+
+const playerTraitsLoadingSpIds =
+    new Set();
+
+
+const playerTraitsErrorBySpId =
+    new Map();
+
 
 const enhancementBonusMap = {
     1: 0,
@@ -2618,6 +2629,354 @@ async function loadPlayerMarketPrice(
     }
 }
 
+function createPlayerTraitsHtml(
+    player
+) {
+
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const fallbackTraits =
+        Array.isArray(
+            player.traits
+        )
+            ? player.traits
+            : [];
+
+
+    const traitData =
+        playerTraitsBySpId.get(
+            spId
+        );
+
+
+    const isLoading =
+        playerTraitsLoadingSpIds.has(
+            spId
+        );
+
+
+    const errorMessage =
+        playerTraitsErrorBySpId.get(
+            spId
+        );
+
+
+    // =====================================
+    // 특성 자체가 없는 선수
+    // =====================================
+
+    if (
+        !traitData
+        &&
+        !isLoading
+        &&
+        !errorMessage
+        &&
+        fallbackTraits.length === 0
+    ) {
+
+        return "";
+    }
+
+
+    // =====================================
+    // 로딩
+    // =====================================
+
+    if (isLoading) {
+
+        return `
+            <section
+                class="player-database-player-traits"
+            >
+
+                <div
+                    class="player-database-player-traits-title"
+                >
+                    특성
+                </div>
+
+
+                <div
+                    class="player-database-player-traits-status"
+                >
+                    특성 불러오는 중...
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    // =====================================
+    // 공식 아이콘 조회 완료
+    // =====================================
+
+    if (
+        traitData
+        &&
+        Array.isArray(
+            traitData.traits
+        )
+    ) {
+
+        const traitItems =
+            traitData.traits;
+
+
+        if (
+            traitItems.length === 0
+        ) {
+            return "";
+        }
+
+
+        return `
+            <section
+                class="player-database-player-traits"
+            >
+
+                <div
+                    class="player-database-player-traits-title"
+                >
+                    특성
+                </div>
+
+
+                <div
+                    class="player-database-player-traits-list"
+                >
+
+                    ${
+                        traitItems
+                            .map(
+                                trait => `
+                                    <div
+                                        class="
+                                            player-database-player-trait
+                                        "
+                                        title="${escapeHtml(
+                                            trait.name
+                                            ?? ""
+                                        )}"
+                                    >
+
+                                        ${
+                                            trait.image_url
+                                                ? `
+                                                    <img
+                                                        src="${escapeHtml(
+                                                            trait.image_url
+                                                        )}"
+                                                        alt=""
+                                                        loading="lazy"
+                                                    >
+                                                `
+                                                : ""
+                                        }
+
+
+                                        <span>
+                                            ${escapeHtml(
+                                                trait.name
+                                                ?? ""
+                                            )}
+                                        </span>
+
+                                    </div>
+                                `
+                            )
+                            .join(
+                                ""
+                            )
+                    }
+
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    // =====================================
+    // 공식 이미지 조회 실패 시
+    // 기존 DB 특성명은 보여주기
+    // =====================================
+
+    if (
+        fallbackTraits.length > 0
+    ) {
+
+        return `
+            <section
+                class="player-database-player-traits"
+            >
+
+                <div
+                    class="player-database-player-traits-title"
+                >
+                    특성
+                </div>
+
+
+                <div
+                    class="player-database-player-traits-list"
+                >
+
+                    ${
+                        fallbackTraits
+                            .map(
+                                traitName => `
+                                    <div
+                                        class="
+                                            player-database-player-trait
+                                            text-only
+                                        "
+                                    >
+
+                                        <span>
+                                            ${escapeHtml(
+                                                traitName
+                                            )}
+                                        </span>
+
+                                    </div>
+                                `
+                            )
+                            .join(
+                                ""
+                            )
+                    }
+
+                </div>
+
+            </section>
+        `;
+    }
+
+
+    return "";
+}
+
+
+async function loadPlayerTraits(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    if (
+        !Number.isInteger(
+            numericSpId
+        )
+    ) {
+        return;
+    }
+
+
+    if (
+        playerTraitsBySpId.has(
+            numericSpId
+        )
+    ) {
+        return;
+    }
+
+
+    if (
+        playerTraitsLoadingSpIds.has(
+            numericSpId
+        )
+    ) {
+        return;
+    }
+
+
+    playerTraitsLoadingSpIds.add(
+        numericSpId
+    );
+
+
+    playerTraitsErrorBySpId.delete(
+        numericSpId
+    );
+
+
+    rerenderPlayerCard(
+        numericSpId
+    );
+
+
+    try {
+
+        const response =
+            await fetch(
+                (
+                    `${apiBaseUrl}`
+                    +
+                    `/api/player-database/traits/`
+                    +
+                    `${numericSpId}`
+                )
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "특성 조회에 실패했습니다."
+            );
+        }
+
+
+        playerTraitsBySpId.set(
+            numericSpId,
+            data
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        playerTraitsErrorBySpId.set(
+            numericSpId,
+            (
+                error.message
+                ??
+                "특성 조회에 실패했습니다."
+            )
+        );
+
+    } finally {
+
+        playerTraitsLoadingSpIds.delete(
+            numericSpId
+        );
+
+
+        rerenderPlayerCard(
+            numericSpId
+        );
+    }
+}
+
 
 function createPlayerCardHtml(
     player
@@ -2886,21 +3245,32 @@ function createPlayerCardHtml(
                     ========================== -->
 
                     <aside
-                        class="player-database-player-photo-wrap"
+                        class="player-database-player-side"
                     >
 
-                        <img
-                            src="${escapeHtml(
-                                player.image_url
-                                ?? ""
-                            )}"
-                            alt="${escapeHtml(
-                                player.player_name
-                            )}"
-                            class="player-database-player-photo"
-                            data-player-image
-                            loading="lazy"
+                        <div
+                            class="player-database-player-photo-wrap"
                         >
+
+                            <img
+                                src="${escapeHtml(
+                                    player.image_url
+                                    ?? ""
+                                )}"
+                                alt="${escapeHtml(
+                                    player.player_name
+                                )}"
+                                class="player-database-player-photo"
+                                data-player-image
+                                loading="lazy"
+                            >
+
+                        </div>
+
+
+                        ${createPlayerTraitsHtml(
+                            player
+                        )}
 
                     </aside>
 
@@ -3926,6 +4296,39 @@ function refreshRecommendMarketPrice() {
         );
 }
 
+function refreshRecommendTraits() {
+
+    const basePlayer =
+        getRecommendBasePlayer(
+            recommendState
+                .basePlayerSpId
+        );
+
+
+    if (!basePlayer) {
+        return;
+    }
+
+
+    const traitsElement =
+        playerRecommendContentElement
+            ?.querySelector(
+                "[data-recommend-traits]"
+            );
+
+
+    if (!traitsElement) {
+        return;
+    }
+
+
+    traitsElement.outerHTML =
+        createPlayerInlineTraitsHtml(
+            basePlayer,
+            "recommend"
+        );
+}
+
 function createRecommendBasePlayerHtml(
     player
 ) {
@@ -4200,6 +4603,11 @@ function createRecommendBasePlayerHtml(
 
                 ${createRecommendMarketPriceHtml(
                     player
+                )}
+
+                ${createPlayerInlineTraitsHtml(
+                    player,
+                    "recommend"
                 )}
 
             </div>
@@ -5281,6 +5689,39 @@ function openPlayerRecommendModal(
             }
         );
 
+    const traitsPromise =
+        loadPlayerTraits(
+            Number(
+                spId
+            )
+        );
+
+
+    refreshRecommendTraits();
+
+
+    traitsPromise
+        .finally(
+            () => {
+
+                if (
+                    Number(
+                        recommendState
+                            .basePlayerSpId
+                    )
+                    !==
+                    Number(
+                        spId
+                    )
+                ) {
+                    return;
+                }
+
+
+                refreshRecommendTraits();
+            }
+        );
+
 }
 
 function closePlayerRecommendModal() {
@@ -6048,6 +6489,187 @@ function createCompareAdaptationSelectOptionsHtml(
         );
 }
 
+function createPlayerInlineTraitsHtml(
+    player,
+    mode
+) {
+
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const traitData =
+        playerTraitsBySpId.get(
+            spId
+        );
+
+
+    const isLoading =
+        playerTraitsLoadingSpIds.has(
+            spId
+        );
+
+
+    const fallbackTraits =
+        Array.isArray(
+            player.traits
+        )
+            ? player.traits
+            : [];
+
+
+    let traitItems =
+        [];
+
+
+    // =====================================
+    // 공식 아이콘 조회 완료
+    // =====================================
+
+    if (
+        traitData
+        &&
+        Array.isArray(
+            traitData.traits
+        )
+    ) {
+
+        traitItems =
+            traitData.traits;
+
+    } else {
+
+        // =================================
+        // 조회 전에는 DB 특성명 우선 표시
+        // =================================
+
+        traitItems =
+            fallbackTraits.map(
+                traitName => ({
+                    name:
+                        traitName,
+
+                    image_url:
+                        "",
+                })
+            );
+    }
+
+
+    const dataAttribute =
+        mode === "compare"
+            ? "data-compare-traits"
+            : "data-recommend-traits";
+
+
+    // =====================================
+    // 조회 완료 + 특성 없음
+    // =====================================
+
+    if (
+        traitData
+        &&
+        traitItems.length === 0
+    ) {
+
+        return `
+            <section
+                class="
+                    player-inline-traits
+                    player-inline-traits-${mode}
+                "
+                ${dataAttribute}="${spId}"
+                hidden
+            ></section>
+        `;
+    }
+
+
+    return `
+        <section
+            class="
+                player-inline-traits
+                player-inline-traits-${mode}
+            "
+            ${dataAttribute}="${spId}"
+        >
+
+            <span
+                class="player-inline-traits-title"
+            >
+                특성
+            </span>
+
+
+            <div
+                class="player-inline-traits-list"
+            >
+
+                ${
+                    traitItems.length > 0
+                        ? traitItems
+                            .map(
+                                trait => `
+                                    <div
+                                        class="player-inline-trait"
+                                        title="${escapeHtml(
+                                            trait.name
+                                            ?? ""
+                                        )}"
+                                    >
+
+                                        ${
+                                            trait.image_url
+                                                ? `
+                                                    <img
+                                                        src="${escapeHtml(
+                                                            trait.image_url
+                                                        )}"
+                                                        alt=""
+                                                        loading="lazy"
+                                                    >
+                                                `
+                                                : ""
+                                        }
+
+
+                                        <span>
+                                            ${escapeHtml(
+                                                trait.name
+                                                ?? ""
+                                            )}
+                                        </span>
+
+                                    </div>
+                                `
+                            )
+                            .join(
+                                ""
+                            )
+
+                        : (
+                            isLoading
+                                ? `
+                                    <span
+                                        class="
+                                            player-inline-traits-status
+                                        "
+                                    >
+                                        불러오는 중...
+                                    </span>
+                                `
+                                : ""
+                        )
+                }
+
+            </div>
+
+        </section>
+    `;
+}
+
 function createCompareMarketPriceHtml(
     player
 ) {
@@ -6395,6 +7017,11 @@ function createComparePlayerSummaryHtml(
 
             ${createCompareMarketPriceHtml(
                 player
+            )}
+
+            ${createPlayerInlineTraitsHtml(
+                player,
+                "compare"
             )}
 
         </article>
@@ -7441,7 +8068,7 @@ function openPlayerCompareModal(
     initializeCompareControlState();
 
 
-    const marketPricePromise =
+    const compareExtraDataPromise =
         Promise.all(
             [
                 loadPlayerMarketPrice(
@@ -7449,6 +8076,14 @@ function openPlayerCompareModal(
                 ),
 
                 loadPlayerMarketPrice(
+                    numericTargetSpId
+                ),
+
+                loadPlayerTraits(
+                    numericBaseSpId
+                ),
+
+                loadPlayerTraits(
                     numericTargetSpId
                 ),
             ]
@@ -7469,7 +8104,7 @@ function openPlayerCompareModal(
         );
 
 
-    marketPricePromise
+    compareExtraDataPromise
         .then(
             () => {
 
@@ -9290,6 +9925,10 @@ playerResultListElement
 
 
                 loadPlayerMarketPrice(
+                    spId
+                );
+
+                loadPlayerTraits(
                     spId
                 );
             }

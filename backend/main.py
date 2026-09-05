@@ -14,6 +14,7 @@ from backend.player_catalog import (
     get_player_catalog_filter_options,
     get_player_catalog_nations_by_continent,
     get_player_catalog_teams_by_league,
+    get_player_ability,
     search_player_catalog,
     recommend_player_catalog,
 )
@@ -26463,6 +26464,72 @@ def get_player_database_teams(
 # =========================================
 # FC ONLINE PLAYER DATABASE
 # =========================================
+
+# =========================================
+# FC ONLINE PLAYER TRAITS
+# =========================================
+
+@app.get(
+    "/api/player-database/traits/{sp_id}"
+)
+def get_player_database_traits_api(
+    sp_id: int,
+):
+
+    if sp_id <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 선수 ID가 아닙니다."
+            ),
+        )
+
+
+    try:
+
+        player_data = (
+            get_player_ability(
+                sp_id=
+                    sp_id,
+
+                grade=
+                    1,
+            )
+        )
+
+    except httpx.HTTPError as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 데이터센터에서 "
+                "선수 특성을 불러오지 못했습니다."
+            ),
+        ) from error
+
+
+    trait_items = (
+        player_data.get(
+            "trait_items",
+            [],
+        )
+        or []
+    )
+
+
+    return {
+        "sp_id":
+            sp_id,
+
+        "traits":
+            trait_items,
+
+        "source":
+            "FC Online DataCenter",
+    }
+
+
 
 # =========================================
 # FC ONLINE PLAYER MARKET PRICE
