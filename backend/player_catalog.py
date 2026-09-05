@@ -4935,6 +4935,7 @@ def recommend_player_catalog(
     team_color=0,
     position_mode="same",
     salary_mode="any",
+    team_color_id=None,
     ovr_min=None,
     ovr_max=None,
     limit=10,
@@ -4962,6 +4963,15 @@ def recommend_player_catalog(
     team_color = int(
         team_color
     )
+
+    if (
+        team_color_id
+        is not None
+    ):
+        team_color_id = int(
+            team_color_id
+        )
+
 
 
     position_mode = (
@@ -5002,8 +5012,6 @@ def recommend_player_catalog(
         not in {
             "any",
             "same_or_below",
-            "plus_1",
-            "plus_2",
         }
     ):
 
@@ -5226,38 +5234,37 @@ def recommend_player_catalog(
                     base_salary
                 )
 
-
-            elif (
-                salary_mode
-                ==
-                "plus_1"
+            if (
+                team_color_id
+                is not None
             ):
 
                 where_clauses.append(
                     """
-                    p.salary <= %s
+                    EXISTS (
+                        SELECT
+                            1
+
+                        FROM
+                            fconline_player_teams
+                            AS team_filter
+
+                        WHERE
+                            team_filter.sp_id
+                            =
+                            p.sp_id
+
+                        AND
+                            team_filter.team_color_id
+                            =
+                            %s
+                    )
                     """
                 )
+
 
                 query_params.append(
-                    base_salary + 1
-                )
-
-
-            elif (
-                salary_mode
-                ==
-                "plus_2"
-            ):
-
-                where_clauses.append(
-                    """
-                    p.salary <= %s
-                    """
-                )
-
-                query_params.append(
-                    base_salary + 2
+                    team_color_id
                 )
 
 

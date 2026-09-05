@@ -9550,8 +9550,10 @@ body.site-auth-modal-open {
 /* FC ONLINE STAT COLORS */
 
 .stat-160 {
-    color: #55ead0;
-    text-shadow: 0 0 5px
+    color: #55ead0 !important;
+
+    text-shadow:
+        0 0 5px
         rgba(85, 234, 208, 0.30);
 }
 
@@ -10348,29 +10350,76 @@ body.site-auth-modal-open {
 
 .player-database-player-row {
     display: grid !important;
-    grid-template-columns: auto
+
+    grid-template-columns:
+        auto
+        auto
         minmax(0, 1fr)
-        auto !important;
+        auto
+        !important;
+
     align-items: center;
+
     gap: 8px;
+
     width: 100%;
 }
 
 .player-database-player-season {
     grid-column: 1;
+
     min-width: 0;
 }
 
-.player-database-player-name {
+
+.player-database-player-position {
     grid-column: 2;
+
+    min-width: 28px;
+
+    font-size: 12px;
+    font-weight: 900;
+
+    text-align: center;
+
+    white-space: nowrap;
+}
+
+
+.player-database-player-position.position-fw {
+    color: #e87979;
+}
+
+
+.player-database-player-position.position-mf {
+    color: #6fc993;
+}
+
+
+.player-database-player-position.position-df {
+    color: #76a9e5;
+}
+
+
+.player-database-player-position.position-gk {
+    color: #e0c568;
+}
+
+
+.player-database-player-name {
+    grid-column: 3;
+
     min-width: 0;
+
     overflow: hidden;
+
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+
 .player-database-player-row-actions {
-    grid-column: 3;
+    grid-column: 4;
     display: inline-flex;
     align-items: center;
     justify-content: flex-end;
@@ -10482,6 +10531,9 @@ body.site-auth-modal-open {
     gap: 6px 12px;
     color: rgba(255, 255, 255, 0.62);
     font-size: 12px;
+    min-width: 0;
+    max-width: 100%;
+    flex: 0 1 auto;
 }
 
 .player-database-player-bonus {
@@ -10570,6 +10622,149 @@ body.site-auth-modal-open {
     font-size: 12px;
 }
 
+/* =========================================
+   PLAYER MARKET PRICE
+========================================= */
+
+.player-database-market-price {
+    margin-top: 22px;
+    padding: 16px 18px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.09);
+
+    border-radius: 8px;
+
+    background:
+        rgba(255, 255, 255, 0.025);
+}
+
+
+.player-database-market-price-header {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 14px;
+
+    padding-bottom: 12px;
+
+    border-bottom:
+        1px solid
+        rgba(255, 255, 255, 0.07);
+}
+
+
+.player-database-market-price-header > div {
+    display: flex;
+
+    align-items: baseline;
+
+    gap: 10px;
+}
+
+
+.player-database-market-price-header strong {
+    color: #fff;
+
+    font-size: 14px;
+}
+
+
+.player-database-market-price-header span,
+.player-database-market-price-header small {
+    color:
+        rgba(255, 255, 255, 0.45);
+
+    font-size: 10px;
+}
+
+
+.player-database-market-price-current {
+    display: grid;
+
+    grid-template-columns:
+        150px
+        minmax(0, 1fr);
+
+    gap: 12px;
+
+    margin-top: 14px;
+}
+
+
+.player-database-market-price-grade,
+.player-database-market-price-value {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    padding: 12px 14px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.06);
+
+    border-radius: 6px;
+
+    background:
+        rgba(0, 0, 0, 0.15);
+}
+
+
+.player-database-market-price-grade span,
+.player-database-market-price-value span {
+    color:
+        rgba(255, 255, 255, 0.48);
+
+    font-size: 10px;
+}
+
+
+.player-database-market-price-grade strong {
+    color: #fff;
+
+    font-size: 18px;
+}
+
+
+.player-database-market-price-value strong {
+    color: #fff;
+
+    font-size: 22px;
+
+    font-weight: 800;
+}
+
+
+.player-database-market-price-status {
+    margin-top: 14px;
+
+    padding: 14px;
+
+    border-radius: 6px;
+
+    background:
+        rgba(0, 0, 0, 0.15);
+
+    color:
+        rgba(255, 255, 255, 0.55);
+
+    font-size: 11px;
+
+    text-align: center;
+}
+
+
+.player-database-market-price-status.error {
+    color: #ff9d9d;
+}
+
+/* RESPONSIVE */
 .player-database-pagination {
     display: flex;
     align-items: center;
@@ -11426,162 +11621,450 @@ body.site-auth-modal-open {
     font-weight: 700;
 }
 
+/* =========================================
+   GRADE
+========================================= */
+
 .player-database-card-grade-options {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    align-items: center;
+    gap: 5px;
 }
+
 
 .player-database-card-grade {
+    appearance: none;
+    -webkit-appearance: none;
+
+    position: relative;
+
     display: inline-flex;
+
     align-items: center;
     justify-content: center;
-    min-width: 34px;
-    height: 28px;
-    padding: 0 7px;
-    border: 1px solid
-        rgba(255, 255, 255, 0.10);
-    border-radius: 5px;
-    color: rgba(255, 255, 255, 0.72);
-    background: rgba(255, 255, 255, 0.04);
+
+    color: #fff;
+
     font-size: 10px;
     font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.2px;
+
+    width: 34px;
+    min-width: 34px;
+    height: 22px;
+
+    padding: 0;
+
+    box-sizing: border-box;
+
+    border-radius: 0;
+
     cursor: pointer;
+
+    transition:
+        transform 0.12s ease,
+        filter 0.12s ease,
+        box-shadow 0.12s ease;
 }
 
-.player-database-card-grade.bronze {
-    border-color: rgba(176, 113, 72, 0.45);
+
+/* =========================================
+   1강
+========================================= */
+
+.player-database-card-grade.grade-1 {
+    color: #c5c8c9 !important;
+    background:
+        linear-gradient(
+            140deg,
+            #51545a 0%,
+            #51545a 0%,
+            #42464d 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #393a3c
+        !important;
+
+    border-top-color:
+        #62676d
+        !important;
+
+    border-left-color:
+        #62676d
+        !important;
+
+    border-right-color:
+        #393a3c
+        !important;
 }
 
-.player-database-card-grade.silver {
-    border-color: rgba(190, 198, 204, 0.48);
+
+/* =========================================
+   2 ~ 4강
+========================================= */
+
+.player-database-card-grade.grade-2,
+.player-database-card-grade.grade-3,
+.player-database-card-grade.grade-4 {
+    color: #7e3f27 !important;
+    background:
+        linear-gradient(
+            140deg,
+            #de946b 0%,
+            #de946b 0%,
+            #ad5f42 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #864229
+        !important;
+
+    border-top-color:
+        #e4b7a2
+        !important;
+
+    border-left-color:
+        #e4b7a2
+        !important;
+
+    border-right-color:
+        #864229
+        !important;
 }
 
-.player-database-card-grade.gold {
-    border-color: rgba(213, 163, 66, 0.52);
+
+/* =========================================
+   5 ~ 7강
+========================================= */
+
+.player-database-card-grade.grade-5,
+.player-database-card-grade.grade-6,
+.player-database-card-grade.grade-7 {
+    color: #4e545e !important;
+    background:
+        linear-gradient(
+            140deg,
+            rgb(216, 217, 220) 0%,
+            rgb(184, 189, 202) 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #a5a8ae
+        !important;
+
+    border-top-color:
+        #d8dadc
+        !important;
+
+    border-left-color:
+        #d8dadc
+        !important;
+
+    border-right-color:
+        #a9aaae
+        !important;
 }
 
-.player-database-card-grade.platinum {
-    border-color: rgba(147, 206, 220, 0.55);
+
+/* =========================================
+   8 ~ 10강
+========================================= */
+
+.player-database-card-grade.grade-8,
+.player-database-card-grade.grade-9,
+.player-database-card-grade.grade-10 {
+    color: #695100 !important;
+    background:
+        linear-gradient(
+            140deg,
+            #f9dd62 0%,
+            #f9dd62 0%,
+            #dca908 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #cda000
+        !important;
+
+    border-top-color:
+        #e9d36c
+        !important;
+
+    border-left-color:
+        #e9d36c
+        !important;
+
+    border-right-color:
+        #cda000
+        !important;
 }
+
+
+/* =========================================
+   11 ~ 13강
+========================================= */
+
+.player-database-card-grade.grade-11,
+.player-database-card-grade.grade-12,
+.player-database-card-grade.grade-13 {
+    color: #2d2b43 !important;
+    background:
+        url(
+            "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/bg_plt.png"
+        )
+        no-repeat
+        0
+        0
+        /
+        100%
+        100%
+        !important;
+
+    border:
+        1.5px solid
+        #5274c0
+        !important;
+
+    border-top-color:
+        #bdc5e5
+        !important;
+
+    border-left-color:
+        #607dc4
+        !important;
+
+    border-right-color:
+        #5274c0
+        !important;
+}
+
+
+/* =========================================
+   HOVER
+========================================= */
+
+.player-database-card-grade:hover {
+    filter:
+        brightness(1.08);
+
+    transform:
+        translateY(-1px);
+}
+
+
+/* =========================================
+   SELECTED
+========================================= */
 
 .player-database-card-grade.selected {
-    color: #111;
-    background: #d5a342;
-    border-color: #d5a342;
-    box-shadow: 0 0 9px
-        rgba(213, 163, 66, 0.26);
+    z-index: 1;
+
+    box-shadow:
+        0 0 0 2px
+        #25c7f5,
+        0 0 10px
+        rgba(37, 199, 245, 0.45);
+
+    transform:
+        translateY(-1px);
 }
+
+/* =========================================
+   ADAPTATION
+========================================= */
 
 .player-database-card-adaptation-options {
     display: flex;
+
     gap: 5px;
 }
+
 
 .player-database-card-adaptation {
     min-width: 42px;
     height: 28px;
-    border: 1px solid
+
+    border:
+        1px solid
         rgba(255, 255, 255, 0.12);
+
     border-radius: 5px;
-    color: rgba(255, 255, 255, 0.68);
-    background: rgba(255, 255, 255, 0.04);
+
+    color:
+        rgba(255, 255, 255, 0.68);
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
     font-size: 10px;
     font-weight: 800;
+
     cursor: pointer;
 }
 
+
 .player-database-card-adaptation.selected {
     color: #111;
+
     background: #d5a342;
+
     border-color: #d5a342;
 }
 
+
+/* =========================================
+   CARD TEAM COLOR
+========================================= */
+
 .player-database-card-team-color {
     display: inline-flex;
+
     align-items: center;
+
     gap: 7px;
+
     margin-left: auto;
-    color: rgba(255, 255, 255, 0.52);
+
+    color:
+        rgba(255, 255, 255, 0.52);
+
     font-size: 10px;
     font-weight: 700;
 }
 
+
 .player-database-card-team-color-select {
     width: 58px;
     height: 28px;
-    padding: 0
+
+    padding:
+        0
         7px;
-    border: 1px solid
+
+    border:
+        1px solid
         rgba(213, 163, 66, 0.34);
+
     border-radius: 5px;
+
     outline: none;
+
     color: #d5a342;
-    background: rgba(255, 255, 255, 0.05);
+
+    background:
+        rgba(255, 255, 255, 0.05);
+
     font-size: 10px;
     font-weight: 800;
+
     cursor: pointer;
 }
 
+
 .player-database-card-team-color-select:focus {
-    border-color: rgba(213, 163, 66, 0.72);
-    box-shadow: 0 0 0 2px
+    border-color:
+        rgba(213, 163, 66, 0.72);
+
+    box-shadow:
+        0 0 0 2px
         rgba(213, 163, 66, 0.08);
 }
 
-.player-database-player-stat strong.stat-160,
-.player-database-player-summary-main b.stat-160,
-.stat-160 {
-    color: #56ead1 !important;
-    text-shadow: 0 0 5px
-        rgba(86, 234, 209, 0.38);
-}
+/* =========================================
+   PLAYER COMPARE
+========================================= */
 
 .player-database-player-item.compare-base {
-    border-color: rgba(213, 163, 66, 0.82);
-    background: linear-gradient(
+    border-color:
+        rgba(213, 163, 66, 0.82);
+
+    background:
+        linear-gradient(
             135deg,
             rgba(213, 163, 66, 0.09),
             rgba(213, 163, 66, 0.02)
         );
-    box-shadow: 0 0 0 1px
+
+    box-shadow:
+        0 0 0 1px
         rgba(213, 163, 66, 0.14),
 
         0 0 22px
         rgba(213, 163, 66, 0.09);
 }
 
+
+/* =========================================
+   COMPARE ACTION
+========================================= */
+
 .player-database-compare-button {
     min-width: 82px;
     height: 32px;
-    padding: 0
+
+    padding:
+        0
         14px;
-    border: 1px solid
+
+    border:
+        1px solid
         rgba(255, 255, 255, 0.14);
+
     border-radius: 6px;
-    color: rgba(255, 255, 255, 0.76);
-    background: rgba(255, 255, 255, 0.04);
+
+    color:
+        rgba(255, 255, 255, 0.76);
+
+    background:
+        rgba(255, 255, 255, 0.04);
+
     font-size: 11px;
     font-weight: 800;
+
     cursor: pointer;
-    transition: color 0.15s ease,
+
+    transition:
+        color 0.15s ease,
         border-color 0.15s ease,
         background 0.15s ease,
         transform 0.15s ease;
 }
 
+
 .player-database-compare-button:hover {
     color: #d5a342;
-    border-color: rgba(213, 163, 66, 0.58);
-    background: rgba(213, 163, 66, 0.07);
-    transform: translateY(-1px);
+
+    border-color:
+        rgba(213, 163, 66, 0.58);
+
+    background:
+        rgba(213, 163, 66, 0.07);
+
+    transform:
+        translateY(-1px);
 }
+
 
 .player-database-compare-button.selected {
     color: #171207;
+
     border-color: #d5a342;
+
     background: #d5a342;
-    box-shadow: 0 0 10px
+
+    box-shadow:
+        0 0 10px
         rgba(213, 163, 66, 0.24);
 }
 
@@ -11667,10 +12150,56 @@ body.site-auth-modal-open {
     }
 
     .player-database-player-row {
-        grid-template-columns: auto
+        grid-template-columns:
+            auto
+            30px
             minmax(0, 1fr)
-            auto !important;
-        gap: 5px;
+            auto
+            !important;
+
+        gap: 6px;
+
+        align-items: center;
+    }
+
+    .player-database-player-season {
+        grid-column: 1;
+
+        justify-self: start;
+    }
+
+
+    .player-database-player-position {
+        grid-column: 2;
+
+        width: 30px;
+        min-width: 30px;
+
+        justify-self: center;
+
+        font-size: 11px;
+
+        text-align: center;
+    }
+
+
+    .player-database-player-name {
+        grid-column: 3;
+
+        width: 100%;
+
+        justify-self: stretch;
+
+        text-align: center;
+
+        font-size: 14px;
+    }
+
+
+    .player-database-player-row-actions {
+        grid-column: 4;
+
+        justify-self: end;
     }
 
     .player-database-player-row-actions {
@@ -11932,10 +12461,11 @@ body.site-auth-modal-open {
     }
 
     .player-database-card-grade {
+        width: 30px;
         min-width: 30px;
-        height: 27px;
-        padding: 0 5px;
-        font-size: 9px;
+        height: 20px;
+
+        padding: 0;
     }
 
     .player-database-card-setting-bottom {
@@ -12205,6 +12735,16 @@ body.site-auth-modal-open {
 
 }
 
+@media (min-width: 701px) {
+
+    .player-database-player-photo-wrap {
+        width: calc(100% - 8px);
+
+        margin-left: 16px;
+    }
+
+}
+
 @media (max-width: 700px) {
     .player-database-player-detail-layout {
         grid-template-columns: 1fr;
@@ -12265,6 +12805,33 @@ body.site-auth-modal-open {
                 )
             );
     }
+
+    .player-database-market-price {
+        margin-top: 16px;
+
+        padding: 13px 12px;
+    }
+
+
+    .player-database-market-price-header {
+        align-items: flex-start;
+
+        flex-direction: column;
+
+        gap: 4px;
+    }
+
+
+    .player-database-market-price-current {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .player-database-market-price-value strong {
+        font-size: 18px;
+    }
+
 }
 
 @media (min-width: 651px) {
@@ -13253,6 +13820,409 @@ body.player-compare-open {
     font-weight: 800;
 }
 
+/* =========================================
+   COMPARE GRADE DROPDOWN
+========================================= */
+
+.player-compare-grade-dropdown {
+    position: relative;
+
+    flex: 1;
+
+    min-width: 0;
+}
+
+
+.player-compare-grade-dropdown > summary {
+    list-style: none;
+}
+
+
+.player-compare-grade-dropdown > summary::-webkit-details-marker {
+    display: none;
+}
+
+
+.player-compare-grade-trigger {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 100%;
+    height: 23px;
+
+    box-sizing: border-box;
+
+    cursor: pointer;
+
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+
+.player-compare-grade-menu {
+    position: absolute;
+
+    top: calc(100% + 5px);
+    left: 0;
+
+    z-index: 100;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            32px
+        );
+
+    gap: 4px;
+
+    width: max-content;
+
+    padding: 6px;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.12);
+
+    border-radius: 5px;
+
+    background:
+        rgba(10, 10, 10, 0.98);
+
+    box-shadow:
+        0 10px 28px
+        rgba(0, 0, 0, 0.55);
+}
+
+
+.player-compare-grade-option {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 22px;
+
+    padding: 0;
+
+    box-sizing: border-box;
+
+    border-radius: 0;
+
+    font-size: 7px;
+    font-weight: 900;
+
+    cursor: pointer;
+}
+
+
+.player-compare-grade-option.selected {
+    box-shadow:
+        0 0 0 2px
+        #25c7f5,
+        0 0 8px
+        rgba(37, 199, 245, 0.35);
+}
+
+
+/* 1강 */
+
+.player-compare-grade-trigger.grade-1,
+.player-compare-grade-option.grade-1,
+.player-compare-market-grade.grade-1 {
+    color:
+        #c5c8c9
+        !important;
+
+    background:
+        linear-gradient(
+            140deg,
+            #51545a 0%,
+            #51545a 0%,
+            #42464d 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #393a3c
+        !important;
+
+    border-top-color:
+        #62676d
+        !important;
+
+    border-left-color:
+        #62676d
+        !important;
+}
+
+
+/* 2 ~ 4강 */
+
+.player-compare-grade-trigger.grade-2,
+.player-compare-grade-trigger.grade-3,
+.player-compare-grade-trigger.grade-4,
+.player-compare-grade-option.grade-2,
+.player-compare-grade-option.grade-3,
+.player-compare-grade-option.grade-4,
+.player-compare-market-grade.grade-2,
+.player-compare-market-grade.grade-3,
+.player-compare-market-grade.grade-4 {
+    color:
+        #7e3f27
+        !important;
+
+    background:
+        linear-gradient(
+            140deg,
+            #de946b 0%,
+            #de946b 0%,
+            #ad5f42 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #864229
+        !important;
+
+    border-top-color:
+        #e4b7a2
+        !important;
+
+    border-left-color:
+        #e4b7a2
+        !important;
+}
+
+
+/* 5 ~ 7강 */
+
+.player-compare-grade-trigger.grade-5,
+.player-compare-grade-trigger.grade-6,
+.player-compare-grade-trigger.grade-7,
+.player-compare-grade-option.grade-5,
+.player-compare-grade-option.grade-6,
+.player-compare-grade-option.grade-7,
+.player-compare-market-grade.grade-5,
+.player-compare-market-grade.grade-6,
+.player-compare-market-grade.grade-7 {
+    color:
+        #4e545e
+        !important;
+
+    background:
+        linear-gradient(
+            140deg,
+            rgb(
+                216,
+                217,
+                220
+            )
+            0%,
+            rgb(
+                184,
+                189,
+                202
+            )
+            100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #a5a8ae
+        !important;
+
+    border-top-color:
+        #d8dadc
+        !important;
+
+    border-left-color:
+        #d8dadc
+        !important;
+}
+
+
+/* 8 ~ 10강 */
+
+.player-compare-grade-trigger.grade-8,
+.player-compare-grade-trigger.grade-9,
+.player-compare-grade-trigger.grade-10,
+.player-compare-grade-option.grade-8,
+.player-compare-grade-option.grade-9,
+.player-compare-grade-option.grade-10,
+.player-compare-market-grade.grade-8,
+.player-compare-market-grade.grade-9,
+.player-compare-market-grade.grade-10 {
+    color:
+        #695100
+        !important;
+
+    background:
+        linear-gradient(
+            140deg,
+            #f9dd62 0%,
+            #f9dd62 0%,
+            #dca908 100%
+        )
+        !important;
+
+    border:
+        1.5px solid
+        #cda000
+        !important;
+
+    border-top-color:
+        #e9d36c
+        !important;
+
+    border-left-color:
+        #e9d36c
+        !important;
+}
+
+
+/* 11 ~ 13강 */
+
+.player-compare-grade-trigger.grade-11,
+.player-compare-grade-trigger.grade-12,
+.player-compare-grade-trigger.grade-13,
+.player-compare-grade-option.grade-11,
+.player-compare-grade-option.grade-12,
+.player-compare-grade-option.grade-13,
+.player-compare-market-grade.grade-11,
+.player-compare-market-grade.grade-12,
+.player-compare-market-grade.grade-13 {
+    color:
+        #2d2b43
+        !important;
+
+    background:
+        url(
+            "https://ssl.nexon.com/s2/game/fc/online/obt/datacenter/bg_plt.png"
+        )
+        no-repeat
+        0
+        0
+        /
+        100%
+        100%
+        !important;
+
+    border:
+        1.5px solid
+        #5274c0
+        !important;
+
+    border-top-color:
+        #bdc5e5
+        !important;
+
+    border-left-color:
+        #607dc4
+        !important;
+}
+
+/* =========================================
+   COMPARE MARKET PRICE
+========================================= */
+
+.player-compare-market-price {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 8px;
+
+    margin-top: 7px;
+
+    padding-top: 7px;
+
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.055);
+}
+
+
+.player-compare-market-price-label {
+    flex-shrink: 0;
+
+    color:
+        rgba(255, 255, 255, 0.40);
+
+    font-size: 7px;
+    font-weight: 700;
+}
+
+
+.player-compare-market-price-info {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.player-compare-market-grade {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 29px;
+    height: 19px;
+
+    box-sizing: border-box;
+
+    flex-shrink: 0;
+
+    font-size: 7px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+
+.player-compare-market-price-info > strong {
+    overflow: hidden;
+
+    color:
+        rgba(255, 255, 255, 0.92);
+
+    font-size: 10px;
+    font-weight: 900;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.player-compare-market-price.loading
+.player-compare-market-price-info > strong {
+    color:
+        rgba(255, 255, 255, 0.42);
+
+    font-size: 8px;
+}
+
+
+.player-compare-market-price.error
+.player-compare-market-price-info > strong {
+    color: #dc7777;
+
+    font-size: 8px;
+}
+
 .player-compare-summary {
     display: grid;
     grid-template-columns: repeat(
@@ -13509,6 +14479,79 @@ body.player-compare-open {
         font-size: 7px;
     }
 
+    .player-compare-grade-trigger {
+        height: 20px;
+
+        font-size: 7px;
+    }
+
+
+    .player-compare-grade-menu {
+        grid-template-columns:
+            repeat(
+                4,
+                28px
+            );
+
+        gap: 3px;
+
+        padding: 5px;
+    }
+
+
+    .player-compare-grade-option {
+        width: 28px;
+        height: 20px;
+
+        font-size: 6px;
+    }
+
+
+    .player-compare-market-price {
+        align-items: flex-start;
+
+        margin-top: 5px;
+        padding-top: 5px;
+    }
+
+
+    .player-compare-market-price-label {
+        font-size: 6px;
+    }
+
+
+    .player-compare-market-grade {
+        width: 26px;
+        height: 18px;
+
+        font-size: 6px;
+    }
+
+    .player-compare-market-price-info {
+        flex: 1;
+
+        justify-content: flex-end;
+
+        min-width: 0;
+    }
+
+
+    .player-compare-market-price-info > strong {
+        overflow: visible;
+
+        max-width: none;
+
+        font-size: 8px;
+        line-height: 1.25;
+
+        text-align: right;
+
+        text-overflow: clip;
+        white-space: normal;
+
+        word-break: keep-all;
+    }
+
     .player-compare-summary {
         grid-template-columns: repeat(
                 3,
@@ -13696,9 +14739,28 @@ body.player-recommend-open {
 }
 
 .player-recommend-base-position {
-    color: #ff5c7d;
     font-size: 25px;
     font-weight: 900;
+}
+
+
+.player-recommend-base-position.position-fw {
+    color: #e87979;
+}
+
+
+.player-recommend-base-position.position-mf {
+    color: #6fc993;
+}
+
+
+.player-recommend-base-position.position-df {
+    color: #76a9e5;
+}
+
+
+.player-recommend-base-position.position-gk {
+    color: #e0c568;
 }
 
 .player-recommend-base-ovr {
@@ -13743,19 +14805,24 @@ body.player-recommend-open {
     margin-top: 10px;
 }
 
+.player-recommend-base-control,
 .player-recommend-base-controls label {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
 }
 
-.player-recommend-base-controls label span {
+.player-recommend-base-control > span,
+.player-recommend-base-controls label > span {
+    flex-shrink: 0;
     color: rgba(255,255,255,0.52);
     font-size: 11px;
     font-weight: 700;
 }
 
 .player-recommend-base-controls select {
+    min-width: 0;
     width: 100%;
     height: 28px;
     border: 1px solid rgba(213,163,66,0.28);
@@ -13766,6 +14833,17 @@ body.player-recommend-open {
     font-weight: 800;
 }
 
+.player-recommend-grade-dropdown {
+    min-width: 0;
+    width: 100%;
+}
+
+.player-recommend-grade-dropdown
+.player-compare-grade-trigger {
+    height: 28px;
+    font-size: 10px;
+}
+
 .player-recommend-base-summary {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -13774,9 +14852,17 @@ body.player-recommend-open {
 }
 
 .player-recommend-base-summary > div {
-    padding: 8px 6px;
+    min-width: 0;
+
+    padding:
+        8px
+        2px;
+
     text-align: center;
-    border-right: 1px solid rgba(255,255,255,0.05);
+
+    border-right:
+        1px solid
+        rgba(255,255,255,0.05);
 }
 
 .player-recommend-base-summary > div:last-child {
@@ -13785,16 +14871,74 @@ body.player-recommend-open {
 
 .player-recommend-base-summary span {
     display: block;
+
     margin-bottom: 4px;
-    color: rgba(255,255,255,0.48);
+
+    color:
+        rgba(255,255,255,0.48);
+
     font-size: 10px;
     font-weight: 700;
+
+    line-height: 1;
+
+    white-space: nowrap;
 }
 
 .player-recommend-base-summary strong {
     color: #cc69f2;
     font-size: 22px;
     font-weight: 900;
+}
+
+.player-recommend-market-price {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+
+    margin-top: 10px;
+    padding: 10px 6px 2px;
+
+    border-top:
+        1px solid
+        rgba(255,255,255,0.07);
+}
+
+.player-recommend-market-price-label {
+    color: rgba(255,255,255,0.50);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.player-recommend-market-price-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.player-recommend-market-price-info > strong {
+    overflow: hidden;
+
+    color: rgba(255,255,255,0.94);
+    font-size: 13px;
+    font-weight: 900;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-recommend-market-price.loading
+.player-recommend-market-price-info > strong {
+    color: rgba(255,255,255,0.45);
+    font-size: 11px;
+}
+
+.player-recommend-market-price.error
+.player-recommend-market-price-info > strong {
+    color: #dc7777;
+    font-size: 11px;
 }
 
 /* =========================================
@@ -13842,29 +14986,60 @@ body.player-recommend-open {
     background: rgba(130, 86, 255, 0.25);
 }
 
-.player-recommend-range-row {
-    display: grid;
-    gap: 8px;
-}
-
-.player-recommend-range-values {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 6px;
-    color: #ffffff;
-    font-size: 12px;
+.player-recommend-team-color-select {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid rgba(213,163,66,0.28);
+    border-radius: 4px;
+    outline: none;
+    color: #d7b461;
+    background: #141414;
+    font-size: 11px;
     font-weight: 800;
 }
 
+.player-recommend-ovr-select-row {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            2,
+            minmax(0, 1fr)
+        );
+    gap: 8px;
+}
+
+.player-recommend-ovr-select-row label {
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+}
+
+.player-recommend-ovr-select-row label span {
+    color: rgba(255,255,255,0.45);
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.player-recommend-ovr-select,
 .player-recommend-limit-select {
-    width: 92px;
     height: 30px;
+    padding: 0 7px;
     border: 1px solid rgba(213,163,66,0.28);
     border-radius: 4px;
+    outline: none;
     color: #d7b461;
     background: #141414;
     font-size: 12px;
     font-weight: 800;
+}
+
+.player-recommend-ovr-select {
+    width: 100%;
+}
+
+.player-recommend-limit-select {
+    width: 92px;
 }
 
 .player-recommend-filter-actions {

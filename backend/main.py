@@ -18,6 +18,7 @@ from backend.player_catalog import (
     recommend_player_catalog,
 )
 
+import re
 
 import httpx
 import psycopg
@@ -21998,437 +21999,6 @@ def get_season_champion():
             final_mvp,
     }
 
-# =========================
-# 기존 NEXON 경기
-# RESULT METHOD BACKFILL
-#
-# 기존 SERIES / MVP / 스쿼드는
-# 전혀 삭제하지 않고
-#
-# series_sets의
-# winner_side / result_method만
-# NEXON 원본으로 복구
-# =========================
-
-@app.post(
-    "/api/fconline/result-methods/backfill"
-)
-def backfill_fconline_result_methods(
-    limit: int = 10,
-):
-
-    # =========================
-    # 한 번에 너무 많은
-    # NEXON API 호출 방지
-    # =========================
-
-    safe_limit = max(
-        1,
-        min(
-            int(limit),
-            50,
-        ),
-    )
-
-
-    # =========================
-    # 아직 판별되지 않은 SET 조회
-    # =========================
-
-    with get_db_connection() as connection:
-
-        with connection.cursor() as cursor:
-
-            cursor.execute(
-                """
-                SELECT
-                    ss.id
-                        AS series_set_id,
-
-                    ss.series_id,
-                    ss.set_number,
-
-                    ss.nexon_match_id,
-
-                    ss.team_a_score,
-                    ss.team_b_score,
-
-                    ss.winner_side,
-                    ss.result_method,
-
-                    s.series_type,
-
-                    team_a.fc_nickname
-                        AS nickname_a,
-
-                    team_b.fc_nickname
-                        AS nickname_b
-
-                FROM series_sets AS ss
-
-                JOIN series AS s
-                    ON s.id =
-                        ss.series_id
-
-                JOIN participants AS team_a
-                    ON team_a.id =
-                        s.team_a_id
-
-                JOIN participants AS team_b
-                    ON team_b.id =
-                        s.team_b_id
-
-                WHERE
-                    ss.nexon_match_id
-                        IS NOT NULL
-
-                    AND
-                    ss.nexon_match_id
-                        <> ''
-
-                    AND
-                    ss.result_method
-                        IS NULL
-
-                ORDER BY
-                    ss.series_id ASC,
-                    ss.set_number ASC
-
-                LIMIT %s
-                """,
-                (
-                    safe_limit,
-                ),
-            )
-
-
-            target_sets = (
-                cursor.fetchall()
-            )
-
-
-    updated_count = 0
-    skipped_count = 0
-    failed_count = 0
-
-    details = []
-
-
-    # =========================
-    # NEXON 경기 상세 재조회
-    # =========================
-
-    for target_set in target_sets:
-
-        series_set_id = (
-            target_set[
-                "series_set_id"
-            ]
-        )
-
-
-        series_id = (
-            target_set[
-                "series_id"
-            ]
-        )
-
-
-        set_number = (
-            target_set[
-                "set_number"
-            ]
-        )
-
-
-        match_id = (
-            target_set[
-                "nexon_match_id"
-            ]
-        )
-
-
-        nickname_a = (
-            target_set[
-                "nickname_a"
-            ]
-        )
-
-
-        nickname_b = (
-            target_set[
-                "nickname_b"
-            ]
-        )
-
-
-        series_type = (
-            target_set[
-                "series_type"
-            ]
-        )
-
-
-        try:
-
-            # =========================
-            # NEXON 원본
-            # =========================
-
-            match_data = (
-                get_match_detail(
-                    match_id
-                )
-            )
-
-
-            # =========================
-            # 실제 경기 종료 방식
-            #
-            # 기존 SERIES의
-            # include_extra_time_result는
-            # 보지 않는다.
-            #
-            # 과거 실제 경기 자체가
-            # 연장/승부차기였는지를
-            # 복구하는 작업이므로 True
-            # =========================
-
-            result_method = (
-                get_match_result_method(
-                    match_data,
-                    nickname_a,
-                    nickname_b,
-                    series_type,
-                    True,
-                )
-            )
-
-
-            # =========================
-            # 실제 최종 승자
-            #
-            # 승부차기 경기의
-            # 기존 draw도 여기서 수정
-            # =========================
-
-            winner_side = (
-                get_match_winner_side(
-                    match_data,
-                    nickname_a,
-                    nickname_b,
-                    series_type,
-                    True,
-                )
-            )
-
-
-            if (
-                result_method is None
-                or
-                winner_side is None
-            ):
-
-                skipped_count += 1
-
-
-                details.append(
-                    {
-                        "series_id":
-                            series_id,
-
-                        "set":
-                            set_number,
-
-                        "match_id":
-                            match_id,
-
-                        "status":
-                            "skipped",
-
-                        "reason":
-                            (
-                                "경기 종료 방식 또는 "
-                                "승자 판별 실패"
-                            ),
-                    }
-                )
-
-
-                continue
-
-
-            # =========================
-            # 기존 SET 행만 UPDATE
-            #
-            # 점수 / MVP / 선수기록 /
-            # 스쿼드는 변경하지 않음
-            # =========================
-
-            with get_db_connection() as connection:
-
-                with connection.cursor() as cursor:
-
-                    cursor.execute(
-                        """
-                        UPDATE series_sets
-
-                        SET
-                            winner_side = %s,
-                            result_method = %s
-
-                        WHERE id = %s
-                        """,
-                        (
-                            winner_side,
-                            result_method,
-                            series_set_id,
-                        ),
-                    )
-
-
-                connection.commit()
-
-
-            updated_count += 1
-
-
-            details.append(
-                {
-                    "series_id":
-                        series_id,
-
-                    "set":
-                        set_number,
-
-                    "match_id":
-                        match_id,
-
-                    "status":
-                        "updated",
-
-                    "winner_side":
-                        winner_side,
-
-                    "result_method":
-                        result_method,
-                }
-            )
-
-
-        except Exception as error:
-
-            failed_count += 1
-
-
-            error_detail = (
-                getattr(
-                    error,
-                    "detail",
-                    None,
-                )
-                or
-                str(
-                    error
-                )
-                or
-                error.__class__.__name__
-            )
-
-
-            details.append(
-                {
-                    "series_id":
-                        series_id,
-
-                    "set":
-                        set_number,
-
-                    "match_id":
-                        match_id,
-
-                    "status":
-                        "failed",
-
-                    "reason":
-                        error_detail,
-                }
-            )
-
-
-        # NEXON API 연속 호출 간격
-        time.sleep(
-            0.1
-        )
-
-
-    # =========================
-    # 아직 남은 대상 수
-    # =========================
-
-    with get_db_connection() as connection:
-
-        with connection.cursor() as cursor:
-
-            cursor.execute(
-                """
-                SELECT
-                    COUNT(*) AS count
-
-                FROM series_sets
-
-                WHERE
-                    nexon_match_id
-                        IS NOT NULL
-
-                    AND
-                    nexon_match_id
-                        <> ''
-
-                    AND
-                    result_method
-                        IS NULL
-                """
-            )
-
-
-            remaining_row = (
-                cursor.fetchone()
-            )
-
-
-    remaining_count = int(
-        remaining_row[
-            "count"
-        ]
-    )
-
-
-    return {
-        "status":
-            "success",
-
-        "processed_count":
-            len(
-                target_sets
-            ),
-
-        "updated_count":
-            updated_count,
-
-        "skipped_count":
-            skipped_count,
-
-        "failed_count":
-            failed_count,
-
-        "remaining_count":
-            remaining_count,
-
-        "details":
-            details,
-    }
-
 
 # =========================
 # 완료된 SERIES 결과 조회
@@ -26894,6 +26464,221 @@ def get_player_database_teams(
 # FC ONLINE PLAYER DATABASE
 # =========================================
 
+# =========================================
+# FC ONLINE PLAYER MARKET PRICE
+# =========================================
+
+def get_fconline_player_market_prices(
+    sp_id: int,
+):
+
+    url = (
+        "https://m.fconline.nexon.com/"
+        "datacenter/playerinfo"
+    )
+
+
+    headers = {
+        "User-Agent":
+            (
+                "Mozilla/5.0 "
+                "(Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 "
+                "(KHTML, like Gecko) "
+                "Chrome/140.0.0.0 Safari/537.36"
+            ),
+
+        "Referer":
+            "https://m.fconline.nexon.com/",
+    }
+
+
+    try:
+
+        response = httpx.get(
+            url,
+            params={
+                "spid":
+                    sp_id,
+            },
+            headers=headers,
+            timeout=20.0,
+            follow_redirects=True,
+        )
+
+    except httpx.RequestError as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 데이터센터에 "
+                "연결할 수 없습니다."
+            ),
+        ) from error
+
+
+    if response.status_code != 200:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 데이터센터에서 "
+                "선수 시세를 불러오지 못했습니다."
+            ),
+        )
+
+
+    price_pattern = re.compile(
+        (
+            r'<span\b'
+            r'[^>]*'
+            r'class=["\']'
+            r'[^"\']*'
+            r'span_bp(\d+)'
+            r'[^"\']*'
+            r'["\']'
+            r'[^>]*>'
+            r'\s*'
+            r'([\d,]+)'
+            r'\s*BP'
+            r'\s*'
+            r'</span>'
+        ),
+        flags=re.IGNORECASE,
+    )
+
+
+    parsed_prices = {}
+
+
+    for match in price_pattern.finditer(
+        response.text
+    ):
+
+        grade = int(
+            match.group(1)
+        )
+
+
+        if (
+            grade < 1
+            or grade > 13
+        ):
+            continue
+
+
+        price = int(
+            match.group(2)
+                .replace(
+                    ",",
+                    "",
+                )
+        )
+
+
+        parsed_prices[
+            grade
+        ] = price
+
+
+    if not parsed_prices:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 데이터센터에서 "
+                "시세 정보를 찾을 수 없습니다."
+            ),
+        )
+
+
+    prices = []
+
+
+    for grade in range(
+        1,
+        14,
+    ):
+
+        prices.append(
+            {
+                "grade":
+                    grade,
+
+                "price":
+                    parsed_prices.get(
+                        grade
+                    ),
+            }
+        )
+
+
+    return prices
+
+
+@app.get(
+    "/api/player-database/price/{sp_id}"
+)
+def get_player_database_price_api(
+    sp_id: int,
+    grade: int = 1,
+):
+
+    if (
+        grade < 1
+        or grade > 13
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "강화 단계는 "
+                "1강부터 13강까지 가능합니다."
+            ),
+        )
+
+
+    prices = (
+        get_fconline_player_market_prices(
+            sp_id
+        )
+    )
+
+
+    selected_price = None
+
+
+    for price_data in prices:
+
+        if (
+            price_data["grade"]
+            == grade
+        ):
+
+            selected_price = (
+                price_data["price"]
+            )
+
+            break
+
+
+    return {
+        "sp_id":
+            sp_id,
+
+        "grade":
+            grade,
+
+        "current_price":
+            selected_price,
+
+        "prices":
+            prices,
+
+        "source":
+            "FC Online DataCenter",
+    }
+
 @app.get(
     "/api/player-database/search"
 )
@@ -27065,6 +26850,7 @@ def recommend_player_database_api(
     team_color: int = 0,
     position_mode: str = "same",
     salary_mode: str = "any",
+    team_color_id: int | None = None,
     ovr_min: int | None = None,
     ovr_max: int | None = None,
     limit: int = 10,
@@ -27090,6 +26876,9 @@ def recommend_player_database_api(
 
             salary_mode=
                 salary_mode,
+
+            team_color_id=
+                team_color_id,
 
             ovr_min=
                 ovr_min,

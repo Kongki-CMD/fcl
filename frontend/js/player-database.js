@@ -223,6 +223,9 @@ const recommendState = {
     selectedSalaryMode:
         "any",
 
+    selectedTeamColorId:
+        null,
+
     ovrMin:
         null,
 
@@ -250,6 +253,15 @@ const compareControlState = {
 };
 
 const playerDataBySpId =
+    new Map();
+
+const playerMarketPriceBySpId =
+    new Map();
+
+const playerMarketPriceLoadingSpIds =
+    new Set();
+
+const playerMarketPriceErrorBySpId =
     new Map();
 
 
@@ -1973,18 +1985,12 @@ function createPlayerGradeButtonsHtml(
                     index + 1;
 
 
-                const gradeTier =
-                    getGradeTierClass(
-                        grade
-                    );
-
-
                 return `
                     <button
                         type="button"
                         class="
                             player-database-card-grade
-                            ${gradeTier}
+                            grade-${grade}
                             ${
                                 grade === selectedGrade
                                     ? "selected"
@@ -1993,8 +1999,10 @@ function createPlayerGradeButtonsHtml(
                         "
                         data-card-grade="${grade}"
                         data-sp-id="${spId}"
+                        aria-label="${grade}강"
+                        title="${grade}강"
                     >
-                        +${grade}
+                         +${grade}
                     </button>
                 `;
             }
@@ -2265,6 +2273,351 @@ function createPlayerStatsHtml(
         );
 }
 
+function formatPlayerMarketPrice(
+    price
+) {
+
+    const numericPrice =
+        Number(
+            price
+        );
+
+
+    if (
+        !Number.isFinite(
+            numericPrice
+        )
+        ||
+        numericPrice <= 0
+    ) {
+        return "-";
+    }
+
+
+    return (
+        numericPrice
+            .toLocaleString(
+                "ko-KR"
+            )
+        +
+        " BP"
+    );
+}
+
+
+function createPlayerMarketPriceHtml(
+    player
+) {
+
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const state =
+        getPlayerCardState(
+            spId
+        );
+
+
+    const grade =
+        Number(
+            state.grade
+            ?? 1
+        );
+
+
+    const marketData =
+        playerMarketPriceBySpId.get(
+            spId
+        );
+
+
+    const isLoading =
+        playerMarketPriceLoadingSpIds
+            .has(
+                spId
+            );
+
+
+    const errorMessage =
+        playerMarketPriceErrorBySpId
+            .get(
+                spId
+            );
+
+
+    let contentHtml = "";
+
+
+    if (isLoading) {
+
+        contentHtml = `
+            <div
+                class="
+                    player-database-market-price-status
+                    loading
+                "
+            >
+                FC Online 시세를 불러오는 중입니다.
+            </div>
+        `;
+
+    } else if (errorMessage) {
+
+        contentHtml = `
+            <div
+                class="
+                    player-database-market-price-status
+                    error
+                "
+            >
+                ${escapeHtml(
+                    errorMessage
+                )}
+            </div>
+        `;
+
+    } else if (marketData) {
+
+        const priceData =
+            (
+                marketData.prices
+                ??
+                []
+            )
+                .find(
+                    item =>
+                        Number(
+                            item.grade
+                        )
+                        ===
+                        grade
+                );
+
+
+        const price =
+            priceData
+                ?.price
+            ??
+            null;
+
+
+        contentHtml = `
+            <div
+                class="player-database-market-price-current"
+            >
+
+                <div
+                    class="player-database-market-price-grade"
+                >
+                    <span>
+                        현재 선택 강화
+                    </span>
+
+                    <strong>
+                        +${grade}
+                    </strong>
+                </div>
+
+
+                <div
+                    class="player-database-market-price-value"
+                >
+                    <span>
+                        데이터센터 기준 시세
+                    </span>
+
+                    <strong>
+                        ${formatPlayerMarketPrice(
+                            price
+                        )}
+                    </strong>
+                </div>
+
+            </div>
+        `;
+
+    } else {
+
+        contentHtml = `
+            <div
+                class="
+                    player-database-market-price-status
+                    waiting
+                "
+            >
+                선수 상세정보를 열면 시세를 조회합니다.
+            </div>
+        `;
+    }
+
+
+    return `
+        <section
+            class="player-database-market-price"
+            data-market-price
+            data-sp-id="${spId}"
+        >
+
+            <div
+                class="player-database-market-price-header"
+            >
+
+                <div>
+                    <strong>
+                        이적시장 시세
+                    </strong>
+
+                    <span>
+                        FC Online DataCenter
+                    </span>
+                </div>
+
+
+                ${
+                    marketData
+                        ? `
+                            <small>
+                                1 ~ 13강 시세 조회 완료
+                            </small>
+                        `
+                        : ""
+                }
+
+            </div>
+
+
+            ${contentHtml}
+
+        </section>
+    `;
+}
+
+
+async function loadPlayerMarketPrice(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    if (
+        !Number.isInteger(
+            numericSpId
+        )
+    ) {
+        return;
+    }
+
+
+    if (
+        playerMarketPriceBySpId
+            .has(
+                numericSpId
+            )
+    ) {
+        return;
+    }
+
+
+    if (
+        playerMarketPriceLoadingSpIds
+            .has(
+                numericSpId
+            )
+    ) {
+        return;
+    }
+
+
+    playerMarketPriceLoadingSpIds
+        .add(
+            numericSpId
+        );
+
+
+    playerMarketPriceErrorBySpId
+        .delete(
+            numericSpId
+        );
+
+
+    rerenderPlayerCard(
+        numericSpId
+    );
+
+
+    try {
+
+        const response =
+            await fetch(
+                (
+                    `${apiBaseUrl}`
+                    +
+                    `/api/player-database/price/`
+                    +
+                    `${numericSpId}`
+                )
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "시세 조회에 실패했습니다."
+            );
+        }
+
+
+        playerMarketPriceBySpId
+            .set(
+                numericSpId,
+                data
+            );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        playerMarketPriceErrorBySpId
+            .set(
+                numericSpId,
+                (
+                    error.message
+                    ??
+                    "시세 조회에 실패했습니다."
+                )
+            );
+
+    } finally {
+
+        playerMarketPriceLoadingSpIds
+            .delete(
+                numericSpId
+            );
+
+
+        rerenderPlayerCard(
+            numericSpId
+        );
+    }
+}
+
 
 function createPlayerCardHtml(
     player
@@ -2437,6 +2790,20 @@ function createPlayerCardHtml(
                     loading="lazy"
                 >
 
+            </span>
+
+            <span
+                class="
+                    player-database-player-position
+                    ${getPositionGroupClass(
+                        player.position
+                    )}
+                "
+            >
+                ${escapeHtml(
+                    player.position
+                    ?? "-"
+                )}
             </span>
 
 
@@ -2719,6 +3086,14 @@ function createPlayerCardHtml(
                             )}
 
                         </div>
+
+                        <!-- =========================
+                            이적시장 시세
+                        ========================== -->
+
+                        ${createPlayerMarketPriceHtml(
+                            player
+                        )}
 
                     </div>
 
@@ -3123,6 +3498,434 @@ function getRecommendBasePlayer(
 
 let recommendationRows = [];
 
+function createRecommendGradeOptionsHtml(
+    selectedGrade
+) {
+    return Array
+        .from(
+            {
+                length: 13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const grade =
+                    index + 1;
+
+
+                return `
+                    <button
+                        type="button"
+                        class="
+                            player-compare-grade-option
+                            grade-${grade}
+                            ${
+                                grade
+                                === Number(
+                                    selectedGrade
+                                )
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-recommend-base-grade="${grade}"
+                        aria-label="${grade}강"
+                        title="${grade}강"
+                    >
+                        +${grade}
+                    </button>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function createRecommendGradeDropdownHtml(
+    selectedGrade
+) {
+    const grade =
+        Number(
+            selectedGrade
+            ?? 1
+        );
+
+
+    return `
+        <details
+            class="
+                player-compare-grade-dropdown
+                player-recommend-grade-dropdown
+            "
+        >
+
+            <summary
+                class="
+                    player-compare-grade-trigger
+                    grade-${grade}
+                "
+                aria-label="${grade}강 선택"
+                title="${grade}강"
+            >
+                +${grade}
+            </summary>
+
+
+            <div
+                class="player-compare-grade-menu"
+            >
+
+                ${createRecommendGradeOptionsHtml(
+                    grade
+                )}
+
+            </div>
+
+        </details>
+    `;
+}
+
+
+function createRecommendTeamColorOptionsHtml(
+    selectedTeamColorId
+) {
+    const selectedId =
+        (
+            selectedTeamColorId
+            === null
+            ||
+            selectedTeamColorId
+            === undefined
+            ||
+            selectedTeamColorId
+            === ""
+        )
+            ? null
+            : Number(
+                selectedTeamColorId
+            );
+
+
+    const groupHtml =
+        teamGroups
+            .map(
+                group => {
+
+                    const optionHtml =
+                        (
+                            group.teams
+                            ?? []
+                        )
+                            .map(
+                                team => {
+
+                                    const teamColorId =
+                                        Number(
+                                            team.team_color_id
+                                        );
+
+
+                                    return `
+                                        <option
+                                            value="${teamColorId}"
+                                            ${
+                                                selectedId
+                                                === teamColorId
+                                                    ? "selected"
+                                                    : ""
+                                            }
+                                        >
+                                            ${escapeHtml(
+                                                team.team_name
+                                            )}
+                                        </option>
+                                    `;
+                                }
+                            )
+                            .join(
+                                ""
+                            );
+
+
+                    if (!optionHtml) {
+                        return "";
+                    }
+
+
+                    return `
+                        <optgroup
+                            label="${escapeHtml(
+                                group.league_name
+                                ?? "기타"
+                            )}"
+                        >
+                            ${optionHtml}
+                        </optgroup>
+                    `;
+                }
+            )
+            .join(
+                ""
+            );
+
+
+    return `
+        <option
+            value=""
+            ${
+                selectedId === null
+                    ? "selected"
+                    : ""
+            }
+        >
+            전체 팀컬러
+        </option>
+
+        ${groupHtml}
+    `;
+}
+
+
+function createRecommendOvrOptionsHtml(
+    minimum,
+    maximum,
+    selectedValue
+) {
+    const start =
+        Math.max(
+            0,
+            Number(
+                minimum
+                ?? 0
+            )
+        );
+
+
+    const end =
+        Math.max(
+            start,
+            Number(
+                maximum
+                ?? start
+            )
+        );
+
+
+    const selected =
+        Number(
+            selectedValue
+            ?? start
+        );
+
+
+    return Array
+        .from(
+            {
+                length:
+                    (
+                        end
+                        -
+                        start
+                        +
+                        1
+                    ),
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const value =
+                    start + index;
+
+
+                return `
+                    <option
+                        value="${value}"
+                        ${
+                            value === selected
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        ${value}
+                    </option>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function createRecommendMarketPriceHtml(
+    player
+) {
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const grade =
+        Number(
+            player.grade
+            ?? 1
+        );
+
+
+    const marketData =
+        playerMarketPriceBySpId
+            .get(
+                spId
+            );
+
+
+    const isLoading =
+        playerMarketPriceLoadingSpIds
+            .has(
+                spId
+            );
+
+
+    const errorMessage =
+        playerMarketPriceErrorBySpId
+            .get(
+                spId
+            );
+
+
+    let statusClass =
+        "";
+
+    let priceText =
+        "-";
+
+
+    if (isLoading) {
+
+        statusClass =
+            "loading";
+
+        priceText =
+            "불러오는 중...";
+
+    } else if (errorMessage) {
+
+        statusClass =
+            "error";
+
+        priceText =
+            "시세 조회 실패";
+
+    } else if (marketData) {
+
+        const priceData =
+            (
+                marketData.prices
+                ?? []
+            )
+                .find(
+                    item =>
+                        Number(
+                            item.grade
+                        )
+                        === grade
+                );
+
+
+        priceText =
+            formatPlayerMarketPrice(
+                priceData?.price
+            );
+
+    } else {
+
+        priceText =
+            "조회 대기";
+    }
+
+
+    return `
+        <div
+            class="
+                player-recommend-market-price
+                ${statusClass}
+            "
+            data-recommend-market-price
+        >
+
+            <span
+                class="player-recommend-market-price-label"
+            >
+                이적시장 시세
+            </span>
+
+
+            <div
+                class="player-recommend-market-price-info"
+            >
+
+                <span
+                    class="
+                        player-compare-market-grade
+                        grade-${grade}
+                    "
+                >
+                    +${grade}
+                </span>
+
+
+                <strong>
+                    ${escapeHtml(
+                        priceText
+                    )}
+                </strong>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+function refreshRecommendMarketPrice() {
+
+    const marketPriceElement =
+        playerRecommendContentElement
+            ?.querySelector(
+                "[data-recommend-market-price]"
+            );
+
+
+    if (!marketPriceElement) {
+        return;
+    }
+
+
+    const basePlayer =
+        getRecommendBasePlayer(
+            recommendState
+                .basePlayerSpId
+        );
+
+
+    if (!basePlayer) {
+        return;
+    }
+
+
+    marketPriceElement.outerHTML =
+        createRecommendMarketPriceHtml(
+            basePlayer
+        );
+}
+
 function createRecommendBasePlayerHtml(
     player
 ) {
@@ -3219,8 +4022,17 @@ function createRecommendBasePlayerHtml(
                         </div>
 
                         <div class="player-recommend-base-meta-row">
-                            <span class="player-recommend-base-position">
-                                ${escapeHtml(player.position)}
+                            <span
+                                class="
+                                    player-recommend-base-position
+                                    ${getPositionGroupClass(
+                                        player.position
+                                    )}
+                                "
+                            >
+                                ${escapeHtml(
+                                    player.position
+                                )}
                             </span>
 
                             <strong class="player-recommend-base-ovr">
@@ -3257,16 +4069,17 @@ function createRecommendBasePlayerHtml(
                 </div>
 
                 <div class="player-recommend-base-controls">
-                    <label>
-                        <span>강화</span>
-                        <select
-                            data-recommend-base-grade
-                        >
-                            ${createCompareGradeSelectOptionsHtml(
-                                player.grade
-                            )}
-                        </select>
-                    </label>
+                    <div
+                        class="player-recommend-base-control"
+                    >
+                        <span>
+                            강화
+                        </span>
+
+                        ${createRecommendGradeDropdownHtml(
+                            player.grade
+                        )}
+                    </div>
 
                     <label>
                         <span>적응도</span>
@@ -3385,6 +4198,10 @@ function createRecommendBasePlayerHtml(
 
                 </div>
 
+                ${createRecommendMarketPriceHtml(
+                    player
+                )}
+
             </div>
         </section>
     `;
@@ -3393,7 +4210,6 @@ function createRecommendBasePlayerHtml(
 function createRecommendFilterPanelHtml(
     player
 ) {
-
     const playerOvr =
         Number(
             player.ovr
@@ -3531,41 +4347,30 @@ function createRecommendFilterPanelHtml(
                         이하
                     </button>
 
-
-                    <button
-                        type="button"
-                        class="
-                            player-recommend-chip
-                            ${
-                                recommendState.selectedSalaryMode
-                                === "plus_1"
-                                    ? "selected"
-                                    : ""
-                            }
-                        "
-                        data-recommend-salary-mode="plus_1"
-                    >
-                        +1
-                    </button>
-
-
-                    <button
-                        type="button"
-                        class="
-                            player-recommend-chip
-                            ${
-                                recommendState.selectedSalaryMode
-                                === "plus_2"
-                                    ? "selected"
-                                    : ""
-                            }
-                        "
-                        data-recommend-salary-mode="plus_2"
-                    >
-                        +2
-                    </button>
-
                 </div>
+
+            </div>
+
+
+            <!-- =================================
+                 TEAM COLOR
+            ================================== -->
+
+            <div class="player-recommend-filter-group">
+
+                <span class="player-recommend-filter-label">
+                    팀컬러
+                </span>
+
+
+                <select
+                    class="player-recommend-team-color-select"
+                    data-recommend-team-color
+                >
+                    ${createRecommendTeamColorOptionsHtml(
+                        recommendState.selectedTeamColorId
+                    )}
+                </select>
 
             </div>
 
@@ -3581,37 +4386,44 @@ function createRecommendFilterPanelHtml(
                 </span>
 
 
-                <div class="player-recommend-range-row">
+                <div
+                    class="player-recommend-ovr-select-row"
+                >
 
-                    <input
-                        type="range"
-                        min="${rangeMin}"
-                        max="${rangeMax}"
-                        value="${recommendState.ovrMin}"
-                        data-recommend-ovr-min
-                    >
+                    <label>
+                        <span>
+                            최소
+                        </span>
+
+                        <select
+                            class="player-recommend-ovr-select"
+                            data-recommend-ovr-min
+                        >
+                            ${createRecommendOvrOptionsHtml(
+                                rangeMin,
+                                rangeMax,
+                                recommendState.ovrMin
+                            )}
+                        </select>
+                    </label>
 
 
-                    <input
-                        type="range"
-                        min="${rangeMin}"
-                        max="${rangeMax}"
-                        value="${recommendState.ovrMax}"
-                        data-recommend-ovr-max
-                    >
+                    <label>
+                        <span>
+                            최대
+                        </span>
 
-                </div>
-
-
-                <div class="player-recommend-range-values">
-
-                    <span data-recommend-ovr-min-value>
-                        ${recommendState.ovrMin}
-                    </span>
-
-                    <span data-recommend-ovr-max-value>
-                        ${recommendState.ovrMax}
-                    </span>
+                        <select
+                            class="player-recommend-ovr-select"
+                            data-recommend-ovr-max
+                        >
+                            ${createRecommendOvrOptionsHtml(
+                                rangeMin,
+                                rangeMax,
+                                recommendState.ovrMax
+                            )}
+                        </select>
+                    </label>
 
                 </div>
 
@@ -4137,6 +4949,21 @@ async function loadPlayerRecommendations(
             .selectedSalaryMode
     );
 
+    if (
+        recommendState.selectedTeamColorId
+        !== null
+    ) {
+
+        params.set(
+            "team_color_id",
+            String(
+                recommendState
+                    .selectedTeamColorId
+            )
+        );
+    }
+
+
 
     if (
         recommendState.ovrMin
@@ -4365,6 +5192,10 @@ function openPlayerRecommendModal(
         .selectedSalaryMode =
             "any";
 
+    recommendState
+        .selectedTeamColorId =
+            null;
+
 
     recommendState.limit =
         10;
@@ -4416,6 +5247,40 @@ function openPlayerRecommendModal(
         .add(
             "player-recommend-open"
         );
+
+    const marketPricePromise =
+        loadPlayerMarketPrice(
+            Number(
+                spId
+            )
+        );
+
+
+    refreshRecommendMarketPrice();
+
+
+    marketPricePromise
+        .finally(
+            () => {
+
+                if (
+                    Number(
+                        recommendState
+                            .basePlayerSpId
+                    )
+                    !==
+                    Number(
+                        spId
+                    )
+                ) {
+                    return;
+                }
+
+
+                refreshRecommendMarketPrice();
+            }
+        );
+
 }
 
 function closePlayerRecommendModal() {
@@ -4955,26 +5820,25 @@ function createCompareGradeOptionsHtml(
                     index + 1;
 
 
-                const tierClass =
-                    getGradeTierClass(
-                        grade
-                    );
-
-
                 return `
                     <button
                         type="button"
                         class="
-                            player-compare-grade-button
-                            ${tierClass}
+                            player-compare-grade-option
+                            grade-${grade}
                             ${
-                                grade === selectedGrade
+                                grade
+                                === Number(
+                                    selectedGrade
+                                )
                                     ? "selected"
                                     : ""
                             }
                         "
                         data-compare-grade="${grade}"
                         data-compare-side="${side}"
+                        aria-label="${grade}강"
+                        title="${grade}강"
                     >
                         +${grade}
                     </button>
@@ -4986,6 +5850,49 @@ function createCompareGradeOptionsHtml(
         );
 }
 
+function createCompareGradeDropdownHtml(
+    side,
+    selectedGrade
+) {
+
+    const grade =
+        Number(
+            selectedGrade
+            ?? 1
+        );
+
+
+    return `
+        <details
+            class="player-compare-grade-dropdown"
+        >
+
+            <summary
+                class="
+                    player-compare-grade-trigger
+                    grade-${grade}
+                "
+                aria-label="${grade}강 선택"
+                title="${grade}강"
+            >
+                +${grade}
+            </summary>
+
+
+            <div
+                class="player-compare-grade-menu"
+            >
+
+                ${createCompareGradeOptionsHtml(
+                    side,
+                    grade
+                )}
+
+            </div>
+
+        </details>
+    `;
+}
 
 function createCompareFootHtml(
     player
@@ -5139,6 +6046,133 @@ function createCompareAdaptationSelectOptionsHtml(
         .join(
             ""
         );
+}
+
+function createCompareMarketPriceHtml(
+    player
+) {
+
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const grade =
+        Number(
+            player.grade
+            ?? 1
+        );
+
+
+    const marketData =
+        playerMarketPriceBySpId
+            .get(
+                spId
+            );
+
+
+    const isLoading =
+        playerMarketPriceLoadingSpIds
+            .has(
+                spId
+            );
+
+
+    const errorMessage =
+        playerMarketPriceErrorBySpId
+            .get(
+                spId
+            );
+
+
+    let priceText =
+        "-";
+
+
+    let statusClass =
+        "";
+
+
+    if (isLoading) {
+
+        priceText =
+            "불러오는 중...";
+
+        statusClass =
+            "loading";
+
+    } else if (errorMessage) {
+
+        priceText =
+            "조회 실패";
+
+        statusClass =
+            "error";
+
+    } else if (marketData) {
+
+        const priceData =
+            (
+                marketData.prices
+                ??
+                []
+            )
+                .find(
+                    item =>
+                        Number(
+                            item.grade
+                        )
+                        === grade
+                );
+
+
+        priceText =
+            formatPlayerMarketPrice(
+                priceData?.price
+            );
+    }
+
+
+    return `
+        <div
+            class="
+                player-compare-market-price
+                ${statusClass}
+            "
+        >
+
+            <span
+                class="player-compare-market-price-label"
+            >
+                이적시장 시세
+            </span>
+
+
+            <div
+                class="player-compare-market-price-info"
+            >
+
+                <span
+                    class="
+                        player-compare-market-grade
+                        grade-${grade}
+                    "
+                >
+                    +${grade}
+                </span>
+
+
+                <strong>
+                    ${escapeHtml(
+                        priceText
+                    )}
+                </strong>
+
+            </div>
+
+        </div>
+    `;
 }
 
 function createComparePlayerSummaryHtml(
@@ -5298,24 +6332,24 @@ function createComparePlayerSummaryHtml(
             <div class="player-compare-compact-controls">
 
 
-                <label class="player-compare-compact-control">
+                <div
+                    class="
+                        player-compare-compact-control
+                        player-compare-grade-control
+                    "
+                >
 
                     <span>
                         강화
                     </span>
 
-                    <select
-                        data-compare-grade
-                        data-compare-side="${side}"
-                    >
 
-                        ${createCompareGradeSelectOptionsHtml(
-                            player.grade
-                        )}
+                    ${createCompareGradeDropdownHtml(
+                        side,
+                        player.grade
+                    )}
 
-                    </select>
-
-                </label>
+                </div>
 
 
                 <label class="player-compare-compact-control">
@@ -5358,6 +6392,10 @@ function createComparePlayerSummaryHtml(
                 </label>
 
             </div>
+
+            ${createCompareMarketPriceHtml(
+                player
+            )}
 
         </article>
     `;
@@ -6376,22 +7414,47 @@ function openPlayerCompareModal(
     targetSpId
 ) {
 
-    compareState.basePlayerSpId =
+    const numericBaseSpId =
         Number(
             baseSpId
         );
 
 
-    compareState.targetPlayerSpId =
+    const numericTargetSpId =
         Number(
             targetSpId
         );
+
+
+    compareState.basePlayerSpId =
+        numericBaseSpId;
+
+
+    compareState.targetPlayerSpId =
+        numericTargetSpId;
+
 
     compareState.activePosition =
         "all";
 
 
     initializeCompareControlState();
+
+
+    const marketPricePromise =
+        Promise.all(
+            [
+                loadPlayerMarketPrice(
+                    numericBaseSpId
+                ),
+
+                loadPlayerMarketPrice(
+                    numericTargetSpId
+                ),
+            ]
+        );
+
+
     renderPlayerCompareModal();
 
 
@@ -6403,6 +7466,45 @@ function openPlayerCompareModal(
         .classList
         .add(
             "player-compare-open"
+        );
+
+
+    marketPricePromise
+        .then(
+            () => {
+
+                if (
+                    playerCompareModalElement
+                        .hidden
+                ) {
+                    return;
+                }
+
+
+                if (
+                    compareState
+                        .basePlayerSpId
+                    !== numericBaseSpId
+                    ||
+                    compareState
+                        .targetPlayerSpId
+                    !== numericTargetSpId
+                ) {
+                    return;
+                }
+
+
+                renderPlayerCompareModal();
+            }
+        )
+        .catch(
+            error => {
+
+                console.error(
+                    error
+                );
+
+            }
         );
 }
 
@@ -7355,6 +8457,85 @@ playerRecommendModalElement
         "click",
         event => {
 
+            const gradeButtonElement =
+                event.target.closest(
+                    "button[data-recommend-base-grade]"
+                );
+
+
+            if (!gradeButtonElement) {
+                return;
+            }
+
+
+            const baseSpId =
+                Number(
+                    recommendState
+                        .basePlayerSpId
+                );
+
+
+            const grade =
+                Number(
+                    gradeButtonElement
+                        .dataset
+                        .recommendBaseGrade
+                );
+
+
+            const cardState =
+                getPlayerCardState(
+                    baseSpId
+                );
+
+
+            cardState.grade =
+                grade;
+
+
+            const adjustedBasePlayer =
+                getRecommendBasePlayer(
+                    baseSpId
+                );
+
+
+            if (adjustedBasePlayer) {
+
+                recommendState.ovrMin =
+                    Math.max(
+                        0,
+                        Number(
+                            adjustedBasePlayer.ovr
+                            ?? 0
+                        )
+                        -
+                        10
+                    );
+
+
+                recommendState.ovrMax =
+                    (
+                        Number(
+                            adjustedBasePlayer.ovr
+                            ?? 0
+                        )
+                        +
+                        10
+                    );
+            }
+
+
+            renderPlayerRecommendModal();
+
+            refreshRecommendMarketPrice();
+        }
+    );
+
+playerRecommendModalElement
+    ?.addEventListener(
+        "click",
+        event => {
+
             const salaryButtonElement =
                 event.target.closest(
                     "button[data-recommend-salary-mode]"
@@ -7400,149 +8581,26 @@ playerRecommendModalElement
 
 playerRecommendModalElement
     ?.addEventListener(
-        "input",
-        event => {
-
-            const minInputElement =
-                event.target.closest(
-                    "input[data-recommend-ovr-min]"
-                );
-
-
-            const maxInputElement =
-                event.target.closest(
-                    "input[data-recommend-ovr-max]"
-                );
-
-
-            if (
-                !minInputElement
-                &&
-                !maxInputElement
-            ) {
-
-                return;
-            }
-
-
-            const currentMinElement =
-                playerRecommendModalElement
-                    .querySelector(
-                        "input[data-recommend-ovr-min]"
-                    );
-
-
-            const currentMaxElement =
-                playerRecommendModalElement
-                    .querySelector(
-                        "input[data-recommend-ovr-max]"
-                    );
-
-
-            if (
-                !currentMinElement
-                ||
-                !currentMaxElement
-            ) {
-
-                return;
-            }
-
-
-            let minimumValue =
-                Number(
-                    currentMinElement.value
-                );
-
-
-            let maximumValue =
-                Number(
-                    currentMaxElement.value
-                );
-
-
-            if (
-                minimumValue
-                >
-                maximumValue
-            ) {
-
-                if (
-                    minInputElement
-                ) {
-
-                    minimumValue =
-                        maximumValue;
-
-
-                    currentMinElement.value =
-                        String(
-                            minimumValue
-                        );
-
-                } else {
-
-                    maximumValue =
-                        minimumValue;
-
-
-                    currentMaxElement.value =
-                        String(
-                            maximumValue
-                        );
-                }
-            }
-
-
-            recommendState.ovrMin =
-                minimumValue;
-
-
-            recommendState.ovrMax =
-                maximumValue;
-
-
-            const minimumTextElement =
-                playerRecommendModalElement
-                    .querySelector(
-                        "[data-recommend-ovr-min-value]"
-                    );
-
-
-            const maximumTextElement =
-                playerRecommendModalElement
-                    .querySelector(
-                        "[data-recommend-ovr-max-value]"
-                    );
-
-
-            if (
-                minimumTextElement
-            ) {
-
-                minimumTextElement.textContent =
-                    String(
-                        minimumValue
-                    );
-            }
-
-
-            if (
-                maximumTextElement
-            ) {
-
-                maximumTextElement.textContent =
-                    String(
-                        maximumValue
-                    );
-            }
-        }
-    );
-
-playerRecommendModalElement
-    ?.addEventListener(
         "change",
         event => {
+
+            const teamColorSelectElement =
+                event.target.closest(
+                    "select[data-recommend-team-color]"
+                );
+
+
+            const minSelectElement =
+                event.target.closest(
+                    "select[data-recommend-ovr-min]"
+                );
+
+
+            const maxSelectElement =
+                event.target.closest(
+                    "select[data-recommend-ovr-max]"
+                );
+
 
             const limitSelectElement =
                 event.target.closest(
@@ -7550,15 +8608,144 @@ playerRecommendModalElement
                 );
 
 
-            if (!limitSelectElement) {
+            if (
+                !teamColorSelectElement
+                &&
+                !minSelectElement
+                &&
+                !maxSelectElement
+                &&
+                !limitSelectElement
+            ) {
                 return;
             }
 
 
-            recommendState.limit =
-                Number(
-                    limitSelectElement.value
-                );
+            // =================================
+            // 팀컬러
+            // =================================
+
+            if (
+                teamColorSelectElement
+            ) {
+
+                const value =
+                    teamColorSelectElement
+                        .value;
+
+
+                recommendState
+                    .selectedTeamColorId =
+                        value === ""
+                            ? null
+                            : Number(
+                                value
+                            );
+
+                return;
+            }
+
+
+            // =================================
+            // OVR 최소 / 최대
+            // =================================
+
+            if (
+                minSelectElement
+                ||
+                maxSelectElement
+            ) {
+
+                const currentMinElement =
+                    playerRecommendModalElement
+                        .querySelector(
+                            "select[data-recommend-ovr-min]"
+                        );
+
+
+                const currentMaxElement =
+                    playerRecommendModalElement
+                        .querySelector(
+                            "select[data-recommend-ovr-max]"
+                        );
+
+
+                if (
+                    !currentMinElement
+                    ||
+                    !currentMaxElement
+                ) {
+                    return;
+                }
+
+
+                let minimumValue =
+                    Number(
+                        currentMinElement.value
+                    );
+
+
+                let maximumValue =
+                    Number(
+                        currentMaxElement.value
+                    );
+
+
+                if (
+                    minimumValue
+                    >
+                    maximumValue
+                ) {
+
+                    if (
+                        minSelectElement
+                    ) {
+
+                        maximumValue =
+                            minimumValue;
+
+                        currentMaxElement.value =
+                            String(
+                                maximumValue
+                            );
+
+                    } else {
+
+                        minimumValue =
+                            maximumValue;
+
+                        currentMinElement.value =
+                            String(
+                                minimumValue
+                            );
+                    }
+                }
+
+
+                recommendState.ovrMin =
+                    minimumValue;
+
+
+                recommendState.ovrMax =
+                    maximumValue;
+
+                return;
+            }
+
+
+            // =================================
+            // 추천 수
+            // =================================
+
+            if (
+                limitSelectElement
+            ) {
+
+                recommendState.limit =
+                    Number(
+                        limitSelectElement.value
+                    );
+            }
         }
     );
 
@@ -7566,12 +8753,6 @@ playerRecommendModalElement
     ?.addEventListener(
         "change",
         event => {
-
-            const gradeSelectElement =
-                event.target.closest(
-                    "select[data-recommend-base-grade]"
-                );
-
 
             const adaptationSelectElement =
                 event.target.closest(
@@ -7586,13 +8767,10 @@ playerRecommendModalElement
 
 
             if (
-                !gradeSelectElement
-                &&
                 !adaptationSelectElement
                 &&
                 !teamColorSelectElement
             ) {
-
                 return;
             }
 
@@ -7610,25 +8788,6 @@ playerRecommendModalElement
                 );
 
 
-            // =================================
-            // 강화
-            // =================================
-
-            if (
-                gradeSelectElement
-            ) {
-
-                cardState.grade =
-                    Number(
-                        gradeSelectElement.value
-                    );
-            }
-
-
-            // =================================
-            // 적응도
-            // =================================
-
             if (
                 adaptationSelectElement
             ) {
@@ -7640,10 +8799,6 @@ playerRecommendModalElement
             }
 
 
-            // =================================
-            // 팀컬러
-            // =================================
-
             if (
                 teamColorSelectElement
             ) {
@@ -7654,10 +8809,6 @@ playerRecommendModalElement
                     );
             }
 
-
-            // =================================
-            // 변경된 기준 선수
-            // =================================
 
             const adjustedBasePlayer =
                 getRecommendBasePlayer(
@@ -7693,11 +8844,9 @@ playerRecommendModalElement
             }
 
 
-            // =================================
-            // 추천창 전체 다시 계산
-            // =================================
-
             renderPlayerRecommendModal();
+
+            refreshRecommendMarketPrice();
         }
     );
 
@@ -8129,6 +9278,21 @@ playerResultListElement
                 willOpen
                     ? "▲"
                     : "▼";
+
+            if (willOpen) {
+
+                const spId =
+                    Number(
+                        itemElement
+                            .dataset
+                            .spId
+                    );
+
+
+                loadPlayerMarketPrice(
+                    spId
+                );
+            }
         }
     );
 
