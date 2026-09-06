@@ -27370,7 +27370,7 @@ def get_quick_squad_candidate_rows(
                     ovr DESC,
                     RANDOM()
 
-                LIMIT 40
+                LIMIT 8
                 """,
                 query_parameters,
             )
@@ -29000,7 +29000,7 @@ def recommend_quick_squad(
     # 남은 예산을 다시 선수단에 투자
     # =====================================
 
-    QUICK_SQUAD_UPGRADE_ROUNDS = 2
+    QUICK_SQUAD_UPGRADE_ROUNDS = 0
 
 
     for upgrade_round in range(
@@ -29482,7 +29482,7 @@ def get_fconline_player_market_prices(
                     sp_id,
             },
             headers=headers,
-            timeout=20.0,
+            timeout=6.0,
             follow_redirects=True,
         )
 

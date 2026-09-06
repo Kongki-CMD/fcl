@@ -2087,8 +2087,35 @@ async function generateQuickSquad() {
             );
 
 
-        const data =
-            await response.json();
+        const responseText =
+            await response.text();
+
+
+        let data = {};
+
+
+        if (
+            responseText
+        ) {
+
+            try {
+
+                data =
+                    JSON.parse(
+                        responseText
+                    );
+
+            } catch (parseError) {
+
+                console.error(
+                    "퀵 스쿼드 응답 JSON 파싱 실패:",
+                    parseError,
+                    responseText
+                );
+
+            }
+
+        }
 
 
         if (
@@ -2099,7 +2126,7 @@ async function generateQuickSquad() {
                 (
                     data.detail
                     ??
-                    "스쿼드 추천에 실패했습니다."
+                    `스쿼드 추천에 실패했습니다. (${response.status})`
                 )
             );
         }
