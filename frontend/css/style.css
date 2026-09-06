@@ -13222,6 +13222,51 @@ body.site-auth-modal-open {
 }
 
 @media (max-width: 600px) {
+
+    /* =====================================
+       PLAYER DETAIL STATS - MOBILE
+    ===================================== */
+
+    .player-database-player-stats {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+
+        gap: 7px;
+    }
+
+
+    .player-database-player-stat {
+        gap: 8px;
+
+        min-height: 38px;
+
+        padding:
+            7px
+            9px;
+    }
+
+
+    .player-database-player-stat span {
+        min-width: 0;
+
+        overflow: visible;
+
+        font-size: 10px;
+
+        text-overflow: clip;
+        white-space: nowrap;
+    }
+
+
+    .player-database-player-stat strong {
+        flex-shrink: 0;
+
+        font-size: 13px;
+    }
+
     .player-database-pagination {
         gap: 4px;
         margin-top: 22px;

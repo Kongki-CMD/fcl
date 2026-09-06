@@ -2720,7 +2720,7 @@ def seed_participants():
         ),
         (
             "서종원",
-            "붉은심장베컴",
+            "끠끼의팬텀드리블",
         ),
     ]
 
@@ -19477,6 +19477,8 @@ def sync_fcl_series_status(
             "conflict",
         )
     )
+
+    status = series["status"]
 
 
     # active 또는
