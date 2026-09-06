@@ -7363,43 +7363,200 @@ body.site-auth-modal-open {
         min-width: 0;
     }
 
-    /* MANUAL RESULT */
+    /* =====================================
+       MANUAL RESULT - MOBILE
+    ===================================== */
 
     .manual-result-panel {
-        padding: 18px 12px;
+        width: 100%;
+        max-width: 100%;
+
+        padding:
+            22px
+            12px
+            18px;
+
+        border-radius: 14px;
     }
 
-    .manual-result-team-header {
-        grid-template-columns: 1fr
-            40px
-            1fr;
-        margin-left: 70px;
+
+    .manual-result-title {
+        margin-bottom: 24px;
+
+        font-size: 26px;
+        line-height: 1.2;
     }
+
+
+    /* =====================================
+       HEADER
+
+       빈칸 | TEAM A | SCORE | TEAM B
+    ===================================== */
+
+    .manual-result-header {
+        display: grid;
+
+        grid-template-columns:
+            64px
+            minmax(0, 1fr)
+            34px
+            minmax(0, 1fr);
+
+        align-items: center;
+
+        column-gap: 7px;
+
+        width: 100%;
+        max-width: 100%;
+
+        margin:
+            0
+            auto
+            8px;
+    }
+
+
+    .manual-result-header .manual-team-name {
+        min-width: 0;
+
+        overflow: hidden;
+
+        font-size: 13px;
+
+        text-align: center;
+
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+
+    .manual-result-header .manual-score-label {
+        font-size: 12px;
+
+        text-align: center;
+    }
+
+
+    /* =====================================
+       SET ROW
+
+       SET | A점수 | : | B점수
+    ===================================== */
 
     .manual-result-row {
-        grid-template-columns: 70px
-            1fr;
+        display: grid;
+
+        grid-template-columns:
+            64px
+            minmax(0, 1fr)
+            34px
+            minmax(0, 1fr);
+
+        align-items: center;
+
+        column-gap: 7px;
+
+        width: 100%;
+        max-width: 100%;
+
+        padding:
+            16px
+            0;
     }
 
-    .manual-score-inputs {
-        grid-template-columns: 1fr
-            40px
-            1fr;
+
+    .manual-set-name {
+        min-width: 0;
+
+        font-size: 16px;
+
+        white-space: nowrap;
     }
 
-    .manual-score-inputs input {
-        width: 58px;
-        padding: 9px 5px;
+
+    .manual-score-input {
+        justify-self: center;
+
+        width: 100%;
+        max-width: 78px;
+        height: 48px;
+
+        padding: 0;
+
+        border-radius: 9px;
+
+        font-size: 20px;
     }
+
+
+    .manual-score-divider {
+        font-size: 19px;
+
+        text-align: center;
+    }
+
+
+    /* =====================================
+       PLAYOFF DRAW WINNER
+    ===================================== */
+
+    .manual-winner-choice {
+        grid-column:
+            1
+            /
+            -1;
+
+        gap: 8px;
+
+        margin-top: 10px;
+
+        padding-top: 8px;
+    }
+
+
+    .manual-winner-button {
+        min-width: 0;
+        width: 100%;
+        max-width: 140px;
+        height: 38px;
+
+        padding:
+            0
+            10px;
+
+        font-size: 11px;
+    }
+
+
+    /* =====================================
+       ACTION BUTTONS
+    ===================================== */
 
     .manual-result-actions {
-        flex-wrap: wrap;
+        display: grid;
+
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
         gap: 10px;
+
+        width: 100%;
+        max-width: 100%;
+
+        margin-top: 20px;
     }
 
     .manual-result-actions button {
-        flex: 1 1 120px;
+        width: 100%;
         min-width: 0;
+        height: 50px;
+
+        font-size: 15px;
+    }
+
+    #manual-complete-button {
+        grid-column: 1 / -1;
     }
 
     .history-action-container {
@@ -7491,9 +7648,70 @@ body.site-auth-modal-open {
         padding: 18px 10px;
     }
 
-    .manual-score-inputs input {
-        width: 52px;
+    .manual-result-panel {
+        padding:
+            20px
+            10px
+            16px;
     }
+
+
+    .manual-result-header,
+    .manual-result-row {
+        grid-template-columns:
+            58px
+            minmax(0, 1fr)
+            24px
+            minmax(0, 1fr);
+
+        column-gap: 5px;
+    }
+
+
+    .manual-result-header .manual-team-name {
+        font-size: 12px;
+    }
+
+
+    .manual-result-header .manual-score-label {
+        font-size: 10px;
+    }
+
+
+    .manual-set-name {
+        font-size: 15px;
+    }
+
+
+    .manual-score-input {
+        max-width: 72px;
+        height: 46px;
+
+        font-size: 19px;
+    }
+
+
+    .manual-score-divider {
+        font-size: 18px;
+    }
+
+    .manual-result-actions {
+        grid-template-columns:
+            repeat(2, minmax(0, 1fr));
+
+        gap: 10px;
+    }
+
+    .manual-result-actions button {
+        height: 48px;
+        font-size: 14px;
+    }
+
+    #manual-complete-button {
+        grid-column: 1 / -1;
+        height: 54px;
+    }
+
 }
 
 .result-sync-guide {
