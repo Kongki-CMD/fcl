@@ -26432,6 +26432,2917 @@ def get_player_database_filters():
         get_player_catalog_filter_options()
     )
 
+# =========================================
+# QUICK SQUAD - OFFICIAL FORMATIONS
+# =========================================
+
+FCONLINE_FORMATION_SOURCE_URL = (
+    "https://fconline.nexon.com/"
+    "datacenter/rank?rt=1vs1"
+)
+
+
+FCONLINE_FORMATION_CACHE_SECONDS = (
+    6
+    *
+    60
+    *
+    60
+)
+
+
+fconline_formation_cache = {
+    "expires_at":
+        0.0,
+
+    "formations":
+        [],
+}
+
+
+FCONLINE_FORMATION_FALLBACK = [
+    # =============================
+    # 3 BACK
+    # =============================
+
+    "3-4-3",
+    "3-4-3(2)",
+    "3-4-1-2",
+    "3-2-3-2",
+    "3-2-2-1-2",
+    "3-1-2-1-3",
+    "3-1-4-2",
+
+    # =============================
+    # 4 BACK
+    # =============================
+
+    "4-5-1",
+    "4-4-2",
+    "4-4-2(2)",
+    "4-4-1-1",
+    "4-3-3",
+    "4-3-3(2)",
+    "4-3-2-1",
+    "4-3-1-2",
+    "4-2-4",
+    "4-2-3-1",
+    "4-2-2-2",
+    "4-2-2-2(2)",
+    "4-2-2-1-1",
+    "4-2-1-3",
+    "4-2-1-3(2)",
+    "4-1-4-1",
+    "4-1-3-2",
+    "4-1-2-3",
+    "4-1-2-3(2)",
+    "4-1-2-1-2",
+    "4-1-2-1-2(2)",
+
+    # =============================
+    # 5 BACK
+    # =============================
+
+    "5-4-1",
+    "5-3-2",
+    "5-2-3",
+    "5-2-1-2",
+    "5-1-2-1-1",
+]
+
+
+FCONLINE_FORMATION_PATTERN = (
+    re.compile(
+        (
+            r"^[345]"
+            r"(?:-[1-5]){2,4}"
+            r"(?:\(2\))?$"
+        )
+    )
+)
+
+
+def get_fconline_official_formations():
+
+    current_time = (
+        time.time()
+    )
+
+
+    cached_formations = (
+        fconline_formation_cache[
+            "formations"
+        ]
+    )
+
+
+    if (
+        cached_formations
+        and
+        current_time
+        <
+        fconline_formation_cache[
+            "expires_at"
+        ]
+    ):
+
+        return {
+            "formations":
+                cached_formations,
+
+            "live":
+                True,
+        }
+
+
+    try:
+
+        response = httpx.get(
+            FCONLINE_FORMATION_SOURCE_URL,
+
+            headers={
+                "User-Agent":
+                    (
+                        "Mozilla/5.0 "
+                        "(Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 "
+                        "(KHTML, like Gecko) "
+                        "Chrome/150.0.0.0 Safari/537.36"
+                    ),
+
+                "Referer":
+                    "https://fconline.nexon.com/",
+            },
+
+            timeout=20.0,
+
+            follow_redirects=True,
+        )
+
+
+        response.raise_for_status()
+
+
+        html = (
+            response.text
+        )
+
+
+        # =================================
+        # FC Online 페이지 원본에서
+        # 포메이션 문자열 직접 추출
+        #
+        # 화면 텍스트뿐 아니라
+        # HTML / script 데이터 안에 있어도 찾음
+        # =================================
+
+        formation_matches = (
+            re.findall(
+                (
+                    r"(?<![\d-])"
+                    r"[345]"
+                    r"(?:-[1-5]){2,4}"
+                    r"(?:\(2\))?"
+                    r"(?![\d-])"
+                ),
+                html,
+            )
+        )
+
+
+        found_formations = []
+
+        seen_formations = set()
+
+
+        for raw_formation in (
+            formation_matches
+        ):
+
+            formation = (
+                str(
+                    raw_formation
+                )
+                .strip()
+            )
+
+
+            if not (
+                FCONLINE_FORMATION_PATTERN
+                .fullmatch(
+                    formation
+                )
+            ):
+
+                continue
+
+
+            base_formation = (
+                formation
+                .replace(
+                    "(2)",
+                    "",
+                )
+            )
+
+
+            formation_numbers = [
+                int(
+                    value
+                )
+
+                for value
+                in base_formation
+                    .split(
+                        "-"
+                    )
+            ]
+
+
+            # GK를 제외한 필드 플레이어 10명
+            if (
+                sum(
+                    formation_numbers
+                )
+                != 10
+            ):
+
+                continue
+
+
+            if (
+                formation
+                in seen_formations
+            ):
+
+                continue
+
+
+            seen_formations.add(
+                formation
+            )
+
+
+            found_formations.append(
+                formation
+            )
+
+
+        # =================================
+        # 데이터센터 구조가 바뀐 경우
+        # 잘못된 일부 목록을 사용하지 않음
+        # =================================
+
+        if (
+            len(
+                found_formations
+            )
+            < 20
+        ):
+
+            raise RuntimeError(
+                (
+                    "FC Online 포메이션 목록을 "
+                    "정상적으로 확인하지 못했습니다."
+                )
+            )
+
+
+        # =================================
+        # 3 / 4 / 5 BACK 순서
+        # =================================
+
+        formations = []
+
+
+        for back_count in (
+            3,
+            4,
+            5,
+        ):
+
+            formations.extend(
+                [
+                    formation
+
+                    for formation
+                    in found_formations
+
+                    if formation.startswith(
+                        f"{back_count}-"
+                    )
+                ]
+            )
+
+
+        fconline_formation_cache[
+            "formations"
+        ] = formations
+
+
+        fconline_formation_cache[
+            "expires_at"
+        ] = (
+            current_time
+            +
+            FCONLINE_FORMATION_CACHE_SECONDS
+        )
+
+
+        return {
+            "formations":
+                formations,
+
+            "live":
+                True,
+        }
+
+
+    except Exception as error:
+
+        print(
+            (
+                "[QUICK SQUAD] "
+                "formation fetch failed:"
+            ),
+            error,
+        )
+
+
+        return {
+            "formations":
+                FCONLINE_FORMATION_FALLBACK,
+
+            "live":
+                False,
+        }
+
+
+@app.get(
+    "/api/quick-squad/formations"
+)
+def get_quick_squad_formations():
+
+    formation_data = (
+        get_fconline_official_formations()
+    )
+
+
+    formations = (
+        formation_data[
+            "formations"
+        ]
+    )
+
+
+    return {
+        "count":
+            len(
+                formations
+            ),
+
+        "formations":
+            [
+                {
+                    "name":
+                        formation,
+
+                    "back_count":
+                        int(
+                            formation[
+                                0
+                            ]
+                        ),
+                }
+
+                for formation
+                in formations
+            ],
+
+        "source":
+            "FC Online DataCenter",
+
+        "live":
+            formation_data[
+                "live"
+            ],
+    }
+
+# =========================================
+# QUICK SQUAD - RECOMMEND
+# =========================================
+
+# =========================================
+# FC ONLINE 대표팀 급여
+# 공식 스쿼드 메이커 기준
+# =========================================
+
+QUICK_SQUAD_SALARY_CAP = 310
+
+QUICK_SQUAD_ENHANCEMENT_BONUS = {
+    1: 0,
+    2: 1,
+    3: 2,
+    4: 4,
+    5: 6,
+    6: 8,
+    7: 11,
+    8: 15,
+    9: 17,
+    10: 19,
+    11: 21,
+    12: 24,
+    13: 27,
+}
+
+# =========================================
+# QUICK SQUAD 강화 추천 정책
+# =========================================
+
+# 일반 추천에서는 1강 ~ 8강까지만 사용
+QUICK_SQUAD_PRIMARY_MAX_GRADE = 8
+
+
+# 9강 이상은 최종 잔여 예산 처리 때만 허용
+QUICK_SQUAD_HIGH_GRADE_MIN = 9
+
+
+# 한 스쿼드에서 9강 이상 선수 최대 인원
+QUICK_SQUAD_MAX_HIGH_GRADE_PLAYERS = 2
+
+
+QUICK_SQUAD_POSITION_CANDIDATES = {
+
+    # =====================================
+    # GK
+    # =====================================
+
+    "GK": [
+        "GK",
+    ],
+
+
+    # =====================================
+    # DEFENDER
+    # =====================================
+
+    "LB": [
+        "LB",
+        "LWB",
+    ],
+
+    "LWB": [
+        "LWB",
+        "LB",
+    ],
+
+    "RB": [
+        "RB",
+        "RWB",
+    ],
+
+    "RWB": [
+        "RWB",
+        "RB",
+    ],
+
+    "CB": [
+        "CB",
+    ],
+
+    "LCB": [
+        "CB",
+    ],
+
+    "RCB": [
+        "CB",
+    ],
+
+
+    # =====================================
+    # MIDFIELDER
+    # =====================================
+
+    "CDM": [
+        "CDM",
+        "CM",
+    ],
+
+    "LDM": [
+        "CDM",
+        "CM",
+    ],
+
+    "RDM": [
+        "CDM",
+        "CM",
+    ],
+
+
+    "CM": [
+        "CM",
+        "CDM",
+        "CAM",
+    ],
+
+    "LCM": [
+        "CM",
+        "CDM",
+        "CAM",
+    ],
+
+    "RCM": [
+        "CM",
+        "CDM",
+        "CAM",
+    ],
+
+
+    "CAM": [
+        "CAM",
+        "CF",
+        "CM",
+    ],
+
+    "LAM": [
+        "CAM",
+        "LW",
+        "LM",
+    ],
+
+    "RAM": [
+        "CAM",
+        "RW",
+        "RM",
+    ],
+
+
+    "LM": [
+        "LM",
+        "LW",
+        "CM",
+    ],
+
+    "RM": [
+        "RM",
+        "RW",
+        "CM",
+    ],
+
+
+    # =====================================
+    # ATTACKER
+    # =====================================
+
+    "LW": [
+        "LW",
+        "LM",
+        "CF",
+    ],
+
+    "RW": [
+        "RW",
+        "RM",
+        "CF",
+    ],
+
+
+    "CF": [
+        "CF",
+        "ST",
+        "CAM",
+    ],
+
+
+    "ST": [
+        "ST",
+        "CF",
+    ],
+
+    "LS": [
+        "ST",
+        "CF",
+    ],
+
+    "RS": [
+        "ST",
+        "CF",
+    ],
+}
+
+
+QUICK_SQUAD_PRICE_CACHE_SECONDS = (
+    20
+    *
+    60
+)
+
+
+quick_squad_price_cache = {}
+
+
+class QuickSquadRecommendRequest(
+    BaseModel
+):
+
+    team_color_id: int
+
+    budget_bp: int
+
+    formation: str
+
+    slots: list[str]
+
+
+def get_quick_squad_cached_prices(
+    sp_id: int,
+):
+
+    numeric_sp_id = int(
+        sp_id
+    )
+
+
+    current_time = (
+        time.time()
+    )
+
+
+    cached_item = (
+        quick_squad_price_cache.get(
+            numeric_sp_id
+        )
+    )
+
+
+    if (
+        cached_item
+        and
+        current_time
+        <
+        cached_item[
+            "expires_at"
+        ]
+    ):
+
+        return (
+            cached_item[
+                "prices"
+            ]
+        )
+
+
+    prices = (
+        get_fconline_player_market_prices(
+            numeric_sp_id
+        )
+    )
+
+
+    quick_squad_price_cache[
+        numeric_sp_id
+    ] = {
+        "expires_at":
+            (
+                current_time
+                +
+                QUICK_SQUAD_PRICE_CACHE_SECONDS
+            ),
+
+        "prices":
+            prices,
+    }
+
+
+    return prices
+
+def is_valid_quick_squad_market_prices(
+    prices,
+):
+
+    valid_prices = [
+        int(
+            item[
+                "price"
+            ]
+        )
+
+        for item
+        in (
+            prices
+            or []
+        )
+
+        if (
+            item.get(
+                "price"
+            )
+            is not None
+
+            and
+
+            int(
+                item[
+                    "price"
+                ]
+            )
+            > 0
+        )
+    ]
+
+
+    # =====================================
+    # 시세 자체가 없음
+    # =====================================
+
+    if not valid_prices:
+
+        return False
+
+
+    # =====================================
+    # 강화별 가격이 전부 똑같은 경우
+    #
+    # 예:
+    # 1강 ~ 13강 전부 43,300 BP
+    #
+    # 퀵 스쿼드 강화 선택에는 사용할 수 없음
+    # =====================================
+
+    unique_prices = set(
+        valid_prices
+    )
+
+
+    if (
+        len(
+            unique_prices
+        )
+        <= 1
+    ):
+
+        return False
+
+
+    # =====================================
+    # 최소한 낮은 강화와 높은 강화 사이에
+    # 실제 가격 변화가 있어야 함
+    # =====================================
+
+    first_price = (
+        valid_prices[
+            0
+        ]
+    )
+
+
+    last_price = (
+        valid_prices[
+            -1
+        ]
+    )
+
+
+    if (
+        last_price
+        <=
+        first_price
+    ):
+
+        return False
+
+
+    return True
+
+def get_quick_squad_candidate_rows(
+    team_color_id: int,
+    slot_position: str,
+    used_player_names: list[str],
+    max_salary: int | None = None,
+):
+
+    normalized_slot_position = (
+        str(
+            slot_position
+            or ""
+        )
+        .strip()
+        .upper()
+    )
+
+
+    candidate_positions = (
+        QUICK_SQUAD_POSITION_CANDIDATES
+        .get(
+            normalized_slot_position,
+            [
+                normalized_slot_position,
+            ],
+        )
+    )
+
+
+    salary_sql = ""
+
+
+    query_parameters = [
+        candidate_positions,
+        int(
+            team_color_id
+        ),
+    ]
+
+
+    if (
+        max_salary
+        is not None
+    ):
+
+        salary_sql = (
+            """
+            AND
+                COALESCE(
+                    p.salary,
+                    0
+                )
+                <=
+                %s
+            """
+        )
+
+
+        query_parameters.append(
+            int(
+                max_salary
+            )
+        )
+
+
+    used_player_sql = ""
+
+
+    if used_player_names:
+
+        used_player_sql = (
+            """
+            AND
+                NOT (
+                    p.player_name
+                    =
+                    ANY(%s)
+                )
+            """
+        )
+
+
+        query_parameters.append(
+            used_player_names
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                f"""
+                WITH top_candidates AS (
+
+                    SELECT
+                        p.sp_id,
+                        p.player_name,
+                        p.season_id,
+                        p.image_url,
+                        p.position,
+                        p.salary,
+                        p.ovr
+
+                    FROM
+                        fconline_players AS p
+
+                    WHERE
+                        p.position
+                        =
+                        ANY(%s)
+
+                    AND
+                        EXISTS (
+
+                            SELECT
+                                1
+
+                            FROM
+                                fconline_player_teams
+                                AS team_filter
+
+                            WHERE
+                                team_filter.sp_id
+                                =
+                                p.sp_id
+
+                            AND
+                                team_filter.team_color_id
+                                =
+                                %s
+
+                        )
+
+                    {salary_sql}
+
+                    {used_player_sql}
+
+                    ORDER BY
+                        p.ovr DESC,
+                        p.salary DESC,
+                        p.sp_id DESC
+
+                    LIMIT 100
+
+                )
+
+                SELECT
+                    *
+
+                FROM
+                    top_candidates
+
+                ORDER BY
+                    ovr DESC,
+                    RANDOM()
+
+                LIMIT 40
+                """,
+                query_parameters,
+            )
+
+
+            return (
+                cursor.fetchall()
+            )
+
+def get_quick_squad_team_name(
+    team_color_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    team_name
+
+                FROM
+                    fconline_player_teams
+
+                WHERE
+                    team_color_id = %s
+
+                AND
+                    team_name IS NOT NULL
+
+                AND
+                    team_name <> ''
+
+                LIMIT 1
+                """,
+                (
+                    int(
+                        team_color_id
+                    ),
+                ),
+            )
+
+
+            row = (
+                cursor.fetchone()
+            )
+
+
+    if not row:
+
+        return ""
+
+
+    return (
+        row[
+            "team_name"
+        ]
+        or ""
+    )
+
+def choose_quick_squad_candidate(
+    team_color_id: int,
+    slot_position: str,
+    target_budget: int,
+    remaining_budget: int,
+    max_salary: int,
+    used_player_names: list[str],
+):
+
+    candidate_rows = (
+        get_quick_squad_candidate_rows(
+            team_color_id=
+                team_color_id,
+
+            slot_position=
+                slot_position,
+
+            used_player_names=
+                used_player_names,
+
+            max_salary=
+                max_salary,
+        )
+    )
+
+
+    all_options = []
+
+
+    for candidate_row in (
+        candidate_rows
+    ):
+
+        sp_id = int(
+            candidate_row[
+                "sp_id"
+            ]
+        )
+
+
+        try:
+
+            prices = (
+                get_quick_squad_cached_prices(
+                    sp_id
+                )
+            )
+
+        except Exception as error:
+
+            print(
+                (
+                    "[QUICK SQUAD] "
+                    "price fetch failed:"
+                ),
+                sp_id,
+                error,
+            )
+
+            continue
+
+
+        if not (
+            is_valid_quick_squad_market_prices(
+                prices
+            )
+        ):
+
+            continue
+
+
+        base_ovr = int(
+            candidate_row[
+                "ovr"
+            ]
+            or 0
+        )
+
+
+        for price_data in (
+            prices
+        ):
+
+            raw_price = (
+                price_data.get(
+                    "price"
+                )
+            )
+
+
+            if (
+                raw_price
+                is None
+            ):
+
+                continue
+
+
+            price = int(
+                raw_price
+            )
+
+
+            if (
+                price <= 0
+                or
+                price > remaining_budget
+            ):
+
+                continue
+
+
+            grade = int(
+                price_data[
+                    "grade"
+                ]
+            )
+
+
+            # =================================
+            # 일반 추천은 최대 +8까지만
+            # =================================
+
+            if (
+                grade
+                >
+                QUICK_SQUAD_PRIMARY_MAX_GRADE
+            ):
+
+                continue
+
+
+            adjusted_ovr = (
+                base_ovr
+                +
+                QUICK_SQUAD_ENHANCEMENT_BONUS
+                .get(
+                    grade,
+                    0,
+                )
+            )
+
+
+            all_options.append(
+                {
+                    "slot_position":
+                        slot_position,
+
+                    "sp_id":
+                        sp_id,
+
+                    "player_name":
+                        candidate_row[
+                            "player_name"
+                        ],
+
+                    "season_id":
+                        int(
+                            candidate_row[
+                                "season_id"
+                            ]
+                        ),
+
+                    "image_url":
+                        (
+                            candidate_row[
+                                "image_url"
+                            ]
+                            or ""
+                        ),
+
+                    "position":
+                        (
+                            candidate_row[
+                                "position"
+                            ]
+                            or ""
+                        ),
+
+                    "salary":
+                        int(
+                            candidate_row[
+                                "salary"
+                            ]
+                            or 0
+                        ),
+
+                    "base_ovr":
+                        base_ovr,
+
+                    "grade":
+                        grade,
+
+                    "ovr":
+                        adjusted_ovr,
+
+                    "price":
+                        price,
+                }
+            )
+
+
+    if not all_options:
+
+        return None
+
+
+    # =====================================
+    # 1. 자리별 목표 예산 안에 들어오는 후보
+    # =====================================
+
+    target_options = [
+        option
+
+        for option
+        in all_options
+
+        if (
+            option[
+                "price"
+            ]
+            <=
+            target_budget
+        )
+    ]
+
+
+    if target_options:
+
+        # =================================
+        # 강화 OVR이 아니라
+        # 기본 카드 OVR을 기준으로
+        # 좋은 시즌부터 추림
+        # =================================
+
+        best_base_ovr = max(
+            option[
+                "base_ovr"
+            ]
+
+            for option
+            in target_options
+        )
+
+
+        # =================================
+        # 최고 기본 OVR과 2 이내면
+        # 충분히 경쟁력 있는 카드로 인정
+        # =================================
+
+        quality_floor = (
+            best_base_ovr
+            -
+            1
+        )
+
+
+        quality_options = [
+            option
+
+            for option
+            in target_options
+
+            if (
+                option[
+                    "base_ovr"
+                ]
+                >=
+                quality_floor
+            )
+        ]
+
+
+        # =================================
+        # 좋은 시즌들 중
+        # 목표 예산에 가장 가깝게 사용
+        #
+        # 여기서 자연스럽게
+        # +1 / +5 / +8 / +12 / +13 등이 섞임
+        # =================================
+
+        return max(
+            quality_options,
+
+            key=lambda option: (
+                option[
+                    "price"
+                ],
+
+                option[
+                    "base_ovr"
+                ],
+
+                option[
+                    "ovr"
+                ],
+            ),
+        )
+
+
+    # =====================================
+    # 목표 예산보다 싼 카드가 하나도 없다면
+    # 전체 남은 예산 내에서 가장 싼 카드로
+    # 일단 11명을 완성
+    # =====================================
+
+    return min(
+        all_options,
+
+        key=lambda option: (
+            option[
+                "price"
+            ],
+
+            -
+            option[
+                "base_ovr"
+            ],
+        ),
+    )
+
+def choose_quick_squad_upgrade(
+    team_color_id: int,
+    current_player: dict,
+    upgrade_budget: int,
+    max_salary: int,
+    excluded_player_names: list[str],
+):
+
+    slot_position = (
+        current_player[
+            "slot_position"
+        ]
+    )
+
+
+    current_price = int(
+        current_player[
+            "price"
+        ]
+    )
+
+
+    current_ovr = int(
+        current_player[
+            "ovr"
+        ]
+    )
+
+
+    current_base_ovr = int(
+        current_player[
+            "base_ovr"
+        ]
+    )
+
+
+    max_total_price = (
+        current_price
+        +
+        upgrade_budget
+    )
+
+
+    candidate_rows = (
+        get_quick_squad_candidate_rows(
+            team_color_id=
+                team_color_id,
+
+            slot_position=
+                slot_position,
+
+            used_player_names=
+                excluded_player_names,
+
+            max_salary=
+                max_salary,
+        )
+    )
+
+
+    upgrade_options = []
+
+
+    for candidate_row in (
+        candidate_rows
+    ):
+
+        sp_id = int(
+            candidate_row[
+                "sp_id"
+            ]
+        )
+
+
+        try:
+
+            prices = (
+                get_quick_squad_cached_prices(
+                    sp_id
+                )
+            )
+
+        except Exception as error:
+
+            print(
+                (
+                    "[QUICK SQUAD] "
+                    "upgrade price fetch failed:"
+                ),
+                sp_id,
+                error,
+            )
+
+            continue
+
+
+        if not (
+            is_valid_quick_squad_market_prices(
+                prices
+            )
+        ):
+
+            continue
+
+
+        base_ovr = int(
+            candidate_row[
+                "ovr"
+            ]
+            or 0
+        )
+
+
+        for price_data in (
+            prices
+        ):
+
+            raw_price = (
+                price_data.get(
+                    "price"
+                )
+            )
+
+
+            if (
+                raw_price
+                is None
+            ):
+
+                continue
+
+
+            price = int(
+                raw_price
+            )
+
+
+            # =================================
+            # 실제로 돈을 더 쓰는 교체만
+            # =================================
+
+            if (
+                price <= current_price
+                or
+                price > max_total_price
+            ):
+
+                continue
+
+
+            grade = int(
+                price_data[
+                    "grade"
+                ]
+            )
+
+            if (
+                grade
+                >
+                QUICK_SQUAD_PRIMARY_MAX_GRADE
+            ):
+
+                continue
+
+            adjusted_ovr = (
+                base_ovr
+                +
+                QUICK_SQUAD_ENHANCEMENT_BONUS
+                .get(
+                    grade,
+                    0,
+                )
+            )
+
+
+            # =================================
+            # 교체 후 OVR이 내려가는 건 제외
+            # =================================
+
+            if (
+                adjusted_ovr
+                <
+                current_ovr
+            ):
+
+                continue
+
+
+            upgrade_options.append(
+                {
+                    "slot_position":
+                        slot_position,
+
+                    "sp_id":
+                        sp_id,
+
+                    "player_name":
+                        candidate_row[
+                            "player_name"
+                        ],
+
+                    "season_id":
+                        int(
+                            candidate_row[
+                                "season_id"
+                            ]
+                        ),
+
+                    "image_url":
+                        (
+                            candidate_row[
+                                "image_url"
+                            ]
+                            or ""
+                        ),
+
+                    "position":
+                        (
+                            candidate_row[
+                                "position"
+                            ]
+                            or ""
+                        ),
+
+                    "salary":
+                        int(
+                            candidate_row[
+                                "salary"
+                            ]
+                            or 0
+                        ),
+
+                    "base_ovr":
+                        base_ovr,
+
+                    "grade":
+                        grade,
+
+                    "ovr":
+                        adjusted_ovr,
+
+                    "price":
+                        price,
+
+                    "extra_cost":
+                        (
+                            price
+                            -
+                            current_price
+                        ),
+                }
+            )
+
+
+    if not upgrade_options:
+
+        return None
+
+
+    # =====================================
+    # 현재 카드보다 기본 OVR이 떨어지는
+    # 구시즌 +고강 카드 남발 방지
+    # =====================================
+
+    better_base_options = [
+        option
+
+        for option
+        in upgrade_options
+
+        if (
+            option[
+                "base_ovr"
+            ]
+            >=
+            current_base_ovr
+        )
+    ]
+
+
+    if better_base_options:
+
+        upgrade_options = (
+            better_base_options
+        )
+
+
+    best_base_ovr = max(
+        option[
+            "base_ovr"
+        ]
+
+        for option
+        in upgrade_options
+    )
+
+
+    quality_floor = (
+        best_base_ovr
+        -
+        1
+    )
+
+
+    quality_options = [
+        option
+
+        for option
+        in upgrade_options
+
+        if (
+            option[
+                "base_ovr"
+            ]
+            >=
+            quality_floor
+        )
+    ]
+
+
+    # =====================================
+    # 품질이 비슷한 카드들 중
+    # 이번에 사용할 수 있는 돈을 최대한 사용
+    # =====================================
+
+    return max(
+        quality_options,
+
+        key=lambda option: (
+            option[
+                "price"
+            ],
+
+            option[
+                "base_ovr"
+            ],
+
+            option[
+                "ovr"
+            ],
+        ),
+    )
+
+def maximize_quick_squad_grade_budget(
+    selected_players: list[dict],
+    remaining_budget: int,
+):
+
+    # =====================================
+    # +1 ~ +8 범위에서
+    # 남은 예산 최대한 사용
+    # =====================================
+
+    max_upgrade_steps = 100
+
+
+    for _ in range(
+        max_upgrade_steps
+    ):
+
+        if (
+            remaining_budget
+            <= 0
+        ):
+
+            break
+
+
+        best_upgrade = None
+
+
+        # =================================
+        # 현재 11명 모두 검사
+        # =================================
+
+        for (
+            player_index,
+            player
+        ) in enumerate(
+            selected_players
+        ):
+
+            sp_id = int(
+                player[
+                    "sp_id"
+                ]
+            )
+
+
+            current_grade = int(
+                player[
+                    "grade"
+                ]
+            )
+
+
+            current_price = int(
+                player[
+                    "price"
+                ]
+            )
+
+
+            base_ovr = int(
+                player[
+                    "base_ovr"
+                ]
+            )
+
+
+            try:
+
+                prices = (
+                    get_quick_squad_cached_prices(
+                        sp_id
+                    )
+                )
+
+            except Exception as error:
+
+                print(
+                    (
+                        "[QUICK SQUAD] "
+                        "grade upgrade price fetch failed:"
+                    ),
+                    sp_id,
+                    error,
+                )
+
+                continue
+
+
+            if not (
+                is_valid_quick_squad_market_prices(
+                    prices
+                )
+            ):
+
+                continue
+
+
+            for price_data in (
+                prices
+            ):
+
+                grade = int(
+                    price_data[
+                        "grade"
+                    ]
+                )
+
+
+                # =================================
+                # 일반 강화 최적화는
+                # 최대 +8까지만
+                # =================================
+
+                if (
+                    grade
+                    >
+                    QUICK_SQUAD_PRIMARY_MAX_GRADE
+                ):
+
+                    continue
+
+
+                # =================================
+                # 현재 강화보다 높은 단계만
+                # =================================
+
+                if (
+                    grade
+                    <=
+                    current_grade
+                ):
+
+                    continue
+
+
+                raw_price = (
+                    price_data.get(
+                        "price"
+                    )
+                )
+
+
+                if (
+                    raw_price
+                    is None
+                ):
+
+                    continue
+
+
+                price = int(
+                    raw_price
+                )
+
+
+                if (
+                    price
+                    <=
+                    current_price
+                ):
+
+                    continue
+
+
+                extra_cost = (
+                    price
+                    -
+                    current_price
+                )
+
+
+                if (
+                    extra_cost
+                    >
+                    remaining_budget
+                ):
+
+                    continue
+
+
+                adjusted_ovr = (
+                    base_ovr
+                    +
+                    QUICK_SQUAD_ENHANCEMENT_BONUS
+                    .get(
+                        grade,
+                        0,
+                    )
+                )
+
+
+                candidate = {
+                    "player_index":
+                        player_index,
+
+                    "grade":
+                        grade,
+
+                    "price":
+                        price,
+
+                    "ovr":
+                        adjusted_ovr,
+
+                    "extra_cost":
+                        extra_cost,
+                }
+
+
+                # =================================
+                # 남은 BP를 가장 많이 사용하는
+                # 업그레이드 우선
+                # =================================
+
+                if (
+                    best_upgrade
+                    is None
+
+                    or
+
+                    candidate[
+                        "extra_cost"
+                    ]
+                    >
+                    best_upgrade[
+                        "extra_cost"
+                    ]
+                ):
+
+                    best_upgrade = (
+                        candidate
+                    )
+
+
+        if (
+            best_upgrade
+            is None
+        ):
+
+            break
+
+
+        player_index = int(
+            best_upgrade[
+                "player_index"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "grade"
+        ] = int(
+            best_upgrade[
+                "grade"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "price"
+        ] = int(
+            best_upgrade[
+                "price"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "ovr"
+        ] = int(
+            best_upgrade[
+                "ovr"
+            ]
+        )
+
+
+        remaining_budget -= int(
+            best_upgrade[
+                "extra_cost"
+            ]
+        )
+
+
+    return (
+        remaining_budget
+    )
+
+def maximize_quick_squad_high_grade_budget(
+    selected_players: list[dict],
+    remaining_budget: int,
+):
+
+    high_grade_player_indexes = set()
+
+
+    # =====================================
+    # 혹시 이미 9강 이상이 있다면 카운트
+    # =====================================
+
+    for (
+        player_index,
+        player
+    ) in enumerate(
+        selected_players
+    ):
+
+        if (
+            int(
+                player[
+                    "grade"
+                ]
+            )
+            >=
+            QUICK_SQUAD_HIGH_GRADE_MIN
+        ):
+
+            high_grade_player_indexes.add(
+                player_index
+            )
+
+
+    while (
+        remaining_budget
+        >
+        0
+        and
+        len(
+            high_grade_player_indexes
+        )
+        <
+        QUICK_SQUAD_MAX_HIGH_GRADE_PLAYERS
+    ):
+
+        best_upgrade = None
+
+
+        for (
+            player_index,
+            player
+        ) in enumerate(
+            selected_players
+        ):
+
+            # =================================
+            # 이미 고강화 담당이 된 선수는
+            # 다시 선택하지 않음
+            # =================================
+
+            if (
+                player_index
+                in
+                high_grade_player_indexes
+            ):
+
+                continue
+
+
+            sp_id = int(
+                player[
+                    "sp_id"
+                ]
+            )
+
+
+            current_grade = int(
+                player[
+                    "grade"
+                ]
+            )
+
+
+            current_price = int(
+                player[
+                    "price"
+                ]
+            )
+
+
+            base_ovr = int(
+                player[
+                    "base_ovr"
+                ]
+            )
+
+
+            try:
+
+                prices = (
+                    get_quick_squad_cached_prices(
+                        sp_id
+                    )
+                )
+
+            except Exception:
+
+                continue
+
+
+            if not (
+                is_valid_quick_squad_market_prices(
+                    prices
+                )
+            ):
+
+                continue
+
+
+            for price_data in (
+                prices
+            ):
+
+                grade = int(
+                    price_data[
+                        "grade"
+                    ]
+                )
+
+
+                # =================================
+                # 여기서만 +9 ~ +13 허용
+                # =================================
+
+                if (
+                    grade
+                    <
+                    QUICK_SQUAD_HIGH_GRADE_MIN
+                ):
+
+                    continue
+
+
+                if (
+                    grade
+                    <=
+                    current_grade
+                ):
+
+                    continue
+
+
+                raw_price = (
+                    price_data.get(
+                        "price"
+                    )
+                )
+
+
+                if (
+                    raw_price
+                    is None
+                ):
+
+                    continue
+
+
+                price = int(
+                    raw_price
+                )
+
+
+                if (
+                    price
+                    <=
+                    current_price
+                ):
+
+                    continue
+
+
+                extra_cost = (
+                    price
+                    -
+                    current_price
+                )
+
+
+                if (
+                    extra_cost
+                    >
+                    remaining_budget
+                ):
+
+                    continue
+
+
+                adjusted_ovr = (
+                    base_ovr
+                    +
+                    QUICK_SQUAD_ENHANCEMENT_BONUS
+                    .get(
+                        grade,
+                        0,
+                    )
+                )
+
+
+                candidate = {
+                    "player_index":
+                        player_index,
+
+                    "grade":
+                        grade,
+
+                    "price":
+                        price,
+
+                    "ovr":
+                        adjusted_ovr,
+
+                    "extra_cost":
+                        extra_cost,
+                }
+
+
+                # =================================
+                # 남은 BP를 가장 많이 사용하는
+                # 강화 선택
+                # =================================
+
+                if (
+                    best_upgrade
+                    is None
+
+                    or
+
+                    candidate[
+                        "extra_cost"
+                    ]
+                    >
+                    best_upgrade[
+                        "extra_cost"
+                    ]
+                ):
+
+                    best_upgrade = (
+                        candidate
+                    )
+
+
+        if (
+            best_upgrade
+            is None
+        ):
+
+            break
+
+
+        player_index = int(
+            best_upgrade[
+                "player_index"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "grade"
+        ] = int(
+            best_upgrade[
+                "grade"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "price"
+        ] = int(
+            best_upgrade[
+                "price"
+            ]
+        )
+
+
+        selected_players[
+            player_index
+        ][
+            "ovr"
+        ] = int(
+            best_upgrade[
+                "ovr"
+            ]
+        )
+
+
+        remaining_budget -= int(
+            best_upgrade[
+                "extra_cost"
+            ]
+        )
+
+
+        high_grade_player_indexes.add(
+            player_index
+        )
+
+
+    return (
+        remaining_budget
+    )
+
+@app.post(
+    "/api/quick-squad/recommend"
+)
+def recommend_quick_squad(
+    request_data:
+        QuickSquadRecommendRequest,
+):
+
+    team_color_id = int(
+        request_data.team_color_id
+    )
+
+
+    budget_bp = int(
+        request_data.budget_bp
+    )
+
+
+    formation = (
+        str(
+            request_data.formation
+            or ""
+        )
+        .strip()
+    )
+
+
+    slots = [
+        str(
+            slot
+        )
+        .strip()
+        .upper()
+
+        for slot
+        in request_data.slots
+    ]
+
+
+    # =====================================
+    # VALIDATION
+    # =====================================
+
+    if (
+        team_color_id <= 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "팀컬러를 선택해주세요."
+            ),
+        )
+
+
+    if (
+        budget_bp <= 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "구단가치를 입력해주세요."
+            ),
+        )
+
+
+    if (
+        len(
+            slots
+        )
+        != 11
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "스쿼드 포지션은 "
+                "11개여야 합니다."
+            ),
+        )
+
+
+    if (
+        "GK"
+        not in slots
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "포메이션에 GK가 없습니다."
+            ),
+        )
+
+
+    # =====================================
+    # 추천
+    # =====================================
+
+    remaining_budget = (
+        budget_bp
+    )
+
+    remaining_salary = (
+        QUICK_SQUAD_SALARY_CAP
+    )
+
+    selected_players = []
+
+
+    used_player_names = []
+
+
+    for (
+        slot_index,
+        slot_position
+    ) in enumerate(
+        slots
+    ):
+
+        remaining_slot_count = (
+            len(
+                slots
+            )
+            -
+            slot_index
+        )
+
+
+        # =================================
+        # 남은 예산을 남은 자리 수로
+        # 나눈 금액을 해당 자리 목표값으로 사용
+        # =================================
+
+        target_budget = max(
+            1,
+
+            remaining_budget
+            //
+            remaining_slot_count,
+        )
+
+
+        # =================================
+        # 남은 공식 급여를
+        # 남은 자리 수로 배분
+        # =================================
+
+        salary_budget = max(
+            1,
+
+            remaining_salary
+            //
+            remaining_slot_count,
+        )
+
+
+        selected_player = (
+            choose_quick_squad_candidate(
+                team_color_id=
+                    team_color_id,
+
+                slot_position=
+                    slot_position,
+
+                target_budget=
+                    target_budget,
+
+                remaining_budget=
+                    remaining_budget,
+
+                max_salary=
+                    salary_budget,
+
+                used_player_names=
+                    used_player_names,
+            )
+        )
+
+
+        # =================================
+        # 정확한 평균 급여 안에 후보가 없으면
+        # 최대 +3까지 완화
+        #
+        # 그래도 전체 310은 넘지 않음
+        # =================================
+
+        if (
+            selected_player
+            is None
+            and
+            remaining_slot_count
+            >
+            1
+        ):
+
+            maximum_relaxed_salary = (
+                remaining_salary
+                -
+                (
+                    remaining_slot_count
+                    -
+                    1
+                )
+            )
+
+
+            relaxed_salary_budget = min(
+                salary_budget
+                +
+                3,
+
+                maximum_relaxed_salary,
+            )
+
+
+            if (
+                relaxed_salary_budget
+                >
+                salary_budget
+            ):
+
+                selected_player = (
+                    choose_quick_squad_candidate(
+                        team_color_id=
+                            team_color_id,
+
+                        slot_position=
+                            slot_position,
+
+                        target_budget=
+                            target_budget,
+
+                        remaining_budget=
+                            remaining_budget,
+
+                        max_salary=
+                            relaxed_salary_budget,
+
+                        used_player_names=
+                            used_player_names,
+                    )
+                )
+
+
+        if (
+            selected_player
+            is None
+        ):
+
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{slot_position} 포지션에서 "
+                    "선택한 팀컬러에 해당하는 "
+                    "거래 가능한 선수를 "
+                    "찾지 못했습니다."
+                ),
+            )
+
+
+        selected_players.append(
+            selected_player
+        )
+
+
+        used_player_names.append(
+            selected_player[
+                "player_name"
+            ]
+        )
+
+
+        remaining_budget -= (
+            selected_player[
+                "price"
+            ]
+        )
+
+        remaining_salary -= (
+            selected_player[
+                "salary"
+            ]
+        )
+
+
+    # =====================================
+    # 2차 업그레이드
+    #
+    # 1차에서 스쿼드 11명을 확보한 뒤
+    # 남은 예산을 다시 선수단에 투자
+    # =====================================
+
+    QUICK_SQUAD_UPGRADE_ROUNDS = 2
+
+
+    for upgrade_round in range(
+        QUICK_SQUAD_UPGRADE_ROUNDS
+    ):
+
+        if (
+            remaining_budget
+            <= 0
+        ):
+
+            break
+
+
+        upgraded_in_round = False
+
+
+        # =================================
+        # 현재 OVR이 낮은 자리부터
+        # 업그레이드 기회 부여
+        #
+        # 실제 배열 순서는 변경하지 않음
+        # =================================
+
+        upgrade_indices = sorted(
+            range(
+                len(
+                    selected_players
+                )
+            ),
+
+            key=lambda index:
+                int(
+                    selected_players[
+                        index
+                    ][
+                        "ovr"
+                    ]
+                ),
+        )
+
+
+        for (
+            order_index,
+            player_index
+        ) in enumerate(
+            upgrade_indices
+        ):
+
+            if (
+                remaining_budget
+                <= 0
+            ):
+
+                break
+
+
+            current_player = (
+                selected_players[
+                    player_index
+                ]
+            )
+
+
+            remaining_upgrade_slots = (
+                len(
+                    upgrade_indices
+                )
+                -
+                order_index
+            )
+
+
+            # =================================
+            # 현재 남은 예산을
+            # 아직 업그레이드 기회를
+            # 받지 않은 자리끼리 배분
+            # =================================
+
+            upgrade_budget = max(
+                1,
+
+                remaining_budget
+                //
+                remaining_upgrade_slots,
+            )
+
+
+            # =================================
+            # 다른 10명과 같은 이름의 선수는
+            # 중복 선택 금지
+            #
+            # 현재 자리 선수 이름은 제외하지 않음
+            # → 같은 선수의 다른 시즌 교체 가능
+            # =================================
+
+            excluded_player_names = [
+                player[
+                    "player_name"
+                ]
+
+                for (
+                    other_index,
+                    player
+                ) in enumerate(
+                    selected_players
+                )
+
+                if (
+                    other_index
+                    !=
+                    player_index
+                )
+            ]
+
+            current_total_salary = sum(
+                int(
+                    player[
+                        "salary"
+                    ]
+                )
+
+                for player
+                in selected_players
+            )
+
+
+            max_upgrade_salary = (
+                QUICK_SQUAD_SALARY_CAP
+                -
+                (
+                    current_total_salary
+                    -
+                    int(
+                        current_player[
+                            "salary"
+                        ]
+                    )
+                )
+            )
+
+
+            upgrade_player = (
+                choose_quick_squad_upgrade(
+                    team_color_id=
+                        team_color_id,
+
+                    current_player=
+                        current_player,
+
+                    upgrade_budget=
+                        upgrade_budget,
+
+                    max_salary=
+                        max_upgrade_salary,
+
+                    excluded_player_names=
+                        excluded_player_names,
+                )
+            )
+
+
+            if (
+                upgrade_player
+                is None
+            ):
+
+                continue
+
+
+            extra_cost = int(
+                upgrade_player[
+                    "extra_cost"
+                ]
+            )
+
+
+            if (
+                extra_cost
+                >
+                remaining_budget
+            ):
+
+                continue
+
+
+            # =================================
+            # 교체
+            # =================================
+
+            selected_players[
+                player_index
+            ] = {
+                key:
+                    value
+
+                for (
+                    key,
+                    value
+                ) in (
+                    upgrade_player.items()
+                )
+
+                if key not in (
+                    "extra_cost",
+                    "ovr_gain",
+                )
+            }
+
+
+            remaining_budget -= (
+                extra_cost
+            )
+
+
+            upgraded_in_round = (
+                True
+            )
+
+
+        # =================================
+        # 한 바퀴 돌았는데 아무도
+        # 좋아지지 않았다면 종료
+        # =================================
+
+        if not (
+            upgraded_in_round
+        ):
+
+            break
+
+    # =====================================
+    # 최종 예산 소진
+    #
+    # 현재 선택된 11명의 강화단계를
+    # 가능한 범위에서 추가 업그레이드
+    # =====================================
+
+    remaining_budget = (
+        maximize_quick_squad_grade_budget(
+            selected_players=
+                selected_players,
+
+            remaining_budget=
+                remaining_budget,
+        )
+    )
+
+    # =====================================
+    # +1 ~ +8까지 모두 최적화했는데도
+    # 남은 BP가 있을 경우
+    #
+    # 최대 2명만 +9 ~ +13 허용
+    # =====================================
+
+    remaining_budget = (
+        maximize_quick_squad_high_grade_budget(
+            selected_players=
+                selected_players,
+
+            remaining_budget=
+                remaining_budget,
+        )
+    )
+
+
+    # =====================================
+    # SUMMARY
+    # =====================================
+
+    total_price = sum(
+        int(
+            player[
+                "price"
+            ]
+        )
+
+        for player
+        in selected_players
+    )
+
+
+    total_salary = sum(
+        int(
+            player[
+                "salary"
+            ]
+        )
+
+        for player
+        in selected_players
+    )
+
+
+    team_name = (
+        get_quick_squad_team_name(
+            team_color_id
+        )
+    )
+
+
+    return {
+        "team_color_id":
+            team_color_id,
+
+        "team_name":
+            team_name,
+
+        "formation":
+            formation,
+
+        "budget_bp":
+            budget_bp,
+
+        "total_price":
+            total_price,
+
+        "remaining_budget":
+            (
+                budget_bp
+                -
+                total_price
+            ),
+
+        "total_salary":
+            total_salary,
+
+        "salary_cap":
+            QUICK_SQUAD_SALARY_CAP,
+
+        "players":
+            selected_players,
+
+        "source":
+            {
+                "player":
+                    "FCL Player Database",
+
+                "price":
+                    "FC Online DataCenter",
+            },
+    }
 
 @app.get(
     "/api/player-database/filters/nations"

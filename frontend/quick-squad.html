@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FCL 퀵 스쿼드</title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css"
+    >
+</head>
+
+
+<body>
+
+    <!-- =====================================
+        HEADER
+    ====================================== -->
+
+    <header>
+
+        <div class="header-container">
+
+            <div class="logo">
+
+                <a href="./index.html">
+
+                    <span class="logo-title">
+                        FCL
+                    </span>
+
+                    <span class="logo-bottom">
+
+                        <span class="logo-line"></span>
+
+                        <span class="logo-season">
+                            SEASON 1
+                        </span>
+
+                        <span class="logo-line"></span>
+
+                    </span>
+
+                </a>
+
+            </div>
+
+
+            <nav>
+                <ul class="main-menu"></ul>
+            </nav>
+
+        </div>
+
+    </header>
+
+
+    <!-- =====================================
+        QUICK SQUAD
+    ====================================== -->
+
+    <main class="quick-squad-page">
+
+        <!-- =================================
+            PAGE HEADER
+        ================================== -->
+
+        <section class="quick-squad-header">
+
+            <span class="quick-squad-eyebrow">
+                FCL QUICK SQUAD
+            </span>
+
+            <h1>
+                퀵 스쿼드
+            </h1>
+
+            <p>
+                팀컬러와 구단가치를 설정하면
+                조건에 맞는 FC온라인 선수 11명을
+                자동으로 추천합니다.
+            </p>
+
+        </section>
+
+
+        <!-- =================================
+            SEARCH CONDITIONS
+        ================================== -->
+
+        <section class="quick-squad-condition-card">
+
+            <div class="quick-squad-condition-grid">
+
+
+                <!-- 팀컬러 -->
+
+                <div class="quick-squad-filter">
+
+                    <label
+                        for="quick-squad-team-color"
+                        class="quick-squad-label"
+                    >
+                        팀컬러
+                    </label>
+
+
+                    <select
+                        id="quick-squad-team-color"
+                        class="quick-squad-select"
+                    >
+
+                        <option value="">
+                            팀컬러 선택
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- 구단가치 -->
+
+                <div class="quick-squad-filter">
+
+                    <label
+                        for="quick-squad-budget"
+                        class="quick-squad-label"
+                    >
+                        구단가치
+                    </label>
+
+
+                    <div class="quick-squad-budget-wrap">
+
+                        <input
+                            type="number"
+                            id="quick-squad-budget"
+                            class="quick-squad-input"
+                            min="1"
+                            step="1"
+                            placeholder="예: 500"
+                        >
+
+                        <span class="quick-squad-budget-unit">
+                            억 BP
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- 포메이션 -->
+
+                <div class="quick-squad-filter">
+
+                    <label
+                        for="quick-squad-formation"
+                        class="quick-squad-label"
+                    >
+                        포메이션
+                    </label>
+
+
+                    <select
+                        id="quick-squad-formation"
+                        class="quick-squad-select"
+                    >
+
+                        <option value="">
+                            포메이션 불러오는 중...
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- 추천 버튼 -->
+
+                <button
+                    type="button"
+                    id="quick-squad-generate-button"
+                    class="quick-squad-generate-button"
+                >
+                    스쿼드 추천
+                </button>
+
+            </div>
+
+
+            <p class="quick-squad-condition-help">
+                선택한 팀컬러와 구단가치 범위 안에서
+                포지션별 선수를 조합합니다.
+            </p>
+
+        </section>
+
+
+        <!-- =================================
+            RESULT
+        ================================== -->
+
+        <section
+            id="quick-squad-result"
+            class="quick-squad-result"
+        >
+
+            <!-- =================================
+                FOOTBALL FIELD
+            ================================== -->
+
+            <div class="quick-squad-field-column">
+
+                <div class="quick-squad-field-header">
+
+                    <div>
+
+                        <span>
+                            FORMATION
+                        </span>
+
+                        <strong
+                            id="quick-squad-formation-title"
+                        >
+                            4-3-3
+                        </strong>
+
+                    </div>
+
+
+                    <span
+                        id="quick-squad-result-status"
+                        class="quick-squad-result-status"
+                    >
+                        조건을 설정하고
+                        스쿼드를 추천해보세요.
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="quick-squad-field"
+                    class="quick-squad-field"
+                >
+
+                    <!-- 중앙선 -->
+
+                    <div class="quick-squad-field-half-line">
+                    </div>
+
+
+                    <!-- 센터 서클 -->
+
+                    <div class="quick-squad-field-center-circle">
+                    </div>
+
+
+                    <!-- 상대 페널티 박스 -->
+
+                    <div
+                        class="
+                            quick-squad-field-penalty-box
+                            quick-squad-field-penalty-box-top
+                        "
+                    ></div>
+
+
+                    <!-- 우리 페널티 박스 -->
+
+                    <div
+                        class="
+                            quick-squad-field-penalty-box
+                            quick-squad-field-penalty-box-bottom
+                        "
+                    ></div>
+
+
+                    <!-- 선수 11명 출력 -->
+
+                    <div
+                        id="quick-squad-player-layer"
+                        class="quick-squad-player-layer"
+                    ></div>
+
+                </div>
+
+            </div>
+
+
+            <!-- =================================
+                SUMMARY
+            ================================== -->
+
+            <aside class="quick-squad-summary">
+
+                <div class="quick-squad-summary-header">
+
+                    <div>
+
+                        <span>
+                            FCL QUICK SQUAD
+                        </span>
+
+                        <h2>
+                            추천 스쿼드 요약
+                        </h2>
+
+                    </div>
+
+                </div>
+
+
+                <div class="quick-squad-summary-list">
+
+
+                    <div class="quick-squad-summary-item">
+
+                        <span class="quick-squad-summary-label">
+                            적용 팀컬러
+                        </span>
+
+                        <strong
+                            id="quick-squad-summary-team-color"
+                            class="quick-squad-summary-value"
+                        >
+                            -
+                        </strong>
+
+                    </div>
+
+
+                    <div class="quick-squad-summary-item">
+
+                        <span class="quick-squad-summary-label">
+                            포메이션
+                        </span>
+
+                        <strong
+                            id="quick-squad-summary-formation"
+                            class="quick-squad-summary-value"
+                        >
+                            4-3-3
+                        </strong>
+
+                    </div>
+
+
+                    <div class="quick-squad-summary-item">
+
+                        <span class="quick-squad-summary-label">
+                            설정 구단가치
+                        </span>
+
+                        <strong
+                            id="quick-squad-summary-budget"
+                            class="quick-squad-summary-value"
+                        >
+                            -
+                        </strong>
+
+                    </div>
+
+
+                    <div class="quick-squad-summary-item">
+
+                        <span class="quick-squad-summary-label">
+                            추천 스쿼드 가치
+                        </span>
+
+                        <strong
+                            id="quick-squad-summary-total-price"
+                            class="quick-squad-summary-value"
+                        >
+                            -
+                        </strong>
+
+                    </div>
+
+
+                    <div class="quick-squad-summary-item">
+
+                        <span class="quick-squad-summary-label">
+                            총 급여
+                        </span>
+
+                        <strong
+                            id="quick-squad-summary-salary"
+                            class="quick-squad-summary-value"
+                        >
+                            -
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div class="quick-squad-summary-note">
+
+                    <strong>
+                        QUICK SQUAD
+                    </strong>
+
+                    <p>
+                        같은 조건으로 다시 추천하면
+                        다른 조합의 스쿼드가 나올 수 있습니다.
+                    </p>
+
+                </div>
+
+            </aside>
+
+        </section>
+
+    </main>
+
+
+    <!-- =====================================
+        FOOTER
+    ====================================== -->
+
+    <footer id="site-footer"></footer>
+
+
+    <!-- =====================================
+        SCRIPT
+    ====================================== -->
+
+    <script
+        type="module"
+        src="./js/site-nav.js"
+    ></script>
+
+
+    <script
+        type="module"
+        src="./js/quick-squad.js"
+    ></script>
+
+</body>
+
+</html>

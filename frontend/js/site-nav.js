@@ -78,15 +78,23 @@ if (siteMainMenuElement) {
 
         {
             label:
-                "선수도감",
+                "선수 DB",
 
             children: [
                 {
                     label:
-                        "선수 검색",
+                        "선수도감",
 
                     href:
                         "./player-database.html",
+                },
+
+                {
+                    label:
+                        "퀵 스쿼드",
+
+                    href:
+                        "./quick-squad.html",
                 },
             ],
         },
