@@ -17968,3 +17968,469 @@ body.player-recommend-open {
     }
 
 }
+
+/* =========================================
+   QUICK SQUAD PLAYER DETAIL MODAL
+========================================= */
+
+.quick-squad-player-modal.hidden {
+    display: none;
+}
+
+.quick-squad-player-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+}
+
+.quick-squad-player-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(4px);
+}
+
+.quick-squad-player-modal-dialog {
+    position: relative;
+    width: min(1240px, calc(100vw - 40px));
+    max-height: calc(100vh - 40px);
+    margin: 20px auto;
+    background:
+        linear-gradient(135deg, rgba(10, 18, 31, 0.97), rgba(8, 12, 20, 0.97));
+    border: 1px solid rgba(214, 170, 64, 0.45);
+    border-radius: 22px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.quick-squad-player-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 28px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quick-squad-player-modal-kicker {
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #d7aa40;
+    letter-spacing: 0.08em;
+}
+
+.quick-squad-player-modal-title {
+    margin: 0;
+    font-size: 32px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.quick-squad-player-modal-close {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: #ffffff;
+    font-size: 32px;
+    cursor: pointer;
+}
+
+.quick-squad-player-modal-body {
+    padding: 22px 24px;
+    overflow-y: auto;
+}
+
+.quick-squad-player-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 18px 24px 24px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quick-squad-player-modal-secondary-button,
+.quick-squad-player-modal-primary-button {
+    min-width: 160px;
+    height: 52px;
+    border-radius: 14px;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.quick-squad-player-modal-secondary-button {
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.quick-squad-player-modal-primary-button {
+    background: linear-gradient(135deg, #e3c56a, #b98a1f);
+    color: #111111;
+    border: none;
+}
+
+/* 내부 3단 레이아웃 */
+.quick-squad-player-detail-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr 400px;
+    gap: 20px;
+}
+
+.quick-squad-player-detail-panel {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 18px;
+}
+
+.quick-squad-player-visual {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.quick-squad-player-season-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quick-squad-player-season-icon {
+    width: 34px;
+    height: 34px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.quick-squad-player-name {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.quick-squad-player-photo-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.quick-squad-player-photo-box img {
+    max-width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+}
+
+.quick-squad-player-meta-main {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.quick-squad-player-main-position {
+    font-size: 38px;
+    font-weight: 900;
+    color: #ff5f8f;
+}
+
+.quick-squad-player-main-ovr {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.quick-squad-player-main-ovr strong {
+    font-size: 48px;
+    color: #d36cff;
+}
+
+.quick-squad-player-sub-meta {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.quick-squad-player-foot-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.quick-squad-player-foot-badge {
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* 스탯 */
+.quick-squad-player-stats-title,
+.quick-squad-player-setting-title,
+.quick-squad-player-market-title,
+.quick-squad-player-traits-title {
+    margin: 0 0 14px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.quick-squad-player-detail-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 16px;
+}
+
+.quick-squad-player-detail-stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.quick-squad-player-detail-stat-label {
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.quick-squad-player-detail-stat-value {
+    font-size: 24px;
+    font-weight: 800;
+}
+
+/* 설정 */
+.quick-squad-player-setting-section + .quick-squad-player-setting-section {
+    margin-top: 18px;
+}
+
+.quick-squad-player-setting-label {
+    display: block;
+    margin-bottom: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.quick-squad-player-setting-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.quick-squad-player-setting-chip {
+    min-width: 54px;
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.quick-squad-player-setting-chip.is-active {
+    border-color: #58a6ff;
+    background: rgba(88, 166, 255, 0.16);
+    color: #ffffff;
+}
+
+.quick-squad-player-teamcolor-select {
+    width: 100%;
+    height: 48px;
+    border-radius: 12px;
+    padding: 0 14px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    font-size: 15px;
+    font-weight: 600;
+}
+
+/* 시세 */
+.quick-squad-player-market-box {
+    padding: 18px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.quick-squad-player-market-price {
+    margin-top: 10px;
+    font-size: 44px;
+    font-weight: 900;
+    color: #f3d47d;
+    line-height: 1.1;
+}
+
+.quick-squad-player-market-caption {
+    margin-top: 8px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.58);
+}
+
+/* 특성 */
+.quick-squad-player-traits-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.quick-squad-player-trait-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.quick-squad-player-trait-item img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+/* 모바일 */
+@media (max-width: 1024px) {
+    .quick-squad-player-detail-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-squad-player-modal-title {
+        font-size: 24px;
+    }
+}
+
+@media (max-width: 768px) {
+    .quick-squad-player-modal-dialog {
+        width: calc(100vw - 16px);
+        max-height: calc(100vh - 16px);
+        margin: 8px auto;
+        border-radius: 16px;
+    }
+
+    .quick-squad-player-modal-header {
+        padding: 18px 18px 14px;
+    }
+
+    .quick-squad-player-modal-body {
+        padding: 16px;
+    }
+
+    .quick-squad-player-modal-footer {
+        flex-direction: column;
+        padding: 16px;
+    }
+
+    .quick-squad-player-modal-secondary-button,
+    .quick-squad-player-modal-primary-button {
+        width: 100%;
+    }
+
+    .quick-squad-player-main-position {
+        font-size: 28px;
+    }
+
+    .quick-squad-player-main-ovr strong {
+        font-size: 38px;
+    }
+
+    .quick-squad-player-detail-stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .quick-squad-player-market-price {
+        font-size: 32px;
+    }
+}
+
+/* =========================================
+   QUICK SQUAD CARD / MODAL SIZE SEPARATION
+========================================= */
+
+/* 축구장 선수 카드 */
+.quick-squad-player-card
+.quick-squad-player-name {
+    font-size: 10px;
+}
+
+.quick-squad-player-card
+.quick-squad-player-season-icon {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+    border-radius: 0;
+}
+
+/* 상세 팝업 */
+.quick-squad-player-modal
+.quick-squad-player-name {
+    font-size: 22px;
+}
+
+.quick-squad-player-modal
+.quick-squad-player-season-icon {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+}
+
+/* 팝업 스탯 색상 */
+.quick-squad-player-modal .stat-color-mint {
+    color: #64e3d1;
+}
+
+.quick-squad-player-modal .stat-color-gold {
+    color: #f1d078;
+}
+
+.quick-squad-player-modal .stat-color-red {
+    color: #f07878;
+}
+
+.quick-squad-player-modal .stat-color-pink {
+    color: #e48bd7;
+}
+
+.quick-squad-player-modal .stat-color-blue {
+    color: #8bb9f3;
+}
+
+.quick-squad-player-modal .stat-color-gray {
+    color: #aeb6c4;
+}
+
+@media (max-width: 600px) {
+    .quick-squad-player-card
+    .quick-squad-player-name {
+        font-size: 8px;
+    }
+
+    .quick-squad-player-card
+    .quick-squad-player-season-icon {
+        width: 14px;
+        height: 14px;
+        flex-basis: 14px;
+    }
+}

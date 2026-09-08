@@ -1,0 +1,1206 @@
+/* =========================================
+   QUICK SQUAD DETAIL v4
+   Consolidated reference-inspired styling
+========================================= */
+
+#quick-squad-player-modal,
+#quick-squad-player-modal * {
+    box-sizing: border-box;
+}
+
+#quick-squad-player-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    margin: 0;
+    color: #f2f4f8;
+    font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+}
+
+#quick-squad-player-modal.hidden {
+    display: none !important;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .76);
+    backdrop-filter: blur(3px);
+}
+
+/* =========================================
+   MODAL FRAME
+========================================= */
+
+#quick-squad-player-modal .quick-squad-player-modal-dialog {
+    position: relative;
+    width: min(966px, 100%);
+    height: min(868px, calc(100vh - 24px));
+    max-width: none;
+    max-height: none;
+    min-height: 0;
+    margin: 0;
+    display: grid;
+    grid-template-rows: 85px minmax(0, 1fr) 70px;
+    overflow: hidden;
+    border: 1px solid #42566d;
+    border-radius: 12px;
+    background: linear-gradient(145deg, #111e2b, #0c1723 65%, #0b1621);
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .6);
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-header {
+    position: relative;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 20px 15px 48px;
+    border-bottom: 1px solid #263647;
+    background: linear-gradient(90deg, #142333, #101c29);
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-header::before {
+    content: "";
+    position: absolute;
+    left: 20px;
+    top: 25px;
+    width: 7px;
+    height: 35px;
+    border-radius: 6px;
+    background: linear-gradient(#fff0a5, #c69a35);
+    box-shadow: 0 0 12px rgba(244, 201, 101, .25);
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-title-wrap {
+    min-width: 0;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-title {
+    margin: 0 0 4px;
+    color: #fff;
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-kicker {
+    margin: 0;
+    color: #b7c2d0;
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-close {
+    flex: 0 0 34px;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #e4eaf1;
+    font-size: 27px;
+    font-weight: 300;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-close:hover {
+    background: rgba(255, 255, 255, .08);
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-body {
+    min-height: 0;
+    min-width: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* =========================================
+   THREE-COLUMN LAYOUT
+========================================= */
+
+#quick-squad-player-modal .qsd-layout {
+    display: grid;
+    grid-template-columns: 30% 26% 44%;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+#quick-squad-player-modal .qsd-column {
+    min-width: 0;
+    min-height: 0;
+    padding: 12px 16px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #394a5c transparent;
+}
+
+#quick-squad-player-modal .qsd-left {
+    padding: 10px 20px 16px;
+}
+
+#quick-squad-player-modal .qsd-center,
+#quick-squad-player-modal .qsd-right {
+    border-left: 1px solid #283746;
+}
+
+#quick-squad-player-modal .qsd-right {
+    padding: 12px 16px 16px;
+}
+
+#quick-squad-player-modal .qsd-heading,
+#quick-squad-player-modal .qsd-section-heading {
+    position: relative;
+    color: #f4f5f7;
+    font-size: 17px;
+    line-height: 1.3;
+    font-weight: 800;
+}
+
+#quick-squad-player-modal .qsd-heading {
+    padding-left: 14px;
+    margin: 2px 0 15px;
+}
+
+#quick-squad-player-modal .qsd-heading::before,
+#quick-squad-player-modal .qsd-section-heading::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 3px;
+    height: 19px;
+    background: linear-gradient(#f7e3a6, #b98c30);
+}
+
+/* =========================================
+   PLAYER CARD
+========================================= */
+
+#quick-squad-player-modal .qsd-card {
+    position: relative;
+    width: 100%;
+    max-width: 248px;
+    aspect-ratio: 260 / 390;
+    margin: 0 auto 14px;
+    overflow: hidden;
+    isolation: isolate;
+    clip-path: polygon(50% 0, 98% 9%, 98% 90%, 50% 100%, 2% 90%, 2% 9%);
+    background: #0b1c33;
+}
+
+#quick-squad-player-modal .qsd-card-art {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    z-index: 0;
+}
+
+/* Player portrait — slightly smaller than v3 */
+#quick-squad-player-modal .qsd-card-photo {
+    position: absolute;
+    left: -10%;
+    top: 18%;
+    width: 120%;
+    height: 66%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+    z-index: 1;
+}
+
+#quick-squad-player-modal .qsd-card-photo img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    object-fit: contain;
+    object-position: center bottom;
+    transform: scale(.98);
+    transform-origin: center bottom;
+}
+
+#quick-squad-player-modal .qsd-card-top {
+    position: absolute;
+    top: 10%;
+    left: 8%;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 43px;
+    height: 43px;
+    padding: 4px;
+    border: 1px solid #e8d38a;
+    background: #11243c;
+}
+
+#quick-squad-player-modal .qsd-card-top img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#quick-squad-player-modal .qsd-card-rating {
+    position: absolute;
+    z-index: 3;
+    top: 22%;
+    left: 8%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    color: #fff;
+    text-shadow: 0 2px 5px #07101c;
+}
+
+#quick-squad-player-modal .qsd-card-rating strong {
+    font-size: 37px;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -1.5px;
+}
+
+#quick-squad-player-modal .qsd-card-pos {
+    padding-left: 6px;
+    border-left: 4px solid #ef4b78;
+    font-size: 24px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+#quick-squad-player-modal .qsd-card-namebar {
+    position: absolute;
+    z-index: 4;
+    left: 6%;
+    right: 6%;
+    bottom: 8%;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 6px;
+    background: linear-gradient(90deg, #0d1b2f, #142a44 55%, #0d1b2f);
+    border-top: 1px solid #bda05c;
+    color: #fff;
+}
+
+#quick-squad-player-modal .qsd-flag {
+    flex-shrink: 0;
+    font-size: 19px;
+}
+
+#quick-squad-player-modal .qsd-card-namebar strong {
+    min-width: 0;
+    flex: 1;
+    font-size: 17px;
+    font-weight: 800;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#quick-squad-player-modal .qsd-card-salary,
+#quick-squad-player-modal .qsd-salary-shield {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 31px;
+    height: 35px;
+    clip-path: polygon(50% 0, 100% 20%, 100% 75%, 50% 100%, 0 75%, 0 20%);
+    background: #33485f;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* =========================================
+   PLAYER INFORMATION
+========================================= */
+
+#quick-squad-player-modal .qsd-identity {
+    display: flex;
+    align-items: baseline;
+    gap: 11px;
+    min-width: 0;
+    margin-bottom: 7px;
+}
+
+#quick-squad-player-modal .qsd-identity-pos {
+    flex-shrink: 0;
+    color: #f15b8a;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+#quick-squad-player-modal .qsd-identity strong {
+    min-width: 0;
+    color: #fff;
+    font-size: 20px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+#quick-squad-player-modal .qsd-salary-line {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #b4becc;
+    font-size: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #293849;
+}
+
+#quick-squad-player-modal .qsd-salary-shield {
+    width: 25px;
+    height: 28px;
+    font-size: 12px;
+}
+
+#quick-squad-player-modal .qsd-foot-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 11px 0;
+    border-bottom: 1px solid #293849;
+}
+
+#quick-squad-player-modal .qsd-foot-line > span {
+    color: #c0c8d3;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+#quick-squad-player-modal .qsd-feet {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#quick-squad-player-modal .quick-squad-player-foot-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: #d9e1eb;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+#quick-squad-player-modal .quick-squad-player-foot-badge span {
+    color: #80bcfb;
+    letter-spacing: -3px;
+    font-size: 14px;
+}
+
+#quick-squad-player-modal .qsd-details-line,
+#quick-squad-player-modal .qsd-position-note,
+#quick-squad-player-modal .qsd-source-note {
+    margin: 10px 0;
+    color: #b8c2ce;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+#quick-squad-player-modal .qsd-action-row {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0;
+}
+
+#quick-squad-player-modal .qsd-small-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid #3d5168;
+    border-radius: 7px;
+    background: linear-gradient(#1c2c3f, #142233);
+    color: #e1e8f1;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+#quick-squad-player-modal .qsd-small-action:hover {
+    border-color: #d3af60;
+    color: #fff;
+}
+
+#quick-squad-player-modal .qsd-team-list {
+    padding: 10px 0 0;
+    border-top: 1px solid #293849;
+}
+
+#quick-squad-player-modal .qsd-mini-label {
+    color: #d4b16c;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+#quick-squad-player-modal .qsd-team-list p {
+    margin: 6px 0 0;
+    color: #b8c2ce;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* =========================================
+   DETAIL STATS
+========================================= */
+
+#quick-squad-player-modal .qsd-stat-scroll {
+    min-height: 0;
+    width: 100%;
+}
+
+#quick-squad-player-modal .qsd-stat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 24px;
+    padding: 3px 0;
+    border-bottom: 1px solid rgba(148, 166, 185, .12);
+    color: #cbd3de;
+}
+
+#quick-squad-player-modal .qsd-stat-row.qsd-group-start {
+    margin-top: 7px;
+    padding-top: 10px;
+    border-top: 1px solid #354657;
+}
+
+#quick-squad-player-modal .qsd-stat-row > span {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.25;
+    font-weight: 500;
+    word-break: keep-all;
+}
+
+#quick-squad-player-modal .qsd-stat-value {
+    flex: 0 0 auto;
+    font-size: 18px;
+    line-height: 1.2;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    text-shadow: none;
+}
+
+/* DataCenter-inspired stat colors */
+#quick-squad-player-modal .stat-color-mint {
+    color: #67d8c7;
+}
+
+#quick-squad-player-modal .stat-color-gold {
+    color: #f2c65b;
+}
+
+#quick-squad-player-modal .stat-color-red {
+    color: #ff6f74;
+}
+
+#quick-squad-player-modal .stat-color-pink {
+    color: #ea97df;
+}
+
+#quick-squad-player-modal .stat-color-blue {
+    color: #9fb6ff;
+}
+
+#quick-squad-player-modal .stat-color-gray {
+    color: #9fa9b8;
+}
+
+/* =========================================
+   RIGHT COLUMN / SETTINGS
+========================================= */
+
+#quick-squad-player-modal .qsd-settings-scroll {
+    min-width: 0;
+}
+
+#quick-squad-player-modal .qsd-setting-panel {
+    margin-bottom: 6px;
+    padding: 12px;
+    border: 1px solid #293a4b;
+    border-radius: 8px;
+    background: rgba(13, 25, 38, .55);
+}
+
+#quick-squad-player-modal .qsd-setting-label {
+    display: block;
+    margin: 0 0 9px;
+    color: #f3f5f7;
+    font-size: 14px;
+    font-weight: 800;
+}
+
+/* =========================================
+   ENHANCEMENT GRADES
+========================================= */
+
+#quick-squad-player-modal .qsd-grade-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 6px;
+}
+
+#quick-squad-player-modal .qsd-grade-grid .player-database-card-grade,
+#quick-squad-player-modal .quick-squad-detail-grade-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    height: 34px;
+    padding: 0;
+    border-radius: 3px;
+    border: 1px solid #617084;
+    background: linear-gradient(180deg, #6c7484 0%, #596271 100%);
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -.2px;
+    box-shadow:
+        inset 0 1px rgba(255, 255, 255, .14),
+        inset 0 -1px rgba(0, 0, 0, .22);
+    cursor: pointer;
+}
+
+#quick-squad-player-modal .quick-squad-detail-grade-badge {
+    width: 36px;
+    height: 24px;
+    font-size: 12px;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* +1 */
+#quick-squad-player-modal .qsd-grade-grid .grade-1,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-1 {
+    background: linear-gradient(180deg, #6b7483, #535c6b) !important;
+    border-color: #788393 !important;
+    color: #fff !important;
+}
+
+/* +2 ~ +4 */
+#quick-squad-player-modal .qsd-grade-grid .grade-2,
+#quick-squad-player-modal .qsd-grade-grid .grade-3,
+#quick-squad-player-modal .qsd-grade-grid .grade-4,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-2,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-3,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-4 {
+    background: linear-gradient(180deg, #b87a55, #8a583c) !important;
+    border-color: #c48b67 !important;
+    color: #fff !important;
+}
+
+/* +5 ~ +7 */
+#quick-squad-player-modal .qsd-grade-grid .grade-5,
+#quick-squad-player-modal .qsd-grade-grid .grade-6,
+#quick-squad-player-modal .qsd-grade-grid .grade-7,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-5,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-6,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-7 {
+    background: linear-gradient(180deg, #c6ceda, #98a4b6) !important;
+    border-color: #d6deea !important;
+    color: #fff !important;
+}
+
+/* +8 ~ +10 */
+#quick-squad-player-modal .qsd-grade-grid .grade-8,
+#quick-squad-player-modal .qsd-grade-grid .grade-9,
+#quick-squad-player-modal .qsd-grade-grid .grade-10,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-8,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-9,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-10 {
+    background: linear-gradient(180deg, #e1ba45, #b48818) !important;
+    border-color: #f0d277 !important;
+    color: #fff !important;
+}
+
+/* +11 ~ +13 : hologram-inspired approximation */
+#quick-squad-player-modal .qsd-grade-grid .grade-11,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-11 {
+    background: linear-gradient(
+        135deg,
+        #fff 0%,
+        #b8d7ff 18%,
+        #ffc5f4 38%,
+        #fff 55%,
+        #b7f0ff 75%,
+        #fff 100%
+    ) !important;
+    border-color: #87bfff !important;
+    color: #4b5fcf !important;
+}
+
+#quick-squad-player-modal .qsd-grade-grid .grade-12,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-12 {
+    background: linear-gradient(
+        135deg,
+        #fff 0%,
+        #d0b8ff 18%,
+        #ffd5f7 38%,
+        #fff 55%,
+        #bcefff 75%,
+        #fff 100%
+    ) !important;
+    border-color: #a88cff !important;
+    color: #6b49df !important;
+}
+
+#quick-squad-player-modal .qsd-grade-grid .grade-13,
+#quick-squad-player-modal .quick-squad-detail-grade-badge.grade-13 {
+    background: linear-gradient(
+        135deg,
+        #fff 0%,
+        #b2d7ff 16%,
+        #d8c4ff 32%,
+        #fff 50%,
+        #aef5ff 72%,
+        #fff 100%
+    ) !important;
+    border-color: #5f99ff !important;
+    color: #2d56da !important;
+}
+
+/* Selected grade */
+#quick-squad-player-modal .qsd-grade-grid .player-database-card-grade.selected {
+    outline: none !important;
+    box-shadow:
+        inset 0 0 0 2px #53c8ff,
+        0 0 0 1px rgba(83, 200, 255, .4);
+    filter: none;
+}
+
+/* =========================================
+   ADAPTATION
+========================================= */
+
+#quick-squad-player-modal .qsd-adaptation-row {
+    display: flex;
+    gap: 7px;
+}
+
+#quick-squad-player-modal .quick-squad-player-setting-chip {
+    min-width: 57px;
+    height: 35px;
+    padding: 0 14px;
+    border: 1px solid #34465a;
+    border-radius: 5px;
+    background: #182635;
+    color: #c4cfdb;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+#quick-squad-player-modal .quick-squad-player-setting-chip.is-active {
+    border-color: #68b6ff;
+    color: #c9e5ff;
+    box-shadow: inset 0 0 0 1px #68b6ff;
+    background: #14283b;
+}
+
+/* =========================================
+   TEAM COLOR
+========================================= */
+
+#quick-squad-player-modal .qsd-team-panel {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+#quick-squad-player-modal .qsd-team-panel .qsd-setting-label {
+    flex-shrink: 0;
+    width: 75px;
+    margin: 0;
+}
+
+#quick-squad-player-modal .qsd-team-select {
+    min-width: 0;
+    flex: 1;
+    height: 41px;
+    padding: 0 12px;
+    border: 1px solid #465a71;
+    border-radius: 6px;
+    background: #1b2939;
+    color: #e6edf5;
+    font-family: inherit;
+    font-size: 13px;
+}
+
+#quick-squad-player-modal .qsd-team-select option {
+    background: #152334;
+    color: #fff;
+}
+
+/* =========================================
+   MARKET PRICE
+========================================= */
+
+#quick-squad-player-modal .qsd-market-section,
+#quick-squad-player-modal .qsd-traits-section {
+    margin-top: 16px;
+}
+
+#quick-squad-player-modal .qsd-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-left: 14px;
+    margin-bottom: 8px;
+}
+
+#quick-squad-player-modal .qsd-section-heading small {
+    color: #aab7c6;
+    font-size: 10px;
+    font-weight: 400;
+}
+
+#quick-squad-player-modal .quick-squad-player-market-box {
+    padding: 14px 12px 12px;
+    border: 1px solid #304457;
+    border-radius: 8px;
+    background: linear-gradient(#152536, #0d1d2c);
+}
+
+#quick-squad-player-modal .quick-squad-detail-market-heading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #b4c0ce;
+    font-size: 11px;
+}
+
+#quick-squad-player-modal .quick-squad-player-market-price {
+    margin: 9px 0;
+    color: #f5d37e;
+    font-size: 29px;
+    line-height: 1.2;
+    font-weight: 900;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+}
+
+#quick-squad-player-modal .quick-squad-player-market-caption {
+    padding-top: 8px;
+    border-top: 1px solid #293c4e;
+    color: #9eafbf;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+/* =========================================
+   TRAITS
+========================================= */
+
+#quick-squad-player-modal .quick-squad-player-traits-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+#quick-squad-player-modal .quick-squad-player-trait-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-height: 34px;
+    padding: 5px 8px;
+    border: 1px solid #35485c;
+    border-radius: 7px;
+    background: #142333;
+    color: #dce5ef;
+    font-size: 11px;
+    line-height: 1.35;
+    font-weight: 600;
+}
+
+#quick-squad-player-modal .quick-squad-player-trait-item img {
+    flex: 0 0 20px;
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+}
+
+#quick-squad-player-modal .quick-squad-player-trait-item span {
+    overflow-wrap: anywhere;
+}
+
+#quick-squad-player-modal .qsd-calculation-note {
+    margin: 12px 0 0;
+    color: #b8c3d0;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+/* =========================================
+   FOOTER
+========================================= */
+
+#quick-squad-player-modal .quick-squad-player-modal-footer {
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 0 14px;
+    border-top: 1px solid #293849;
+    background: linear-gradient(#101d2b, #0c1825);
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-secondary-button,
+#quick-squad-player-modal .quick-squad-player-modal-primary-button {
+    min-width: 140px;
+    height: 46px;
+    border-radius: 7px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-secondary-button {
+    border: 1px solid #4b5c70;
+    background: #1a293a;
+    color: #e1e8f1;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-primary-button {
+    border: 1px solid #e4c777;
+    background: linear-gradient(#efd78e, #c8a453);
+    color: #1b1d21;
+}
+
+#quick-squad-player-modal .quick-squad-player-modal-primary-button:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+#quick-squad-player-modal :is(button, a, select):focus-visible {
+    outline: 2px solid #8fcaff;
+    outline-offset: 3px;
+}
+
+#quick-squad-player-modal .quick-squad-detail-status {
+    padding: 32px;
+    color: #e5ebf3;
+    text-align: center;
+}
+
+/* =========================================
+   RESPONSIVE
+========================================= */
+
+@media (max-width: 840px) {
+    #quick-squad-player-modal .quick-squad-player-modal-dialog {
+        width: 100%;
+        height: calc(100vh - 16px);
+        grid-template-rows: 72px minmax(0, 1fr) 64px;
+    }
+
+    #quick-squad-player-modal {
+        padding: 8px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-header {
+        padding: 12px 14px 12px 36px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-header::before {
+        left: 14px;
+        top: 22px;
+        height: 28px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-title {
+        font-size: 19px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-body {
+        overflow-y: auto;
+    }
+
+    #quick-squad-player-modal .qsd-layout {
+        display: block;
+        height: auto;
+    }
+
+    #quick-squad-player-modal .qsd-column {
+        overflow: visible;
+        padding: 16px;
+        border-left: 0;
+    }
+
+    #quick-squad-player-modal .qsd-center,
+    #quick-squad-player-modal .qsd-right {
+        border-top: 1px solid #293849;
+    }
+
+    #quick-squad-player-modal .qsd-card {
+        max-width: 248px;
+    }
+
+    #quick-squad-player-modal .qsd-stat-row {
+        min-height: 28px;
+    }
+
+    #quick-squad-player-modal .qsd-stat-row > span {
+        font-size: 14px;
+    }
+
+    #quick-squad-player-modal .qsd-stat-value {
+        font-size: 19px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-footer {
+        padding: 0 10px;
+    }
+
+    #quick-squad-player-modal .quick-squad-player-modal-secondary-button,
+    #quick-squad-player-modal .quick-squad-player-modal-primary-button {
+        min-width: 0;
+        flex: 1;
+    }
+}
+
+/* Keep all labels and numeric values in the same typeface */
+#quick-squad-player-modal :is(h2, h3, h4, p, span, strong, small, button, select, a) {
+    font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+}
+
+/* =========================================
+   QUICK SQUAD DETAIL v5
+   FOOT DISPLAY
+========================================= */
+
+/* 스크롤바 공간을 미리 확보 */
+#quick-squad-player-modal .qsd-left {
+    scrollbar-gutter: stable;
+    padding-right: 18px;
+}
+
+/* 라벨과 발 모양이 서로 밀리지 않도록 */
+#quick-squad-player-modal .qsd-foot-line {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+#quick-squad-player-modal .qsd-foot-line > span {
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.4;
+}
+
+#quick-squad-player-modal .qsd-feet {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    flex: 0 0 auto;
+    min-width: 0;
+    padding-right: 2px;
+}
+
+/* 기존 선수도감의 발 모양 */
+#quick-squad-player-modal .qsd-feet .player-database-foot {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 28px;
+    width: 28px;
+    height: 38px;
+    box-sizing: border-box;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.10);
+}
+
+/* 왼발 */
+#quick-squad-player-modal .qsd-feet .player-database-foot-left {
+    border-radius: 55% 40% 48% 45% / 26% 32% 70% 74%;
+    transform: rotate(-5deg);
+}
+
+/* 오른발 */
+#quick-squad-player-modal .qsd-feet .player-database-foot-right {
+    border-radius: 40% 55% 45% 48% / 32% 26% 74% 70%;
+    transform: rotate(5deg);
+}
+
+/* 발 수치 5 */
+#quick-squad-player-modal .qsd-feet .player-database-foot.active {
+    background: linear-gradient(180deg, #39bd62 0%, #168a40 100%);
+    border-color: rgba(117, 239, 151, 0.62);
+    box-shadow:
+        0 0 5px rgba(49, 213, 95, 0.35),
+        inset 0 1px 1px rgba(255, 255, 255, 0.25);
+}
+
+/* 발 수치 1~4 */
+#quick-squad-player-modal .qsd-feet .player-database-foot.inactive {
+    background: linear-gradient(180deg, #757975 0%, #505450 100%);
+}
+
+/* 발 안의 L4 / R5 */
+#quick-squad-player-modal .qsd-feet .player-database-foot-value {
+    position: relative;
+    z-index: 1;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* 발 회전과 반대로 수치 보정 */
+#quick-squad-player-modal .qsd-feet
+.player-database-foot-left .player-database-foot-value {
+    transform: rotate(5deg);
+}
+
+#quick-squad-player-modal .qsd-feet
+.player-database-foot-right .player-database-foot-value {
+    transform: rotate(-5deg);
+}
+
+/* 주발 별표 */
+#quick-squad-player-modal .qsd-feet .player-database-foot-star {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    z-index: 2;
+    color: #ffffff;
+    font-size: 7px;
+    line-height: 1;
+    transform: translateX(-50%);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+#quick-squad-player-modal .qsd-feet
+.player-database-foot-star + .player-database-foot-value {
+    margin-top: 9px;
+}
+
+/* =========================================
+   CARD IDENTITY CLEANUP
+========================================= */
+
+/* 시즌 아이콘 주변의 별도 네모 박스 제거 */
+#quick-squad-player-modal .qsd-card-top {
+    position: absolute;
+    top: 8%;
+    left: 8%;
+    z-index: 3;
+    width: 46px;
+    height: 40px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#quick-squad-player-modal .qsd-card-top img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+}
+
+/* 별도의 딱딱한 이름 박스 대신 프레임에 자연스럽게 겹치기 */
+#quick-squad-player-modal .qsd-card-namebar {
+    position: absolute;
+    z-index: 4;
+    left: 6%;
+    right: 6%;
+    bottom: 8%;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(8, 22, 39, 0.25) 14%,
+        rgba(8, 22, 39, 0.45) 50%,
+        rgba(8, 22, 39, 0.25) 86%,
+        transparent 100%
+    );
+    box-shadow: none;
+    color: #ffffff;
+}
+
+/* 이름은 기존 프레임의 하단에 맞춰 표시 */
+#quick-squad-player-modal .qsd-card-namebar strong {
+    min-width: 0;
+    flex: 1;
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#quick-squad-player-modal .qsd-card-namebar .qsd-flag {
+    flex: 0 0 auto;
+    font-size: 19px;
+    line-height: 1;
+}
+
+/* 선수 사진은 현재 축소된 크기를 유지 */
+#quick-squad-player-modal .qsd-card-photo {
+    left: -10%;
+    top: 18%;
+    width: 120%;
+    height: 66%;
+}
+
+#quick-squad-player-modal .qsd-card-photo img {
+    transform: scale(.98);
+    transform-origin: center bottom;
+}

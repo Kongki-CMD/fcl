@@ -11,6 +11,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from backend.player_catalog import (
     PLAYER_DATABASE_STAT_FILTER_MAP,
+    PLAYER_STAT_COLUMN_MAP,
     get_player_catalog_filter_options,
     get_player_catalog_nations_by_continent,
     get_player_catalog_teams_by_league,
@@ -29442,6 +29443,94 @@ def get_player_database_traits_api(
             "FC Online DataCenter",
     }
 
+
+# =========================================
+# QUICK SQUAD - PLAYER DETAIL
+# =========================================
+
+@app.get("/api/quick-squad/player-detail/{sp_id}")
+def get_quick_squad_player_detail(sp_id: int):
+
+    if sp_id <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="올바른 선수 ID가 아닙니다.",
+        )
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT *
+                FROM fconline_players
+                WHERE sp_id = %s
+                """,
+                (sp_id,),
+            )
+
+            row = cursor.fetchone()
+
+            if row is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="선수 DB에서 해당 선수를 찾지 못했습니다.",
+                )
+
+            cursor.execute(
+                """
+                SELECT
+                    team_color_id,
+                    team_name
+                FROM fconline_player_teams
+                WHERE sp_id = %s
+                ORDER BY team_name
+                """,
+                (sp_id,),
+            )
+
+            team_colors = [
+                {
+                    "team_color_id": item["team_color_id"],
+                    "team_name": item["team_name"],
+                }
+                for item in cursor.fetchall()
+            ]
+
+    # DB에 저장된 1강 / 적응도 1 / 팀컬러 0 원본값
+    stats = {}
+
+    for stat_name, column_name in PLAYER_STAT_COLUMN_MAP.items():
+        raw_value = row.get(column_name)
+
+        stats[stat_name] = (
+            int(raw_value)
+            if raw_value is not None
+            else None
+        )
+
+    left_foot = int(row.get("left_foot") or 0)
+    right_foot = int(row.get("right_foot") or 0)
+
+    return {
+        "sp_id": int(row["sp_id"]),
+        "player_name": row["player_name"],
+        "season_id": int(row["season_id"]),
+        "image_url": row.get("image_url") or "",
+        "position": row.get("position") or "",
+        "salary": int(row.get("salary") or 0),
+        "base_ovr": int(row.get("ovr") or 0),
+        "height": row.get("height"),
+        "weight": row.get("weight"),
+        "nation_name": row.get("nation_name") or "",
+        "left_foot": left_foot,
+        "right_foot": right_foot,
+        "skill_moves": row.get("skill_moves"),
+        "traits": row.get("traits") or [],
+        "stats": stats,
+        "team_colors": team_colors,
+        "ability_bonus": 0,
+    }
 
 
 # =========================================

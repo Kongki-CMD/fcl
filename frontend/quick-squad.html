@@ -15,6 +15,9 @@
         rel="stylesheet"
         href="./css/style.css"
     >
+
+    <link rel="stylesheet" href="./css/quick-squad-detail.css?v=3">
+
 </head>
 
 
@@ -423,6 +426,73 @@
         </section>
 
     </main>
+
+    <!-- 퀵 스쿼드 선수 상세 팝업 -->
+<div
+    id="quick-squad-player-modal"
+    class="quick-squad-player-modal hidden"
+    aria-hidden="true"
+>
+    <div
+        class="quick-squad-player-modal-backdrop"
+        data-quick-squad-player-close
+    ></div>
+
+    <section
+        class="quick-squad-player-modal-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-squad-player-modal-title"
+    >
+        <div class="quick-squad-player-modal-header">
+            <div class="quick-squad-player-modal-title-wrap">
+                <p class="quick-squad-player-modal-kicker">
+                    선수 상세 정보
+                </p>
+
+                <h2
+                    id="quick-squad-player-modal-title"
+                    class="quick-squad-player-modal-title"
+                >
+                    퀵 스쿼드 추천 선수 상세 보기
+                </h2>
+            </div>
+
+            <button
+                type="button"
+                class="quick-squad-player-modal-close"
+                data-quick-squad-player-close
+                aria-label="선수 상세 팝업 닫기"
+            >
+                ×
+            </button>
+        </div>
+
+        <div
+            id="quick-squad-player-modal-body"
+            class="quick-squad-player-modal-body"
+        >
+        </div>
+
+        <div class="quick-squad-player-modal-footer">
+            <button
+                type="button"
+                class="quick-squad-player-modal-secondary-button"
+                data-quick-squad-player-close
+            >
+                닫기
+            </button>
+
+            <button
+                type="button"
+                class="quick-squad-player-modal-primary-button"
+                id="quick-squad-player-compare-button"
+            >
+                비교에 추가
+            </button>
+        </div>
+    </section>
+</div>
 
 
     <!-- =====================================

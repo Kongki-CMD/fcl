@@ -2,6 +2,9 @@ import {
     apiBaseUrl,
 } from "./config.js";
 
+import {
+    createQuickSquadDetailModal,
+} from "./quick-squad-detail.js?v=3";
 
 // =========================================
 // DOM
@@ -77,9 +80,25 @@ const quickSquadGenerateButtonElement =
         "quick-squad-generate-button"
     );
 
+const quickSquadPlayerModal = document.getElementById(
+    "quick-squad-player-modal"
+);
+
+const quickSquadPlayerModalBody = document.getElementById(
+    "quick-squad-player-modal-body"
+);
+
+const quickSquadPlayerCompareButton = document.getElementById(
+    "quick-squad-player-compare-button"
+);
+
+let currentQuickSquadPlayerModalData = null;
+
 
 // 현재 화면에 표시 중인 포메이션 11자리
 let currentQuickSquadSlots = [];
+
+let currentQuickSquadResult = null;
 
 // =========================================
 // 기존에 위치를 확정한 포메이션
@@ -1022,6 +1041,9 @@ function renderQuickSquadFormation() {
     currentQuickSquadSlots =
         slots;
 
+    currentQuickSquadResult =
+        null;
+
 
     quickSquadPlayerLayerElement
         .innerHTML =
@@ -1548,7 +1570,8 @@ function formatQuickSquadBp(
 
 function createQuickSquadPlayerHtml(
     player,
-    slot
+    slot,
+    index
 ) {
 
     const positionGroup =
@@ -1593,6 +1616,7 @@ function createQuickSquadPlayerHtml(
 
             <div
                 class="quick-squad-player-card"
+                data-quick-squad-player-index="${index}"
             >
 
                 <span
@@ -1720,7 +1744,8 @@ function renderQuickSquadResult(
                                 player,
                                 currentQuickSquadSlots[
                                     index
-                                ]
+                                ],
+                                index
                             )
                         );
 
@@ -1838,6 +1863,48 @@ function renderQuickSquadResult(
 
 }
 
+quickSquadPlayerLayerElement
+    ?.addEventListener(
+        "click",
+        (event) => {
+
+            const card =
+                event.target.closest(
+                    "[data-quick-squad-player-index]"
+                );
+
+            if (!card) {
+                return;
+            }
+
+            const playerIndex =
+                Number(
+                    card.dataset.quickSquadPlayerIndex
+                );
+
+            if (
+                !Number.isInteger(
+                    playerIndex
+                )
+            ) {
+                return;
+            }
+
+            const player =
+                currentQuickSquadResult
+                    ?.players
+                    ?.[playerIndex];
+
+            if (!player) {
+                return;
+            }
+
+            openQuickSquadPlayerModal(
+                player
+            );
+        }
+    );
+
 
 // =========================================
 // CONDITION SUMMARY
@@ -1909,6 +1976,42 @@ function updateQuickSquadConditionSummary() {
                 );
     }
 
+}
+
+// =========================================
+// QUICK SQUAD PLAYER DETAIL
+// =========================================
+
+const quickSquadDetailModal =
+    createQuickSquadDetailModal({
+        apiBaseUrl:
+            apiBaseUrl,
+
+        modal:
+            quickSquadPlayerModal,
+
+        body:
+            quickSquadPlayerModalBody,
+
+        compareButton:
+            quickSquadPlayerCompareButton,
+
+        formatPrice:
+            formatQuickSquadBp,
+    });
+
+
+function openQuickSquadPlayerModal(
+    player
+) {
+    return quickSquadDetailModal.open(
+        player
+    );
+}
+
+
+function closeQuickSquadPlayerModal() {
+    quickSquadDetailModal.close();
 }
 
 // =========================================
@@ -2131,6 +2234,9 @@ async function generateQuickSquad() {
             );
         }
 
+        currentQuickSquadResult =
+            data;
+
 
         renderQuickSquadResult(
             data
@@ -2213,6 +2319,28 @@ quickSquadBudgetElement
         "input",
         updateQuickSquadConditionSummary
     );
+
+document.querySelectorAll(
+    "[data-quick-squad-player-close]"
+).forEach((button) => {
+    button.addEventListener(
+        "click",
+        closeQuickSquadPlayerModal
+    );
+});
+
+document.addEventListener(
+    "keydown",
+    (event) => {
+        if (
+            event.key === "Escape"
+            &&
+            !quickSquadPlayerModal.classList.contains("hidden")
+        ) {
+            closeQuickSquadPlayerModal();
+        }
+    }
+);
 
 
 // =========================================
