@@ -9,6 +9,7 @@ import secrets
 from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from backend.player_cards import router as player_cards_router
 from backend.player_catalog import (
     PLAYER_DATABASE_STAT_FILTER_MAP,
     get_player_catalog_filter_options,
@@ -53,6 +54,8 @@ from pydantic import BaseModel
 # =========================
 
 app = FastAPI()
+
+app.include_router(player_cards_router)
 
 
 # =========================

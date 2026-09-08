@@ -1,3 +1,5 @@
+import { createOfficialPlayerCardHtml } from "./player-card.js";
+
 import {
     apiBaseUrl,
 } from "./config.js";
@@ -1546,145 +1548,55 @@ function formatQuickSquadBp(
 }
 
 
-function createQuickSquadPlayerHtml(
-    player,
-    slot
-) {
+const quickSquadPlayersById = new Map();
 
-    const positionGroup =
-        getQuickSquadPositionGroup(
-            slot.position
-        );
-
-
-    const imageUrl =
-        escapeQuickSquadHtml(
-            player.image_url
-            ??
-            ""
-        );
-
-
-    const playerName =
-        escapeQuickSquadHtml(
-            player.player_name
-        );
-
-    const seasonImageUrl =
-        (
-            `${apiBaseUrl}`
-            +
-            "/api/fconline/metadata/seasons/"
-            +
-            `${Number(
-                player.season_id
-            )}/image`
-        );
-
-
-    return `
-        <div
-            class="quick-squad-player-slot"
-            style="
-                left: ${slot.left}%;
-                top: ${slot.top}%;
-            "
-        >
-
-            <div
-                class="quick-squad-player-card"
-            >
-
-                <span
-                    class="
-                        quick-squad-player-position
-                        quick-squad-player-position-${positionGroup}
-                    "
-                >
-                    ${escapeQuickSquadHtml(
-                        slot.position
-                    )}
-                </span>
-
-
-                <img
-                    src="${imageUrl}"
-                    alt="${playerName}"
-                    class="quick-squad-player-image"
-                >
-
-
-                <div
-                    class="quick-squad-player-name-row"
-                >
-
-                    <img
-                        src="${escapeQuickSquadHtml(
-                            seasonImageUrl
-                        )}"
-                        alt=""
-                        class="quick-squad-player-season-icon"
-                        loading="lazy"
-                    >
-
-
-                    <strong
-                        class="quick-squad-player-name"
-                        title="${playerName}"
-                    >
-                        ${playerName}
-                    </strong>
-
-                </div>
-
-
-                <div
-                    class="quick-squad-player-meta"
-                >
-
-                    <span
-                        class="quick-squad-player-ovr"
-                    >
-                        ${Number(
-                            player.ovr
-                            ??
-                            0
-                        )}
-                    </span>
-
-
-                    <span
-                        class="quick-squad-player-grade"
-                    >
-                        +${Number(
-                            player.grade
-                            ??
-                            1
-                        )}
-                    </span>
-
-                </div>
-
-
-                <span
-                    class="quick-squad-player-price"
-                >
-                    ${formatQuickSquadBp(
-                        player.price
-                    )}
-                </span>
-
-            </div>
-
-        </div>
-    `;
-
+function createQuickSquadPlayerHtml(player, slot) {
+    quickSquadPlayersById.set(Number(player.sp_id), { ...player, slot_position: slot.position });
+    return `<div class="quick-squad-player-slot" style="left:${slot.left}%;top:${slot.top}%">
+        <button type="button" class="quick-squad-player-card quick-squad-official-player"
+            data-quick-squad-player="${Number(player.sp_id)}"
+            aria-label="${escapeQuickSquadHtml(player.player_name)} 선수 상세 정보">
+            <span class="quick-squad-player-position quick-squad-player-position-${getQuickSquadPositionGroup(slot.position)}">${escapeQuickSquadHtml(slot.position)}</span>
+            ${createOfficialPlayerCardHtml(player)}
+            <span class="quick-squad-player-price">${formatQuickSquadBp(player.price)}</span>
+        </button></div>`;
 }
+
+const quickSquadDetailDialog = document.createElement("dialog");
+quickSquadDetailDialog.className = "quick-squad-detail-dialog";
+quickSquadDetailDialog.setAttribute("aria-labelledby", "quick-squad-detail-title");
+document.body.append(quickSquadDetailDialog);
+quickSquadDetailDialog.addEventListener("click", event => {
+    if (event.target.closest("[data-close-squad-detail]") || event.target === quickSquadDetailDialog) {
+        quickSquadDetailDialog.close();
+    }
+});
+quickSquadPlayerLayerElement.addEventListener("click", event => {
+    const button = event.target.closest("[data-quick-squad-player]");
+    if (!button) return;
+    const player = quickSquadPlayersById.get(Number(button.dataset.quickSquadPlayer));
+    if (!player) return;
+    quickSquadDetailDialog.innerHTML = `<header>
+        <h2 id="quick-squad-detail-title">선수 상세 정보</h2>
+        <button type="button" data-close-squad-detail aria-label="선수 상세 정보 닫기">×</button>
+        </header>${createOfficialPlayerCardHtml(player)}
+        <dl><dt>선수</dt><dd>${escapeQuickSquadHtml(player.player_name)}</dd>
+            <dt>배치 포지션</dt><dd>${escapeQuickSquadHtml(player.slot_position)}</dd>
+            <dt>주 포지션</dt><dd>${escapeQuickSquadHtml(player.position)}</dd>
+            <dt>OVR / 강화</dt><dd>${Number(player.ovr)} / +${Number(player.grade)}</dd>
+            <dt>급여</dt><dd>${Number(player.salary)}</dd>
+            <dt>시세</dt><dd>${formatQuickSquadBp(player.price)}</dd></dl>
+        <a href="https://fconline.nexon.com/datacenter/PlayerInfo?spid=${Number(player.sp_id)}&n1Strong=${Number(player.grade)}"
+            target="_blank" rel="noopener noreferrer">공식 데이터센터에서 전체 능력치 보기</a>`;
+    quickSquadDetailDialog.showModal();
+});
 
 
 function renderQuickSquadResult(
     data
 ) {
+
+    quickSquadPlayersById.clear();
 
     const players =
         (

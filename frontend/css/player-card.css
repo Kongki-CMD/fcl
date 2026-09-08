@@ -1,0 +1,228 @@
+/* Scoped Data Center card layout. Coordinates follow the official 340 × 400 canvas. */
+.fco-player-card { position: relative; width: 100%; aspect-ratio: 340 / 400; container-type: inline-size; color: #fff; font-family: Arial, sans-serif; font-weight: 700; isolation: isolate; }
+.fco-player-card *, .fco-player-card *::before { box-sizing: border-box; }
+.fco-player-card [hidden] { display: none !important; }
+.fco-card-background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 0; }
+.fco-card-placeholder { position: absolute; inset: 8% 12%; background: linear-gradient(145deg,#253546,#111820); border: 1px solid #78838f; border-radius: 7%; z-index: -1; }
+.fco-player-card.is-ready .fco-card-placeholder { visibility: hidden; }
+.fco-player-card .playerCardWrap { position: absolute; inset: 0; }
+.fco-card-portrait-wrap { position: absolute; top: 8%; left: 27.94%; width: 52.94%; height: 60%; overflow: hidden; }
+.fco-card-portrait { position: absolute; bottom: 0; right: 0; width: 100%; aspect-ratio: 1; object-fit: contain; object-position: bottom; }
+.fco-card-portrait.head { width: 88.89%; }
+.fco-card-side { position: absolute; top: 22.5%; left: 21.18%; width: 17.06%; text-align: center; display: flex; flex-direction: column; gap: 2.4cqw; }
+.fco-player-card .ovr { font-size: 11.76cqw; line-height: .85; }
+.fco-player-card .position { font-size: 7.35cqw; line-height: 1; }
+.fco-player-card .pay { align-self: center; display: grid; place-items: center; font-size: 5.88cqw; width: 10cqw; height: 10cqw; border: .5cqw solid currentColor; clip-path: polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); }
+.fco-card-grade { position: absolute; top: 44.5%; left: 21.18%; width: 17.06%; height: 9%; font-size: 8.82cqw; line-height: 1.2; text-align: center; border: .45cqw solid #62676d; background: linear-gradient(140deg,#51545a,#42464d); color: #c5c8c9; }
+.fco-card-grade.silver { background: linear-gradient(140deg,#e3e7eb,#a3abb6); color: #253141; border-color: #e3e7eb; }
+.fco-card-grade.gold { background: linear-gradient(140deg,#f9e59a,#bd9140); color: #59420f; border-color: #f5dc88; }
+.fco-card-bottom { position: absolute; top: 68%; left: 19.12%; width: 61.76%; height: 24%; }
+.fco-player-card .nameWrap { padding-top: 2.94cqw; display: flex; align-items: center; justify-content: center; gap: 1.1cqw; height: 10cqw; }
+.fco-player-card .season { width: auto; max-width: 12cqw; height: 7.05cqw; object-fit: contain; flex-shrink: 0; }
+.fco-player-card .name { font-size: 5.3cqw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.25; }
+.fco-card-emblems { display: flex; align-items: center; justify-content: center; gap: 1.47cqw; height: 9.41cqw; margin-top: 1.47cqw; }
+.fco-card-emblems img { width: 7.06cqw; max-height: 9.41cqw; object-fit: contain; }
+.fco-card-status { position: absolute; bottom: 0; left: 0; width: 100%; font-size: 3.5cqw; color: #bfcbd6; text-align: center; }
+.player-database-player-photo-wrap:has(.fco-player-card), .player-compare-photo-wrap:has(.fco-player-card), .player-recommend-base-photo-wrap:has(.fco-player-card) { min-height: 0; height: auto; align-items: center; background: none; border: 0; overflow: visible; }
+.quick-squad-player-card.quick-squad-official-player { display: block; width: 100%; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; cursor: pointer; color: #fff; }
+.quick-squad-official-player .quick-squad-player-position { margin: 0; }
+.quick-squad-official-player .quick-squad-player-price { margin-top: 0; }
+.quick-squad-official-player:hover .fco-player-card { filter: drop-shadow(0 0 5px #e4bb46); }
+.quick-squad-official-player:focus-visible { outline: 2px solid #e4bb46; outline-offset: 3px; }
+.quick-squad-detail-dialog { width: min(92vw, 480px); max-height: 90dvh; padding: 24px; border: 1px solid #627180; border-radius: 14px; background: #111f2d; color: #fff; overflow: auto; }
+.quick-squad-detail-dialog::backdrop { background: #000b; }
+.quick-squad-detail-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.quick-squad-detail-dialog h2 { margin: 0; font-size: 22px; }
+.quick-squad-detail-dialog button { color: #fff; background: transparent; border: 0; font-size: 28px; cursor: pointer; }
+.quick-squad-detail-dialog .fco-player-card { max-width: 340px; margin: 12px auto; }
+.quick-squad-detail-dialog dl { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.quick-squad-detail-dialog dd { margin: 0; text-align: right; }
+.quick-squad-detail-dialog a { display: inline-block; margin-top: 16px; color: #a9dfff; text-decoration: underline; }
+
+/* Official season text colors (seasons_ssl.css, 2026-09-08). */
+.fco-player-card ._17.playerCardWrap .position,.fco-player-card ._17.playerCardWrap .pay span,.fco-player-card ._17.playerCardWrap .ovr,.fco-player-card ._18.playerCardWrap .position,.fco-player-card ._18.playerCardWrap .pay span,.fco-player-card ._18.playerCardWrap .ovr,.fco-player-card ._19.playerCardWrap .position,.fco-player-card ._19.playerCardWrap .pay span,.fco-player-card ._19.playerCardWrap .ovr,.fco-player-card ._20.playerCardWrap .position,.fco-player-card ._20.playerCardWrap .pay span,.fco-player-card ._20.playerCardWrap .ovr,.fco-player-card ._21.playerCardWrap .position,.fco-player-card ._21.playerCardWrap .pay span,.fco-player-card ._21.playerCardWrap .ovr,.fco-player-card ._22.playerCardWrap .position,.fco-player-card ._22.playerCardWrap .pay span,.fco-player-card ._22.playerCardWrap .ovr,.fco-player-card ._23.playerCardWrap .position,.fco-player-card ._23.playerCardWrap .pay span,.fco-player-card ._23.playerCardWrap .ovr,.fco-player-card ._24.playerCardWrap .position,.fco-player-card ._24.playerCardWrap .pay span,.fco-player-card ._24.playerCardWrap .ovr,.fco-player-card ._23PLA.playerCardWrap .position,.fco-player-card ._23PLA.playerCardWrap .pay span,.fco-player-card ._23PLA.playerCardWrap .ovr,.fco-player-card ._24PLA.playerCardWrap .position,.fco-player-card ._24PLA.playerCardWrap .pay span,.fco-player-card ._24PLA.playerCardWrap .ovr,.fco-player-card ._LIVE.playerCardWrap .position,.fco-player-card ._LIVE.playerCardWrap .pay span,.fco-player-card ._LIVE.playerCardWrap .ovr,.fco-player-card ._KFA.playerCardWrap .position,.fco-player-card ._KFA.playerCardWrap .pay span,.fco-player-card ._KFA.playerCardWrap .ovr,.fco-player-card ._2019KFA.playerCardWrap .position,.fco-player-card ._2019KFA.playerCardWrap .pay span,.fco-player-card ._2019KFA.playerCardWrap .ovr,.fco-player-card ._21KFA.playerCardWrap .position,.fco-player-card ._21KFA.playerCardWrap .pay span,.fco-player-card ._21KFA.playerCardWrap .ovr,.fco-player-card ._22KFA.playerCardWrap .position,.fco-player-card ._22KFA.playerCardWrap .pay span,.fco-player-card ._22KFA.playerCardWrap .ovr,.fco-player-card ._23KFA.playerCardWrap .position,.fco-player-card ._23KFA.playerCardWrap .pay span,.fco-player-card ._23KFA.playerCardWrap .ovr,.fco-player-card ._PLC.playerCardWrap .position,.fco-player-card ._PLC.playerCardWrap .pay span,.fco-player-card ._PLC.playerCardWrap .ovr,.fco-player-card ._19PLA.playerCardWrap .position,.fco-player-card ._19PLA.playerCardWrap .pay span,.fco-player-card ._19PLA.playerCardWrap .ovr,.fco-player-card ._20PLA.playerCardWrap .position,.fco-player-card ._20PLA.playerCardWrap .pay span,.fco-player-card ._20PLA.playerCardWrap .ovr,.fco-player-card ._21PLA.playerCardWrap .position,.fco-player-card ._21PLA.playerCardWrap .pay span,.fco-player-card ._21PLA.playerCardWrap .ovr,.fco-player-card ._22PLA.playerCardWrap .position,.fco-player-card ._22PLA.playerCardWrap .pay span,.fco-player-card ._22PLA.playerCardWrap .ovr,.fco-player-card ._18PLS.playerCardWrap .position,.fco-player-card ._18PLS.playerCardWrap .pay span,.fco-player-card ._18PLS.playerCardWrap .ovr,.fco-player-card ._19PLS.playerCardWrap .position,.fco-player-card ._19PLS.playerCardWrap .pay span,.fco-player-card ._19PLS.playerCardWrap .ovr,.fco-player-card ._19UCL.playerCardWrap .position,.fco-player-card ._19UCL.playerCardWrap .pay span,.fco-player-card ._19UCL.playerCardWrap .ovr,.fco-player-card ._20UCL.playerCardWrap .position,.fco-player-card ._20UCL.playerCardWrap .pay span,.fco-player-card ._20UCL.playerCardWrap .ovr,.fco-player-card ._21UCL.playerCardWrap .position,.fco-player-card ._21UCL.playerCardWrap .pay span,.fco-player-card ._21UCL.playerCardWrap .ovr,.fco-player-card ._22UCL.playerCardWrap .position,.fco-player-card ._22UCL.playerCardWrap .pay span,.fco-player-card ._22UCL.playerCardWrap .ovr,.fco-player-card ._23UCL.playerCardWrap .position,.fco-player-card ._23UCL.playerCardWrap .pay span,.fco-player-card ._23UCL.playerCardWrap .ovr,.fco-player-card ._20KL.playerCardWrap .position,.fco-player-card ._20KL.playerCardWrap .pay span,.fco-player-card ._20KL.playerCardWrap .ovr,.fco-player-card ._21KL.playerCardWrap .position,.fco-player-card ._21KL.playerCardWrap .pay span,.fco-player-card ._21KL.playerCardWrap .ovr,.fco-player-card ._22KL.playerCardWrap .position,.fco-player-card ._22KL.playerCardWrap .pay span,.fco-player-card ._22KL.playerCardWrap .ovr,.fco-player-card ._23KL.playerCardWrap .position,.fco-player-card ._23KL.playerCardWrap .pay span,.fco-player-card ._23KL.playerCardWrap .ovr,.fco-player-card ._24KL.playerCardWrap .position,.fco-player-card ._24KL.playerCardWrap .pay span,.fco-player-card ._24KL.playerCardWrap .ovr,.fco-player-card ._25KL.playerCardWrap .position,.fco-player-card ._25KL.playerCardWrap .pay span,.fco-player-card ._25KL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._18TOTY.playerCardWrap .position,.fco-player-card ._18TOTY.playerCardWrap .pay span,.fco-player-card ._18TOTY.playerCardWrap .ovr{color:#d0b361}
+.fco-player-card ._19NG.playerCardWrap .position,.fco-player-card ._19NG.playerCardWrap .pay span,.fco-player-card ._19NG.playerCardWrap .ovr{color:#befd74}
+.fco-player-card ._19TOTS.playerCardWrap .position,.fco-player-card ._19TOTS.playerCardWrap .pay span,.fco-player-card ._19TOTS.playerCardWrap .ovr{color:#eedc82}
+.fco-player-card ._19TOTY.playerCardWrap .position,.fco-player-card ._19TOTY.playerCardWrap .pay span,.fco-player-card ._19TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._20NG.playerCardWrap .position,.fco-player-card ._20NG.playerCardWrap .pay span,.fco-player-card ._20NG.playerCardWrap .ovr{color:#faff51}
+.fco-player-card ._20TOTS.playerCardWrap .position,.fco-player-card ._20TOTS.playerCardWrap .pay span,.fco-player-card ._20TOTS.playerCardWrap .ovr{color:#eedc82}
+.fco-player-card ._20TOTY.playerCardWrap .position,.fco-player-card ._20TOTY.playerCardWrap .pay span,.fco-player-card ._20TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._20TOTN.playerCardWrap .position,.fco-player-card ._20TOTN.playerCardWrap .pay span,.fco-player-card ._20TOTN.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._2012KH.playerCardWrap .position,.fco-player-card ._2012KH.playerCardWrap .pay span,.fco-player-card ._2012KH.playerCardWrap .ovr{color:#e4d58c}
+.fco-player-card ._20KLB.playerCardWrap .position,.fco-player-card ._20KLB.playerCardWrap .pay span,.fco-player-card ._20KLB.playerCardWrap .ovr,.fco-player-card ._21KLB.playerCardWrap .position,.fco-player-card ._21KLB.playerCardWrap .pay span,.fco-player-card ._21KLB.playerCardWrap .ovr,.fco-player-card ._22KLB.playerCardWrap .position,.fco-player-card ._22KLB.playerCardWrap .pay span,.fco-player-card ._22KLB.playerCardWrap .ovr,.fco-player-card ._23KLB.playerCardWrap .position,.fco-player-card ._23KLB.playerCardWrap .pay span,.fco-player-card ._23KLB.playerCardWrap .ovr,.fco-player-card ._24KLB.playerCardWrap .position,.fco-player-card ._24KLB.playerCardWrap .pay span,.fco-player-card ._24KLB.playerCardWrap .ovr{color:#ffeba8}
+.fco-player-card ._21NG.playerCardWrap .position,.fco-player-card ._21NG.playerCardWrap .pay span,.fco-player-card ._21NG.playerCardWrap .ovr{color:#f5ff4e}
+.fco-player-card ._21TOTS.playerCardWrap .position,.fco-player-card ._21TOTS.playerCardWrap .pay span,.fco-player-card ._21TOTS.playerCardWrap .ovr{color:#eedc82}
+.fco-player-card ._21TOTY.playerCardWrap .position,.fco-player-card ._21TOTY.playerCardWrap .pay span,.fco-player-card ._21TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._21TOTN.playerCardWrap .position,.fco-player-card ._21TOTN.playerCardWrap .pay span,.fco-player-card ._21TOTN.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._22HR.playerCardWrap .position,.fco-player-card ._22HR.playerCardWrap .pay span,.fco-player-card ._22HR.playerCardWrap .ovr{color:#aedefb}
+.fco-player-card ._22NG.playerCardWrap .position,.fco-player-card ._22NG.playerCardWrap .pay span,.fco-player-card ._22NG.playerCardWrap .ovr{color:#ffe066}
+.fco-player-card ._22TOTN.playerCardWrap .position,.fco-player-card ._22TOTN.playerCardWrap .pay span,.fco-player-card ._22TOTN.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._22TOTY.playerCardWrap .position,.fco-player-card ._22TOTY.playerCardWrap .pay span,.fco-player-card ._22TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._22TOTS.playerCardWrap .position,.fco-player-card ._22TOTS.playerCardWrap .pay span,.fco-player-card ._22TOTS.playerCardWrap .ovr{color:#eedc82}
+.fco-player-card ._23HR.playerCardWrap .position,.fco-player-card ._23HR.playerCardWrap .pay span,.fco-player-card ._23HR.playerCardWrap .ovr{color:#fef6c4}
+.fco-player-card ._23HW.playerCardWrap .position,.fco-player-card ._23HW.playerCardWrap .pay span,.fco-player-card ._23HW.playerCardWrap .ovr{color:#e4ff66}
+.fco-player-card ._23NG.playerCardWrap .position,.fco-player-card ._23NG.playerCardWrap .pay span,.fco-player-card ._23NG.playerCardWrap .ovr{color:#fff67a}
+.fco-player-card ._23TOTS.playerCardWrap .position,.fco-player-card ._23TOTS.playerCardWrap .pay span,.fco-player-card ._23TOTS.playerCardWrap .ovr,.fco-player-card ._23TOTN.playerCardWrap .position,.fco-player-card ._23TOTN.playerCardWrap .pay span,.fco-player-card ._23TOTN.playerCardWrap .ovr,.fco-player-card ._23TOTY.playerCardWrap .position,.fco-player-card ._23TOTY.playerCardWrap .pay span,.fco-player-card ._23TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._24UCL.playerCardWrap .position,.fco-player-card ._24UCL.playerCardWrap .pay span,.fco-player-card ._24UCL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._24UCL.playerCardWrap .nameWrap .name,.fco-player-card ._24UCL.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._24UCL.playerCardWrap .nameWrap .name span,.fco-player-card ._24UCL.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._25UCL.playerCardWrap .position,.fco-player-card ._25UCL.playerCardWrap .pay span,.fco-player-card ._25UCL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._25UCL.playerCardWrap .nameWrap .name,.fco-player-card ._25UCL.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25UCL.playerCardWrap .nameWrap .name span,.fco-player-card ._25UCL.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._26FSL.playerCardWrap .position,.fco-player-card ._26FSL.playerCardWrap .pay span,.fco-player-card ._26FSL.playerCardWrap .ovr{color:#1d252d}
+.fco-player-card ._26FSL.playerCardWrap .nameWrap .name,.fco-player-card ._26FSL.playerCardWrap .name_wrap .name{color:#c80506}
+.fco-player-card ._26FSL.playerCardWrap .nameWrap .name span,.fco-player-card ._26FSL.playerCardWrap .name_wrap .name span{color:#c80506}
+.fco-player-card ._SPT.playerCardWrap .position,.fco-player-card ._SPT.playerCardWrap .pay span,.fco-player-card ._SPT.playerCardWrap .ovr{color:#ffc}
+.fco-player-card ._SPT.playerCardWrap .nameWrap .name,.fco-player-card ._SPT.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._SPT.playerCardWrap .nameWrap .name span,.fco-player-card ._SPT.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._24EP.playerCardWrap .position,.fco-player-card ._24EP.playerCardWrap .pay span,.fco-player-card ._24EP.playerCardWrap .ovr{color:#ffff63}
+.fco-player-card ._24EP.playerCardWrap .nameWrap .name,.fco-player-card ._24EP.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._24EP.playerCardWrap .nameWrap .name span,.fco-player-card ._24EP.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._24HR.playerCardWrap .position,.fco-player-card ._24HR.playerCardWrap .pay span,.fco-player-card ._24HR.playerCardWrap .ovr{color:#fdfad5}
+.fco-player-card ._24TOTN.playerCardWrap .position,.fco-player-card ._24TOTN.playerCardWrap .pay span,.fco-player-card ._24TOTN.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._24TOTY.playerCardWrap .position,.fco-player-card ._24TOTY.playerCardWrap .pay span,.fco-player-card ._24TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._24TOTS.playerCardWrap .position,.fco-player-card ._24TOTS.playerCardWrap .pay span,.fco-player-card ._24TOTS.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._24TOTS.playerCardWrap .nameWrap .name,.fco-player-card ._24TOTS.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._24TOTS.playerCardWrap .nameWrap .name span,.fco-player-card ._24TOTS.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._25TOTS.playerCardWrap .position,.fco-player-card ._25TOTS.playerCardWrap .pay span,.fco-player-card ._25TOTS.playerCardWrap .ovr{color:#f8e9b3}
+.fco-player-card ._25TOTS.playerCardWrap .nameWrap .name,.fco-player-card ._25TOTS.playerCardWrap .name_wrap .name{color:#f8e9b3}
+.fco-player-card ._25TOTS.playerCardWrap .nameWrap .name span,.fco-player-card ._25TOTS.playerCardWrap .name_wrap .name span{color:#f8e9b3}
+.fco-player-card ._26TOTS.playerCardWrap .position,.fco-player-card ._26TOTS.playerCardWrap .pay span,.fco-player-card ._26TOTS.playerCardWrap .ovr{color:#f8e9b3}
+.fco-player-card ._26TOTS.playerCardWrap .nameWrap .name,.fco-player-card ._26TOTS.playerCardWrap .name_wrap .name{color:#f8e9b3}
+.fco-player-card ._26TOTS.playerCardWrap .nameWrap .name span,.fco-player-card ._26TOTS.playerCardWrap .name_wrap .name span{color:#f8e9b3}
+.fco-player-card ._25HR.playerCardWrap .position,.fco-player-card ._25HR.playerCardWrap .pay span,.fco-player-card ._25HR.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._25HR.playerCardWrap .nameWrap .name,.fco-player-card ._25HR.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25HR.playerCardWrap .nameWrap .name span,.fco-player-card ._25HR.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._WG.playerCardWrap .position,.fco-player-card ._WG.playerCardWrap .pay span,.fco-player-card ._WG.playerCardWrap .ovr{color:#ffefb1}
+.fco-player-card ._WG.playerCardWrap .nameWrap .name,.fco-player-card ._WG.playerCardWrap .name_wrap .name{color:#332113}
+.fco-player-card ._WG.playerCardWrap .nameWrap .name span,.fco-player-card ._WG.playerCardWrap .name_wrap .name span{color:#332113}
+.fco-player-card ._KHD.playerCardWrap .position,.fco-player-card ._KHD.playerCardWrap .pay span,.fco-player-card ._KHD.playerCardWrap .ovr{color:#ffd}
+.fco-player-card ._KHD.playerCardWrap .nameWrap .name,.fco-player-card ._KHD.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._KHD.playerCardWrap .nameWrap .name span,.fco-player-card ._KHD.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._26HR.playerCardWrap .position,.fco-player-card ._26HR.playerCardWrap .pay span,.fco-player-card ._26HR.playerCardWrap .ovr{color:#ffe8a8}
+.fco-player-card ._26HR.playerCardWrap .nameWrap .name,.fco-player-card ._26HR.playerCardWrap .name_wrap .name{color:#ffe8a8}
+.fco-player-card ._26HR.playerCardWrap .nameWrap .name span,.fco-player-card ._26HR.playerCardWrap .name_wrap .name span{color:#ffe8a8}
+.fco-player-card ._25IM_SP.playerCardWrap .position,.fco-player-card ._25IM_SP.playerCardWrap .pay span,.fco-player-card ._25IM_SP.playerCardWrap .ovr{color:#f8e19b}
+.fco-player-card ._25IM_SP.playerCardWrap .nameWrap .name,.fco-player-card ._25IM_SP.playerCardWrap .name_wrap .name{color:#f8e19b}
+.fco-player-card ._25IM_SP.playerCardWrap .nameWrap .name span,.fco-player-card ._25IM_SP.playerCardWrap .name_wrap .name span{color:#f8e19b}
+.fco-player-card ._25IM_FB.playerCardWrap .position,.fco-player-card ._25IM_FB.playerCardWrap .ovr{color:#241f0c}
+.fco-player-card ._25IM_FB.playerCardWrap .pay span{color:#ede5b4}
+.fco-player-card ._25IM_FB.playerCardWrap .nameWrap .name,.fco-player-card ._25IM_FB.playerCardWrap .name_wrap .name{color:#241f0c}
+.fco-player-card ._25IM_FB.playerCardWrap .nameWrap .name span,.fco-player-card ._25IM_FB.playerCardWrap .name_wrap .name span{color:#241f0c}
+.fco-player-card ._25KB.playerCardWrap .position,.fco-player-card ._25KB.playerCardWrap .pay span,.fco-player-card ._25KB.playerCardWrap .ovr{color:#ffeba8}
+.fco-player-card ._25KB.playerCardWrap .nameWrap .name,.fco-player-card ._25KB.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25KB.playerCardWrap .nameWrap .name span,.fco-player-card ._25KB.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._25PLA.playerCardWrap .position,.fco-player-card ._25PLA.playerCardWrap .pay span,.fco-player-card ._25PLA.playerCardWrap .ovr,.fco-player-card ._25DP.playerCardWrap .position,.fco-player-card ._25DP.playerCardWrap .pay span,.fco-player-card ._25DP.playerCardWrap .ovr{color:#fffcde}
+.fco-player-card ._25PLA.playerCardWrap .nameWrap .name,.fco-player-card ._25PLA.playerCardWrap .name_wrap .name,.fco-player-card ._25DP.playerCardWrap .nameWrap .name,.fco-player-card ._25DP.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25PLA.playerCardWrap .nameWrap .name span,.fco-player-card ._25PLA.playerCardWrap .name_wrap .name span,.fco-player-card ._25DP.playerCardWrap .nameWrap .name span,.fco-player-card ._25DP.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._25FSL.playerCardWrap .position,.fco-player-card ._25FSL.playerCardWrap .pay span,.fco-player-card ._25FSL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._25FSL.playerCardWrap .nameWrap .name,.fco-player-card ._25FSL.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25FSL.playerCardWrap .nameWrap .name span,.fco-player-card ._25FSL.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._25TOTY.playerCardWrap .position,.fco-player-card ._25TOTY.playerCardWrap .pay span,.fco-player-card ._25TOTY.playerCardWrap .ovr{color:#ffee90}
+.fco-player-card ._25TOTY.playerCardWrap .nameWrap .name,.fco-player-card ._25TOTY.playerCardWrap .name_wrap .name{color:#ffee90}
+.fco-player-card ._25TOTY.playerCardWrap .nameWrap .name span,.fco-player-card ._25TOTY.playerCardWrap .name_wrap .name span{color:#ffee90}
+.fco-player-card ._25TOTN.playerCardWrap .position,.fco-player-card ._25TOTN.playerCardWrap .pay span,.fco-player-card ._25TOTN.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._25TOTN.playerCardWrap .nameWrap .name,.fco-player-card ._25TOTN.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._25TOTN.playerCardWrap .nameWrap .name span,.fco-player-card ._25TOTN.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._26TOTY.playerCardWrap .position,.fco-player-card ._26TOTY.playerCardWrap .pay span,.fco-player-card ._26TOTY.playerCardWrap .ovr{color:#f5e5a7}
+.fco-player-card ._26TOTY.playerCardWrap .nameWrap .name,.fco-player-card ._26TOTY.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._26TOTY.playerCardWrap .nameWrap .name span,.fco-player-card ._26TOTY.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._26TOTN.playerCardWrap .position,.fco-player-card ._26TOTN.playerCardWrap .pay span,.fco-player-card ._26TOTN.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._26TOTN.playerCardWrap .nameWrap .name,.fco-player-card ._26TOTN.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._26TOTN.playerCardWrap .nameWrap .name span,.fco-player-card ._26TOTN.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._BOE21.playerCardWrap .position,.fco-player-card ._BOE21.playerCardWrap .pay span,.fco-player-card ._BOE21.playerCardWrap .ovr{color:#530815}
+.fco-player-card ._BTB.playerCardWrap .position,.fco-player-card ._BTB.playerCardWrap .pay span,.fco-player-card ._BTB.playerCardWrap .ovr{color:#fff94a}
+.fco-player-card ._BDO.playerCardWrap .position,.fco-player-card ._BDO.playerCardWrap .pay span,.fco-player-card ._BDO.playerCardWrap .ovr{color:#ffefc3}
+.fco-player-card ._BDO.playerCardWrap .nameWrap .name,.fco-player-card ._BDO.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._BDO.playerCardWrap .nameWrap .name span,.fco-player-card ._BDO.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._BLD.playerCardWrap .position,.fco-player-card ._BLD.playerCardWrap .pay span,.fco-player-card ._BLD.playerCardWrap .ovr{color:#f1d698}
+.fco-player-card ._BLD.playerCardWrap .nameWrap .name,.fco-player-card ._BLD.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._BLD.playerCardWrap .nameWrap .name span,.fco-player-card ._BLD.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._BWC.playerCardWrap .position,.fco-player-card ._BWC.playerCardWrap .pay span,.fco-player-card ._BWC.playerCardWrap .ovr{color:#ffebb4}
+.fco-player-card ._CAP.playerCardWrap .position,.fco-player-card ._CAP.playerCardWrap .pay span,.fco-player-card ._CAP.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._CC.playerCardWrap .position,.fco-player-card ._CC.playerCardWrap .pay span,.fco-player-card ._CC.playerCardWrap .ovr{color:#fee596}
+.fco-player-card ._CU.playerCardWrap .position,.fco-player-card ._CU.playerCardWrap .pay span,.fco-player-card ._CU.playerCardWrap .ovr{color:#fce38b}
+.fco-player-card ._CU.playerCardWrap .nameWrap .name,.fco-player-card ._CU.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._CU.playerCardWrap .nameWrap .name span,.fco-player-card ._CU.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._CFA.playerCardWrap .position,.fco-player-card ._CFA.playerCardWrap .pay span,.fco-player-card ._CFA.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._COC.playerCardWrap .position,.fco-player-card ._COC.playerCardWrap .pay span,.fco-player-card ._COC.playerCardWrap .ovr{color:#ffdc74}
+.fco-player-card ._CH.playerCardWrap .position,.fco-player-card ._CH.playerCardWrap .pay span,.fco-player-card ._CH.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._CH.playerCardWrap .nameWrap .name,.fco-player-card ._CH.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._CH.playerCardWrap .nameWrap .name span,.fco-player-card ._CH.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._DC.playerCardWrap .position,.fco-player-card ._DC.playerCardWrap .pay span,.fco-player-card ._DC.playerCardWrap .ovr{color:#ffdc96}
+.fco-player-card ._DCB.playerCardWrap .position,.fco-player-card ._DCB.playerCardWrap .pay span,.fco-player-card ._DCB.playerCardWrap .ovr{color:#ffe7b6}
+.fco-player-card ._DCB.playerCardWrap .nameWrap .name,.fco-player-card ._DCB.playerCardWrap .name_wrap .name{color:#f5e9cf}
+.fco-player-card ._DCB.playerCardWrap .nameWrap .name span,.fco-player-card ._DCB.playerCardWrap .name_wrap .name span{color:#f5e9cf}
+.fco-player-card ._EBS.playerCardWrap .position,.fco-player-card ._EBS.playerCardWrap .pay span,.fco-player-card ._EBS.playerCardWrap .ovr{color:#ede7ad}
+.fco-player-card ._EU24.playerCardWrap .position,.fco-player-card ._EU24.playerCardWrap .pay span,.fco-player-card ._EU24.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._FAC.playerCardWrap .position,.fco-player-card ._FAC.playerCardWrap .pay span,.fco-player-card ._FAC.playerCardWrap .ovr{color:#c1ffff}
+.fco-player-card ._FAC.playerCardWrap .nameWrap .name,.fco-player-card ._FAC.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._FAC.playerCardWrap .nameWrap .name span,.fco-player-card ._FAC.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._FCA.playerCardWrap .position,.fco-player-card ._FCA.playerCardWrap .pay span,.fco-player-card ._FCA.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._FA.playerCardWrap .position,.fco-player-card ._FA.playerCardWrap .pay span,.fco-player-card ._FA.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._GRU.playerCardWrap .position,.fco-player-card ._GRU.playerCardWrap .pay span,.fco-player-card ._GRU.playerCardWrap .ovr{color:#fffcde}
+.fco-player-card ._GRU.playerCardWrap .nameWrap .name,.fco-player-card ._GRU.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._GRU.playerCardWrap .nameWrap .name span,.fco-player-card ._GRU.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._GR.playerCardWrap .position,.fco-player-card ._GR.playerCardWrap .pay span,.fco-player-card ._GR.playerCardWrap .ovr{color:#61521a}
+.fco-player-card ._HOT.playerCardWrap .position,.fco-player-card ._HOT.playerCardWrap .pay span,.fco-player-card ._HOT.playerCardWrap .ovr{color:#fe2b38}
+.fco-player-card ._HRT.playerCardWrap .position,.fco-player-card ._HRT.playerCardWrap .pay span,.fco-player-card ._HRT.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._HRT.playerCardWrap .nameWrap .name,.fco-player-card ._HRT.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._HRT.playerCardWrap .nameWrap .name span,.fco-player-card ._HRT.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._HG.playerCardWrap .position,.fco-player-card ._HG.playerCardWrap .pay span,.fco-player-card ._HG.playerCardWrap .ovr{color:#f5ff51}
+.fco-player-card ._ICON.playerCardWrap .position,.fco-player-card ._ICON.playerCardWrap .pay span,.fco-player-card ._ICON.playerCardWrap .ovr{color:#5d573d}
+.fco-player-card ._ICONTM.playerCardWrap .position,.fco-player-card ._ICONTM.playerCardWrap .pay span,.fco-player-card ._ICONTM.playerCardWrap .ovr{color:#5d573d}
+.fco-player-card ._ICONTM_B.playerCardWrap .position,.fco-player-card ._ICONTM_B.playerCardWrap .pay span,.fco-player-card ._ICONTM_B.playerCardWrap .ovr{color:#5d573d}
+.fco-player-card ._ICON_M.playerCardWrap .position,.fco-player-card ._ICON_M.playerCardWrap .pay span,.fco-player-card ._ICON_M.playerCardWrap .ovr{color:#5d573d}
+.fco-player-card ._JNM.playerCardWrap .position,.fco-player-card ._JNM.playerCardWrap .pay span,.fco-player-card ._JNM.playerCardWrap .ovr{color:#ffffdb}
+.fco-player-card ._JVA.playerCardWrap .position,.fco-player-card ._JVA.playerCardWrap .pay span,.fco-player-card ._JVA.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._LE.playerCardWrap .position,.fco-player-card ._LE.playerCardWrap .pay span,.fco-player-card ._LE.playerCardWrap .ovr{color:#fbdb8f}
+.fco-player-card ._LE.playerCardWrap .nameWrap .name,.fco-player-card ._LE.playerCardWrap .name_wrap .name{color:#fbdb8f}
+.fco-player-card ._LE.playerCardWrap .nameWrap .name span,.fco-player-card ._LE.playerCardWrap .name_wrap .name span{color:#fbdb8f}
+.fco-player-card ._LD.playerCardWrap .position,.fco-player-card ._LD.playerCardWrap .pay span,.fco-player-card ._LD.playerCardWrap .ovr{color:#594a3e}
+.fco-player-card ._LOL.playerCardWrap .position,.fco-player-card ._LOL.playerCardWrap .pay span,.fco-player-card ._LOL.playerCardWrap .ovr{color:#fdaaea}
+.fco-player-card ._LKI.playerCardWrap .position,.fco-player-card ._LKI.playerCardWrap .pay span,.fco-player-card ._LKI.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._LN.playerCardWrap .position,.fco-player-card ._LN.playerCardWrap .pay span,.fco-player-card ._LN.playerCardWrap .ovr{color:#dafd65}
+.fco-player-card ._LA.playerCardWrap .position,.fco-player-card ._LA.playerCardWrap .pay span,.fco-player-card ._LA.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._LH.playerCardWrap .position,.fco-player-card ._LH.playerCardWrap .pay span,.fco-player-card ._LH.playerCardWrap .ovr{color:#f6b3a3}
+.fco-player-card ._MCFC.playerCardWrap .position,.fco-player-card ._MCFC.playerCardWrap .pay span,.fco-player-card ._MCFC.playerCardWrap .ovr{color:#00285e}
+.fco-player-card ._MCICON.playerCardWrap .position,.fco-player-card ._MCICON.playerCardWrap .pay span,.fco-player-card ._MCICON.playerCardWrap .ovr{color:#0f69af}
+.fco-player-card ._MDL.playerCardWrap .position,.fco-player-card ._MDL.playerCardWrap .pay span,.fco-player-card ._MDL.playerCardWrap .ovr{color:#23306e}
+.fco-player-card ._MOG.playerCardWrap .position,.fco-player-card ._MOG.playerCardWrap .pay span,.fco-player-card ._MOG.playerCardWrap .ovr{color:#ff8125}
+.fco-player-card ._MC.playerCardWrap .position,.fco-player-card ._MC.playerCardWrap .pay span,.fco-player-card ._MC.playerCardWrap .ovr{color:#080d39}
+.fco-player-card ._NHD.playerCardWrap .position,.fco-player-card ._NHD.playerCardWrap .pay span,.fco-player-card ._NHD.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._NTG.playerCardWrap .position,.fco-player-card ._NTG.playerCardWrap .pay span,.fco-player-card ._NTG.playerCardWrap .ovr{color:#957d54}
+.fco-player-card ._NO7.playerCardWrap .position,.fco-player-card ._NO7.playerCardWrap .pay span,.fco-player-card ._NO7.playerCardWrap .ovr{color:#1a2a45}
+.fco-player-card ._NO7.playerCardWrap .nameWrap .name,.fco-player-card ._NO7.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._NO7.playerCardWrap .nameWrap .name span,.fco-player-card ._NO7.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._OTW.playerCardWrap .position,.fco-player-card ._OTW.playerCardWrap .pay span,.fco-player-card ._OTW.playerCardWrap .ovr{color:#fc5461}
+.fco-player-card ._RMCF.playerCardWrap .position,.fco-player-card ._RMCF.playerCardWrap .pay span,.fco-player-card ._RMCF.playerCardWrap .ovr{color:#031352}
+.fco-player-card ._RTN.playerCardWrap .position,.fco-player-card ._RTN.playerCardWrap .pay span,.fco-player-card ._RTN.playerCardWrap .ovr{color:#ffe9b5}
+.fco-player-card ._SPL.playerCardWrap .position,.fco-player-card ._SPL.playerCardWrap .pay span,.fco-player-card ._SPL.playerCardWrap .ovr{color:#80ffd6}
+.fco-player-card ._TKL.playerCardWrap .position,.fco-player-card ._TKL.playerCardWrap .pay span,.fco-player-card ._TKL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._TKI.playerCardWrap .position,.fco-player-card ._TKI.playerCardWrap .pay span,.fco-player-card ._TKI.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._TT.playerCardWrap .position,.fco-player-card ._TT.playerCardWrap .pay span,.fco-player-card ._TT.playerCardWrap .ovr{color:#d3c070}
+.fco-player-card ._TB.playerCardWrap .position,.fco-player-card ._TB.playerCardWrap .pay span,.fco-player-card ._TB.playerCardWrap .ovr{color:#2a2c2e}
+.fco-player-card ._TC.playerCardWrap .position,.fco-player-card ._TC.playerCardWrap .pay span,.fco-player-card ._TC.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._UT.playerCardWrap .position,.fco-player-card ._UT.playerCardWrap .pay span,.fco-player-card ._UT.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._UP.playerCardWrap .position,.fco-player-card ._UP.playerCardWrap .pay span,.fco-player-card ._UP.playerCardWrap .ovr{color:#58ffd6}
+.fco-player-card ._VTR.playerCardWrap .position,.fco-player-card ._VTR.playerCardWrap .pay span,.fco-player-card ._VTR.playerCardWrap .ovr{color:#f1debd}
+.fco-player-card ._WC22.playerCardWrap .position,.fco-player-card ._WC22.playerCardWrap .pay span,.fco-player-card ._WC22.playerCardWrap .ovr{color:#ee4}
+.fco-player-card ._WS.playerCardWrap .position,.fco-player-card ._WS.playerCardWrap .pay span,.fco-player-card ._WS.playerCardWrap .ovr{color:#fffade}
+.fco-player-card ._WS.playerCardWrap .nameWrap .name,.fco-player-card ._WS.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._WS.playerCardWrap .nameWrap .name span,.fco-player-card ._WS.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._WB.playerCardWrap .position,.fco-player-card ._WB.playerCardWrap .pay span,.fco-player-card ._WB.playerCardWrap .ovr{color:#fff7be}
+.fco-player-card ._WB.playerCardWrap .nameWrap .name,.fco-player-card ._WB.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._WB.playerCardWrap .nameWrap .name span,.fco-player-card ._WB.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._26KL.playerCardWrap .position,.fco-player-card ._26KL.playerCardWrap .pay span,.fco-player-card ._26KL.playerCardWrap .ovr{color:#fff}
+.fco-player-card ._26KL.playerCardWrap .nameWrap .name,.fco-player-card ._26KL.playerCardWrap .name_wrap .name{color:#fff}
+.fco-player-card ._26KL.playerCardWrap .nameWrap .name span,.fco-player-card ._26KL.playerCardWrap .name_wrap .name span{color:#fff}
+.fco-player-card ._SH.playerCardWrap .position,.fco-player-card ._SH.playerCardWrap .pay span,.fco-player-card ._SH.playerCardWrap .ovr{color:#f0f2fa}
+.fco-player-card ._SH.playerCardWrap .nameWrap .name,.fco-player-card ._SH.playerCardWrap .name_wrap .name{color:#f0f2fa}
+.fco-player-card ._SH.playerCardWrap .nameWrap .name span,.fco-player-card ._SH.playerCardWrap .name_wrap .name span{color:#f0f2fa}
+.fco-player-card ._PTG.playerCardWrap .position,.fco-player-card ._PTG.playerCardWrap .pay span,.fco-player-card ._PTG.playerCardWrap .ovr{color:#fcfcf7}
+.fco-player-card ._PTG.playerCardWrap .nameWrap .name,.fco-player-card ._PTG.playerCardWrap .name_wrap .name{color:#fcfcf7}
+.fco-player-card ._PTG.playerCardWrap .nameWrap .name span,.fco-player-card ._PTG.playerCardWrap .name_wrap .name span{color:#fcfcf7}
+.fco-player-card ._TK.playerCardWrap .position,.fco-player-card ._TK.playerCardWrap .pay span,.fco-player-card ._TK.playerCardWrap .ovr{color:#584838}
+.fco-player-card ._TK.playerCardWrap .nameWrap .name,.fco-player-card ._TK.playerCardWrap .name_wrap .name{color:#584838}
+.fco-player-card ._TK.playerCardWrap .nameWrap .name span,.fco-player-card ._TK.playerCardWrap .name_wrap .name span{color:#584838}

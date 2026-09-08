@@ -1,3 +1,5 @@
+import { createOfficialPlayerCardHtml } from "./player-card.js";
+
 import {
     apiBaseUrl,
 } from "./config.js";
@@ -3252,18 +3254,7 @@ function createPlayerCardHtml(
                             class="player-database-player-photo-wrap"
                         >
 
-                            <img
-                                src="${escapeHtml(
-                                    player.image_url
-                                    ?? ""
-                                )}"
-                                alt="${escapeHtml(
-                                    player.player_name
-                                )}"
-                                class="player-database-player-photo"
-                                data-player-image
-                                loading="lazy"
-                            >
+                            ${createOfficialPlayerCardHtml(player)}
 
                         </div>
 
@@ -4457,17 +4448,7 @@ function createRecommendBasePlayerHtml(
                     </div>
 
                     <div class="player-recommend-base-photo-wrap">
-                        <img
-                            src="${escapeHtml(
-                                player.image_url
-                                ?? ""
-                            )}"
-                            alt="${escapeHtml(
-                                player.player_name
-                            )}"
-                            class="player-recommend-base-photo"
-                            data-player-image
-                        >
+                        ${createOfficialPlayerCardHtml(player)}
                     </div>
                 </div>
 
@@ -6930,17 +6911,7 @@ function createComparePlayerSummaryHtml(
 
                 <div class="player-compare-photo-wrap">
 
-                    <img
-                        src="${escapeHtml(
-                            player.image_url
-                            ?? ""
-                        )}"
-                        alt="${escapeHtml(
-                            player.player_name
-                        )}"
-                        class="player-compare-photo"
-                        data-player-image
-                    >
+                    ${createOfficialPlayerCardHtml(player)}
 
                 </div>
 
