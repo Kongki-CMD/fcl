@@ -657,7 +657,10 @@ class LockedSquadService:
 
         cache = {}
         failed = False
-        deadline = monotonic() + 35
+
+        started_at = monotonic()
+        deadline = started_at + 35
+
         best = None
 
         # 후보와 외부 시세 요청 수를 제한한다.
@@ -750,9 +753,19 @@ class LockedSquadService:
 
                             try:
                                 cache[spid] = future.result()
-                            except Exception:
+
+                            except Exception as error:
                                 cache[spid] = None
                                 failed = True
+
+                                print(
+                                    "[QUICK SQUAD LOCKED] PRICE FAILED",
+                                    "spid=", spid,
+                                    "type=", type(error).__name__,
+                                    "error=", str(error),
+                                    "cause=", repr(error.__cause__),
+                                    flush=True,
+                                )
 
                 finally:
                     for future in futures:
@@ -868,6 +881,31 @@ class LockedSquadService:
                 break
 
         if best is None:
+            print(
+                "[QUICK SQUAD LOCKED] NO SQUAD",
+                "mode=", getattr(request, "budget_mode", "legacy"),
+                "grade=", request.enhancement_grade,
+                "locked=", len(fixed),
+                "remaining_slots=", len(remaining),
+                "budget=", remaining_budget,
+                "salary=", remaining_salary,
+                "prices_checked=", len(cache),
+                "prices_success=", sum(
+                    1 for value in cache.values()
+                    if value
+                ),
+                "prices_failed=", sum(
+                    1 for value in cache.values()
+                    if value is None
+                ),
+                "elapsed=", round(
+                    monotonic() - started_at,
+                    2,
+                ),
+                "deadline_reached=", monotonic() >= deadline,
+                flush=True,
+            )
+
             if failed or monotonic() >= deadline:
                 raise HTTPException(
                     503,
