@@ -5,6 +5,7 @@ import secrets
 import hashlib
 import hmac
 import secrets
+import heapq
 
 
 from pathlib import Path
@@ -27054,64 +27055,57 @@ class QuickSquadRecommendRequest(BaseModel):
 def get_quick_squad_cached_prices(
     sp_id: int,
 ):
+    numeric_sp_id = int(sp_id)
+    current_time = time.time()
 
-    numeric_sp_id = int(
-        sp_id
+    cached_item = quick_squad_price_cache.get(
+        numeric_sp_id
     )
-
-
-    current_time = (
-        time.time()
-    )
-
-
-    cached_item = (
-        quick_squad_price_cache.get(
-            numeric_sp_id
-        )
-    )
-
 
     if (
         cached_item
-        and
-        current_time
-        <
-        cached_item[
-            "expires_at"
-        ]
+        and current_time < cached_item["expires_at"]
     ):
+        return cached_item["prices"]
 
-        return (
-            cached_item[
-                "prices"
-            ]
-        )
-
-
-    prices = (
-        get_fconline_player_market_prices(
-            numeric_sp_id
-        )
+    prices = get_fconline_player_market_prices(
+        numeric_sp_id
     )
 
+    # 만료된 캐시부터 정리
+    expired_keys = [
+        key
+        for key, item in quick_squad_price_cache.items()
+        if current_time >= item["expires_at"]
+    ]
 
-    quick_squad_price_cache[
-        numeric_sp_id
-    ] = {
-        "expires_at":
-            (
-                current_time
-                +
-                QUICK_SQUAD_PRICE_CACHE_SECONDS
+    for key in expired_keys:
+        quick_squad_price_cache.pop(key, None)
+
+    # 메모리 캐시는 최대 512명분만 유지
+    if len(quick_squad_price_cache) >= 512:
+        oldest_key = min(
+            quick_squad_price_cache,
+            key=lambda key: (
+                quick_squad_price_cache[key]["expires_at"]
             ),
+        )
 
-        "prices":
-            prices,
+        quick_squad_price_cache.pop(
+            oldest_key,
+            None,
+        )
+
+    quick_squad_price_cache[numeric_sp_id] = {
+        "expires_at": (
+            current_time
+            + QUICK_SQUAD_PRICE_CACHE_SECONDS
+        ),
+        "prices": prices,
     }
 
-
     return prices
+
 
 def is_valid_quick_squad_market_prices(
     prices,
@@ -28830,7 +28824,7 @@ def get_fixed_quick_squad_options(
     }
 
     if unique_rows:
-        with ThreadPoolExecutor(max_workers=8) as executor:
+        with ThreadPoolExecutor(max_workers=4) as executor:
             for sp_id, prices in executor.map(
                 fetch_prices,
                 unique_rows.values(),
@@ -28892,18 +28886,16 @@ def search_fixed_quick_squad(
     budget_bp: int,
 ):
     """
-    급여·예산·이름 중복을 지키는 11명 조합 탐색.
-
-    품질이 높은 조합을 먼저 찾고,
-    비슷한 품질의 조합 중 예산을 많이 쓰는
-    구성을 선택한다. 후보 수를 제한한 휴리스틱이다.
+    메모리 제한형 고정 강화 조합 탐색.
+    매 단계에서 상위 상태만 유지하고,
+    모든 조합을 리스트에 쌓지 않는다.
     """
 
-    if len(options_by_slot) != 11:
+    if len(options_by_slot) != 11 or budget_bp <= 0:
         return None
 
-    # 포지션별 후보를 가격/능력치/급여 측면에서
-    # 다양하게 남겨 한쪽으로 치우치지 않게 한다.
+    # 자리별 후보를 능력치·가격·급여 기준으로 다양하게 확보
+    # 한 자리당 최대 40개까지만 탐색한다.
     prepared = []
 
     for options in options_by_slot:
@@ -28917,7 +28909,7 @@ def search_fixed_quick_squad(
 
         values = list(unique.values())
 
-        selections = [
+        groups = [
             sorted(
                 values,
                 key=lambda p: (
@@ -28925,21 +28917,21 @@ def search_fixed_quick_squad(
                     p["price"],
                     p["salary"],
                 ),
-            )[:32],
+            )[:14],
             sorted(
                 values,
                 key=lambda p: (
                     p["price"],
                     -p["ovr"],
                 ),
-            )[:24],
+            )[:12],
             sorted(
                 values,
                 key=lambda p: (
                     -p["price"],
                     -p["ovr"],
                 ),
-            )[:24],
+            )[:10],
             sorted(
                 values,
                 key=lambda p: (
@@ -28947,19 +28939,24 @@ def search_fixed_quick_squad(
                     -p["ovr"],
                     p["price"],
                 ),
-            )[:16],
+            )[:10],
         ]
 
         chosen = {}
 
-        for group in selections:
+        for group in groups:
             for option in group:
-                chosen[option["sp_id"]] = option
+                if len(chosen) >= 40:
+                    break
+
+                chosen.setdefault(
+                    int(option["sp_id"]),
+                    option,
+                )
 
         prepared.append(list(chosen.values()))
 
-    # 선택지가 적은 포지션부터 배치하면
-    # 동일 선수 중복으로 막히는 경우를 줄일 수 있다.
+    # 후보가 적은 자리부터 탐색
     order = sorted(
         range(11),
         key=lambda index: len(prepared[index]),
@@ -28967,166 +28964,185 @@ def search_fixed_quick_squad(
 
     ordered = [prepared[index] for index in order]
 
-    min_prices = [
-        min(p["price"] for p in options)
-        for options in ordered
-    ]
-
-    min_salaries = [
-        min(p["salary"] for p in options)
-        for options in ordered
-    ]
-
+    # 남은 자리의 최소 비용·급여
+    # 불가능한 조합은 미리 제거한다.
     remaining_min_price = [0] * 12
     remaining_min_salary = [0] * 12
 
     for index in range(10, -1, -1):
         remaining_min_price[index] = (
             remaining_min_price[index + 1]
-            + min_prices[index]
+            + min(
+                p["price"]
+                for p in ordered[index]
+            )
         )
+
         remaining_min_salary[index] = (
             remaining_min_salary[index + 1]
-            + min_salaries[index]
+            + min(
+                p["salary"]
+                for p in ordered[index]
+            )
         )
 
-    # state:
-    # (선택 선수, 사용 이름, 가격, 급여, OVR 합계)
+    if (
+        remaining_min_price[0] > budget_bp
+        or remaining_min_salary[0] > QUICK_SQUAD_SALARY_CAP
+    ):
+        return None
+
+    # state = (선택 선수, 사용 이름, 비용, 급여, OVR 합계)
     initial = ((), frozenset(), 0, 0, 0)
-    completed = []
+    beam = [initial]
 
-    for mode in ("quality", "balanced", "spend"):
-        beam = [initial]
+    # 각 기준별 최대 유지 상태 수
+    BEAM_WIDTH = 32
+    sequence = 0
 
-        for depth, options in enumerate(ordered):
-            next_states = []
+    def push_bounded(heap, rank, state):
+        nonlocal sequence
 
-            for selected, names, cost, salary, quality in beam:
-                for option in options:
-                    name_key = (
-                        str(option["player_name"])
-                        .strip()
-                        .casefold()
-                    )
+        sequence += 1
+        entry = (rank, sequence, state)
 
-                    if name_key in names:
-                        continue
+        if len(heap) < BEAM_WIDTH:
+            heapq.heappush(heap, entry)
+        elif rank > heap[0][0]:
+            heapq.heapreplace(heap, entry)
 
-                    next_cost = cost + option["price"]
-                    next_salary = salary + option["salary"]
+    for depth, options in enumerate(ordered):
+        quality_heap = []
+        spend_heap = []
+        cheap_heap = []
 
-                    if (
-                        next_cost
-                        + remaining_min_price[depth + 1]
-                        > budget_bp
-                    ):
-                        continue
+        for selected, names, cost, salary, quality in beam:
+            for option in options:
+                name_key = (
+                    str(option["player_name"])
+                    .strip()
+                    .casefold()
+                )
 
-                    if (
-                        next_salary
-                        + remaining_min_salary[depth + 1]
-                        > QUICK_SQUAD_SALARY_CAP
-                    ):
-                        continue
+                if name_key in names:
+                    continue
 
-                    next_states.append((
-                        selected + (option,),
-                        names | {name_key},
+                next_cost = cost + int(option["price"])
+                next_salary = salary + int(option["salary"])
+
+                if (
+                    next_cost
+                    + remaining_min_price[depth + 1]
+                    > budget_bp
+                ):
+                    continue
+
+                if (
+                    next_salary
+                    + remaining_min_salary[depth + 1]
+                    > QUICK_SQUAD_SALARY_CAP
+                ):
+                    continue
+
+                next_quality = quality + int(option["ovr"])
+
+                state = (
+                    selected + (option,),
+                    names | {name_key},
+                    next_cost,
+                    next_salary,
+                    next_quality,
+                )
+
+                # 능력치 우선
+                push_bounded(
+                    quality_heap,
+                    (
+                        next_quality,
+                        -next_cost,
+                        -next_salary,
+                    ),
+                    state,
+                )
+
+                # 예산 활용 우선
+                push_bounded(
+                    spend_heap,
+                    (
                         next_cost,
-                        next_salary,
-                        quality + option["ovr"],
-                    ))
-
-            if not next_states:
-                beam = []
-                break
-
-            if mode == "quality":
-                ranking = lambda s: (
-                    s[4],
-                    -s[2],
-                    -s[3],
-                )
-            elif mode == "balanced":
-                ranking = lambda s: (
-                    s[4] - 4 * s[2] / budget_bp,
-                    s[4],
-                    s[2],
-                )
-            else:
-                ranking = lambda s: (
-                    s[2],
-                    s[4],
-                    -s[3],
+                        next_quality,
+                        -next_salary,
+                    ),
+                    state,
                 )
 
-            # 품질 상위 상태뿐 아니라 저비용 상태도
-            # 보존해 뒤쪽 포지션의 예산을 확보한다.
-            quality_states = sorted(
-                next_states,
-                key=ranking,
-                reverse=True,
-            )[:120]
+                # 저비용 조합도 유지해
+                # 뒤쪽 선수의 예산 부족을 방지
+                push_bounded(
+                    cheap_heap,
+                    (
+                        -next_cost,
+                        -next_salary,
+                        next_quality,
+                    ),
+                    state,
+                )
 
-            cheap_states = sorted(
-                next_states,
-                key=lambda s: (
-                    s[2],
-                    s[3],
-                    -s[4],
-                ),
-            )[:40]
+        if not quality_heap and not spend_heap and not cheap_heap:
+            return None
 
-            merged = {}
-            for state in quality_states + cheap_states:
+        # 각 기준별 최대 32개, 총 96개 이하만 유지
+        merged = {}
+
+        for heap in (
+            quality_heap,
+            spend_heap,
+            cheap_heap,
+        ):
+            for _, _, state in heap:
                 key = (
                     state[1],
                     state[2],
                     state[3],
                 )
+
                 previous = merged.get(key)
 
                 if previous is None or state[4] > previous[4]:
                     merged[key] = state
 
-            beam = list(merged.values())
+        beam = list(merged.values())
 
-        completed.extend(beam)
-
-    if not completed:
+    if not beam:
         return None
 
-    best_quality = max(state[4] for state in completed)
+    best_quality = max(state[4] for state in beam)
 
-    # 최고 OVR 합계에서 최대 11 이내인 조합을
-    # 경쟁력 있는 조합으로 보고 예산 사용량을 우선한다.
-    quality_floor = best_quality - 11
-
+    # 최고 OVR 합계에서 11 이내인 경쟁력 있는 조합 중
+    # 예산을 가장 많이 사용하는 조합을 선택
     eligible = [
         state
-        for state in completed
-        if state[4] >= quality_floor
+        for state in beam
+        if state[4] >= best_quality - 11
     ]
 
     best = max(
         eligible,
-        key=lambda s: (
-            s[2],
-            s[4],
-            -s[3],
+        key=lambda state: (
+            state[2],
+            state[4],
+            -state[3],
         ),
     )
 
-    selected_ordered = best[0]
     selected_players = [None] * 11
 
     for ordered_index, original_index in enumerate(order):
         selected_players[original_index] = dict(
-            selected_ordered[ordered_index]
+            best[0][ordered_index]
         )
 
     return selected_players
-
 
 def recommend_fixed_quick_squad(
     team_color_id: int,
@@ -29146,8 +29162,8 @@ def recommend_fixed_quick_squad(
 
     # 1차 후보로 구성하고, 불가능하면 후보 범위를 넓힌다.
     for per_salary_limit, total_limit in (
-        (5, 600),
-        (12, 1800),
+        (3, 120),
+        (6, 240),
     ):
         candidate_rows = (
             get_fixed_quick_squad_candidate_rows(
