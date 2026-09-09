@@ -18,6 +18,16 @@
 
     <link rel="stylesheet" href="./css/quick-squad-detail.css?v=3">
 
+    <link
+        rel="stylesheet"
+        href="./css/quick-squad-locks.css?v=1"
+    >
+
+    <link
+        rel="stylesheet"
+        href="./css/quick-squad-budget.css?v=2"
+    >
+
 </head>
 
 
@@ -218,6 +228,135 @@
 
                 </div>
 
+                <!-- 예산 배분 -->
+                <fieldset
+                    id="quick-squad-budget-panel"
+                    class="qs-budget-panel"
+                >
+                    <legend>예산 배분</legend>
+
+                    <div class="qs-budget-choices">
+                        <label class="qs-budget-choice">
+                            <input
+                                type="radio"
+                                name="qs-budget-mode"
+                                value="core"
+                                checked
+                            >
+
+                            <span>
+                                <strong>코어 우선</strong>
+                                <small>
+                                    공격·미드필더·중앙수비수 집중
+                                </small>
+                            </span>
+                        </label>
+
+                        <label class="qs-budget-choice">
+                            <input
+                                type="radio"
+                                name="qs-budget-mode"
+                                value="balanced"
+                            >
+
+                            <span>
+                                <strong>균등 배분</strong>
+                                <small>
+                                    모든 포지션을 고르게
+                                </small>
+                            </span>
+                        </label>
+                    </div>
+
+                    <div
+                        class="qs-budget-strength"
+                        data-qs-budget-strength-wrap
+                    >
+                        <div class="qs-budget-strength-heading">
+                            <label for="quick-squad-core-strength">
+                                코어 투자 강도
+                            </label>
+
+                            <output data-qs-budget-strength-value>
+                                2.0배
+                            </output>
+                        </div>
+
+                        <input
+                            id="quick-squad-core-strength"
+                            data-qs-budget-strength
+                            type="range"
+                            min="100"
+                            max="300"
+                            step="10"
+                            value="200"
+                        >
+
+                        <div class="qs-budget-strength-marks">
+                            <span>1.0배</span>
+                            <span>2.0배</span>
+                            <span>3.0배</span>
+                        </div>
+                    </div>
+
+                    <p
+                        class="qs-budget-explanation"
+                        data-qs-budget-explanation
+                    ></p>
+
+                    <div class="qs-budget-preview">
+                        <div>
+                            <span>
+                                코어
+                                <b data-qs-budget-core-count>0명</b>
+                            </span>
+
+                            <strong data-qs-budget-core-target>-</strong>
+                        </div>
+
+                        <div>
+                            <span>
+                                기타
+                                <b data-qs-budget-other-count>0명</b>
+                            </span>
+
+                            <strong data-qs-budget-other-target>-</strong>
+                        </div>
+
+                        <div class="qs-budget-share">
+                            <span>코어 목표 비중</span>
+                            <strong data-qs-budget-core-share>0%</strong>
+                        </div>
+                    </div>
+
+                    <div
+                        class="qs-budget-actual"
+                        data-qs-budget-actual
+                        hidden
+                    >
+                        <span>실제 추천 배분</span>
+
+                        <p>
+                            코어
+                            <strong data-qs-budget-actual-core>-</strong>
+
+                            · 기타
+                            <strong data-qs-budget-actual-other>-</strong>
+                        </p>
+
+                        <small>
+                            실제 코어 비중
+                            <b data-qs-budget-actual-share>0%</b>
+                        </small>
+                    </div>
+
+                    <p class="qs-budget-note">
+                        목표 비율은 강제 상한이 아닙니다.
+                        실제 선수 시세와 급여에 따라 달라질 수 있으며,
+                        고정 선수 비용은 먼저 차감합니다.
+                    </p>
+                </fieldset>
+
 
                 <!-- 추천 버튼 -->
 
@@ -237,6 +376,77 @@
                 포지션별 선수를 조합합니다.
             </p>
 
+        </section>
+
+        <!-- =================================
+            LOCKED PLAYERS
+        ================================== -->
+
+        <section
+            id="quick-squad-locked-panel"
+            class="qs-lock-panel"
+        >
+            <div class="qs-lock-heading">
+                <div>
+                    <h2>
+                        고정 선수
+                        <span data-qs-lock-count>0 / 11</span>
+                    </h2>
+
+                    <p>
+                        선택한 시즌과 강화를 유지하고
+                        나머지 포지션만 추천합니다.
+                    </p>
+                </div>
+
+                <a
+                    class="qs-lock-add"
+                    href="./player-database.html"
+                >
+                    + 선수도감에서 추가
+                </a>
+            </div>
+
+            <div
+                data-qs-lock-list
+                class="qs-lock-list"
+            ></div>
+
+            <div class="qs-lock-summary">
+                <span>
+                    고정 선수 금액
+                    <strong data-qs-lock-total>-</strong>
+                </span>
+
+                <span>
+                    고정 급여
+                    <strong data-qs-lock-salary>0 / 310</strong>
+                </span>
+
+                <span>
+                    남은 추천 예산
+                    <strong data-qs-lock-remaining>-</strong>
+                </span>
+            </div>
+
+            <p class="qs-lock-help">
+                고정 선수의 강화등급은 전체 강화 필터보다 우선합니다.
+                나머지 선수만 선택한 강화로 추천됩니다.
+            </p>
+
+            <p
+                class="qs-lock-error"
+                data-qs-lock-error
+                role="status"
+            ></p>
+
+            <button
+                type="button"
+                class="qs-lock-clear"
+                data-qs-lock-clear
+            >
+                고정 선수 전체 해제
+            </button>
         </section>
 
 

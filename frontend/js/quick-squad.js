@@ -6,6 +6,18 @@ import {
     createQuickSquadDetailModal,
 } from "./quick-squad-detail.js?v=3";
 
+import {
+    createQuickSquadLockController,
+} from "./quick-squad-locks.js?v=1";
+
+import {
+    readQuickSquadLocks,
+} from "./quick-squad-locks.js?v=1";
+
+import {
+    createQuickSquadBudgetController,
+} from "./quick-squad-budget.js?v=1";
+
 // =========================================
 // DOM
 // =========================================
@@ -104,6 +116,10 @@ let currentQuickSquadPlayerModalData = null;
 let currentQuickSquadSlots = [];
 
 let currentQuickSquadResult = null;
+
+let quickSquadLocksController = null;
+
+let quickSquadBudgetController = null;
 
 // =========================================
 // 기존에 위치를 확정한 포메이션
@@ -1080,6 +1096,10 @@ function renderQuickSquadFormation() {
                 formation;
     }
 
+    quickSquadLocksController?.syncFormation();
+
+    quickSquadBudgetController?.clearResult();
+
 }
 
 
@@ -1620,7 +1640,7 @@ function createQuickSquadPlayerHtml(
         >
 
             <div
-                class="quick-squad-player-card"
+                class="quick-squad-player-card ${player.locked ? "quick-squad-player-card-locked" : ""}"
                 data-quick-squad-player-index="${index}"
             >
 
@@ -1642,6 +1662,9 @@ function createQuickSquadPlayerHtml(
                     class="quick-squad-player-image"
                 >
 
+                ${player.locked
+                    ? '<span class="qs-lock-field-badge">고정</span>'
+                    : ""}
 
                 <div
                     class="quick-squad-player-name-row"
@@ -1707,6 +1730,56 @@ function createQuickSquadPlayerHtml(
 
         </div>
     `;
+
+}
+
+function renderQuickSquadLockedPreview(players) {
+    const arranged = Array(11).fill(null);
+
+    for (const player of players) {
+        if (
+            Number.isInteger(player.slot_index)
+            && player.slot_index >= 0
+            && player.slot_index < 11
+        ) {
+            arranged[player.slot_index] = player;
+        }
+    }
+
+    currentQuickSquadResult = players.length
+        ? {players: arranged}
+        : null;
+
+    quickSquadPlayerLayerElement.innerHTML =
+        currentQuickSquadSlots
+            .map((slot, index) =>
+                arranged[index]
+                    ? createQuickSquadPlayerHtml(
+                        arranged[index],
+                        slot,
+                        index
+                    )
+                    : createQuickSquadPlaceholderHtml(slot)
+            )
+            .join("");
+
+    if (quickSquadSummaryTotalPriceElement) {
+        quickSquadSummaryTotalPriceElement.textContent = "-";
+    }
+
+    if (quickSquadSummarySalaryElement) {
+        quickSquadSummarySalaryElement.textContent = "-";
+    }
+
+    if (
+        quickSquadResultStatusElement
+        && players.length
+    ) {
+        quickSquadResultStatusElement.textContent =
+            `고정 선수 ${players.length}명 · 나머지 자리 추천 대기`;
+    }
+
+    quickSquadBudgetController?.clearResult();
 
 }
 
@@ -1865,6 +1938,11 @@ function renderQuickSquadResult(
                     )
                 );
     }
+
+    quickSquadBudgetController?.showResult(
+        data.budget_allocation
+    );
+
 
 }
 
@@ -2150,7 +2228,6 @@ async function generateQuickSquad() {
             100_000_000
         );
 
-
     const requestBody = {
         team_color_id:
             teamColorId,
@@ -2162,14 +2239,23 @@ async function generateQuickSquad() {
             formation,
 
         slots:
-            currentQuickSquadSlots
-                .map(
-                    slot =>
-                        slot.position
-                ),
+            currentQuickSquadSlots.map(
+                slot => slot.position
+            ),
 
         enhancement_grade:
             enhancementGrade,
+
+        locked_players: [],
+
+        ...(
+            quickSquadBudgetController
+                ?.getPreferences()
+            ?? {
+                budget_mode: "core",
+                core_strength: 200,
+            }
+        ),
     };
 
 
@@ -2203,6 +2289,9 @@ async function generateQuickSquad() {
 
 
     try {
+
+        requestBody.locked_players =
+            await quickSquadLocksController.collect(budgetBp);
 
         const response =
             await fetch(
@@ -2346,17 +2435,18 @@ quickSquadFormationElement
 
 
 quickSquadTeamColorElement
-    ?.addEventListener(
-        "change",
-        updateQuickSquadConditionSummary
-    );
+    ?.addEventListener("change", () => {
+        updateQuickSquadConditionSummary();
+        quickSquadLocksController?.refresh();
+    });
 
 
 quickSquadBudgetElement
-    ?.addEventListener(
-        "input",
-        updateQuickSquadConditionSummary
-    );
+    ?.addEventListener("input", () => {
+        updateQuickSquadConditionSummary();
+        quickSquadLocksController?.updateBudget();
+        quickSquadBudgetController?.clearResult();
+    });
 
 document.querySelectorAll(
     "[data-quick-squad-player-close]"
@@ -2398,6 +2488,109 @@ async function initializeQuickSquad() {
                 loadQuickSquadFormations(),
             ]
         );
+
+    if (!quickSquadLocksController) {
+        quickSquadLocksController =
+            createQuickSquadLockController({
+                apiBaseUrl,
+
+                root: document.getElementById(
+                    "quick-squad-locked-panel"
+                ),
+
+                getSlots: () => currentQuickSquadSlots,
+
+                getTeamColorId: () =>
+                    quickSquadTeamColorElement.value,
+
+                getBudgetBp: () =>
+                    Math.round(
+                        Number(
+                            quickSquadBudgetElement.value || 0
+                        ) * 100_000_000
+                    ),
+
+                formatPrice: formatQuickSquadBp,
+
+                onChange: renderQuickSquadLockedPreview,
+            });
+    }
+
+    const preferredTeam =
+        quickSquadLocksController.preferredTeamColorId();
+
+        if (
+            !quickSquadTeamColorElement.value
+            && preferredTeam
+            && [...quickSquadTeamColorElement.options]
+                .some(option =>
+                    Number(option.value) === preferredTeam
+                )
+        ) {
+            quickSquadTeamColorElement.value =
+                String(preferredTeam);
+        }
+
+    await quickSquadLocksController.initialize();
+
+    if (!quickSquadBudgetController) {
+        quickSquadBudgetController =
+            createQuickSquadBudgetController({
+                root: document.getElementById(
+                    "quick-squad-budget-panel"
+                ),
+
+                getSlots: () => {
+                    return currentQuickSquadSlots;
+                },
+
+                getBudgetBp: () => {
+                    const budgetEok = Number(
+                        quickSquadBudgetElement.value || 0
+                    );
+
+                    return Math.round(
+                        budgetEok * 100_000_000
+                    );
+                },
+
+                getLockedPlayers: () => {
+                    const saved = new Map(
+                        readQuickSquadLocks().map(
+                            player => [
+                                player.sp_id,
+                                player,
+                            ]
+                        )
+                    );
+
+                    return (
+                        quickSquadLocksController
+                            ?.getPreview()
+                        || []
+                    ).map(player => ({
+                        ...player,
+
+                        slot_index:
+                            saved.get(player.sp_id)
+                                ?.slot_index
+                            ?? null,
+                    }));
+                },
+
+                formatPrice:
+                    formatQuickSquadBp,
+
+                onPreferenceChange: () => {
+                    if (quickSquadResultStatusElement) {
+                        quickSquadResultStatusElement
+                            .textContent =
+                                "예산 배분이 변경되었습니다. "
+                                + "추천 버튼을 눌러 새 조합을 생성하세요.";
+                    }
+                },
+            });
+    }
 
 
     updateQuickSquadConditionSummary();

@@ -1,0 +1,267 @@
+/* 선수도감 -> 퀵 스쿼드 고정 선수 */
+
+.qs-register-button {
+    display: block;
+    width: 100%;
+    margin-top: 18px;
+    padding: 13px 18px;
+    border: 1px solid #64748b;
+    border-radius: 10px;
+    background: #26364b;
+    color: #fff;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.qs-register-button:hover {
+    background: #334c68;
+}
+
+.qs-register-button:disabled {
+    opacity: .55;
+    cursor: wait;
+}
+
+.qs-lock-panel {
+    margin: 20px 0;
+    padding: 24px;
+    border: 1px solid rgba(148, 163, 184, .24);
+    border-radius: 16px;
+    background: rgba(15, 23, 42, .64);
+    color: #e5e7eb;
+}
+
+.qs-lock-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
+.qs-lock-heading h2 {
+    margin: 0 0 6px;
+    font-size: 20px;
+}
+
+.qs-lock-heading h2 span {
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+.qs-lock-heading p {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.qs-lock-add {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 15px;
+    border-radius: 8px;
+    background: #334155;
+    color: #fff;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.qs-lock-add:hover {
+    background: #475569;
+}
+
+.qs-lock-list {
+    display: grid;
+    gap: 10px;
+}
+
+.qs-lock-empty {
+    margin: 8px 0;
+    padding: 18px;
+    text-align: center;
+    color: #94a3b8;
+    border: 1px dashed #475569;
+    border-radius: 10px;
+    font-size: 13px;
+}
+
+.qs-lock-row {
+    display: grid;
+    grid-template-columns:
+        56px minmax(0, 1fr) minmax(150px, 210px) auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
+    border: 1px solid rgba(148, 163, 184, .2);
+    border-radius: 10px;
+    background: rgba(30, 41, 59, .6);
+}
+
+.qs-lock-image {
+    width: 56px;
+    height: 66px;
+    object-fit: contain;
+}
+
+.qs-lock-info {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+}
+
+.qs-lock-info strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.qs-lock-info span {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+
+.qs-lock-warning {
+    color: #fca5a5;
+    font-size: 12px;
+}
+
+.qs-lock-placement {
+    display: grid;
+    gap: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.qs-lock-placement select {
+    min-width: 0;
+    width: 100%;
+    padding: 9px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: #0f172a;
+    color: #fff;
+    font: inherit;
+}
+
+.qs-lock-remove,
+.qs-lock-clear {
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: transparent;
+    color: #cbd5e1;
+    padding: 9px 12px;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+}
+
+.qs-lock-remove:hover,
+.qs-lock-clear:hover {
+    border-color: #f87171;
+    color: #fca5a5;
+}
+
+.qs-lock-clear:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+.qs-lock-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    margin-top: 16px;
+    padding: 14px;
+    background: rgba(15, 23, 42, .65);
+    border-radius: 8px;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.qs-lock-summary span {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+}
+
+.qs-lock-summary strong {
+    color: #f1f5f9;
+    font-size: 13px;
+}
+
+.qs-lock-help {
+    margin: 12px 0 0;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.qs-lock-error {
+    min-height: 0;
+    margin: 10px 0;
+    color: #fca5a5;
+    font-size: 13px;
+}
+
+.qs-lock-error:empty {
+    display: none;
+}
+
+.qs-lock-clear {
+    margin-top: 10px;
+}
+
+.quick-squad-player-card-locked {
+    outline: 1px solid rgba(250, 204, 21, .8);
+    outline-offset: 2px;
+}
+
+.qs-lock-field-badge {
+    display: block;
+    position: relative;
+    z-index: 2;
+    margin: 2px auto;
+    width: fit-content;
+    padding: 2px 5px;
+    background: #854d0e;
+    border-radius: 4px;
+    color: #fef3c7;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .qs-lock-panel {
+        padding: 16px;
+    }
+
+    .qs-lock-row {
+        grid-template-columns:
+            46px minmax(0, 1fr) auto;
+        gap: 10px;
+    }
+
+    .qs-lock-image {
+        width: 46px;
+        height: 58px;
+    }
+
+    .qs-lock-placement {
+        grid-column: 2 / 4;
+        grid-row: 2;
+    }
+
+    .qs-lock-remove {
+        grid-column: 3;
+        grid-row: 1;
+    }
+
+    .qs-lock-summary {
+        display: grid;
+    }
+}

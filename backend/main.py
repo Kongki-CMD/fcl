@@ -22,6 +22,12 @@ from backend.player_catalog import (
     recommend_player_catalog,
 )
 
+from backend.quick_squad_locked import (
+    LockedPlayerInput,
+    LockedPreviewRequest,
+    LockedSquadService,
+)
+
 import re
 
 import httpx
@@ -49,6 +55,7 @@ from fastapi.staticfiles import StaticFiles
 
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
+from typing import Literal
 
 
 
@@ -27045,12 +27052,38 @@ QUICK_SQUAD_PRICE_CACHE_SECONDS = (
 quick_squad_price_cache = {}
 
 
+
 class QuickSquadRecommendRequest(BaseModel):
     team_color_id: int
     budget_bp: int
     formation: str
     slots: list[str]
-    enhancement_grade: int | None = None
+
+    enhancement_grade: int | None = Field(
+        default=None,
+        ge=1,
+        le=13,
+        strict=True,
+    )
+
+    locked_players: list[LockedPlayerInput] = Field(
+        default_factory=list,
+        max_length=11,
+    )
+
+    # 기존 API 요청은 이전 추천 방식을 유지한다.
+    budget_mode: Literal[
+        "legacy",
+        "balanced",
+        "core",
+    ] = "legacy"
+
+    core_strength: int = Field(
+        default=200,
+        ge=100,
+        le=300,
+        strict=True,
+    )
 
 def get_quick_squad_cached_prices(
     sp_id: int,
@@ -29281,6 +29314,36 @@ def recommend_fixed_quick_squad(
         },
     }
 
+# =========================================
+# QUICK SQUAD - LOCKED PLAYERS
+# =========================================
+
+def create_locked_squad_service():
+    return LockedSquadService(
+        db=get_db_connection,
+        prices=get_quick_squad_cached_prices,
+        candidates=get_fixed_quick_squad_candidate_rows,
+        positions=QUICK_SQUAD_POSITION_CANDIDATES,
+        bonus=QUICK_SQUAD_ENHANCEMENT_BONUS,
+        team_name=get_quick_squad_team_name,
+        valid_prices=is_valid_quick_squad_market_prices,
+        cap=QUICK_SQUAD_SALARY_CAP,
+    )
+
+
+@app.post("/api/quick-squad/locked/preview")
+def preview_quick_squad_locked(
+    request_data: LockedPreviewRequest,
+):
+    players = create_locked_squad_service().resolve(
+        request_data.locked_players,
+        team_color_id=request_data.team_color_id,
+    )
+
+    return {
+        "players": players,
+    }
+
 @app.post(
     "/api/quick-squad/recommend"
 )
@@ -29374,6 +29437,18 @@ def recommend_quick_squad(
             detail=(
                 "포메이션에 GK가 없습니다."
             ),
+        )
+
+    # =====================================
+    # 선수도감에서 고정한 선수 우선
+    # =====================================
+
+    if (
+        request_data.locked_players
+        or request_data.budget_mode != "legacy"
+    ):
+        return create_locked_squad_service().recommend(
+            request_data
         )
 
     # =====================================

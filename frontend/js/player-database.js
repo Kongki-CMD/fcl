@@ -2,6 +2,10 @@ import {
     apiBaseUrl,
 } from "./config.js";
 
+import {
+    addQuickSquadLock,
+} from "./quick-squad-locks.js?v=1";
+
 const playerCompareModalElement =
     document.querySelector(
         "#player-compare-modal"
@@ -3470,6 +3474,14 @@ function createPlayerCardHtml(
                 </div>
 
             </div>
+
+            <button
+                type="button"
+                class="qs-register-button"
+                data-quick-squad-register="${player.sp_id}"
+            >
+                퀵 스쿼드에 등록
+            </button>
 
         </article>
     `;
@@ -8986,6 +8998,110 @@ function initializePlayerImageFallbacks(
 // =========================================
 // EVENTS
 // =========================================
+
+// =========================================
+// REGISTER TO QUICK SQUAD
+// =========================================
+
+playerResultListElement.addEventListener(
+    "click",
+    async event => {
+        const button = event.target.closest(
+            "button[data-quick-squad-register]"
+        );
+
+        if (!button) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        const spId = Number(
+            button.dataset.quickSquadRegister
+        );
+
+        const player = playerDataBySpId.get(spId);
+        const grade = getPlayerCardState(spId).grade;
+
+        if (!player) {
+            return;
+        }
+
+        button.disabled = true;
+        button.textContent = "등록 중...";
+
+        try {
+            let market = playerMarketPriceBySpId.get(spId);
+
+            if (!market) {
+                const response = await fetch(
+                    `${apiBaseUrl}`
+                    + `/api/player-database/price/${spId}`
+                    + `?grade=${grade}`
+                );
+
+                market = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        typeof market.detail === "string"
+                            ? market.detail
+                            : "시세 조회에 실패했습니다."
+                    );
+                }
+
+                playerMarketPriceBySpId.set(
+                    spId,
+                    market
+                );
+            }
+
+            const price = market.prices
+                ?.find(item =>
+                    Number(item.grade) === grade
+                )
+                ?.price;
+
+            if (
+                !Number.isFinite(Number(price))
+                || Number(price) <= 0
+            ) {
+                throw new Error(
+                    `+${grade}강의 시세가 없어 등록할 수 없습니다.`
+                );
+            }
+
+            addQuickSquadLock({
+                sp_id: spId,
+                grade,
+                player_name: player.player_name,
+                position: player.position,
+                preferred_team_color_id: selectedTeamColorId,
+            });
+
+            window.location.assign(
+                "./quick-squad.html"
+            );
+
+        } catch (error) {
+            alert(
+                error.message
+                || "선수 등록에 실패했습니다."
+            );
+
+            const current = playerResultListElement.querySelector(
+                `button[data-quick-squad-register="${spId}"]`
+            );
+
+            if (current) {
+                current.disabled = false;
+                current.textContent =
+                    "퀵 스쿼드에 등록";
+            }
+        }
+    }
+);
 
 playerResultListElement
     .addEventListener(

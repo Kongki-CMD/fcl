@@ -1,0 +1,258 @@
+/* =========================================
+   QUICK SQUAD BUDGET ALLOCATION
+========================================= */
+
+.qs-budget-panel {
+    grid-column: 1 / -1;
+    min-width: 0;
+    margin: 0;
+    padding: 18px;
+
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 12px;
+
+    background: rgba(15, 23, 42, 0.65);
+    color: #e5e7eb;
+}
+
+.qs-budget-panel legend {
+    padding: 0 8px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+
+/* =========================================
+   코어 우선 / 균등 배분 버튼
+========================================= */
+
+.qs-budget-choices {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.qs-budget-choice {
+    position: relative;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.qs-budget-choice input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+.qs-budget-choice span {
+    display: grid;
+    gap: 5px;
+    padding: 14px;
+
+    border: 1px solid #475569;
+    border-radius: 10px;
+
+    background: rgba(30, 41, 59, 0.75);
+
+    transition:
+        background 0.15s,
+        border-color 0.15s;
+}
+
+.qs-budget-choice input:checked + span {
+    border-color: #a78bfa;
+    background: rgba(109, 40, 217, 0.2);
+}
+
+.qs-budget-choice input:focus-visible + span {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 3px;
+}
+
+.qs-budget-choice strong {
+    font-size: 14px;
+    color: #f8fafc;
+}
+
+.qs-budget-choice small {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #94a3b8;
+}
+
+
+/* =========================================
+   코어 투자 강도 슬라이더
+========================================= */
+
+.qs-budget-strength {
+    margin-top: 20px;
+}
+
+.qs-budget-strength[hidden],
+.qs-budget-actual[hidden] {
+    display: none;
+}
+
+.qs-budget-strength-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+
+    font-size: 13px;
+    color: #cbd5e1;
+}
+
+.qs-budget-strength-heading output {
+    font-size: 14px;
+    font-weight: 700;
+    color: #ddd6fe;
+}
+
+.qs-budget-strength input[type="range"] {
+    display: block;
+    width: 100%;
+    margin: 0;
+
+    accent-color: #a78bfa;
+    cursor: pointer;
+}
+
+.qs-budget-strength-marks {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-top: 8px;
+
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+
+/* =========================================
+   설명 문구
+========================================= */
+
+.qs-budget-explanation,
+.qs-budget-note {
+    margin: 14px 0 0;
+
+    font-size: 12px;
+    line-height: 1.7;
+    color: #94a3b8;
+}
+
+
+/* =========================================
+   목표 예산 표시
+========================================= */
+
+.qs-budget-preview {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+
+    margin-top: 16px;
+}
+
+.qs-budget-preview > div {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 14px;
+
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 10px;
+
+    background: rgba(30, 41, 59, 0.6);
+}
+
+.qs-budget-preview span {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.qs-budget-preview span b {
+    color: #cbd5e1;
+}
+
+.qs-budget-preview strong {
+    font-size: 16px;
+    font-weight: 700;
+    color: #f8fafc;
+    overflow-wrap: anywhere;
+}
+
+.qs-budget-preview .qs-budget-share {
+    grid-column: 1 / -1;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+
+/* =========================================
+   실제 추천 예산 배분
+========================================= */
+
+.qs-budget-actual {
+    margin-top: 14px;
+    padding: 14px;
+
+    border-left: 3px solid #a78bfa;
+    border-radius: 6px;
+
+    background: rgba(109, 40, 217, 0.12);
+
+    font-size: 12px;
+    color: #cbd5e1;
+}
+
+.qs-budget-actual > span {
+    font-weight: 700;
+    color: #c4b5fd;
+}
+
+.qs-budget-actual p {
+    margin: 8px 0;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+.qs-budget-actual strong {
+    color: #f8fafc;
+}
+
+.qs-budget-actual small {
+    color: #cbd5e1;
+}
+
+
+/* =========================================
+   모바일
+========================================= */
+
+@media (max-width: 480px) {
+    .qs-budget-panel {
+        padding: 14px;
+    }
+
+    .qs-budget-choices {
+        grid-template-columns: 1fr;
+    }
+
+    .qs-budget-preview {
+        gap: 8px;
+    }
+
+    .qs-budget-preview strong {
+        font-size: 13px;
+    }
+}
