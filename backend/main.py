@@ -28816,6 +28816,209 @@ def get_fixed_quick_squad_candidate_rows(
 
             return cursor.fetchall()
 
+def get_budget_quick_squad_candidate_rows(
+    team_color_id: int,
+    slots: list[str],
+    per_salary_limit: int = 2,
+    total_limit: int = 48,
+):
+    """
+    예산 배분용 후보 수집.
+    모든 포지션을 한 번의 SQL로 조회하고,
+    급여 구간별 고/저 OVR 후보를 함께 확보한다.
+    """
+    unique_slots = list(dict.fromkeys(
+        str(slot).strip().upper()
+        for slot in slots
+    ))
+
+    if not unique_slots:
+        return []
+
+    per_slot = max(
+        1,
+        total_limit // len(unique_slots),
+    )
+
+    rank_limit = max(
+        1,
+        min(2, per_salary_limit // 2),
+    )
+
+    specifications = [
+        (
+            index,
+            QUICK_SQUAD_POSITION_CANDIDATES.get(
+                slot,
+                [slot],
+            ),
+        )
+        for index, slot in enumerate(unique_slots)
+    ]
+
+    placeholders = ", ".join(
+        ["(%s::integer, %s::text[])"]
+        * len(specifications)
+    )
+
+    parameters = [
+        value
+        for specification in specifications
+        for value in specification
+    ]
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                WITH requested(
+                    slot_index,
+                    positions
+                ) AS (
+                    VALUES {placeholders}
+                ),
+                eligible AS (
+                    SELECT
+                        r.slot_index,
+                        p.sp_id,
+                        p.player_name,
+                        p.season_id,
+                        p.image_url,
+                        p.position,
+                        p.salary,
+                        p.ovr,
+                        CASE
+                            WHEN p.salary <= 15 THEN 0
+                            WHEN p.salary <= 22 THEN 1
+                            WHEN p.salary <= 28 THEN 2
+                            ELSE 3
+                        END AS salary_band
+                    FROM requested r
+                    JOIN fconline_players p
+                        ON p.position = ANY(r.positions)
+                    WHERE COALESCE(p.salary, 0)
+                        BETWEEN 1 AND %s
+                    AND COALESCE(p.ovr, 0) > 0
+                    AND EXISTS (
+                        SELECT 1
+                        FROM fconline_player_teams t
+                        WHERE t.sp_id = p.sp_id
+                        AND t.team_color_id = %s
+                    )
+                ),
+                ranked AS (
+                    SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                slot_index,
+                                salary_band
+                            ORDER BY
+                                ovr DESC,
+                                sp_id DESC
+                        ) AS best_rank,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                slot_index,
+                                salary_band
+                            ORDER BY
+                                ovr ASC,
+                                sp_id DESC
+                        ) AS cheap_rank
+                    FROM eligible
+                )
+                SELECT
+                    slot_index,
+                    salary_band,
+                    best_rank,
+                    cheap_rank,
+                    sp_id,
+                    player_name,
+                    season_id,
+                    image_url,
+                    position,
+                    salary,
+                    ovr
+                FROM ranked
+                WHERE
+                    best_rank <= %s
+                    OR cheap_rank <= %s
+                ORDER BY
+                    slot_index,
+                    salary_band,
+                    best_rank,
+                    cheap_rank
+                """,
+                (
+                    *parameters,
+                    QUICK_SQUAD_SALARY_CAP - 10,
+                    team_color_id,
+                    rank_limit,
+                    rank_limit,
+                ),
+            )
+
+            rows = cursor.fetchall()
+
+    # 급여 구간별로 후보를 교차 선택한다.
+    # 한 구간의 선수만 앞쪽에 몰리지 않도록 한다.
+    groups = {
+        i: {
+            band: {
+                "best": {},
+                "cheap": {},
+            }
+            for band in range(4)
+        }
+        for i in range(len(unique_slots))
+    }
+
+    for row in rows:
+        index = int(row["slot_index"])
+        band = int(row["salary_band"])
+
+        if row["best_rank"] <= rank_limit:
+            groups[index][band]["best"][
+                int(row["best_rank"])
+            ] = row
+
+        if row["cheap_rank"] <= rank_limit:
+            groups[index][band]["cheap"][
+                int(row["cheap_rank"])
+            ] = row
+
+    selected = {}
+
+    for index in range(len(unique_slots)):
+        slot_selected = {}
+
+        for rank in range(1, rank_limit + 1):
+            for kind in ("best", "cheap"):
+                for band in range(4):
+                    row = (
+                        groups[index][band][kind]
+                        .get(rank)
+                    )
+
+                    if row is None:
+                        continue
+
+                    spid = int(row["sp_id"])
+
+                    slot_selected.setdefault(
+                        spid,
+                        row,
+                    )
+
+        for row in list(
+            slot_selected.values()
+        )[:per_slot]:
+            selected.setdefault(
+                int(row["sp_id"]),
+                row,
+            )
+
+    return list(selected.values())
 
 def get_fixed_quick_squad_options(
     candidate_rows: list[dict],
@@ -29323,13 +29526,13 @@ def create_locked_squad_service():
         db=get_db_connection,
         prices=get_quick_squad_cached_prices,
         candidates=get_fixed_quick_squad_candidate_rows,
+        budget_candidates=get_budget_quick_squad_candidate_rows,
         positions=QUICK_SQUAD_POSITION_CANDIDATES,
         bonus=QUICK_SQUAD_ENHANCEMENT_BONUS,
         team_name=get_quick_squad_team_name,
         valid_prices=is_valid_quick_squad_market_prices,
         cap=QUICK_SQUAD_SALARY_CAP,
     )
-
 
 @app.post("/api/quick-squad/locked/preview")
 def preview_quick_squad_locked(

@@ -53,7 +53,17 @@ class LockedSquadService:
         team_name,
         valid_prices,
         cap=310,
+        budget_candidates=None,
     ):
+        self.db = db
+        self.prices = prices
+        self.candidates = candidates
+        self.budget_candidates = budget_candidates
+        self.positions = positions
+        self.bonus = bonus
+        self.team_name = team_name
+        self.valid_prices = valid_prices
+        self.cap = cap
         self.db = db
         self.prices = prices
         self.candidates = candidates
@@ -659,57 +669,39 @@ class LockedSquadService:
         failed = False
 
         started_at = monotonic()
-        deadline = started_at + 35
+        deadline = started_at + 60
 
         best = None
 
         # 후보와 외부 시세 요청 수를 제한한다.
+        # 1차: 적은 후보로 빠르게 구성.
+        # 2차: 필요한 경우에만 후보 범위를 확대.
         for per_salary, limit in (
-            (3, 72),
-            (6, 144),
+            (2, 48),
+            (4, 96),
         ):
-            if allocation_plan is None:
-                # 기존 추천 방식은 그대로 유지.
-                rows = self.candidates(
-                    request.team_color_id,
-                    [s for _, s in remaining],
-                    per_salary_limit=per_salary,
-                    total_limit=limit,
-                )
+            candidate_source = (
+                self.budget_candidates
+                or self.candidates
+            )
 
-            else:
-                # 새 예산 배분은 특정 포지션의 후보가
-                # 전체 OVR 정렬에 밀리지 않도록
-                # 포지션별로 후보를 확보한다.
-                unique_slots = list(dict.fromkeys(
-                    slot for _, slot in remaining
-                ))
+            rows = candidate_source(
+                request.team_color_id,
+                [s for _, s in remaining],
+                per_salary_limit=per_salary,
+                total_limit=limit,
+            )
 
-                per_slot = min(
-                    24,
-                    max(
-                        8,
-                        limit // len(unique_slots),
-                    ),
-                )
-
-                rows_by_id = {}
-
-                for slot in unique_slots:
-                    slot_rows = self.candidates(
-                        request.team_color_id,
-                        [slot],
-                        per_salary_limit=per_salary,
-                        total_limit=per_slot,
-                    )
-
-                    for row in slot_rows:
-                        rows_by_id.setdefault(
-                            int(row["sp_id"]),
-                            row,
-                        )
-
-                rows = list(rows_by_id.values())
+            print(
+                "[QUICK SQUAD] CANDIDATES",
+                "limit=", limit,
+                "rows=", len(rows),
+                "elapsed=", round(
+                    monotonic() - started_at,
+                    2,
+                ),
+                flush=True,
+            )
 
             unique = {
                 int(row["sp_id"]): row
@@ -723,7 +715,7 @@ class LockedSquadService:
 
             if pending and monotonic() < deadline:
                 executor = ThreadPoolExecutor(
-                    max_workers=2
+                    max_workers=4
                 )
 
                 futures = {
@@ -906,11 +898,18 @@ class LockedSquadService:
                 flush=True,
             )
 
-            if failed or monotonic() >= deadline:
+            if monotonic() >= deadline:
                 raise HTTPException(
                     503,
-                    "시세 조회가 일부 실패했거나 시간 제한에 "
-                    "도달했습니다. 잠시 후 다시 시도해주세요.",
+                    "추천 후보 조회가 시간 제한에 도달했습니다. "
+                    "조회 범위를 줄여 다시 시도해주세요.",
+                )
+
+            if failed:
+                raise HTTPException(
+                    502,
+                    "일부 선수의 실제 시세를 조회하지 못했습니다. "
+                    "잠시 후 다시 시도해주세요.",
                 )
 
             raise HTTPException(
