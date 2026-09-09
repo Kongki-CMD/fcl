@@ -3186,6 +3186,19 @@ function createPlayerCardHtml(
                         class="
                             player-database-recommend-button
                             player-database-recommend-button-row
+                            qs-inline-register-button
+                        "
+                        data-quick-squad-register="${player.sp_id}"
+                        data-sp-id="${player.sp_id}"
+                    >
+                        퀵 스쿼드 등록
+                    </button>
+
+                    <button
+                        type="button"
+                        class="
+                            player-database-recommend-button
+                            player-database-recommend-button-row
                         "
                         data-recommend-player
                         data-sp-id="${player.sp_id}"
@@ -3474,14 +3487,6 @@ function createPlayerCardHtml(
                 </div>
 
             </div>
-
-            <button
-                type="button"
-                class="qs-register-button"
-                data-quick-squad-register="${player.sp_id}"
-            >
-                퀵 스쿼드에 등록
-            </button>
 
         </article>
     `;
@@ -9096,8 +9101,7 @@ playerResultListElement.addEventListener(
 
             if (current) {
                 current.disabled = false;
-                current.textContent =
-                    "퀵 스쿼드에 등록";
+                current.textContent = "퀵 스쿼드 등록";
             }
         }
     }

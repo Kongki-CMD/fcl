@@ -1,3 +1,9 @@
+import {
+    normalizeQuickSquadLockSettings,
+    mergeQuickSquadLockSettings,
+    readSavedQuickSquad,
+} from "./quick-squad-state.js?v=2";
+
 const STORAGE_KEY = "fcl.quick-squad.locks.v1";
 const STORAGE_EVENT = "fcl:quick-squad-locks-changed";
 
@@ -41,6 +47,19 @@ export function readQuickSquadLocks() {
             return [];
         }
 
+        // 이전 버전에서 스쿼드에만 저장했던 설정도
+        // 처음 읽을 때 고정 선수 설정으로 복구한다.
+        const savedSquad = readSavedQuickSquad();
+
+        const legacyPlayers = new Map(
+            (savedSquad?.players || [])
+                .filter(p =>
+                    p?.manual_saved
+                    && positiveInteger(p.sp_id)
+                )
+                .map(p => [Number(p.sp_id), p])
+        );
+
         return raw.slice(0, 11)
             .filter(p =>
                 positiveInteger(p.sp_id)
@@ -48,39 +67,84 @@ export function readQuickSquadLocks() {
                 && p.grade >= 1
                 && p.grade <= 13
             )
-            .map(p => ({
-                sp_id: Number(p.sp_id),
-                grade: Number(p.grade),
-                player_name: String(p.player_name || ""),
-                position: String(p.position || ""),
-                slot_index: (
-                    Number.isInteger(p.slot_index)
-                    && p.slot_index >= 0
-                    && p.slot_index <= 10
-                        ? p.slot_index
-                        : null
-                ),
-                slot_position: String(p.slot_position || ""),
-                preferred_team_color_id: (
-                    positiveInteger(p.preferred_team_color_id)
-                        ? Number(p.preferred_team_color_id)
-                        : null
-                ),
-            }));
+            .map(p => {
+                const legacy = legacyPlayers.get(
+                    Number(p.sp_id)
+                );
+
+                const source =
+                    p.saved_settings === undefined
+                        ? legacy
+                        : p.saved_settings;
+
+                const saved =
+                    normalizeQuickSquadLockSettings(source);
+
+                return {
+                    sp_id: Number(p.sp_id),
+                    grade: Number(p.grade),
+
+                    player_name:
+                        String(p.player_name || ""),
+
+                    position:
+                        String(p.position || ""),
+
+                    slot_index: (
+                        Number.isInteger(p.slot_index)
+                        && p.slot_index >= 0
+                        && p.slot_index <= 10
+                            ? p.slot_index
+                            : null
+                    ),
+
+                    slot_position:
+                        String(p.slot_position || ""),
+
+                    preferred_team_color_id: (
+                        positiveInteger(
+                            p.preferred_team_color_id
+                        )
+                            ? Number(
+                                p.preferred_team_color_id
+                            )
+                            : null
+                    ),
+
+                    saved_settings:
+                        saved?.grade === Number(p.grade)
+                            ? saved
+                            : null,
+                };
+            });
+
     } catch {
         return [];
     }
 }
 
 function saveLocks(entries) {
+    const nextValue = JSON.stringify(entries);
+
+    // 실제 내용이 같으면 다시 저장하거나
+    // 변경 이벤트를 발생시키지 않는다.
+    if (
+        localStorage.getItem(STORAGE_KEY)
+        === nextValue
+    ) {
+        return false;
+    }
+
     localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify(entries)
+        nextValue
     );
 
     window.dispatchEvent(
         new CustomEvent(STORAGE_EVENT)
     );
+
+    return true;
 }
 
 export function addQuickSquadLock(player) {
@@ -130,6 +194,10 @@ export function addQuickSquadLock(player) {
                 ? Number(player.preferred_team_color_id)
                 : same?.preferred_team_color_id ?? null
         ),
+        saved_settings:
+            same?.grade === grade
+                ? same.saved_settings ?? null
+                : null,
     };
 
     if (same) {
@@ -156,12 +224,38 @@ export function createQuickSquadLockController({
     let error = "";
     let generation = 0;
 
+    let loadedKey = null;
+    let pendingKey = null;
+    let pendingPromise = null;
+
     const $ = selector => root.querySelector(selector);
-    const getPlayer = spid =>
-        preview.find(p => p.sp_id === spid);
+    const getDisplayPreview = () =>
+        preview.map(p => {
+            const entry = entries.find(
+                e => e.sp_id === p.sp_id
+            );
+
+            return entry
+                ? mergeQuickSquadLockSettings(p, entry)
+                : {...p};
+        });
+
+    const getPlayer = spid => {
+        const raw = preview.find(
+            p => p.sp_id === spid
+        );
+
+        const entry = entries.find(
+            e => e.sp_id === spid
+        );
+
+        return raw && entry
+            ? mergeQuickSquadLockSettings(raw, entry)
+            : raw;
+    };
 
     const total = () =>
-        preview.reduce(
+        getDisplayPreview().reduce(
             (sum, p) => sum + Number(p.price || 0),
             0
         );
@@ -177,22 +271,13 @@ export function createQuickSquadLockController({
         return positiveInteger(id) ? id : null;
     };
 
-    const persist = () => saveLocks(entries);
+    const persist = () => {
+        invalidatePreview();
+        return saveLocks(entries);
+    };
 
-    const notify = () => onChange(
-        preview.map(p => {
-            const entry = entries.find(
-                e => e.sp_id === p.sp_id
-            );
-
-            return {
-                ...p,
-                slot_index: entry?.slot_index ?? null,
-                slot_position: entry?.slot_position || null,
-                locked: true,
-            };
-        })
-    );
+    const notify = () =>
+        onChange(getDisplayPreview());
 
     function remap(autoAssign = true) {
         const slots = getSlots();
@@ -288,6 +373,49 @@ export function createQuickSquadLockController({
                 ? entries.map(entry => {
                     const p = getPlayer(entry.sp_id);
 
+                    const saved = normalizeQuickSquadLockSettings(
+                        entry.saved_settings
+                    );
+
+                    const hasSaved =
+                        saved?.grade === entry.grade;
+
+                    const displayPrice =
+                        Number(p?.price) > 0
+                            ? Number(p.price)
+                            : (
+                                hasSaved
+                                    ? saved.price
+                                    : null
+                            );
+
+                    const displayOvr =
+                        Number(p?.ovr) > 0
+                            ? Number(p.ovr)
+                            : (
+                                hasSaved
+                                    ? saved.ovr
+                                    : null
+                            );
+
+                    const seasonId = [
+                        p?.season_id,
+                        entry.season_id,
+                        Math.floor(Number(entry.sp_id) / 1_000_000),
+                    ]
+                        .map(value => Number(value))
+                        .find(value =>
+                            Number.isSafeInteger(value)
+                            && value > 0
+                        ) ?? null;
+
+                    const seasonImageUrl = seasonId !== null
+                        ? (
+                            `${apiBaseUrl}`
+                            + `/api/fconline/metadata/seasons/${seasonId}/image`
+                        )
+                        : "";
+
                     const occupied = new Set(
                         entries
                             .filter(e =>
@@ -341,21 +469,51 @@ export function createQuickSquadLockController({
                                     )}
                                 </strong>
 
-                                <span>
-                                    시즌 ${escapeHtml(
-                                        p?.season_id
-                                        || Math.floor(
-                                            entry.sp_id / 1000000
-                                        )
-                                    )}
-                                    · +${entry.grade}
-                                    · 급여 ${p?.salary ?? "-"}
+                                <span class="qs-lock-season-meta">
+                                    ${seasonImageUrl
+                                        ? `
+                                            <img
+                                                src="${escapeHtml(safeImage(seasonImageUrl))}"
+                                                alt="시즌 ${seasonId}"
+                                                class="qs-lock-season-icon"
+                                                loading="lazy"
+                                            >
+                                        `
+                                        : ""
+                                    }
+
+                                    <span>+${entry.grade}</span>
+
+                                    <span class="qs-lock-meta-dot">·</span>
+
+                                    <span>급여 ${p?.salary ?? "-"}</span>
                                 </span>
 
-                                <span>
-                                    ${p
-                                        ? formatPrice(p.price)
-                                        : "시세 확인 중"}
+                                ${hasSaved
+                                    ? `
+                                        <div class="qs-lock-saved-meta">
+                                            ${displayOvr !== null
+                                                ? `<span>OVR ${displayOvr}</span>`
+                                                : ""
+                                            }
+
+                                            <span>
+                                                적응도 ${saved.adaptation}
+                                            </span>
+
+                                            <span>
+                                                팀컬러 +${saved.team_color_bonus}
+                                            </span>
+                                        </div>
+                                    `
+                                    : ""
+                                }
+
+                                <span class="qs-lock-current-price">
+                                    ${displayPrice !== null
+                                        ? formatPrice(displayPrice)
+                                        : "시세 확인 중"
+                                    }
                                 </span>
 
                                 ${p && !p.team_color_match
@@ -405,17 +563,65 @@ export function createQuickSquadLockController({
                 `;
     }
 
-    async function refresh() {
-        const token = ++generation;
+function previewKey() {
+    return JSON.stringify({
+        team_color_id: selectedTeam(),
 
-        if (!entries.length) {
-            preview = [];
-            error = "";
-            render();
-            notify();
-            return;
-        }
+        slots: getSlots().map(
+            slot => slot.position
+        ),
 
+        locked_players: entries.map(
+            ({
+                sp_id,
+                grade,
+                slot_index,
+                slot_position,
+            }) => ({
+                sp_id,
+                grade,
+                slot_index,
+                slot_position,
+            })
+        ),
+    });
+}
+
+function invalidatePreview() {
+    ++generation;
+    loadedKey = null;
+    pendingKey = null;
+    pendingPromise = null;
+}
+
+async function refresh({force = false} = {}) {
+    const key = previewKey();
+
+    // 동일한 요청이 이미 실행 중이면 그 요청을 함께 사용.
+    if (pendingKey === key && pendingPromise) {
+        return pendingPromise;
+    }
+
+    // 조건이 변하지 않았다면 서버를 다시 조회하지 않는다.
+    if (!force && loadedKey === key) {
+        render();
+        return preview;
+    }
+
+    const token = ++generation;
+
+    if (!entries.length) {
+        preview = [];
+        error = "";
+        loadedKey = key;
+        render();
+        notify();
+        return preview;
+    }
+
+    pendingKey = key;
+
+    const work = (async () => {
         try {
             const response = await fetch(
                 `${apiBaseUrl}/api/quick-squad/locked/preview`,
@@ -426,8 +632,13 @@ export function createQuickSquadLockController({
                     },
                     body: JSON.stringify({
                         team_color_id: selectedTeam(),
+
                         locked_players: entries.map(
-                            ({sp_id, grade, slot_index}) => ({
+                            ({
+                                sp_id,
+                                grade,
+                                slot_index,
+                            }) => ({
                                 sp_id,
                                 grade,
                                 slot_index,
@@ -447,30 +658,53 @@ export function createQuickSquadLockController({
                 );
             }
 
-            if (token !== generation) {
-                return;
-            }
+            // 이전 요청의 응답은 현재 상태를 덮어쓰지 않음.
+            if (token !== generation) return preview;
 
-            preview = data.players || [];
+            const checkedAt = new Date().toISOString();
+
+            preview = (data.players || []).map(p => ({
+                ...p,
+                price_checked_at: checkedAt,
+            }));
             error = "";
 
             remap(true);
-            persist();
+
+            // 조회 결과는 저장하지 않는다.
+            // 실제 저장은 사용자가 고정 선수를 변경할 때만 한다.
+            loadedKey = previewKey();
 
         } catch (cause) {
-            if (token !== generation) {
-                return;
-            }
+            if (token !== generation) return preview;
 
-            error = cause.message
+            loadedKey = null;
+            error =
+                cause.message
                 || "고정 선수 정보를 불러오지 못했습니다.";
 
             preview = [];
         }
 
-        render();
-        notify();
+        if (token === generation) {
+            render();
+            notify();
+        }
+
+        return preview;
+    })();
+
+    pendingPromise = work;
+
+    try {
+        return await work;
+    } finally {
+        if (pendingPromise === work) {
+            pendingKey = null;
+            pendingPromise = null;
+        }
     }
+}
 
     function changeSlot(spid, value) {
         const entry = entries.find(p => p.sp_id === spid);
@@ -570,10 +804,20 @@ export function createQuickSquadLockController({
     });
 
     window.addEventListener("storage", event => {
-        if (event.key === STORAGE_KEY) {
-            entries = readQuickSquadLocks();
-            refresh();
+        if (event.key !== STORAGE_KEY) return;
+
+        const next = readQuickSquadLocks();
+
+        if (
+            JSON.stringify(next)
+            === JSON.stringify(entries)
+        ) {
+            return;
         }
+
+        entries = next;
+        invalidatePreview();
+        refresh();
     });
 
     return {
@@ -602,14 +846,73 @@ export function createQuickSquadLockController({
         },
 
         getPreview: () =>
-            preview.map(p => ({...p})),
+            getDisplayPreview().map(p => ({...p})),
+
+    updateSavedSettings(player) {
+        const spid = Number(player.sp_id);
+
+        const saved =
+            normalizeQuickSquadLockSettings(player);
+
+        if (!positiveInteger(spid) || !saved) {
+            throw new Error(
+                "저장할 고정 선수 설정이 올바르지 않습니다."
+            );
+        }
+
+        const entry = entries.find(
+            p => p.sp_id === spid
+        );
+
+        if (!entry) {
+            throw new Error(
+                "고정 선수 목록에서 해당 선수를 찾지 못했습니다."
+            );
+        }
+
+        const nextEntries = entries.map(p =>
+            p.sp_id === spid
+                ? {
+                    ...p,
+                    grade: saved.grade,
+                    saved_settings: saved,
+                }
+                : {...p}
+        );
+
+        // 저장 성공 후에만 메모리 상태를 변경한다.
+        saveLocks(nextEntries);
+
+        entries = nextEntries;
+
+        invalidatePreview();
+
+        // 서버 재조회 없이 현재 패널에 즉시 반영.
+        preview = preview.map(p =>
+            p.sp_id === spid
+                ? {
+                    ...p,
+                    ...saved,
+                    grade: saved.grade,
+                    locked_grade: saved.grade,
+                    manual_saved: true,
+                }
+                : p
+        );
+
+        render();
+
+        // 여기서는 notify()나 refresh()를 호출하지 않는다.
+        // 스쿼드 화면은 저장 함수가 한 번만 갱신한다.
+        return true;
+    },
 
         async collect(budgetBp) {
             if (!entries.length) {
                 return [];
             }
 
-            await refresh();
+            await refresh({force: true});
 
             if (error) {
                 throw new Error(error);

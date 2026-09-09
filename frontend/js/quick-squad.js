@@ -4,19 +4,29 @@ import {
 
 import {
     createQuickSquadDetailModal,
-} from "./quick-squad-detail.js?v=3";
+} from "./quick-squad-detail.js?v=5";
 
 import {
     createQuickSquadLockController,
-} from "./quick-squad-locks.js?v=1";
+} from "./quick-squad-locks.js?v=2";
 
 import {
     readQuickSquadLocks,
-} from "./quick-squad-locks.js?v=1";
+} from "./quick-squad-locks.js?v=2";
 
 import {
     createQuickSquadBudgetController,
-} from "./quick-squad-budget.js?v=1";
+} from "./quick-squad-budget.js?v=3";
+
+import {
+    normalizeQuickSquadResult,
+    createQuickSquadDraft,
+    sameQuickSquadLocks,
+    applyQuickSquadPlayerSettings,
+    readSavedQuickSquad,
+    writeSavedQuickSquad,
+    mergeQuickSquadLockSettings,
+} from "./quick-squad-state.js?v=2";
 
 // =========================================
 // DOM
@@ -105,8 +115,8 @@ const quickSquadPlayerModalBody = document.getElementById(
     "quick-squad-player-modal-body"
 );
 
-const quickSquadPlayerCompareButton = document.getElementById(
-    "quick-squad-player-compare-button"
+const quickSquadPlayerSaveButton = document.getElementById(
+    "quick-squad-player-save-button"
 );
 
 let currentQuickSquadPlayerModalData = null;
@@ -1618,16 +1628,22 @@ function createQuickSquadPlayerHtml(
             player.player_name
         );
 
-    const seasonImageUrl =
-        (
+    const seasonId = [
+        player.season_id,
+        Math.floor(Number(player.sp_id) / 1_000_000),
+    ]
+        .map(value => Number(value))
+        .find(value =>
+            Number.isSafeInteger(value)
+            && value > 0
+        ) ?? null;
+
+    const seasonImageUrl = seasonId !== null
+        ? (
             `${apiBaseUrl}`
-            +
-            "/api/fconline/metadata/seasons/"
-            +
-            `${Number(
-                player.season_id
-            )}/image`
-        );
+            + `/api/fconline/metadata/seasons/${seasonId}/image`
+        )
+        : "";
 
 
     return `
@@ -1670,14 +1686,17 @@ function createQuickSquadPlayerHtml(
                     class="quick-squad-player-name-row"
                 >
 
-                    <img
-                        src="${escapeQuickSquadHtml(
-                            seasonImageUrl
-                        )}"
-                        alt=""
-                        class="quick-squad-player-season-icon"
-                        loading="lazy"
-                    >
+                ${seasonImageUrl
+                    ? `
+                        <img
+                            src="${escapeQuickSquadHtml(seasonImageUrl)}"
+                            alt=""
+                            class="quick-squad-player-season-icon"
+                            loading="lazy"
+                        >
+                    `
+                    : ""
+                }
 
 
                     <strong
@@ -1717,6 +1736,18 @@ function createQuickSquadPlayerHtml(
 
                 </div>
 
+                ${player.manual_saved
+                    ? `
+                        <span class="quick-squad-player-setting-meta">
+                            적${Number(player.adaptation ?? 1)}
+                            · 팀+${Number(
+                                player.team_color_bonus ?? 0
+                            )}
+                        </span>
+                    `
+                    : ""
+                }
+
 
                 <span
                     class="quick-squad-player-price"
@@ -1734,53 +1765,58 @@ function createQuickSquadPlayerHtml(
 }
 
 function renderQuickSquadLockedPreview(players) {
-    const arranged = Array(11).fill(null);
+    const previous = currentQuickSquadResult;
 
-    for (const player of players) {
-        if (
-            Number.isInteger(player.slot_index)
-            && player.slot_index >= 0
-            && player.slot_index < 11
-        ) {
-            arranged[player.slot_index] = player;
-        }
-    }
+    const context = {
+        team_color_id:
+            Number(quickSquadTeamColorElement.value) || null,
 
-    currentQuickSquadResult = players.length
-        ? {players: arranged}
-        : null;
+        team_name:
+            quickSquadTeamColorElement
+                .selectedOptions[0]?.textContent || "-",
 
-    quickSquadPlayerLayerElement.innerHTML =
-        currentQuickSquadSlots
-            .map((slot, index) =>
-                arranged[index]
-                    ? createQuickSquadPlayerHtml(
-                        arranged[index],
-                        slot,
-                        index
-                    )
-                    : createQuickSquadPlaceholderHtml(slot)
-            )
-            .join("");
+        formation:
+            quickSquadFormationElement.value,
 
-    if (quickSquadSummaryTotalPriceElement) {
-        quickSquadSummaryTotalPriceElement.textContent = "-";
-    }
+        budget_bp:
+            Math.round(
+                Number(quickSquadBudgetElement.value || 0)
+                * 100_000_000
+            ),
 
-    if (quickSquadSummarySalaryElement) {
-        quickSquadSummarySalaryElement.textContent = "-";
-    }
+        salary_cap: 310,
+    };
 
+    const sameContext =
+        previous
+        && previous.formation === context.formation
+        && Number(previous.team_color_id)
+            === Number(context.team_color_id);
+
+    // 동일한 고정 선수의 단순 재조회라면
+    // 완성된 추천 또는 저장 스쿼드를 덮어쓰지 않는다.
     if (
-        quickSquadResultStatusElement
-        && players.length
+        sameContext
+        && !previous.is_draft
+        && sameQuickSquadLocks(
+            previous.players,
+            players
+        )
     ) {
-        quickSquadResultStatusElement.textContent =
-            `고정 선수 ${players.length}명 · 나머지 자리 추천 대기`;
+        quickSquadBudgetController?.refresh();
+        return;
     }
 
-    quickSquadBudgetController?.clearResult();
+    // 고정 선수만 있는 상태도 11개의 슬롯으로 관리한다.
+    // 기존에 저장한 수동 설정이 있다면 같은 선수에 유지한다.
+    const draft = createQuickSquadDraft(
+        players,
+        sameContext ? previous : null,
+        context,
+        currentQuickSquadSlots
+    );
 
+    renderQuickSquadResult(draft);
 }
 
 
@@ -1788,12 +1824,15 @@ function renderQuickSquadResult(
     data
 ) {
 
-    const players =
-        (
-            data.players
-            ??
-            []
-        );
+    const normalized = normalizeQuickSquadResult(
+        data,
+        currentQuickSquadSlots
+    );
+
+    currentQuickSquadResult = normalized;
+    data = normalized;
+
+    const players = data.players;
 
 
     if (
@@ -1808,30 +1847,20 @@ function renderQuickSquadResult(
     }
 
 
-    quickSquadPlayerLayerElement
-        .innerHTML =
-            players
-                .map(
-                    (
+    quickSquadPlayerLayerElement.innerHTML =
+        players
+            .map((player, index) =>
+                player
+                    ? createQuickSquadPlayerHtml(
                         player,
+                        currentQuickSquadSlots[index],
                         index
-                    ) => {
-
-                        return (
-                            createQuickSquadPlayerHtml(
-                                player,
-                                currentQuickSquadSlots[
-                                    index
-                                ],
-                                index
-                            )
-                        );
-
-                    }
-                )
-                .join(
-                    ""
-                );
+                    )
+                    : createQuickSquadPlaceholderHtml(
+                        currentQuickSquadSlots[index]
+                    )
+            )
+            .join("");
 
 
     if (
@@ -1928,15 +1957,36 @@ function renderQuickSquadResult(
         quickSquadResultStatusElement
     ) {
 
-        quickSquadResultStatusElement
-            .textContent =
-                (
-                    "추천 완료 · 남은 예산 "
-                    +
-                    formatQuickSquadBp(
-                        data.remaining_budget
-                    )
+        if (quickSquadResultStatusElement) {
+            const remaining = Number(
+                data.remaining_budget ?? 0
+            );
+
+            const prefix = data.is_draft
+                ? (
+                    data.manually_modified
+                        ? "고정 선수 설정 저장됨"
+                        : `고정 선수 ${data.locked_count}명 · 나머지 자리 추천 대기`
+                )
+                : (
+                    data.manually_modified
+                        ? "저장된 카드 설정"
+                        : "추천 완료"
                 );
+
+            quickSquadResultStatusElement.textContent =
+                remaining < 0
+                    ? (
+                        `${prefix} · 예산 초과 `
+                        + formatQuickSquadBp(
+                            Math.abs(remaining)
+                        )
+                    )
+                    : (
+                        `${prefix} · 남은 예산 `
+                        + formatQuickSquadBp(remaining)
+                    );
+        }
     }
 
     quickSquadBudgetController?.showResult(
@@ -1982,9 +2032,14 @@ quickSquadPlayerLayerElement
                 return;
             }
 
-            openQuickSquadPlayerModal(
-                player
-            );
+            openQuickSquadPlayerModal({
+                ...player,
+
+                slot_index: playerIndex,
+
+                slot_position:
+                    currentQuickSquadSlots[playerIndex].position,
+            });
         }
     );
 
@@ -2061,6 +2116,69 @@ function updateQuickSquadConditionSummary() {
 
 }
 
+async function saveQuickSquadPlayerSettings(
+    summary,
+    selection
+) {
+    const data = currentQuickSquadResult;
+    const slotIndex = summary.slot_index;
+
+    if (
+        !Number.isInteger(slotIndex)
+        || slotIndex < 0
+        || slotIndex >= 11
+        || !data?.players?.[slotIndex]
+        || Number(data.players[slotIndex].sp_id)
+            !== Number(summary.sp_id)
+    ) {
+        throw new Error(
+            "현재 스쿼드에서 해당 선수를 찾지 못했습니다."
+        );
+    }
+
+    const originalPlayer = data.players[slotIndex];
+
+    const next = applyQuickSquadPlayerSettings(
+        data,
+        slotIndex,
+        selection,
+        currentQuickSquadSlots
+    );
+
+    // 고정 선수라면 추천용 강화등급도 변경.
+    if (originalPlayer.locked) {
+        next.players[slotIndex].locked_grade =
+            Number(selection.grade);
+    }
+
+    const savedKey = "fcl.quick-squad.saved.v1";
+    const previousSaved = localStorage.getItem(savedKey);
+
+    // 먼저 스쿼드 저장을 시도한다.
+    writeSavedQuickSquad(next);
+
+    try {
+        if (originalPlayer.locked) {
+            quickSquadLocksController.updateSavedSettings(
+                next.players[slotIndex]
+            );
+        }
+
+    } catch (error) {
+        // 고정 선수 저장이 실패하면 이전 스쿼드 저장본 복원.
+        if (previousSaved === null) {
+            localStorage.removeItem(savedKey);
+        } else {
+            localStorage.setItem(savedKey, previousSaved);
+        }
+
+        throw error;
+    }
+
+    // 두 저장이 끝난 뒤 화면을 한 번만 갱신.
+    renderQuickSquadResult(next);
+}
+
 // =========================================
 // QUICK SQUAD PLAYER DETAIL
 // =========================================
@@ -2076,11 +2194,14 @@ const quickSquadDetailModal =
         body:
             quickSquadPlayerModalBody,
 
-        compareButton:
-            quickSquadPlayerCompareButton,
+        saveButton:
+            quickSquadPlayerSaveButton,
 
         formatPrice:
             formatQuickSquadBp,
+
+        onSave:
+            saveQuickSquadPlayerSettings,
     });
 
 
@@ -2361,13 +2482,43 @@ async function generateQuickSquad() {
             );
         }
 
-        currentQuickSquadResult =
-            data;
-
-
-        renderQuickSquadResult(
-            data
+        const savedLocks = new Map(
+            readQuickSquadLocks().map(entry => [
+                entry.sp_id,
+                entry,
+            ])
         );
+
+        const playersWithSettings = data.players.map(player => {
+            if (!player.locked) {
+                return player;
+            }
+
+            const entry = savedLocks.get(
+                Number(player.sp_id)
+            );
+
+            return entry
+                ? mergeQuickSquadLockSettings(player, entry)
+                : player;
+        });
+
+        const result = normalizeQuickSquadResult(
+            {
+                ...data,
+                players: playersWithSettings,
+
+                manually_modified:
+                    playersWithSettings.some(
+                        player => player.manual_saved
+                    ),
+            },
+            currentQuickSquadSlots
+        );
+
+        currentQuickSquadResult = result;
+
+        renderQuickSquadResult(result);
 
 
     } catch (error) {
@@ -2623,6 +2774,112 @@ async function initializeQuickSquad() {
                         "설정해주세요."
                     );
     }
+
+   // 마지막 저장본은 서버 추천과 별도로 복원한다.
+const savedSquad = readSavedQuickSquad();
+
+if (savedSquad) {
+    const formationOption = [
+        ...quickSquadFormationElement.options
+    ].find(
+        option =>
+            option.value === savedSquad.formation
+    );
+
+    const teamOption = [
+        ...quickSquadTeamColorElement.options
+    ].find(
+        option =>
+            Number(option.value)
+            === Number(savedSquad.team_color_id)
+    );
+
+    if (formationOption && teamOption) {
+        const expectedSlots =
+            getQuickSquadFormationSlots(
+                savedSquad.formation
+            );
+
+        const expectedPositions =
+            expectedSlots.map(slot => slot.position);
+
+        const savedPositions =
+            savedSquad.slot_positions;
+
+        const positionsValid =
+            !savedPositions.some(Boolean)
+            || JSON.stringify(savedPositions)
+                === JSON.stringify(expectedPositions);
+
+        if (positionsValid) {
+            quickSquadFormationElement.value =
+                savedSquad.formation;
+
+            quickSquadTeamColorElement.value =
+                String(savedSquad.team_color_id);
+
+            quickSquadBudgetElement.value =
+                String(
+                    Number(savedSquad.budget_bp)
+                    / 100_000_000
+                );
+
+            if (quickSquadEnhancementGradeElement) {
+                const grade =
+                    savedSquad.enhancement_grade;
+
+                const optionValue =
+                    grade == null
+                        ? "auto"
+                        : String(grade);
+
+                if (
+                    [...quickSquadEnhancementGradeElement.options]
+                        .some(
+                            option =>
+                                option.value === optionValue
+                        )
+                ) {
+                    quickSquadEnhancementGradeElement.value =
+                        optionValue;
+                }
+            }
+
+            renderQuickSquadFormation();
+            updateQuickSquadConditionSummary();
+
+            quickSquadLocksController?.updateBudget();
+
+            try {
+                const restored =
+                    normalizeQuickSquadResult(
+                        savedSquad,
+                        currentQuickSquadSlots
+                    );
+
+                if (
+                    sameQuickSquadLocks(
+                        restored.players,
+                        quickSquadLocksController.getPreview()
+                    )
+                ) {
+                    renderQuickSquadResult(restored);
+
+                } else if (quickSquadResultStatusElement) {
+                    quickSquadResultStatusElement.textContent =
+                        "저장본과 현재 고정 선수 구성이 다릅니다. "
+                        + "저장본은 삭제하지 않았습니다.";
+                }
+
+            } catch (error) {
+                console.warn(
+                    "저장 스쿼드 복원 실패:",
+                    error
+                );
+            }
+        }
+    }
+}
 
 }
 

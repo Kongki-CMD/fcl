@@ -20,12 +20,12 @@
 
     <link
         rel="stylesheet"
-        href="./css/quick-squad-locks.css?v=1"
+        href="./css/quick-squad-locks.css?v=2"
     >
 
     <link
         rel="stylesheet"
-        href="./css/quick-squad-budget.css?v=2"
+        href="./css/quick-squad-budget.css?v=4"
     >
 
 </head>
@@ -725,12 +725,20 @@
                 닫기
             </button>
 
+            <p
+                class="qs-detail-save-status"
+                data-qs-save-status
+                role="status"
+                aria-live="polite"
+            ></p>
+
             <button
                 type="button"
                 class="quick-squad-player-modal-primary-button"
-                id="quick-squad-player-compare-button"
+                id="quick-squad-player-save-button"
+                disabled
             >
-                비교에 추가
+                저장
             </button>
         </div>
     </section>
@@ -756,7 +764,7 @@
 
     <script
         type="module"
-        src="./js/quick-squad.js"
+        src="./js/quick-squad.js?v=6"
     ></script>
 
 </body>

@@ -1,6 +1,11 @@
 // Quick Squad player detail controller
 export function createQuickSquadDetailModal({
-    apiBaseUrl, modal, body, compareButton, formatPrice,
+    apiBaseUrl,
+    modal,
+    body,
+    saveButton,
+    formatPrice,
+    onSave,
 }) {
     const titleWrap = modal.querySelector(".quick-squad-player-modal-title-wrap");
     if (titleWrap) {
@@ -17,6 +22,11 @@ export function createQuickSquadDetailModal({
     let generation = 0;
     let previousFocus = null;
     let previousOverflow = "";
+    let saving = false;
+
+    const saveStatus = modal.querySelector(
+        "[data-qs-save-status]"
+    );
 
     const $ = (selector) => body.querySelector(selector);
     const all = (selector) => [...body.querySelectorAll(selector)];
@@ -156,8 +166,32 @@ const footHtml = (
     }
 
     function selectedPrice() {
-        const item = state.prices?.find((row) => number(row.grade) === state.grade);
-        return item ? number(item.price) : null;
+        const item = state?.prices?.find(
+            row => number(row.grade) === state.grade
+        );
+
+        const price = number(item?.price);
+
+        return Number.isFinite(price) && price > 0
+            ? price
+            : null;
+    }
+
+    function syncSaveButton() {
+        if (!saveButton) return;
+
+        const canSave = (
+            Boolean(state?.detail)
+            && state?.priceStatus === "ready"
+            && selectedPrice() !== null
+            && !saving
+        );
+
+        saveButton.disabled = !canSave;
+
+        if (!saving) {
+            saveButton.textContent = "저장";
+        }
     }
 
     function renderPrice() {
@@ -185,6 +219,9 @@ const footHtml = (
             <div class="quick-squad-player-market-price">${escape(label)}</div>
             <div class="quick-squad-player-market-caption">${escape(caption)}</div>
         `;
+
+        syncSaveButton();
+    
     }
 
     function renderTraits() {
@@ -251,7 +288,19 @@ const footHtml = (
         const position = escape(player.position || "-");
         const slot = escape(state.summary.slot_position || "");
         const photo = imageUrl(player.image_url);
-        const season = `${apiBaseUrl}/api/fconline/metadata/seasons/${number(player.season_id)}/image`;
+const seasonId = [
+    player.season_id,
+    Math.floor(number(player.sp_id) / 1_000_000),
+]
+    .map(value => Number(value))
+    .find(value =>
+        Number.isSafeInteger(value)
+        && value > 0
+    ) ?? null;
+
+        const season = seasonId === null
+            ? ""
+            : `${apiBaseUrl}/api/fconline/metadata/seasons/${seasonId}/image`;
         const frame = new URL("../assets/quick-squad-card-frame.svg", import.meta.url).href;
         const stats = Object.entries(player.stats ?? {});
         const teamNames = (player.team_colors ?? []).map(t => t.team_name).filter(Boolean);
@@ -281,7 +330,10 @@ const footHtml = (
                                 : '<span class="qsd-no-image">NO IMAGE</span>'}
                         </div>
                         <div class="qsd-card-top">
-                            <img src="${escape(season)}" alt="" loading="lazy">
+                            ${season
+                                ? `<img src="${escape(season)}" alt="" loading="lazy">`
+                                : ""
+                            }
                         </div>
                         <div class="qsd-card-rating">
                             <strong data-qs-card-ovr></strong>
@@ -403,15 +455,40 @@ const footHtml = (
         state = {
             summary: { ...summary },
             detail: null,
-            grade: Math.max(1, Math.min(13, number(summary.grade, 1))),
-            adaptation: 1,
-            teamColor: 0,
+
+            grade: Math.max(
+                1,
+                Math.min(13, number(summary.grade, 1))
+            ),
+
+            adaptation:
+                number(summary.adaptation, 1) === 5
+                    ? 5
+                    : 1,
+
+            teamColor: Math.max(
+                0,
+                Math.min(
+                    9,
+                    number(summary.team_color_bonus, 0)
+                )
+            ),
+
             prices: null,
             priceStatus: "loading",
             priceError: "",
+
             traitItems: null,
             traitStatus: "loading",
         };
+
+        saving = false;
+
+        if (saveStatus) {
+            saveStatus.textContent = "";
+        }
+
+        syncSaveButton();
         modal.classList.remove("hidden");
         modal.setAttribute("aria-hidden", "false");
         document.body.style.overflow = "hidden";
@@ -431,8 +508,10 @@ const footHtml = (
             return;
         }
 
-        const pricesPromise = cached(`prices:${spId}`, () =>
-            fetchJson(`/api/player-database/price/${spId}`));
+        // 상세창을 새로 열 때마다 현재 시세를 확인한다.
+        const pricesPromise = fetchJson(
+            `/api/player-database/price/${spId}`
+        );
         const traitsPromise = cached(`traits:${spId}`, () =>
             fetchJson(`/api/player-database/traits/${spId}`));
 
@@ -513,11 +592,75 @@ const footHtml = (
         }
     });
 
-    if (compareButton) {
-        compareButton.hidden = false;
-        compareButton.disabled = true;
-        compareButton.textContent = "비교에 추가";
-        compareButton.title = "선수도감 비교 연동 예정";
+    if (saveButton) {
+        saveButton.addEventListener("click", async () => {
+            if (
+                saving
+                || !state?.detail
+                || state.priceStatus !== "ready"
+            ) {
+                return;
+            }
+
+            const price = selectedPrice();
+
+            if (price === null) {
+                if (saveStatus) {
+                    saveStatus.textContent =
+                        "선택한 강화등급의 시세를 확인해주세요.";
+                }
+                return;
+            }
+
+            const token = generation;
+            const { bonus, ovr } = calculate();
+
+            const summary = { ...state.summary };
+
+            const selection = {
+                grade: state.grade,
+                adaptation: state.adaptation,
+                team_color_bonus: state.teamColor,
+                ability_bonus: bonus,
+                base_ovr: number(state.detail.base_ovr),
+                ovr,
+                price,
+                price_checked_at: new Date().toISOString(),
+            };
+
+            saving = true;
+            saveButton.disabled = true;
+            saveButton.textContent = "저장 중...";
+
+            if (saveStatus) {
+                saveStatus.textContent = "";
+            }
+
+            try {
+                if (typeof onSave !== "function") {
+                    throw new Error(
+                        "스쿼드 저장 기능이 연결되지 않았습니다."
+                    );
+                }
+
+                await onSave(summary, selection);
+
+                if (token === generation) {
+                    close();
+                }
+
+            } catch (error) {
+                if (saveStatus) {
+                    saveStatus.textContent =
+                        error.message
+                        || "선수 설정 저장에 실패했습니다.";
+                }
+
+            } finally {
+                saving = false;
+                syncSaveButton();
+            }
+        });
     }
 
     return { open, close };

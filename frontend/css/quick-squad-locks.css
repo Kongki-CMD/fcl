@@ -265,3 +265,92 @@
         display: grid;
     }
 }
+
+/* 선수도감 목록 - 추천 왼쪽 등록 버튼 */
+.player-database-player-row-actions
+.qs-inline-register-button {
+    width: auto;
+    min-width: 0;
+    height: auto;
+    margin: 0;
+    padding: 6px 12px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border: 1px solid #64748b;
+    border-radius: 6px;
+
+    background: #26364b;
+    color: #fff;
+
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.player-database-player-row-actions
+.qs-inline-register-button:hover {
+    background: #334c68;
+    border-color: #94a3b8;
+}
+
+.player-database-player-row-actions
+.qs-inline-register-button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+/* 고정 선수 목록 - 시즌 아이콘 */
+.qs-lock-season-meta {
+    display: flex !important;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
+    min-height: 22px;
+}
+
+.qs-lock-season-icon {
+    display: block;
+    width: 30px;
+    height: 22px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.qs-lock-meta-dot {
+    color: #64748b;
+}
+
+/* 고정 선수 - 저장한 카드 설정 */
+.qs-lock-info .qs-lock-saved-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+
+    margin-top: 2px;
+    color: #cbd5e1;
+    font-size: 12px;
+    line-height: 1.5;
+
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.qs-lock-info .qs-lock-saved-meta span {
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.qs-lock-info .qs-lock-current-price {
+    display: block;
+    margin-top: 2px;
+    color: #f1f5f9;
+    font-size: 13px;
+    font-weight: 700;
+}
