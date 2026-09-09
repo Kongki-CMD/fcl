@@ -1,5 +1,6 @@
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 import secrets
 import hashlib
 import hmac
@@ -46,7 +47,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from openpyxl import load_workbook
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 
 
 # =========================
@@ -27042,18 +27044,12 @@ QUICK_SQUAD_PRICE_CACHE_SECONDS = (
 quick_squad_price_cache = {}
 
 
-class QuickSquadRecommendRequest(
-    BaseModel
-):
-
+class QuickSquadRecommendRequest(BaseModel):
     team_color_id: int
-
     budget_bp: int
-
     formation: str
-
     slots: list[str]
-
+    enhancement_grade: int | None = None
 
 def get_quick_squad_cached_prices(
     sp_id: int,
@@ -28707,6 +28703,568 @@ def maximize_quick_squad_high_grade_budget(
         remaining_budget
     )
 
+# =========================================
+# QUICK SQUAD - FIXED ENHANCEMENT
+# =========================================
+
+def get_fixed_quick_squad_candidate_rows(
+    team_color_id: int,
+    slots: list[str],
+    per_salary_limit: int = 5,
+    total_limit: int = 600,
+):
+    """
+    팀컬러와 포지션에 맞는 여러 시즌을 수집한다.
+    기존 자동 추천의 LIMIT 8 대신
+    급여 구간별로 후보를 확보한다.
+    """
+
+    positions = sorted({
+        position
+        for slot in slots
+        for position in (
+            QUICK_SQUAD_POSITION_CANDIDATES.get(
+                slot,
+                [slot],
+            )
+        )
+    })
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH ranked AS (
+                    SELECT
+                        p.sp_id,
+                        p.player_name,
+                        p.season_id,
+                        p.image_url,
+                        p.position,
+                        p.salary,
+                        p.ovr,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                p.position,
+                                p.salary
+                            ORDER BY
+                                p.ovr DESC,
+                                p.sp_id DESC
+                        ) AS salary_rank
+                    FROM fconline_players AS p
+                    WHERE p.position = ANY(%s)
+                    AND COALESCE(p.salary, 0)
+                        BETWEEN 1 AND %s
+                    AND COALESCE(p.ovr, 0) > 0
+                    AND EXISTS (
+                        SELECT 1
+                        FROM fconline_player_teams AS t
+                        WHERE t.sp_id = p.sp_id
+                        AND t.team_color_id = %s
+                    )
+                )
+                SELECT
+                    sp_id,
+                    player_name,
+                    season_id,
+                    image_url,
+                    position,
+                    salary,
+                    ovr
+                FROM ranked
+                WHERE salary_rank <= %s
+                ORDER BY
+                    ovr DESC,
+                    sp_id DESC
+                LIMIT %s
+                """,
+                (
+                    positions,
+                    QUICK_SQUAD_SALARY_CAP - 10,
+                    team_color_id,
+                    per_salary_limit,
+                    total_limit,
+                ),
+            )
+
+            return cursor.fetchall()
+
+
+def get_fixed_quick_squad_options(
+    candidate_rows: list[dict],
+    grade: int,
+    budget_bp: int,
+    price_cache: dict,
+):
+    """
+    선택한 강화등급의 실제 가격만 사용한다.
+    가격이 없으면 다른 강화로 대체하지 않는다.
+    """
+
+    rows_to_fetch = [
+        row
+        for row in candidate_rows
+        if int(row["sp_id"]) not in price_cache
+    ]
+
+    def fetch_prices(row):
+        sp_id = int(row["sp_id"])
+
+        try:
+            return (
+                sp_id,
+                get_quick_squad_cached_prices(sp_id),
+            )
+        except Exception as error:
+            print(
+                "[QUICK SQUAD FIXED] price failed:",
+                sp_id,
+                error,
+            )
+            return sp_id, None
+
+    # 동일 SPID는 한 번만 조회한다.
+    unique_rows = {
+        int(row["sp_id"]): row
+        for row in rows_to_fetch
+    }
+
+    if unique_rows:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            for sp_id, prices in executor.map(
+                fetch_prices,
+                unique_rows.values(),
+            ):
+                price_cache[sp_id] = prices
+
+    options = []
+
+    for row in candidate_rows:
+        sp_id = int(row["sp_id"])
+        prices = price_cache.get(sp_id)
+
+        if not prices:
+            continue
+
+        selected_price = None
+
+        for price_data in prices:
+            if int(price_data.get("grade", 0)) != grade:
+                continue
+
+            raw_price = price_data.get("price")
+
+            if raw_price is not None:
+                selected_price = int(raw_price)
+
+            break
+
+        if (
+            selected_price is None
+            or selected_price <= 0
+            or selected_price > budget_bp
+        ):
+            continue
+
+        base_ovr = int(row["ovr"] or 0)
+
+        options.append({
+            "sp_id": sp_id,
+            "player_name": row["player_name"],
+            "season_id": int(row["season_id"]),
+            "image_url": row["image_url"] or "",
+            "position": row["position"] or "",
+            "salary": int(row["salary"] or 0),
+            "base_ovr": base_ovr,
+            "grade": grade,
+            "ovr": (
+                base_ovr
+                + QUICK_SQUAD_ENHANCEMENT_BONUS[grade]
+            ),
+            "price": selected_price,
+        })
+
+    return options
+
+
+def search_fixed_quick_squad(
+    options_by_slot: list[list[dict]],
+    budget_bp: int,
+):
+    """
+    급여·예산·이름 중복을 지키는 11명 조합 탐색.
+
+    품질이 높은 조합을 먼저 찾고,
+    비슷한 품질의 조합 중 예산을 많이 쓰는
+    구성을 선택한다. 후보 수를 제한한 휴리스틱이다.
+    """
+
+    if len(options_by_slot) != 11:
+        return None
+
+    # 포지션별 후보를 가격/능력치/급여 측면에서
+    # 다양하게 남겨 한쪽으로 치우치지 않게 한다.
+    prepared = []
+
+    for options in options_by_slot:
+        if not options:
+            return None
+
+        unique = {
+            int(option["sp_id"]): option
+            for option in options
+        }
+
+        values = list(unique.values())
+
+        selections = [
+            sorted(
+                values,
+                key=lambda p: (
+                    -p["ovr"],
+                    p["price"],
+                    p["salary"],
+                ),
+            )[:32],
+            sorted(
+                values,
+                key=lambda p: (
+                    p["price"],
+                    -p["ovr"],
+                ),
+            )[:24],
+            sorted(
+                values,
+                key=lambda p: (
+                    -p["price"],
+                    -p["ovr"],
+                ),
+            )[:24],
+            sorted(
+                values,
+                key=lambda p: (
+                    p["salary"],
+                    -p["ovr"],
+                    p["price"],
+                ),
+            )[:16],
+        ]
+
+        chosen = {}
+
+        for group in selections:
+            for option in group:
+                chosen[option["sp_id"]] = option
+
+        prepared.append(list(chosen.values()))
+
+    # 선택지가 적은 포지션부터 배치하면
+    # 동일 선수 중복으로 막히는 경우를 줄일 수 있다.
+    order = sorted(
+        range(11),
+        key=lambda index: len(prepared[index]),
+    )
+
+    ordered = [prepared[index] for index in order]
+
+    min_prices = [
+        min(p["price"] for p in options)
+        for options in ordered
+    ]
+
+    min_salaries = [
+        min(p["salary"] for p in options)
+        for options in ordered
+    ]
+
+    remaining_min_price = [0] * 12
+    remaining_min_salary = [0] * 12
+
+    for index in range(10, -1, -1):
+        remaining_min_price[index] = (
+            remaining_min_price[index + 1]
+            + min_prices[index]
+        )
+        remaining_min_salary[index] = (
+            remaining_min_salary[index + 1]
+            + min_salaries[index]
+        )
+
+    # state:
+    # (선택 선수, 사용 이름, 가격, 급여, OVR 합계)
+    initial = ((), frozenset(), 0, 0, 0)
+    completed = []
+
+    for mode in ("quality", "balanced", "spend"):
+        beam = [initial]
+
+        for depth, options in enumerate(ordered):
+            next_states = []
+
+            for selected, names, cost, salary, quality in beam:
+                for option in options:
+                    name_key = (
+                        str(option["player_name"])
+                        .strip()
+                        .casefold()
+                    )
+
+                    if name_key in names:
+                        continue
+
+                    next_cost = cost + option["price"]
+                    next_salary = salary + option["salary"]
+
+                    if (
+                        next_cost
+                        + remaining_min_price[depth + 1]
+                        > budget_bp
+                    ):
+                        continue
+
+                    if (
+                        next_salary
+                        + remaining_min_salary[depth + 1]
+                        > QUICK_SQUAD_SALARY_CAP
+                    ):
+                        continue
+
+                    next_states.append((
+                        selected + (option,),
+                        names | {name_key},
+                        next_cost,
+                        next_salary,
+                        quality + option["ovr"],
+                    ))
+
+            if not next_states:
+                beam = []
+                break
+
+            if mode == "quality":
+                ranking = lambda s: (
+                    s[4],
+                    -s[2],
+                    -s[3],
+                )
+            elif mode == "balanced":
+                ranking = lambda s: (
+                    s[4] - 4 * s[2] / budget_bp,
+                    s[4],
+                    s[2],
+                )
+            else:
+                ranking = lambda s: (
+                    s[2],
+                    s[4],
+                    -s[3],
+                )
+
+            # 품질 상위 상태뿐 아니라 저비용 상태도
+            # 보존해 뒤쪽 포지션의 예산을 확보한다.
+            quality_states = sorted(
+                next_states,
+                key=ranking,
+                reverse=True,
+            )[:120]
+
+            cheap_states = sorted(
+                next_states,
+                key=lambda s: (
+                    s[2],
+                    s[3],
+                    -s[4],
+                ),
+            )[:40]
+
+            merged = {}
+            for state in quality_states + cheap_states:
+                key = (
+                    state[1],
+                    state[2],
+                    state[3],
+                )
+                previous = merged.get(key)
+
+                if previous is None or state[4] > previous[4]:
+                    merged[key] = state
+
+            beam = list(merged.values())
+
+        completed.extend(beam)
+
+    if not completed:
+        return None
+
+    best_quality = max(state[4] for state in completed)
+
+    # 최고 OVR 합계에서 최대 11 이내인 조합을
+    # 경쟁력 있는 조합으로 보고 예산 사용량을 우선한다.
+    quality_floor = best_quality - 11
+
+    eligible = [
+        state
+        for state in completed
+        if state[4] >= quality_floor
+    ]
+
+    best = max(
+        eligible,
+        key=lambda s: (
+            s[2],
+            s[4],
+            -s[3],
+        ),
+    )
+
+    selected_ordered = best[0]
+    selected_players = [None] * 11
+
+    for ordered_index, original_index in enumerate(order):
+        selected_players[original_index] = dict(
+            selected_ordered[ordered_index]
+        )
+
+    return selected_players
+
+
+def recommend_fixed_quick_squad(
+    team_color_id: int,
+    budget_bp: int,
+    formation: str,
+    slots: list[str],
+    grade: int,
+):
+    """
+    고정 강화 추천 전용 경로.
+    기존 자동 강화 업그레이드 함수를 호출하지 않는다.
+    """
+
+    price_cache = {}
+    best_players = None
+    price_fetch_failed = False
+
+    # 1차 후보로 구성하고, 불가능하면 후보 범위를 넓힌다.
+    for per_salary_limit, total_limit in (
+        (5, 600),
+        (12, 1800),
+    ):
+        candidate_rows = (
+            get_fixed_quick_squad_candidate_rows(
+                team_color_id=team_color_id,
+                slots=slots,
+                per_salary_limit=per_salary_limit,
+                total_limit=total_limit,
+            )
+        )
+
+        options = get_fixed_quick_squad_options(
+            candidate_rows=candidate_rows,
+            grade=grade,
+            budget_bp=budget_bp,
+            price_cache=price_cache,
+        )
+
+        if any(value is None for value in price_cache.values()):
+            price_fetch_failed = True
+
+        options_by_slot = []
+
+        for slot in slots:
+            accepted_positions = set(
+                QUICK_SQUAD_POSITION_CANDIDATES.get(
+                    slot,
+                    [slot],
+                )
+            )
+
+            slot_options = [
+                {
+                    **option,
+                    "slot_position": slot,
+                }
+                for option in options
+                if option["position"] in accepted_positions
+            ]
+
+            options_by_slot.append(slot_options)
+
+        selected = search_fixed_quick_squad(
+            options_by_slot=options_by_slot,
+            budget_bp=budget_bp,
+        )
+
+        if selected is not None:
+            best_players = selected
+            break
+
+    if best_players is None:
+        if price_fetch_failed:
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "일부 선수의 이적시장 시세를 조회하지 "
+                    "못했습니다. 잠시 후 다시 시도해주세요."
+                ),
+            )
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"+{grade}강 고정 조건으로 "
+                "예산과 급여를 모두 만족하는 "
+                "11명 조합을 찾지 못했습니다. "
+                "예산을 늘리거나 다른 강화등급을 "
+                "선택해주세요."
+            ),
+        )
+
+    total_price = sum(
+        int(player["price"])
+        for player in best_players
+    )
+
+    total_salary = sum(
+        int(player["salary"])
+        for player in best_players
+    )
+
+    player_names = [
+        str(player["player_name"]).strip().casefold()
+        for player in best_players
+    ]
+
+    # 최종 방어 검증: 조건이 깨진 결과는 반환하지 않는다.
+    if (
+        len(best_players) != 11
+        or any(player["grade"] != grade for player in best_players)
+        or len(set(player_names)) != 11
+        or total_price > budget_bp
+        or total_salary > QUICK_SQUAD_SALARY_CAP
+        or any(player["price"] <= 0 for player in best_players)
+    ):
+        raise HTTPException(
+            status_code=500,
+            detail="고정 강화 스쿼드 검증에 실패했습니다.",
+        )
+
+    return {
+        "team_color_id": team_color_id,
+        "team_name": get_quick_squad_team_name(team_color_id),
+        "formation": formation,
+        "budget_bp": budget_bp,
+        "enhancement_grade": grade,
+        "total_price": total_price,
+        "remaining_budget": budget_bp - total_price,
+        "total_salary": total_salary,
+        "salary_cap": QUICK_SQUAD_SALARY_CAP,
+        "players": best_players,
+        "source": {
+            "player": "FCL Player Database",
+            "price": "FC Online DataCenter",
+        },
+    }
+
 @app.post(
     "/api/quick-squad/recommend"
 )
@@ -28800,6 +29358,19 @@ def recommend_quick_squad(
             detail=(
                 "포메이션에 GK가 없습니다."
             ),
+        )
+
+    # =====================================
+    # 고정 강화 추천
+    # =====================================
+
+    if request_data.enhancement_grade is not None:
+        return recommend_fixed_quick_squad(
+            team_color_id=team_color_id,
+            budget_bp=budget_bp,
+            formation=formation,
+            slots=slots,
+            grade=request_data.enhancement_grade,
         )
 
 

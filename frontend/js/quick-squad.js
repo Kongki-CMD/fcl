@@ -21,6 +21,11 @@ const quickSquadBudgetElement =
         "quick-squad-budget"
     );
 
+const quickSquadEnhancementGradeElement =
+    document.getElementById(
+        "quick-squad-enhancement-grade"
+    );
+
 
 const quickSquadFormationElement =
     document.getElementById(
@@ -2046,6 +2051,36 @@ async function generateQuickSquad() {
             ""
         );
 
+    const enhancementGradeValue =
+        quickSquadEnhancementGradeElement
+            ?.value
+        ??
+        "auto";
+
+    const enhancementGrade =
+        enhancementGradeValue === "auto"
+            ? null
+            : Number(enhancementGradeValue);
+
+    if (
+        enhancementGrade !== null
+        &&
+        (
+            !Number.isInteger(enhancementGrade)
+            ||
+            enhancementGrade < 1
+            ||
+            enhancementGrade > 13
+        )
+    ) {
+        if (quickSquadResultStatusElement) {
+            quickSquadResultStatusElement.textContent =
+                "강화등급을 다시 선택해주세요.";
+        }
+
+        return;
+    }
+
 
     if (
         !Number.isInteger(
@@ -2132,6 +2167,9 @@ async function generateQuickSquad() {
                     slot =>
                         slot.position
                 ),
+
+        enhancement_grade:
+            enhancementGrade,
     };
 
 
