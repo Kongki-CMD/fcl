@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 import secrets
 import hashlib
@@ -20,6 +21,16 @@ from backend.player_catalog import (
     get_player_ability,
     search_player_catalog,
     recommend_player_catalog,
+)
+
+from backend import (
+    player_catalog as
+    player_catalog_service,
+)
+
+from backend.update_new_season import (
+    build_metadata_card_map,
+    get_database_season_counts,
 )
 
 from backend.quick_squad_locked import (
@@ -118,6 +129,10 @@ ADMIN_SESSION_SECONDS = (
 
 
 ADMIN_SESSIONS = {}
+
+FC_ONLINE_SYNC_LOCK = (
+    threading.Lock()
+)
 
 NEXON_API_BASE_URL = (
     "https://open.api.nexon.com/fconline/v1"
@@ -5506,6 +5521,754 @@ def admin_login(
         "expires_in":
             ADMIN_SESSION_SECONDS,
     }
+
+# =========================
+# ADMIN FC ONLINE DB CHECK
+# 신규 시즌 감지
+# =========================
+
+@app.get(
+    "/api/admin/fconline-sync/check"
+)
+def admin_check_fconline_sync(
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    if not DATABASE_URL:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DATABASE_URL이 "
+                "설정되지 않았습니다."
+            ),
+        )
+
+
+    try:
+
+        # =================================
+        # 관리자 버튼을 누를 때마다
+        # 시즌 메타데이터는 새로 조회
+        # =================================
+
+        player_catalog_service.SEASON_METADATA_CACHE = (
+            None
+        )
+
+
+        season_metadata = (
+            player_catalog_service
+            .get_season_metadata()
+        )
+
+
+        cards_by_season = (
+            build_metadata_card_map()
+        )
+
+
+        db_counts = (
+            get_database_season_counts(
+                DATABASE_URL
+            )
+        )
+
+
+        seasons = []
+
+
+        for (
+            season_id,
+            cards,
+        ) in cards_by_season.items():
+
+            metadata_count = len(
+                cards
+            )
+
+            database_count = int(
+                db_counts.get(
+                    season_id,
+                    0,
+                )
+            )
+
+            missing_count = (
+                metadata_count
+                -
+                database_count
+            )
+
+
+            if missing_count <= 0:
+                continue
+
+
+            metadata = (
+                season_metadata.get(
+                    season_id,
+                    {}
+                )
+            )
+
+
+            seasons.append(
+                {
+                    "season_id":
+                        int(
+                            season_id
+                        ),
+
+                    "class_name":
+                        metadata.get(
+                            "class_name",
+                            "알 수 없는 클래스",
+                        ),
+
+                    "metadata_count":
+                        metadata_count,
+
+                    "database_count":
+                        database_count,
+
+                    "missing_count":
+                        missing_count,
+                }
+            )
+
+
+        seasons.sort(
+            key=lambda season:
+                season[
+                    "season_id"
+                ],
+            reverse=True,
+        )
+
+
+        # =================================
+        # 현재 Nexon 메타데이터상
+        # 가장 최신 시즌
+        # =================================
+
+        available_season_ids = [
+            int(
+                season_id
+            )
+
+            for season_id
+            in cards_by_season.keys()
+
+            if season_id
+            in season_metadata
+        ]
+
+
+        latest_metadata_season = None
+
+
+        if available_season_ids:
+
+            latest_season_id = max(
+                available_season_ids
+            )
+
+            latest_metadata = (
+                season_metadata.get(
+                    latest_season_id,
+                    {}
+                )
+            )
+
+
+            latest_metadata_season = {
+                "season_id":
+                    latest_season_id,
+
+                "class_name":
+                    latest_metadata.get(
+                        "class_name",
+                        "알 수 없는 클래스",
+                    ),
+
+                "player_count":
+                    len(
+                        cards_by_season[
+                            latest_season_id
+                        ]
+                    ),
+
+                "database_count":
+                    int(
+                        db_counts.get(
+                            latest_season_id,
+                            0,
+                        )
+                    ),
+            }
+
+
+        return {
+            "has_updates":
+                bool(
+                    seasons
+                ),
+
+            "update_count":
+                len(
+                    seasons
+                ),
+
+            "latest_metadata_season":
+                latest_metadata_season,
+
+            "seasons":
+                seasons,
+        }
+
+
+    except HTTPException:
+
+        raise
+
+
+    except Exception as error:
+
+        print(
+            "FC ONLINE SYNC CHECK ERROR:",
+            repr(
+                error
+            ),
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "신규 시즌 확인 중 "
+                "오류가 발생했습니다."
+            ),
+        )
+
+# =========================
+# ADMIN FC ONLINE DB SYNC
+# 신규 시즌 10명 단위 동기화
+# =========================
+
+@app.post(
+    "/api/admin/fconline-sync/batch"
+)
+def admin_sync_fconline_batch(
+    season_id: int,
+    batch_size: int = 10,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    # =========================
+    # 기본 검증
+    # =========================
+
+    if not DATABASE_URL:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "DATABASE_URL이 "
+                "설정되지 않았습니다."
+            ),
+        )
+
+
+    batch_size = max(
+        1,
+        min(
+            int(batch_size),
+            10,
+        ),
+    )
+
+
+    # =========================
+    # 동시에 두 동기화 방지
+    # =========================
+
+    lock_acquired = (
+        FC_ONLINE_SYNC_LOCK.acquire(
+            blocking=False
+        )
+    )
+
+
+    if not lock_acquired:
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "다른 FC Online DB "
+                "동기화 작업이 진행 중입니다."
+            ),
+        )
+
+
+    try:
+
+        # =========================
+        # player_catalog.py도
+        # 현재 DB 환경변수를 사용하도록 설정
+        # =========================
+
+        player_catalog_service.DATABASE_URL = (
+            DATABASE_URL
+        )
+
+
+        # =========================
+        # Nexon 최신 메타데이터
+        # =========================
+
+        season_metadata = (
+            player_catalog_service
+            .get_season_metadata()
+        )
+
+
+        cards_by_season = (
+            build_metadata_card_map()
+        )
+
+
+        season_cards = (
+            cards_by_season.get(
+                season_id
+            )
+        )
+
+
+        if season_cards is None:
+
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    f"Nexon 메타데이터에서 "
+                    f"시즌 {season_id}을 "
+                    "찾을 수 없습니다."
+                ),
+            )
+
+
+        season_info = (
+            season_metadata.get(
+                season_id,
+                {}
+            )
+        )
+
+
+        class_name = (
+            season_info.get(
+                "class_name",
+                f"시즌 {season_id}",
+            )
+        )
+
+
+        total_count = len(
+            season_cards
+        )
+
+
+        # =========================
+        # 현재 DB 저장 SPID
+        # =========================
+
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        sp_id
+
+                    FROM fconline_players
+
+                    WHERE season_id = %s
+                    """,
+                    (
+                        season_id,
+                    ),
+                )
+
+
+                existing_rows = (
+                    cursor.fetchall()
+                )
+
+
+        existing_ids = {
+            int(
+                row["sp_id"]
+            )
+
+            for row
+            in existing_rows
+        }
+
+
+        # =========================
+        # 아직 저장되지 않은 선수
+        # =========================
+
+        missing_cards = [
+            card
+
+            for card
+            in season_cards
+
+            if int(
+                card["sp_id"]
+            )
+            not in existing_ids
+        ]
+
+
+        missing_cards.sort(
+            key=lambda card:
+                int(
+                    card["sp_id"]
+                )
+        )
+
+
+        # =========================
+        # 이미 완료된 시즌
+        # =========================
+
+        if not missing_cards:
+
+            return {
+                "season_id":
+                    season_id,
+
+                "class_name":
+                    class_name,
+
+                "total_count":
+                    total_count,
+
+                "database_count":
+                    len(
+                        existing_ids
+                    ),
+
+                "requested_count":
+                    0,
+
+                "success_count":
+                    0,
+
+                "failed_count":
+                    0,
+
+                "remaining_count":
+                    0,
+
+                "complete":
+                    True,
+
+                "failures":
+                    [],
+            }
+
+
+        # =========================
+        # 이번 요청에서 최대 10명
+        # =========================
+
+        batch_cards = (
+            missing_cards[
+                :batch_size
+            ]
+        )
+
+
+        # =========================
+        # 시즌 아이콘 Snapshot 저장
+        #
+        # 첫 신규 선수 동기화 때만
+        # 실제 다운로드됨
+        # 이미 있으면 즉시 종료
+        # =========================
+
+        global SEASON_METADATA_CACHE
+
+        SEASON_METADATA_CACHE = None
+
+
+        try:
+
+            ensure_fconline_season_snapshot(
+                int(
+                    batch_cards[0][
+                        "sp_id"
+                    ]
+                )
+            )
+
+        except Exception as error:
+
+            print(
+                "FC ONLINE SEASON SNAPSHOT ERROR:",
+                repr(
+                    error
+                ),
+            )
+
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "신규 시즌 이미지 "
+                    "저장에 실패했습니다."
+                ),
+            )
+
+
+        success_count = 0
+
+        failures = []
+
+
+        # =========================
+        # 선수 단위 저장
+        # =========================
+
+        for card in batch_cards:
+
+            sp_id = int(
+                card[
+                    "sp_id"
+                ]
+            )
+
+            player_name = str(
+                card.get(
+                    "player_name",
+                    ""
+                )
+            ).strip()
+
+
+            try:
+
+                player_catalog_service.set_player_sync_running(
+                    sp_id,
+                    player_name,
+                )
+
+
+                player = (
+                    player_catalog_service
+                    .get_player_ability(
+                        sp_id,
+                        grade=1,
+                    )
+                )
+
+
+                player_catalog_service.validate_collected_player(
+                    player
+                )
+
+
+                player["image_url"] = (
+                    player_catalog_service
+                    .PLAYER_IMAGE_URL_TEMPLATE
+                    .format(
+                        sp_id=sp_id
+                    )
+                )
+
+
+                player_catalog_service.save_player_to_database(
+                    player
+                )
+
+
+                player_catalog_service.set_player_sync_completed(
+                    sp_id
+                )
+
+
+                success_count += 1
+
+
+            except Exception as error:
+
+                print(
+                    "FC ONLINE PLAYER SYNC ERROR:",
+                    sp_id,
+                    player_name,
+                    repr(
+                        error
+                    ),
+                )
+
+
+                try:
+
+                    player_catalog_service.set_player_sync_failed(
+                        sp_id,
+                        str(
+                            error
+                        ),
+                    )
+
+                except Exception as state_error:
+
+                    print(
+                        "FC ONLINE SYNC STATE ERROR:",
+                        repr(
+                            state_error
+                        ),
+                    )
+
+
+                failures.append(
+                    {
+                        "sp_id":
+                            sp_id,
+
+                        "player_name":
+                            player_name,
+
+                        "error":
+                            str(
+                                error
+                            ),
+                    }
+                )
+
+
+            time.sleep(
+                player_catalog_service
+                .PLAYER_REQUEST_DELAY_SECONDS
+            )
+
+
+        # =========================
+        # 저장 후 실제 DB 개수 재확인
+        # =========================
+
+        with get_db_connection() as connection:
+
+            with connection.cursor() as cursor:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(*) AS count
+
+                    FROM fconline_players
+
+                    WHERE season_id = %s
+                    """,
+                    (
+                        season_id,
+                    ),
+                )
+
+
+                count_row = (
+                    cursor.fetchone()
+                )
+
+
+        database_count = int(
+            count_row["count"]
+        )
+
+
+        remaining_count = max(
+            0,
+            total_count
+            -
+            database_count,
+        )
+
+
+        return {
+            "season_id":
+                season_id,
+
+            "class_name":
+                class_name,
+
+            "total_count":
+                total_count,
+
+            "database_count":
+                database_count,
+
+            "requested_count":
+                len(
+                    batch_cards
+                ),
+
+            "success_count":
+                success_count,
+
+            "failed_count":
+                len(
+                    failures
+                ),
+
+            "remaining_count":
+                remaining_count,
+
+            "complete":
+                (
+                    remaining_count
+                    == 0
+                ),
+
+            "failures":
+                failures,
+        }
+
+
+    except HTTPException:
+
+        raise
+
+
+    except Exception as error:
+
+        print(
+            "FC ONLINE BATCH SYNC ERROR:",
+            repr(
+                error
+            ),
+        )
+
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "FC Online 선수 "
+                "동기화 중 오류가 발생했습니다."
+            ),
+        )
+
+
+    finally:
+
+        FC_ONLINE_SYNC_LOCK.release()
 
 # =========================
 # ADMIN USERS

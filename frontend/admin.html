@@ -204,6 +204,14 @@
                         포인트 교환소
                     </button>
 
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="fconline-db"
+                    >
+                        FC Online DB
+                    </button>
+
                 </nav>
 
             </aside>
@@ -531,6 +539,116 @@
                     </div>
 
                 </section>
+
+
+                <!-- ========================= -->
+                <!-- FC Online DB -->
+                <!-- ========================= -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="fconline-db"
+                >
+
+                    <h1>
+                        FC Online DB 관리
+                    </h1>
+
+                    <p>
+                        Nexon 공식 메타데이터와 현재 Neon DB를 비교하고
+                        신규 시즌을 동기화합니다.
+                    </p>
+
+
+                    <div class="admin-fconline-sync-card">
+
+                        <div class="admin-fconline-sync-header">
+
+                            <div>
+                                <h2>
+                                    신규 시즌 감지
+                                </h2>
+
+                                <p>
+                                    seasonid.json / spid.json과
+                                    현재 DB를 비교합니다.
+                                </p>
+                            </div>
+
+
+                            <button
+                                type="button"
+                                id="admin-fconline-check-button"
+                                class="admin-fconline-primary-button"
+                            >
+                                신규 시즌 감지
+                            </button>
+
+                        </div>
+
+
+                        <p
+                            id="admin-fconline-check-message"
+                            class="admin-fconline-message"
+                        >
+                            버튼을 눌러 신규 시즌을 확인해주세요.
+                        </p>
+
+
+                        <div
+                            id="admin-fconline-current-season"
+                            class="admin-fconline-current-season"
+                        >
+                        </div>
+
+
+                        <div
+                            id="admin-fconline-season-list"
+                            class="admin-fconline-season-list"
+                        >
+                        </div>
+
+                    </div>
+
+
+                    <div class="admin-fconline-sync-card">
+
+                        <div class="admin-fconline-sync-header">
+
+                            <div>
+                                <h2>
+                                    신규 시즌 동기화
+                                </h2>
+
+                                <p>
+                                    감지된 신규 선수만 Neon DB에 추가합니다.
+                                </p>
+                            </div>
+
+
+                            <button
+                                type="button"
+                                id="admin-fconline-sync-button"
+                                class="admin-fconline-primary-button"
+                                disabled
+                            >
+                                신규 시즌 동기화
+                            </button>
+
+                        </div>
+
+
+                        <div
+                            id="admin-fconline-sync-status"
+                            class="admin-fconline-sync-status"
+                        >
+                            먼저 신규 시즌을 감지해주세요.
+                        </div>
+
+                    </div>
+
+                </section>
+
 
             </div>
 

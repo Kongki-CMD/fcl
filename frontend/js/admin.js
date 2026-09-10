@@ -205,6 +205,39 @@ const adminPointShopExchangeListElement =
         "#admin-point-shop-exchange-list"
     );
 
+const adminFconlineCheckButtonElement =
+    document.querySelector(
+        "#admin-fconline-check-button"
+    );
+
+const adminFconlineSyncButtonElement =
+    document.querySelector(
+        "#admin-fconline-sync-button"
+    );
+
+const adminFconlineCheckMessageElement =
+    document.querySelector(
+        "#admin-fconline-check-message"
+    );
+
+const adminFconlineCurrentSeasonElement =
+    document.querySelector(
+        "#admin-fconline-current-season"
+    );
+
+const adminFconlineSeasonListElement =
+    document.querySelector(
+        "#admin-fconline-season-list"
+    );
+
+const adminFconlineSyncStatusElement =
+    document.querySelector(
+        "#admin-fconline-sync-status"
+    );
+
+
+let adminFconlineDetectedSeasons = [];
+
 
 let editingAdminResult = null;
 
@@ -537,6 +570,603 @@ adminMenuButtonElements.forEach(
         );
     }
 );
+
+// =========================================
+// FC ONLINE 신규 시즌 감지
+// =========================================
+
+async function checkAdminFconlineSync() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    adminFconlineCheckButtonElement
+        .disabled = true;
+
+    adminFconlineSyncButtonElement
+        .disabled = true;
+
+
+    adminFconlineCheckMessageElement
+        .textContent =
+            "Nexon 메타데이터와 DB를 비교하는 중...";
+
+
+    adminFconlineCurrentSeasonElement
+        .innerHTML = "";
+
+    adminFconlineSeasonListElement
+        .innerHTML = "";
+
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}`
+            + "/api/admin/fconline-sync/check",
+            {
+                headers: {
+                    "X-Admin-Token":
+                        adminToken,
+                },
+            }
+        );
+
+
+        if (response.status === 401) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        const responseData =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "신규 시즌 확인 실패"
+            );
+        }
+
+
+        adminFconlineDetectedSeasons =
+            Array.isArray(
+                responseData.seasons
+            )
+                ? responseData.seasons
+                : [];
+
+
+        const latest =
+            responseData
+                .latest_metadata_season;
+
+
+        if (latest) {
+
+            adminFconlineCurrentSeasonElement
+                .innerHTML = `
+                    <div
+                        class="admin-fconline-current-card"
+                    >
+                        <span
+                            class="admin-fconline-current-label"
+                        >
+                            Nexon 메타데이터 최신 시즌
+                        </span>
+
+                        <span
+                            class="admin-fconline-current-name"
+                        >
+                            ${latest.season_id}
+                            ·
+                            ${latest.class_name}
+                        </span>
+
+                        <div
+                            class="admin-fconline-season-meta"
+                        >
+                            <span>
+                                Nexon ${latest.player_count}명
+                            </span>
+
+                            <span>
+                                Neon ${latest.database_count}명
+                            </span>
+                        </div>
+                    </div>
+                `;
+        }
+
+
+        if (
+            !responseData.has_updates
+            ||
+            adminFconlineDetectedSeasons.length === 0
+        ) {
+
+            adminFconlineCheckMessageElement
+                .textContent =
+                    "신규/누락 시즌이 없습니다. "
+                    + "현재 DB가 Nexon 메타데이터와 "
+                    + "동기화되어 있습니다.";
+
+
+            adminFconlineSyncStatusElement
+                .textContent =
+                    "동기화할 신규 선수가 없습니다.";
+
+
+            return;
+        }
+
+
+        adminFconlineCheckMessageElement
+            .textContent =
+                `신규/누락 시즌 `
+                + `${adminFconlineDetectedSeasons.length}개를 `
+                + `발견했습니다.`;
+
+
+        adminFconlineSeasonListElement
+            .innerHTML =
+                adminFconlineDetectedSeasons
+                    .map(
+                        season => `
+                            <article
+                                class="admin-fconline-season-card"
+                            >
+
+                                <div>
+
+                                    <span
+                                        class="admin-fconline-season-name"
+                                    >
+                                        ${season.season_id}
+                                        ·
+                                        ${season.class_name}
+                                    </span>
+
+                                    <div
+                                        class="admin-fconline-season-meta"
+                                    >
+                                        <span>
+                                            Nexon
+                                            ${season.metadata_count}명
+                                        </span>
+
+                                        <span>
+                                            Neon
+                                            ${season.database_count}명
+                                        </span>
+                                    </div>
+
+                                </div>
+
+
+                                <span
+                                    class="admin-fconline-missing-count"
+                                >
+                                    +${season.missing_count}명
+                                </span>
+
+                            </article>
+                        `
+                    )
+                    .join("");
+
+
+        const latestSeason =
+            adminFconlineDetectedSeasons[0];
+
+
+        adminFconlineSyncStatusElement
+            .textContent =
+                `${latestSeason.class_name} `
+                + `${latestSeason.missing_count}명을 `
+                + `동기화할 수 있습니다.`;
+
+
+        adminFconlineSyncButtonElement
+            .disabled = false;
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminFconlineCheckMessageElement
+            .textContent =
+                error.message
+                ?? "신규 시즌 확인에 실패했습니다.";
+
+
+    } finally {
+
+        adminFconlineCheckButtonElement
+            .disabled = false;
+    }
+}
+
+
+// =========================================
+// FC ONLINE 감지 버튼
+// =========================================
+
+adminFconlineCheckButtonElement
+    ?.addEventListener(
+        "click",
+        checkAdminFconlineSync
+    );
+
+// =========================================
+// FC ONLINE 신규 시즌 동기화
+// =========================================
+
+async function syncAdminFconlineSeason() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const targetSeason =
+        adminFconlineDetectedSeasons[0];
+
+
+    if (!targetSeason) {
+
+        adminFconlineSyncStatusElement
+            .textContent =
+                "먼저 신규 시즌을 감지해주세요.";
+
+        return;
+    }
+
+
+    const isConfirmed = confirm(
+        `${targetSeason.class_name}\n\n`
+        + `시즌 ID: ${targetSeason.season_id}\n`
+        + `Nexon: ${targetSeason.metadata_count}명\n`
+        + `현재 DB: ${targetSeason.database_count}명\n`
+        + `추가 필요: ${targetSeason.missing_count}명\n\n`
+        + `기존 선수는 삭제하지 않고 `
+        + `누락된 선수만 추가합니다.\n\n`
+        + `동기화를 시작하시겠습니까?`
+    );
+
+
+    if (!isConfirmed) {
+        return;
+    }
+
+
+    adminFconlineCheckButtonElement
+        .disabled = true;
+
+    adminFconlineSyncButtonElement
+        .disabled = true;
+
+
+    let batchNumber = 0;
+
+
+    try {
+
+        while (true) {
+
+            batchNumber += 1;
+
+
+            if (batchNumber > 100) {
+
+                throw new Error(
+                    "동기화 반복 횟수 제한을 초과했습니다."
+                );
+            }
+
+
+            adminFconlineSyncStatusElement
+                .innerHTML = `
+                    <div
+                        class="admin-fconline-progress-info"
+                    >
+                        <strong>
+                            ${targetSeason.class_name}
+                        </strong>
+
+                        <span>
+                            ${batchNumber}번째 배치 처리 중...
+                        </span>
+                    </div>
+                `;
+
+
+            const response = await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/fconline-sync/batch`
+                + `?season_id=${targetSeason.season_id}`
+                + `&batch_size=10`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+            if (response.status === 401) {
+
+                sessionStorage.removeItem(
+                    adminTokenStorageKey
+                );
+
+                showAdminLogin();
+
+                return;
+            }
+
+
+            const responseData =
+                await response.json();
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    responseData.detail
+                    ?? "신규 시즌 동기화 실패"
+                );
+            }
+
+
+            const totalCount =
+                Number(
+                    responseData.total_count
+                    ?? 0
+                );
+
+
+            const databaseCount =
+                Number(
+                    responseData.database_count
+                    ?? 0
+                );
+
+
+            const remainingCount =
+                Number(
+                    responseData.remaining_count
+                    ?? 0
+                );
+
+
+            const progressPercent =
+                totalCount > 0
+
+                    ? Math.min(
+                        100,
+                        Math.round(
+                            (
+                                databaseCount
+                                / totalCount
+                            )
+                            * 100
+                        )
+                    )
+
+                    : 0;
+
+
+            adminFconlineSyncStatusElement
+                .innerHTML = `
+                    <div
+                        class="admin-fconline-progress-info"
+                    >
+
+                        <strong>
+                            ${responseData.class_name}
+                        </strong>
+
+                        <span>
+                            ${databaseCount}
+                            /
+                            ${totalCount}명
+                            (${progressPercent}%)
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        class="admin-fconline-progress-track"
+                    >
+                        <div
+                            class="admin-fconline-progress-bar"
+                            style="width: ${progressPercent}%"
+                        ></div>
+                    </div>
+
+
+                    <div
+                        class="admin-fconline-progress-detail"
+                    >
+                        <span>
+                            이번 배치 성공:
+                            ${responseData.success_count}
+                        </span>
+
+                        <span>
+                            실패:
+                            ${responseData.failed_count}
+                        </span>
+
+                        <span>
+                            남음:
+                            ${remainingCount}
+                        </span>
+                    </div>
+                `;
+
+
+            if (
+                responseData.failed_count > 0
+            ) {
+
+                const failedPlayers =
+                    responseData.failures
+                        .map(
+                            failure =>
+                                `${failure.player_name}`
+                                + ` (${failure.sp_id})`
+                        )
+                        .join(", ");
+
+
+                adminFconlineSyncStatusElement
+                    .innerHTML += `
+                        <p
+                            class="admin-fconline-sync-error"
+                        >
+                            실패 선수:
+                            ${failedPlayers}
+                            <br>
+                            자동 동기화를 중지했습니다.
+                            다시 버튼을 누르면
+                            남은 선수부터 재시도합니다.
+                        </p>
+                    `;
+
+
+                adminFconlineSyncButtonElement
+                    .disabled = false;
+
+
+                break;
+            }
+
+
+            if (
+                responseData.complete
+                ||
+                remainingCount <= 0
+            ) {
+
+                adminFconlineSyncStatusElement
+                    .innerHTML += `
+                        <p
+                            class="admin-fconline-sync-complete"
+                        >
+                            신규 시즌 동기화가
+                            완료되었습니다.
+                        </p>
+                    `;
+
+
+                adminFconlineDetectedSeasons = [];
+
+
+                setTimeout(
+                    () => {
+                        checkAdminFconlineSync();
+                    },
+                    1000
+                );
+
+
+                break;
+            }
+
+
+            // Render / Nexon에 연속 요청이
+            // 너무 붙지 않도록 짧게 대기
+            await new Promise(
+                resolve => {
+                    setTimeout(
+                        resolve,
+                        500
+                    );
+                }
+            );
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminFconlineSyncStatusElement
+            .innerHTML = `
+                <p
+                    class="admin-fconline-sync-error"
+                >
+                    ${error.message
+                    ?? "동기화에 실패했습니다."}
+
+                    <br>
+
+                    이미 저장된 선수는 유지됩니다.
+                    다시 감지 후 이어서
+                    동기화할 수 있습니다.
+                </p>
+            `;
+
+
+        adminFconlineSyncButtonElement
+            .disabled = false;
+
+
+    } finally {
+
+        adminFconlineCheckButtonElement
+            .disabled = false;
+    }
+}
+
+
+// =========================================
+// FC ONLINE 동기화 버튼
+// =========================================
+
+adminFconlineSyncButtonElement
+    ?.addEventListener(
+        "click",
+        syncAdminFconlineSeason
+    );
 
 // =========================================
 // 참가자 / 현재 팀 조회
