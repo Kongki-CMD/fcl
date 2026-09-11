@@ -11,7 +11,7 @@
 
 <body>
 
- <header>
+<header>
     <div class="header-container">
 
         <!-- 로고 영역 -->
@@ -72,150 +72,221 @@
 </header>
 
 
-    <!-- 경기 규칙 -->
-    <main class="rules-page">
+<!-- 경기 규칙 -->
+<main class="rules-page">
 
-        <section class="rules-section">
+    <section class="rules-section">
 
-            <div class="rules-header">
-                <h1>경기 규칙</h1>
-                <p>FC Online Champions League 운영 규칙</p>
-            </div>
+        <div class="rules-header">
+            <h1>경기 규칙</h1>
+            <p>FC Online Champions League 운영 규칙</p>
+        </div>
 
-            <div class="rules-content">
+        <div class="rules-content">
 
-                <article class="rule-card">
-                    <h2>1. 리그 참가자</h2>
+            <article class="rule-card">
+                <h2>1. 리그 참가자</h2>
 
+                <p>
+                    FC Online Champions League는 총 5명이 참가한다.
+                </p>
+
+                <ul>
+                    <li>문권기</li>
+                    <li>이준석</li>
+                    <li>주은성</li>
+                    <li>이상</li>
+                    <li>서종원</li>
+                </ul>
+            </article>
+
+
+            <article class="rule-card">
+                <h2>2. 정규리그 방식</h2>
+
+                <p>
+                    정규리그는 총 5명의 참가자가 홈 앤드 어웨이 방식으로 진행한다.
+                </p>
+
+                <p>
+                    각 참가자는 다른 4명의 참가자와 각각 2번씩 대결하며,
+                    참가자당 총 8 SERIES를 진행한다.
+                </p>
+
+                <p>
+                    SERIES는 두 참가자 사이의 하나의 대진 단위를 의미하며,
+                    세트(SET)는 SERIES 안에서 실제로 진행되는 FC Online 1경기를 의미한다.
+                </p>
+
+                <p>
+                    정규리그는 총 4라운드, 20 SERIES로 구성한다.
+                </p>
+
+                <h3>ROUND 1</h3>
+
+                <p>
+                    ROUND 1은 기존 운영 방식에 따라 SERIES당 3세트로 진행한다.
+                </p>
+
+                <ul>
+                    <li>Fixture 1 ~ 5</li>
+                    <li>SERIES당 3세트</li>
+                    <li>승패와 관계없이 3세트를 모두 진행</li>
+                    <li>모든 세트의 결과를 승점에 반영</li>
+                </ul>
+
+                
+                <h3>ROUND 2 ~ ROUND 4</h3>
+
+                <p>
+                    ROUND 2부터 ROUND 4까지는 일정 개편에 따라
+                    SERIES당 2세트로 진행한다.
+                </p>
+
+                <ul>
+                    <li>Fixture 6 ~ 20</li>
+                    <li>SERIES당 2세트</li>
+                    <li>1세트 결과와 관계없이 2세트를 모두 진행</li>
+                    <li>모든 세트의 결과를 승점에 반영</li>
+                    <li>경기는 월요일, 수요일, 토요일에 진행</li>
+                    <li>하루 최대 2 SERIES 진행</li>
+                    <li>같은 날짜에 동일 참가자가 두 SERIES에 중복 출전하지 않는다</li>
+                </ul>
+
+                <p>
+                    정규리그에서 참가자 한 명이 진행하는 전체 세트 수는 총 18세트이다.
+                </p>
+
+                <ul>
+                    <li>ROUND 1: 참가자당 6세트</li>
+                    <li>ROUND 2 ~ ROUND 4: 참가자당 12세트</li>
+                    <li>참가자당 정규리그 총 18세트</li>
+                    <li>정규리그 전체 총 45세트</li>
+                </ul>
+            </article>
+
+
+            <article class="rule-card">
+                <h2>3. 승점</h2>
+
+                <p>
+                    정규리그 순위에 사용되는 승점은 SERIES의 최종 승패가 아닌
+                    각 세트의 결과를 기준으로 개별 계산한다.
+                </p>
+
+                <ul>
+                    <li>승리: 3점</li>
+                    <li>무승부: 1점</li>
+                    <li>패배: 0점</li>
+                </ul>
+
+                <p>
+                    2세트 SERIES에서 각 참가자가 1세트씩 승리한 경우에도
+                    각 세트의 결과에 따라 각각 승점을 획득한다.
+                </p>
+
+                <p>
+                    SERIES 자체의 최종 승패에 대한 별도의 추가 승점은 부여하지 않는다.
+                </p>
+            </article>
+
+
+            <article class="rule-card">
+                <h2>4. MVP 선정 기준</h2>
+
+                <p>
+                    각 SERIES의 MVP는 해당 SERIES의 실제 진행 세트 수에 따라
+                    출전 조건을 적용한다.
+                </p>
+
+                <ul>
+                    <li>
+                        1 ~ 2세트 SERIES:
+                        해당 SERIES에서 1세트 이상 출전한 선수
+                    </li>
+
+                    <li>
+                        3세트 이상 SERIES:
+                        해당 SERIES에서 2세트 이상 출전한 선수
+                    </li>
+                </ul>
+
+                <ol>
+                    <li>누적 평점이 높은 선수</li>
+                    <li>누적 평점이 같을 경우 득점이 많은 선수</li>
+                    <li>득점까지 같을 경우 도움이 많은 선수</li>
+                    <li>도움까지 같을 경우 평균 평점이 높은 선수</li>
+                </ol>
+
+                <p>
+                    동일한 선수가 서로 다른 시즌 카드로 출전한 경우에도
+                    동일 선수로 간주하여 기록을 합산한다.
+                </p>
+
+                <p>
+                    플레이오프는 승부가 확정될 때까지 실제로 진행된
+                    모든 세트의 기록을 기준으로 MVP를 선정한다.
+                </p>
+            </article>
+
+
+            <article class="rule-card">
+                <h2>5. 정규리그 순위</h2>
+
+                <p>
+                    정규리그 순위는 모든 정규리그 세트 결과를 합산하여
+                    다음 기준에 따라 결정한다.
+                </p>
+
+                <ol>
+                    <li>승점</li>
+                    <li>득실차</li>
+                    <li>득점</li>
+                </ol>
+            </article>
+
+
+            <article class="rule-card">
+                <h2>6. 플레이오프</h2>
+
+                <p>
+                    정규리그 종료 후 상위 4명이 플레이오프에 진출하며,
+                    정규리그 5위는 탈락한다.
+                </p>
+
+                <div class="playoff-flow">
                     <p>
-                        FC Online Champions League는 총 5명이 참가한다.
+                        <strong>준플레이오프</strong><br>
+                        정규리그 3위 VS 정규리그 4위(5판 3선승제)
                     </p>
 
-                    <ul>
-                        <li>문권기</li>
-                        <li>이준석</li>
-                        <li>주은성</li>
-                        <li>이상</li>
-                        <li>서종원</li>
-                    </ul>
-                </article>
-
-
-                <article class="rule-card">
-                    <h2>2. 정규리그 방식</h2>
+                    <span>↓</span>
 
                     <p>
-                        모든 참가자는 다른 참가자와 홈 앤드 어웨이 방식으로 경기를 진행한다.
+                        <strong>플레이오프</strong><br>
+                        정규리그 2위 VS 준플레이오프 승자(5판 3선승제)
                     </p>
+
+                    <span>↓</span>
 
                     <p>
-                        각 참가자는 다른 4명의 참가자와 홈 1경기,
-                        원정 1경기씩 진행한다.
+                        <strong>결승 시리즈</strong><br>
+                        정규리그 1위 VS 플레이오프 승자(7판 4선승제)
                     </p>
+                </div>
+            </article>
 
-                    <ul>
-                        <li>승패에 관계없이 1경기당 3세트 진행</li>
-                        <li>3세트 모두 승점이 계산된다</li>
-                        <li>참가자당 총 8경기</li>
-                        <li>정규리그 전체 총 20경기</li>
-                        <li>한 명당 전체 24세트 경기 진행</li>
-                        <li>경기는 매주 토요일과 일요일에 진행</li>
-                    </ul>
-                </article>
+        </div>
 
+    </section>
 
-                <article class="rule-card">
-                    <h2>3. 승점</h2>
-
-                    <ul>
-                        <li>승리: 3점</li>
-                        <li>무승부: 1점</li>
-                        <li>패배: 0점</li>
-                    </ul>
-                </article>
-
-                <article class="rule-card">
-                    <h2>4. MVP 선정 기준</h2>
-
-                    <p>
-                        각 SERIES의 MVP는 해당 SERIES에서
-                        2경기 이상 출전한 선수를 대상으로 선정한다.
-                    </p>
-
-                    <ol>
-                        <li>누적 평점이 높은 선수</li>
-                        <li>누적 평점이 같을 경우 득점이 많은 선수</li>
-                        <li>득점까지 같을 경우 도움이 많은 선수</li>
-                        <li>도움까지 같을 경우 평균 평점이 높은 선수</li>
-                    </ol>
-
-                    <p>
-                        동일한 선수가 서로 다른 시즌 카드로 출전한 경우에도
-                        동일 선수로 간주하여 기록을 합산한다.
-                    </p>
-
-                    <p>
-                        플레이오프는 승부가 확정될 때까지 실제로 진행된
-                        모든 경기의 기록을 기준으로 MVP를 선정한다.
-                    </p>
-                </article>
-
-                <article class="rule-card">
-                    <h2>5. 정규리그 순위</h2>
-
-                    <p>
-                        정규리그 순위는 다음 기준에 따라 결정한다.
-                    </p>
-
-                    <ol>
-                        <li>승점</li>
-                        <li>득실차</li>
-                        <li>득점</li>
-                    </ol>
-                </article>
-
-
-                <article class="rule-card">
-                    <h2>6. 플레이오프</h2>
-
-                    <p>
-                        정규리그 종료 후 상위 4명이 플레이오프에 진출하며,
-                        정규리그 5위는 탈락한다.
-                    </p>
-
-                    <div class="playoff-flow">
-                        <p>
-                            <strong>준플레이오프</strong><br>
-                            정규리그 3위 VS 정규리그 4위(5판 3선승제)
-                        </p>
-
-                        <span>↓</span>
-
-                        <p>
-                            <strong>플레이오프</strong><br>
-                            정규리그 2위 VS 준플레이오프 승자(5판 3선승제)
-                        </p>
-
-                        <span>↓</span>
-
-                        <p>
-                            <strong>결승 시리즈</strong><br>
-                            정규리그 1위 VS 플레이오프 승자(7판 4선승제)
-                        </p>
-                    </div>
-                </article>
-
-            </div>
-
-        </section>
-
-    </main>
+</main>
 
 
 <!-- 하단 영역 -->
 <footer id="site-footer"></footer>
 
-    <script src="./js/site-nav.js"></script>
+<script src="./js/site-nav.js"></script>
 
 </body>
 </html>
