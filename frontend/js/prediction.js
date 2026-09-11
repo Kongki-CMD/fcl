@@ -1057,9 +1057,16 @@ function createMatchCard(
         "prediction-set-list";
 
 
+    const targetSetCount =
+        Number(
+            match.target_set_count
+            ?? 3
+        );
+
+
     for (
         let setNumber = 1;
-        setNumber <= 3;
+        setNumber <= targetSetCount;
         setNumber += 1
     ) {
 

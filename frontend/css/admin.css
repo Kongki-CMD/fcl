@@ -575,6 +575,73 @@
    정규리그 일정 관리
 ======================================== */
 
+.admin-schedule-reform-card {
+    margin-top: 24px;
+    padding: 20px;
+
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 18px;
+    align-items: center;
+
+    background: white;
+
+    border: 1px solid #e2e4e8;
+    border-radius: 10px;
+}
+
+
+.admin-schedule-reform-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+
+.admin-schedule-reform-info strong {
+    margin-bottom: 5px;
+
+    font-size: 15px;
+}
+
+
+.admin-schedule-reform-info span {
+    color: #777;
+
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+
+.admin-regular-reform-button {
+    padding: 10px 18px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: #17191d;
+    color: white;
+
+    cursor: pointer;
+}
+
+
+.admin-regular-reform-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+
+.admin-regular-reform-message {
+    grid-column: 1 / -1;
+
+    min-height: 18px;
+    margin: 0;
+
+    color: #666;
+    font-size: 13px;
+}
+
 .admin-schedule-list {
     display: flex;
     flex-direction: column;

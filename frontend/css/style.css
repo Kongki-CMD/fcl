@@ -1991,6 +1991,104 @@ footer p {
     color: black;
 }
 
+/* PRE-SEASON SET COUNT */
+
+.preseason-set-count {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+
+    margin: -8px 0 28px;
+}
+
+.preseason-set-count-label {
+    color: #9c8b64;
+
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+}
+
+.preseason-set-count-options {
+    display: grid;
+    grid-template-columns:
+        repeat(3, 1fr);
+
+    gap: 8px;
+
+    width: 280px;
+}
+
+.preseason-set-count-option {
+    position: relative;
+
+    cursor: pointer;
+}
+
+.preseason-set-count-option input {
+    position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    opacity: 0;
+    pointer-events: none;
+}
+
+.preseason-set-count-option span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 44px;
+
+    border: 1px solid #3a3a3a;
+    border-radius: 7px;
+
+    background: rgba(
+        255,
+        255,
+        255,
+        0.025
+    );
+
+    color: #888;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    transition: 0.2s;
+}
+
+.preseason-set-count-option:hover span {
+    border-color: #777;
+
+    color: #ddd;
+}
+
+.preseason-set-count-option
+input:checked
++ span {
+    border-color: #b49a5a;
+
+    background: rgba(
+        180,
+        154,
+        90,
+        0.14
+    );
+
+    color: #d7bc78;
+}
+
+.preseason-set-count small {
+    color: #777;
+
+    font-size: 12px;
+    text-align: center;
+}
+
 /* PRE-SEASON MATCH DATE */
 
 .preseason-match-date {
@@ -7311,6 +7409,10 @@ body.site-auth-modal-open {
 
     .preseason-match-date
      input[type="date"] {
+        width: 100%;
+    }
+
+    .preseason-set-count-options {
         width: 100%;
     }
 

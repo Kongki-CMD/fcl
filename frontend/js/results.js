@@ -1545,70 +1545,70 @@ async function openResultDetail(
 
         resultDetailContentElement.innerHTML = `
 
-        <div class="result-detail-match-title">
+            <div class="result-detail-match-title">
 
-            <div class="result-detail-match-team">
-                <img
-                    src="${data.team_a.logo_path}"
-                    alt=""
-                    class="result-detail-match-team-logo"
-                >
+                <div class="result-detail-match-team">
+                    <img
+                        src="${data.team_a.logo_path}"
+                        alt=""
+                        class="result-detail-match-team-logo"
+                    >
 
-                <span>
-                    ${data.team_a.fcl_name}
-                </span>
-            </div>
-
-
-            <strong class="result-detail-match-vs">
-                VS
-            </strong>
+                    <span>
+                        ${data.team_a.fcl_name}
+                    </span>
+                </div>
 
 
-            <div class="result-detail-match-team">
-                <img
-                    src="${data.team_b.logo_path}"
-                    alt=""
-                    class="result-detail-match-team-logo"
-                >
-
-                <span>
-                    ${data.team_b.fcl_name}
-                </span>
-            </div>
-
-        </div>
-
-
-        <div class="result-detail-set-section">
-
-            <div class="result-detail-set-title">
-
-                <span>
-                    1
-                </span>
-
-                <strong>
-                    세트 선택
+                <strong class="result-detail-match-vs">
+                    VS
                 </strong>
 
+
+                <div class="result-detail-match-team">
+                    <img
+                        src="${data.team_b.logo_path}"
+                        alt=""
+                        class="result-detail-match-team-logo"
+                    >
+
+                    <span>
+                        ${data.team_b.fcl_name}
+                    </span>
+                </div>
+
             </div>
 
 
-            <div
-                class="result-detail-set-tabs"
-                style="
-                    grid-template-columns:
-                        repeat(
-                            ${data.sets.length},
-                            minmax(0, 1fr)
-                        );
-                "
-            >
-                ${setTabHtml}
-            </div>
+            <div class="result-detail-set-section">
 
-        </div>
+                <div class="result-detail-set-title">
+
+                    <span>
+                        1
+                    </span>
+
+                    <strong>
+                        세트 선택
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="result-detail-set-tabs"
+                    style="
+                        grid-template-columns:
+                            repeat(
+                                ${data.sets.length},
+                                minmax(0, 1fr)
+                            );
+                    "
+                >
+                    ${setTabHtml}
+                </div>
+
+            </div>
 
 
             <div
@@ -1618,6 +1618,20 @@ async function openResultDetail(
             </div>
 
         `;
+
+
+        // ==============================
+        // 첫 번째 SET 자동 출력
+        // ==============================
+
+        if (
+            data.sets.length > 0
+        ) {
+
+            renderResultDetailSet(
+                data.sets[0].set
+            );
+        }
 
 
     } catch (error) {
@@ -1632,13 +1646,6 @@ async function openResultDetail(
                 ${error.message}
             </div>
         `;
-
-        if (data.sets.length > 0) {
-
-            renderResultDetailSet(
-                data.sets[0].set
-            );
-        }
     }
 }
 

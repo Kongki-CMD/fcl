@@ -173,6 +173,11 @@ const seriesStatusHeaderElement =
         ".series-status-header"
     );
 
+const preseasonSetCountInputElements =
+    document.querySelectorAll(
+        'input[name="preseason-set-count"]'
+    );
+
 
 let currentSeriesId = null;
 
@@ -279,6 +284,33 @@ async function startSeries() {
     const scheduledDate =
     preseasonDateInputElement.value;
 
+    const selectedSetCountElement =
+        document.querySelector(
+            'input[name="preseason-set-count"]:checked'
+        );
+
+
+    const targetSetCount =
+        Number(
+            selectedSetCountElement
+                ?.value
+            ?? 3
+        );
+
+
+    if (
+        ![1, 2, 3].includes(
+            targetSetCount
+        )
+    ) {
+
+        preseasonMessageElement
+            .textContent =
+                "친선전 세트 수를 선택해주세요.";
+
+        return;
+    }
+
     if (!scheduledDate) {
 
     preseasonMessageElement.textContent =
@@ -345,6 +377,9 @@ async function startSeries() {
                     scheduled_date:
                         scheduledDate,
 
+                    target_set_count:
+                        targetSetCount,
+
                     include_extra_time_result:
                         Boolean(
                             preseasonIncludeExtraTimeElement
@@ -370,7 +405,9 @@ async function startSeries() {
 
 
         preseasonMessageElement.textContent =
-            `${data.scheduled_date} 친선전이 예약되었습니다.`;
+            `${data.scheduled_date} `
+            + `${data.target_set_count}세트 `
+            + "친선전이 예약되었습니다.";
 
 
         seriesStartButtonElement.disabled =
@@ -458,7 +495,9 @@ async function importHistorySeries() {
         window.confirm(
             `${matchDate}\n`
             + `${teamA} VS ${teamB}\n\n`
-            + "실제 FC Online 경기 3세트를 찾아 등록합니다."
+            + "해당 날짜의 FC Online 맞대결을 찾습니다.\n"
+            + "1~3경기가 발견되면 실제 경기 수에 맞춰 "
+            + "자동으로 친선전을 등록합니다."
         );
 
 
@@ -521,7 +560,9 @@ async function importHistorySeries() {
 
 
         preseasonMessageElement.textContent =
-            `${matchDate} 친선전 등록 완료`;
+            `${matchDate} `
+            + `${data.sets_found}세트 `
+            + "친선전 등록 완료";
 
 
         setTimeout(
@@ -680,8 +721,11 @@ function renderSeriesStatus(data) {
     ?? null;
 
     currentSeriesBestOf =
-        series.best_of
-        ?? 3;
+        Number(
+            series.target_set_count
+            ?? series.best_of
+            ?? 3
+        );
 
     currentWinsRequired =
         series.wins_required
@@ -1663,17 +1707,21 @@ async function completeManualResult() {
 
 
     /*
-     * 일반 SERIES는 정확히 3세트
+     * 일반 SERIES는
+     * 예약한 세트 수만큼 입력
      */
     if (
         currentSeriesType
         !== "플레이오프"
         &&
-        playedSetCount !== 3
+        playedSetCount
+        !== currentSeriesBestOf
     ) {
 
-        manualResultMessageElement.textContent =
-            "3세트 점수를 모두 입력해주세요.";
+        manualResultMessageElement
+            .textContent =
+                `${currentSeriesBestOf}세트 `
+                + "점수를 모두 입력해주세요.";
 
         return;
     }

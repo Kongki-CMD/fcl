@@ -161,7 +161,9 @@
                     </li>
 
                     <li>
-                        SERIES는 총 3세트로 진행됩니다.
+                        친선전은 예약 시
+                        1세트, 2세트, 3세트 중
+                        원하는 경기 수를 선택할 수 있습니다.
                     </li>
 
                 </ul>
@@ -233,6 +235,69 @@
                     type="date"
                     id="preseason-date-input"
                 >
+
+            </div>
+
+            <div class="preseason-set-count">
+
+                <span class="preseason-set-count-label">
+                    MATCH SETS
+                </span>
+
+
+                <div class="preseason-set-count-options">
+
+                    <label class="preseason-set-count-option">
+
+                        <input
+                            type="radio"
+                            name="preseason-set-count"
+                            value="1"
+                        >
+
+                        <span>
+                            1 SET
+                        </span>
+
+                    </label>
+
+
+                    <label class="preseason-set-count-option">
+
+                        <input
+                            type="radio"
+                            name="preseason-set-count"
+                            value="2"
+                        >
+
+                        <span>
+                            2 SET
+                        </span>
+
+                    </label>
+
+
+                    <label class="preseason-set-count-option">
+
+                        <input
+                            type="radio"
+                            name="preseason-set-count"
+                            value="3"
+                            checked
+                        >
+
+                        <span>
+                            3 SET
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <small>
+                    선택한 세트 수만큼 경기 결과를 기록합니다.
+                </small>
 
             </div>
 
@@ -335,12 +400,21 @@
                     </li>
 
                     <li>
-                        선택한 날짜에 두 참가자의 맞대결이
-                        정확히 3경기 있어야 등록됩니다.
+                        선택한 날짜에 두 참가자가 진행한
+                        FC Online 맞대결을 자동으로 조회합니다.
                     </li>
 
                     <li>
-                        3경기 미만이거나 4경기 이상이면
+                        맞대결이 1경기면 1세트,
+                        2경기면 2세트,
+                        3경기면 3세트 친선전으로
+                        자동 등록됩니다.
+                    </li>
+
+                    <li>
+                        맞대결이 없거나
+                        같은 날짜에 4경기 이상이면
+                        SERIES를 정확히 구분할 수 없어
                         자동 등록되지 않습니다.
                     </li>
 

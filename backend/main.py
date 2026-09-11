@@ -10,7 +10,10 @@ import heapq
 
 
 from pathlib import Path
-from datetime import datetime
+from datetime import (
+    datetime,
+    timedelta,
+)
 from zoneinfo import ZoneInfo
 from backend.player_catalog import (
     PLAYER_DATABASE_STAT_FILTER_MAP,
@@ -612,6 +615,73 @@ def get_db_connection():
         DATABASE_URL,
         row_factory=dict_row,
     )
+
+# =========================
+# SERIES 목표 세트 수
+# =========================
+
+def get_series_target_set_count(
+    series,
+):
+
+    # =========================
+    # 플레이오프
+    #
+    # 기존 BO5 / BO7 규칙 유지
+    # =========================
+
+    if (
+        series["series_type"]
+        == "플레이오프"
+    ):
+
+        best_of = (
+            series.get(
+                "best_of"
+            )
+        )
+
+
+        if best_of is None:
+
+            raise RuntimeError(
+                "플레이오프 세트 정보가 없습니다."
+            )
+
+
+        return int(
+            best_of
+        )
+
+
+    # =========================
+    # 프리시즌 / 정규리그
+    # =========================
+
+    target_set_count = int(
+        series.get(
+            "target_set_count"
+        )
+        or 3
+    )
+
+
+    if target_set_count not in (
+        1,
+        2,
+        3,
+    ):
+
+        raise RuntimeError(
+            (
+                "올바르지 않은 SERIES "
+                f"세트 수입니다: "
+                f"{target_set_count}"
+            )
+        )
+
+
+    return target_set_count
 
 # =========================
 # POINTS
@@ -1894,6 +1964,60 @@ def initialize_database():
                     include_extra_time_result BOOLEAN
                     NOT NULL
                     DEFAULT FALSE
+                """
+            )
+
+            # =========================
+            # SERIES 목표 세트 수
+            #
+            # 프리시즌 / 정규리그
+            # 1 ~ 3세트 운영용
+            #
+            # 기존 데이터는 3세트로 보존
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ADD COLUMN IF NOT EXISTS
+                    target_set_count SMALLINT
+                """
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE series
+
+                SET target_set_count = 3
+
+                WHERE target_set_count
+                    IS NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ALTER COLUMN
+                    target_set_count
+
+                SET DEFAULT 3
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ALTER COLUMN
+                    target_set_count
+
+                SET NOT NULL
                 """
             )
 
@@ -3826,13 +3950,31 @@ def calculate_series_mvp_from_matches(
 
     # =========================
     # MVP 후보
-    # 최소 2세트 출전
+    #
+    # 1 ~ 2세트 경기:
+    # 최소 1세트 출전
+    #
+    # 3세트 이상:
+    # 기존처럼 최소 2세트 출전
     # =========================
+
+    minimum_mvp_sets = (
+        1
+        if len(matches) <= 2
+        else 2
+    )
+
 
     mvp_rankings = [
         player
-        for player in all_player_stats
-        if player["sets_played"] >= 2
+
+        for player
+        in all_player_stats
+
+        if (
+            player["sets_played"]
+            >= minimum_mvp_sets
+        )
     ]
 
 
@@ -3961,7 +4103,8 @@ def settle_predictions_for_series(
             series_type,
             team_a_id,
             team_b_id,
-            status
+            status,
+            target_set_count
 
         FROM series
 
@@ -4015,8 +4158,16 @@ def settle_predictions_for_series(
 
 
     # =========================
-    # 실제 1 / 2 / 3세트 결과
+    # 실제 SERIES 세트 결과
     # =========================
+
+    target_set_count = int(
+        series[
+            "target_set_count"
+        ]
+        or 3
+    )
+
 
     cursor.execute(
         """
@@ -4031,7 +4182,7 @@ def settle_predictions_for_series(
             series_id = %s
 
             AND set_number
-                BETWEEN 1 AND 3
+                BETWEEN 1 AND %s
 
         ORDER BY
             set_number
@@ -4040,6 +4191,7 @@ def settle_predictions_for_series(
         """,
         (
             series_id,
+            target_set_count,
         ),
     )
 
@@ -4058,21 +4210,26 @@ def settle_predictions_for_series(
     }
 
 
+    expected_set_numbers = set(
+        range(
+            1,
+            target_set_count + 1,
+        )
+    )
+
+
     if (
         set(
             set_map.keys()
         )
         !=
-        {
-            1,
-            2,
-            3,
-        }
+        expected_set_numbers
     ):
 
         raise RuntimeError(
             "승부예측 정산에 필요한 "
-            "1~3세트 결과가 모두 존재하지 않습니다."
+            f"1~{target_set_count}세트 "
+            "결과가 모두 존재하지 않습니다."
         )
 
 
@@ -4135,10 +4292,80 @@ def settle_predictions_for_series(
 
 
         set_result = (
-            set_map[
+            set_map.get(
                 set_number
-            ]
+            )
         )
+
+
+        # =========================
+        # 운영 방식 변경 등으로
+        # 존재하지 않게 된 세트 예측
+        # → 포인트 환불
+        # =========================
+
+        if set_result is None:
+
+            refund_points = int(
+                prediction[
+                    "stake_points"
+                ]
+            )
+
+
+            change_user_points(
+                cursor,
+
+                prediction[
+                    "user_id"
+                ],
+
+                refund_points,
+
+                "prediction_refund",
+
+                reference_type=
+                    "prediction",
+
+                reference_id=
+                    prediction[
+                        "id"
+                    ],
+
+                description=(
+                    "FCL 승부예측 "
+                    f"{set_number}세트 "
+                    "운영 변경 환불"
+                ),
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE predictions
+
+                SET
+                    status = 'refunded',
+                    payout_points = %s,
+                    settled_at = NOW(),
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+                    AND status = 'pending'
+                """,
+                (
+                    refund_points,
+                    prediction[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            settled_count += 1
+
+            continue
 
 
         team_a_score = int(
@@ -4483,22 +4710,32 @@ class SeriesStartRequest(BaseModel):
 
     scheduled_date: str | None = None
 
+    target_set_count: int = Field(
+        default=3,
+        ge=1,
+        le=3,
+    )
+
     include_extra_time_result: bool = False
 
 class ManualSeriesCompleteRequest(BaseModel):
 
+    # 1세트는 항상 존재
     set1_team_a: int
     set1_team_b: int
     set1_winner_side: str | None = None
 
-    set2_team_a: int
-    set2_team_b: int
+    # 2 / 3세트는
+    # SERIES의 target_set_count에 따라 선택
+    set2_team_a: int | None = None
+    set2_team_b: int | None = None
     set2_winner_side: str | None = None
 
-    set3_team_a: int
-    set3_team_b: int
+    set3_team_a: int | None = None
+    set3_team_b: int | None = None
     set3_winner_side: str | None = None
 
+    # 플레이오프용
     set4_team_a: int | None = None
     set4_team_b: int | None = None
     set4_winner_side: str | None = None
@@ -4514,6 +4751,7 @@ class ManualSeriesCompleteRequest(BaseModel):
     set7_team_a: int | None = None
     set7_team_b: int | None = None
     set7_winner_side: str | None = None
+
 
 class AdminSeriesResultUpdateRequest(
     BaseModel
@@ -4522,12 +4760,12 @@ class AdminSeriesResultUpdateRequest(
     set1_team_b: int
     set1_winner_side: str | None = None
 
-    set2_team_a: int
-    set2_team_b: int
+    set2_team_a: int | None = None
+    set2_team_b: int | None = None
     set2_winner_side: str | None = None
 
-    set3_team_a: int
-    set3_team_b: int
+    set3_team_a: int | None = None
+    set3_team_b: int | None = None
     set3_winner_side: str | None = None
 
     set4_team_a: int | None = None
@@ -4545,6 +4783,7 @@ class AdminSeriesResultUpdateRequest(
     set7_team_a: int | None = None
     set7_team_b: int | None = None
     set7_winner_side: str | None = None
+
 
 class HistorySeriesImportRequest(BaseModel):
     team_a: str
@@ -7548,6 +7787,829 @@ def admin_update_regular_schedule(
     }
 
 
+# =========================
+# ADMIN REGULAR SCHEDULE REFORM
+#
+# 2026-09-15 이후
+#
+# 화 / 목 / 토
+# 하루 2 SERIES
+#
+# ROUND 1:
+# Fixture 1 ~ 5
+# 기존 일정 / 기존 3 SET 유지
+#
+# ROUND 2 ~ 4:
+# Fixture 6 ~ 20
+# 2 SET
+# =========================
+
+@app.post(
+    "/api/admin/regular-schedule/"
+    "apply-two-set-format"
+)
+def admin_apply_regular_two_set_format(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    from itertools import permutations
+
+
+    # =========================
+    # 새 운영 시작일
+    #
+    # 월 / 수 / 토
+    # =========================
+
+    first_schedule_date = (
+        datetime.strptime(
+            "2026-09-14",
+            "%Y-%m-%d",
+        ).date()
+    )
+
+
+    # =========================
+    # 변경 대상
+    #
+    # ROUND 2 ~ ROUND 4
+    # Fixture 6 ~ 20
+    # =========================
+
+    first_fixture = 6
+    last_fixture = 20
+
+
+    expected_fixture_numbers = list(
+        range(
+            first_fixture,
+            last_fixture + 1,
+        )
+    )
+
+
+    # =========================
+    # 두 SERIES 참가자 중복 확인
+    # =========================
+
+    def series_are_disjoint(
+        left_series,
+        right_series,
+    ):
+
+        left_participants = {
+            int(
+                left_series[
+                    "team_a_id"
+                ]
+            ),
+            int(
+                left_series[
+                    "team_b_id"
+                ]
+            ),
+        }
+
+
+        right_participants = {
+            int(
+                right_series[
+                    "team_a_id"
+                ]
+            ),
+            int(
+                right_series[
+                    "team_b_id"
+                ]
+            ),
+        }
+
+
+        return (
+            left_participants
+            .isdisjoint(
+                right_participants
+            )
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 대상 SERIES 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.fixture_number,
+                    s.round_number,
+                    s.scheduled_date,
+                    s.status,
+                    s.target_set_count,
+
+                    s.team_a_id,
+                    s.team_b_id,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_b.fcl_name
+                        AS team_b
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type =
+                        '정규리그'
+
+                    AND
+                    s.fixture_number
+                        BETWEEN %s AND %s
+
+                    AND
+                    s.status <>
+                        'cancelled'
+
+                ORDER BY
+                    s.fixture_number ASC
+
+                FOR UPDATE
+                """,
+                (
+                    first_fixture,
+                    last_fixture,
+                ),
+            )
+
+
+            series_rows = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # Fixture 구성 검증
+            # =========================
+
+            actual_fixture_numbers = [
+                int(
+                    row[
+                        "fixture_number"
+                    ]
+                )
+
+                for row
+                in series_rows
+            ]
+
+
+            if (
+                actual_fixture_numbers
+                != expected_fixture_numbers
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "정규리그 Fixture 6~20을 "
+                        "정확히 찾을 수 없습니다. "
+                        f"현재: "
+                        f"{actual_fixture_numbers}"
+                    ),
+                )
+
+
+            # =========================
+            # 이미 진행된 경기 보호
+            #
+            # scheduled만 일정 변경 가능
+            # =========================
+
+            non_scheduled_rows = [
+                row
+
+                for row
+                in series_rows
+
+                if (
+                    row["status"]
+                    != "scheduled"
+                )
+            ]
+
+
+            if non_scheduled_rows:
+
+                blocked_fixtures = [
+                    int(
+                        row[
+                            "fixture_number"
+                        ]
+                    )
+
+                    for row
+                    in non_scheduled_rows
+                ]
+
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "이미 시작 또는 완료된 "
+                        "정규리그 경기가 있어 "
+                        "일괄 변경할 수 없습니다. "
+                        f"Fixture: "
+                        f"{blocked_fixtures}"
+                    ),
+                )
+
+
+            # =========================
+            # 기존 라운드별 SERIES 분리
+            #
+            # 기존 대진 구성 자체는 보존
+            # 라운드 안에서 경기 순서만 변경
+            # =========================
+
+            round_rows = {
+                2: [],
+                3: [],
+                4: [],
+            }
+
+
+            for series_row in series_rows:
+
+                fixture_number = int(
+                    series_row[
+                        "fixture_number"
+                    ]
+                )
+
+
+                round_number = (
+                    (
+                        fixture_number - 1
+                    )
+                    // 5
+                ) + 1
+
+
+                if (
+                    round_number
+                    not in round_rows
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "정규리그 라운드 계산 중 "
+                            "올바르지 않은 Fixture가 "
+                            "발견되었습니다."
+                        ),
+                    )
+
+
+                round_rows[
+                    round_number
+                ].append(
+                    series_row
+                )
+
+
+            # =========================
+            # 라운드 구성 검증
+            #
+            # 각 라운드:
+            # - 5 SERIES
+            # - 참가자 5명
+            # - 각 참가자 2회 출전
+            # =========================
+
+            for (
+                round_number,
+                rows,
+            ) in round_rows.items():
+
+                if len(rows) != 5:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"ROUND {round_number}의 "
+                            "경기 수가 5경기가 아닙니다."
+                        ),
+                    )
+
+
+                participant_counts = {}
+
+
+                for row in rows:
+
+                    for participant_id in (
+                        int(
+                            row[
+                                "team_a_id"
+                            ]
+                        ),
+                        int(
+                            row[
+                                "team_b_id"
+                            ]
+                        ),
+                    ):
+
+                        participant_counts[
+                            participant_id
+                        ] = (
+                            participant_counts.get(
+                                participant_id,
+                                0,
+                            )
+                            + 1
+                        )
+
+
+                if (
+                    len(participant_counts)
+                    != 5
+                    or
+                    any(
+                        count != 2
+                        for count
+                        in participant_counts.values()
+                    )
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"ROUND {round_number}의 "
+                            "참가자 출전 구성이 "
+                            "2회씩 균등하지 않습니다. "
+                            f"현재: "
+                            f"{participant_counts}"
+                        ),
+                    )
+
+
+            # =========================
+            # 경기 순서 재배치
+            #
+            # 하루 2 SERIES인 경우
+            # 두 경기 참가자가 완전히 달라야 함
+            #
+            # 전체 위치:
+            #
+            # R2
+            # 0 / 1
+            # 2 / 3
+            # 4
+            #
+            # R3
+            # 5
+            # 6 / 7
+            # 8 / 9
+            #
+            # R4
+            # 10 / 11
+            # 12 / 13
+            # 14
+            #
+            # 위치 4 / 5는 같은 9/19 경기일
+            # =========================
+
+            round_2_candidates = [
+                candidate
+
+                for candidate
+                in permutations(
+                    round_rows[2]
+                )
+
+                if (
+                    series_are_disjoint(
+                        candidate[0],
+                        candidate[1],
+                    )
+                    and
+                    series_are_disjoint(
+                        candidate[2],
+                        candidate[3],
+                    )
+                )
+            ]
+
+
+            round_3_candidates = [
+                candidate
+
+                for candidate
+                in permutations(
+                    round_rows[3]
+                )
+
+                if (
+                    series_are_disjoint(
+                        candidate[1],
+                        candidate[2],
+                    )
+                    and
+                    series_are_disjoint(
+                        candidate[3],
+                        candidate[4],
+                    )
+                )
+            ]
+
+
+            round_4_candidates = [
+                candidate
+
+                for candidate
+                in permutations(
+                    round_rows[4]
+                )
+
+                if (
+                    series_are_disjoint(
+                        candidate[0],
+                        candidate[1],
+                    )
+                    and
+                    series_are_disjoint(
+                        candidate[2],
+                        candidate[3],
+                    )
+                )
+            ]
+
+
+            ordered_series = None
+
+
+            for round_2 in (
+                round_2_candidates
+            ):
+
+                for round_3 in (
+                    round_3_candidates
+                ):
+
+                    # =================
+                    # 9/19
+                    #
+                    # R2 마지막 경기 +
+                    # R3 첫 경기
+                    # =================
+
+                    if not (
+                        series_are_disjoint(
+                            round_2[4],
+                            round_3[0],
+                        )
+                    ):
+
+                        continue
+
+
+                    for round_4 in (
+                        round_4_candidates
+                    ):
+
+                        ordered_series = list(
+                            round_2
+                            + round_3
+                            + round_4
+                        )
+
+                        break
+
+
+                    if (
+                        ordered_series
+                        is not None
+                    ):
+
+                        break
+
+
+                if (
+                    ordered_series
+                    is not None
+                ):
+
+                    break
+
+
+            if (
+                ordered_series
+                is None
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "하루 2경기에 "
+                        "4명의 서로 다른 참가자가 "
+                        "배치되는 일정 조합을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 월 / 수 / 토 경기일 생성
+            #
+            # Python weekday:
+            #
+            # 월 0
+            # 화 1
+            # 수 2
+            # 목 3
+            # 금 4
+            # 토 5
+            # 일 6
+            # =========================
+
+            allowed_weekdays = {
+                0,
+                2,
+                5,
+            }
+
+
+            required_match_days = (
+                (
+                    len(
+                        ordered_series
+                    )
+                    + 1
+                )
+                // 2
+            )
+
+
+            match_dates = []
+
+
+            current_date = (
+                first_schedule_date
+            )
+
+
+            while (
+                len(match_dates)
+                <
+                required_match_days
+            ):
+
+                if (
+                    current_date.weekday()
+                    in allowed_weekdays
+                ):
+
+                    match_dates.append(
+                        current_date
+                    )
+
+
+                current_date += timedelta(
+                    days=1
+                )
+
+
+            # =========================
+            # 최종 하루 참가자 중복 검증
+            # =========================
+
+            for index in range(
+                0,
+                len(ordered_series),
+                2,
+            ):
+
+                if (
+                    index + 1
+                    >= len(
+                        ordered_series
+                    )
+                ):
+
+                    break
+
+
+                first_series = (
+                    ordered_series[
+                        index
+                    ]
+                )
+
+                second_series = (
+                    ordered_series[
+                        index + 1
+                    ]
+                )
+
+
+                if not (
+                    series_are_disjoint(
+                        first_series,
+                        second_series,
+                    )
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "동일 경기일에 같은 "
+                            "참가자가 두 번 배정되는 "
+                            "일정이 발견되었습니다."
+                        ),
+                    )
+
+
+            # =========================
+            # Fixture 번호 임시 해제
+            #
+            # 순서를 재배치하므로
+            # UNIQUE 충돌 방지
+            # =========================
+
+            for series_row in (
+                series_rows
+            ):
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET fixture_number = NULL
+
+                    WHERE id = %s
+                    """,
+                    (
+                        series_row["id"],
+                    ),
+                )
+
+
+            # =========================
+            # 새 일정 / Fixture 적용
+            # =========================
+
+            updated_schedules = []
+
+
+            for (
+                index,
+                series_row,
+            ) in enumerate(
+                ordered_series
+            ):
+
+                fixture_number = (
+                    first_fixture
+                    + index
+                )
+
+
+                round_number = (
+                    (
+                        fixture_number - 1
+                    )
+                    // 5
+                ) + 1
+
+
+                match_day_index = (
+                    index
+                    // 2
+                )
+
+
+                scheduled_date = (
+                    match_dates[
+                        match_day_index
+                    ]
+                )
+
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET
+                        fixture_number = %s,
+                        scheduled_date = %s,
+                        round_number = %s,
+                        target_set_count = 2
+
+                    WHERE id = %s
+                    """,
+                    (
+                        fixture_number,
+                        scheduled_date,
+                        round_number,
+                        series_row["id"],
+                    ),
+                )
+
+
+                updated_schedules.append(
+                    {
+                        "series_id":
+                            series_row[
+                                "id"
+                            ],
+
+                        "fixture_number":
+                            fixture_number,
+
+                        "round":
+                            round_number,
+
+                        "scheduled_date":
+                            scheduled_date
+                                .isoformat(),
+
+                        "target_set_count":
+                            2,
+
+                        "team_a":
+                            series_row[
+                                "team_a"
+                            ],
+
+                        "team_b":
+                            series_row[
+                                "team_b"
+                            ],
+                    }
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "message": (
+            "정규리그 일정 개편이 "
+            "완료되었습니다."
+        ),
+
+        "rule": {
+            "start_date":
+                first_schedule_date
+                    .isoformat(),
+
+            "weekdays": [
+                "월",
+                "수",
+                "토",
+            ],
+
+            "series_per_day":
+                2,
+
+            "unique_players_per_full_day":
+                4,
+
+            "sets_per_series":
+                2,
+
+            "first_fixture":
+                first_fixture,
+
+            "last_fixture":
+                last_fixture,
+        },
+
+        "updated_count":
+            len(
+                updated_schedules
+            ),
+
+        "schedule":
+            updated_schedules,
+    }
+
 
 # =========================
 # ADMIN SERIES DELETE
@@ -8120,6 +9182,7 @@ def admin_update_series_result(
                     id,
                     series_type,
                     playoff_stage,
+                    target_set_count,
                     best_of,
                     wins_required,
                     status,
@@ -8206,7 +9269,12 @@ def admin_update_series_result(
 
             else:
 
-                max_sets = 3
+                max_sets = (
+                    get_series_target_set_count(
+                        series
+                    )
+                )
+
                 wins_required = None
 
 
@@ -8617,18 +9685,21 @@ def admin_update_series_result(
 
             # =========================
             # 일반 경기
-            # 정확히 3세트
             # =========================
 
             if not is_playoff:
 
-                if len(updated_sets) != 3:
+                if (
+                    len(updated_sets)
+                    != max_sets
+                ):
 
                     raise HTTPException(
                         status_code=400,
                         detail=(
-                            "프리시즌과 정규리그는 "
-                            "3세트를 모두 입력해야 합니다."
+                            f"{series['series_type']}는 "
+                            f"{max_sets}세트를 모두 "
+                            "입력해야 합니다."
                         ),
                     )
 
@@ -9172,6 +10243,7 @@ def get_prediction_matches():
                     s.scheduled_date,
                     s.status,
                     s.started_at,
+                    s.target_set_count,
 
                     team_a.id
                         AS team_a_id,
@@ -9284,6 +10356,14 @@ def get_prediction_matches():
 
                 "is_open":
                     is_open,
+
+                "target_set_count":
+                    int(
+                        row[
+                            "target_set_count"
+                        ]
+                        or 3
+                    ),
 
                 "odds": {
                     "team_a":
@@ -11259,7 +12339,8 @@ def create_prediction(
                         team_b_id,
                         status,
                         scheduled_date,
-                        started_at
+                        started_at,
+                        target_set_count
 
                     FROM series
 
@@ -11302,6 +12383,33 @@ def create_prediction(
                         detail=(
                             "정규리그 경기만 "
                             "승부예측할 수 있습니다."
+                        ),
+                    )
+
+                # =========================
+                # 실제 SERIES 세트 수 확인
+                # =========================
+
+                target_set_count = int(
+                    series[
+                        "target_set_count"
+                    ]
+                    or 3
+                )
+
+
+                if (
+                    request.set_number
+                    >
+                    target_set_count
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "이 경기는 "
+                            f"{target_set_count}세트 "
+                            "경기입니다."
                         ),
                     )
 
@@ -12494,6 +13602,7 @@ def get_matches():
                     s.scheduled_date,
                     s.round_number,
                     s.status,
+                    s.target_set_count,
 
                     team_a.fcl_name
                         AS team_a,
@@ -12613,6 +13722,14 @@ def get_matches():
                     series_row[
                         "status"
                     ],
+
+                "target_set_count":
+                    int(
+                        series_row[
+                            "target_set_count"
+                        ]
+                        or 3
+                    ),
             }
         )
 
@@ -13218,6 +14335,7 @@ def get_standings():
         team_a,
         team_b,
         sets,
+        expected_set_count=3,
     ):
 
         if (
@@ -13228,8 +14346,12 @@ def get_standings():
             return
 
 
-        # FCL 정규리그는 3세트
-        if len(sets) != 3:
+        # SERIES에 설정된
+        # 세트 수가 모두 있어야 반영
+        if (
+            len(sets)
+            != expected_set_count
+        ):
             return
 
 
@@ -13375,6 +14497,7 @@ def get_standings():
 
                     s.scheduled_date,
                     s.started_at,
+                    s.target_set_count,
 
                     team_a.fcl_name
                         AS team_a,
@@ -13457,6 +14580,14 @@ def get_standings():
                         "team_b"
                     ],
 
+                "target_set_count":
+                    int(
+                        row[
+                            "target_set_count"
+                        ]
+                        or 3
+                    ),
+
                 "sets": [],
             }
 
@@ -13519,7 +14650,18 @@ def get_standings():
         ]
 
 
-        if len(sets) != 3:
+        expected_set_count = int(
+            series_data[
+                "target_set_count"
+            ]
+            or 3
+        )
+
+
+        if (
+            len(sets)
+            != expected_set_count
+        ):
             continue
 
 
@@ -13551,6 +14693,8 @@ def get_standings():
             ],
 
             sets,
+
+            expected_set_count,
         )
 
 
@@ -17653,6 +18797,8 @@ def start_fcl_series(
 
                     include_extra_time_result,
 
+                    target_set_count,
+
                     scheduled_date,
                     round_number,
 
@@ -17665,6 +18811,8 @@ def start_fcl_series(
                     %s,
 
                     40,
+
+                    %s,
 
                     %s,
 
@@ -17683,6 +18831,11 @@ def start_fcl_series(
                     bool(
                         request
                             .include_extra_time_result
+                    ),
+
+                    int(
+                        request
+                            .target_set_count
                     ),
 
                     scheduled_date,
@@ -17728,6 +18881,12 @@ def start_fcl_series(
             bool(
                 request
                     .include_extra_time_result
+            ),
+
+        "target_set_count":
+            int(
+                request
+                    .target_set_count
             ),
 
         "started_at":
@@ -18084,27 +19243,45 @@ def import_history_series(
 
 
     # =========================
-    # 반드시 정확히 3경기
+    # 과거 친선전 세트 수
+    # 자동 감지
+    #
+    # 1경기 -> 1세트
+    # 2경기 -> 2세트
+    # 3경기 -> 3세트
     # =========================
 
-    if len(detected_matches) < 3:
+    detected_set_count = len(
+        detected_matches
+    )
+
+
+    if detected_set_count == 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{request.match_date} "
+                "두 참가자의 맞대결을 "
+                "찾지 못했습니다."
+            ),
+        )
+
+
+    if detected_set_count > 3:
 
         raise HTTPException(
             status_code=400,
             detail=(
                 f"{request.match_date} "
                 "맞대결을 "
-                f"{len(detected_matches)}경기만 "
+                f"{detected_set_count}경기 "
                 "찾았습니다. "
-                "3경기가 필요합니다."
+                "같은 날짜에 4경기 이상이면 "
+                "하나의 친선전 SERIES를 "
+                "자동으로 구분할 수 없습니다."
             ),
         )
-
-
-    # 시간순 첫 3경기만 SERIES로 사용
-    detected_matches = (
-        detected_matches[:3]
-    )
 
 
     match_ids = [
@@ -18137,14 +19314,12 @@ def import_history_series(
                 FROM series_sets
 
                 WHERE nexon_match_id
-                    IN (%s, %s, %s)
+                    = ANY(%s)
 
                 LIMIT 1
                 """,
                 (
-                    match_ids[0],
-                    match_ids[1],
-                    match_ids[2],
+                    match_ids,
                 ),
             )
 
@@ -18202,7 +19377,36 @@ def import_history_series(
 
 
     # =========================
-    # SERIES + 3 SET 저장
+    # 최종 저장 세트 수
+    #
+    # DB INSERT 바로 직전에
+    # 실제 detected_matches 기준으로
+    # 다시 계산
+    # =========================
+
+    detected_set_count = len(
+        detected_matches
+    )
+
+
+    if detected_set_count not in (
+        1,
+        2,
+        3,
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "과거 친선전은 "
+                "1~3경기만 자동 등록할 수 있습니다. "
+                f"현재 감지: {detected_set_count}경기"
+            ),
+        )
+
+
+    # =========================
+    # SERIES + 감지된 SET 저장
     # =========================
 
     with get_db_connection() as connection:
@@ -18220,6 +19424,7 @@ def import_history_series(
                     match_type,
 
                     include_extra_time_result,
+                    target_set_count,
 
                     scheduled_date,
                     round_number,
@@ -18240,6 +19445,7 @@ def import_history_series(
 
                     40,
 
+                    %s,
                     %s,
 
                     %s,
@@ -18263,6 +19469,8 @@ def import_history_series(
                         request
                             .include_extra_time_result
                     ),
+
+                    detected_set_count,
 
                     target_date,
 
@@ -18519,7 +19727,7 @@ def import_history_series(
             request.team_b,
 
         "sets_found":
-            3,
+            detected_set_count,
 
         "match_ids":
             match_ids,
@@ -19097,6 +20305,7 @@ def manual_complete_fcl_series(
                     s.id,
                     s.series_type,
                     s.status,
+                    s.target_set_count,
 
                     s.playoff_stage,
                     s.best_of,
@@ -19294,7 +20503,12 @@ def manual_complete_fcl_series(
 
             else:
 
-                max_sets = 3
+                max_sets = (
+                    get_series_target_set_count(
+                        series
+                    )
+                )
+
                 wins_required = None
 
 
@@ -19543,17 +20757,23 @@ def manual_complete_fcl_series(
 
 
             # =========================
-            # 일반 SERIES는 정확히 3세트
+            # 일반 SERIES
+            # 예약된 세트 수만큼 입력
             # =========================
 
             if not is_playoff:
 
-                if len(manual_sets) != 3:
+                if (
+                    len(manual_sets)
+                    != max_sets
+                ):
+
                     raise HTTPException(
                         status_code=400,
                         detail=(
-                            "프리시즌과 정규리그는 "
-                            "3세트를 모두 입력해야 합니다."
+                            f"{series['series_type']}는 "
+                            f"{max_sets}세트를 모두 "
+                            "입력해야 합니다."
                         ),
                     )
 
@@ -19866,7 +21086,8 @@ def get_fcl_series_status(
                     s.series_type,
                     s.match_type,
                     s.scheduled_date,
-
+                    s.target_set_count,
+                    
                     s.playoff_stage,
                     s.best_of,
                     s.wins_required,
@@ -20062,6 +21283,11 @@ def get_fcl_series_status(
                     "wins_required"
                 ],
 
+            "target_set_count":
+                get_series_target_set_count(
+                    series
+                ),
+
             "team_a":
                 series["team_a_name"],
 
@@ -20162,6 +21388,7 @@ def sync_fcl_series_status(
                     s.match_type,
                     s.include_extra_time_result,
                     s.scheduled_date,
+                    s.target_set_count,
 
                     s.playoff_stage,
                     s.best_of,
@@ -20253,6 +21480,12 @@ def sync_fcl_series_status(
     )
 
     status = series["status"]
+
+    required_set_count = (
+        get_series_target_set_count(
+            series
+        )
+    )
 
 
     # active 또는
@@ -20604,10 +21837,17 @@ def sync_fcl_series_status(
 
     else:
 
+        # =========================
         # 프리시즌 / 정규리그
-        # 항상 3세트
+        #
+        # SERIES에 저장된
+        # 목표 세트 수만 감지
+        # =========================
+
         detected_matches = (
-            detected_matches[:3]
+            detected_matches[
+                :required_set_count
+            ]
         )
 
         # =========================
@@ -20868,15 +22108,42 @@ def sync_fcl_series_status(
                 )
 
 
-        if len(manual_sets) != 3:
+        # =========================
+        # 실제 NEXON 동기화에
+        # 필요한 경기 수
+        # =========================
 
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "수동 입력된 3세트 결과가 "
-                    "완전하지 않습니다."
-                ),
+        if (
+            series["series_type"]
+            == "플레이오프"
+        ):
+
+            required_sync_set_count = (
+                len(
+                    manual_sets
+                )
             )
+
+        else:
+
+            required_sync_set_count = (
+                required_set_count
+            )
+
+
+            if (
+                len(manual_sets)
+                != required_sync_set_count
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "수동 입력된 "
+                        f"{required_sync_set_count}세트 "
+                        "결과가 완전하지 않습니다."
+                    ),
+                )
 
 
         # =========================
@@ -20884,7 +22151,11 @@ def sync_fcl_series_status(
         # 3경기 전부 올라오지 않음
         # =========================
 
-        if len(detected_matches) < 3:
+        if (
+            len(detected_matches)
+            <
+            required_sync_set_count
+        ):
 
             return {
                 "series": {
@@ -20924,7 +22195,7 @@ def sync_fcl_series_status(
                         "completed",
 
                     "set_count":
-                        3,
+                        required_sync_set_count,
 
                     "stats_sync_status":
                         "pending",
@@ -20997,8 +22268,9 @@ def sync_fcl_series_status(
                 "sync_message":
                     (
                         "NEXON 경기 기록 "
-                        f"{len(detected_matches)}/3경기 감지. "
-                        "아직 3경기 기록이 모두 "
+                        f"{len(detected_matches)}/"
+                        f"{required_sync_set_count}경기 감지. "
+                        "아직 필요한 경기 기록이 모두 "
                         "반영되지 않았습니다."
                     ),
             }
@@ -21179,7 +22451,7 @@ def sync_fcl_series_status(
                         "completed",
 
                     "set_count":
-                        3,
+                        required_sync_set_count,
 
                     "stats_sync_status":
                         "conflict",
@@ -21887,10 +23159,15 @@ def sync_fcl_series_status(
 
             else:
 
+                # =========================
                 # 프리시즌 / 정규리그
-                # 항상 3세트
+                #
+                # 목표 세트 수 도달 시 완료
+                # =========================
+
                 series_completed = (
-                    set_count >= 3
+                    set_count
+                    >= required_set_count
                 )
 
 
@@ -22802,6 +24079,7 @@ def get_completed_series_results():
                 SELECT
                     s.id AS series_id,
                     s.series_type,
+                    s.target_set_count,
                     s.round_number,
 
                     s.playoff_stage,
@@ -22918,9 +24196,54 @@ def get_completed_series_results():
                 )
 
 
-                # 3세트 미완성 데이터 보호
-                if len(set_rows) < 3:
-                    continue
+                # =========================
+                # SERIES별 결과 완성 여부
+                #
+                # 프리시즌 / 정규리그:
+                # target_set_count 기준
+                #
+                # 플레이오프:
+                # 선승 구조이므로 실제 저장된
+                # 세트를 그대로 사용
+                # =========================
+
+                if (
+                    series_row[
+                        "series_type"
+                    ]
+                    != "플레이오프"
+                ):
+
+                    target_set_count = int(
+                        series_row[
+                            "target_set_count"
+                        ]
+                        or 3
+                    )
+
+
+                    if (
+                        len(set_rows)
+                        != target_set_count
+                    ):
+                        continue
+
+
+                else:
+
+                    wins_required = int(
+                        series_row[
+                            "wins_required"
+                        ]
+                        or 1
+                    )
+
+
+                    if (
+                        len(set_rows)
+                        < wins_required
+                    ):
+                        continue
 
 
                 sets = []
@@ -23111,6 +24434,14 @@ def get_completed_series_results():
                             series_row[
                                 "series_type"
                             ],
+
+                        "target_set_count":
+                            int(
+                                series_row[
+                                    "target_set_count"
+                                ]
+                                or 3
+                            ),
 
                         "playoff_stage":
                             series_row[

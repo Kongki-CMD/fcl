@@ -132,6 +132,17 @@ const adminScheduleListElement =
         "#admin-schedule-list"
     );
 
+const adminRegularReformButtonElement =
+    document.querySelector(
+        "#admin-regular-reform-button"
+    );
+
+
+const adminRegularReformMessageElement =
+    document.querySelector(
+        "#admin-regular-reform-message"
+    );
+
 const adminPhotoRequestListElement =
     document.querySelector(
         "#admin-photo-request-list"
@@ -1830,6 +1841,147 @@ async function loadAdminRegularSchedule() {
 }
 
 // =========================================
+// 정규리그 일정 개편
+//
+// Fixture 6 ~ 20
+// 화 / 목 / 토
+// 하루 2 SERIES
+// 경기당 2 SET
+// =========================================
+
+async function applyAdminRegularReform() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "정규리그 일정을 개편하시겠습니까?\n\n"
+                + "Fixture 6~20\n"
+                + "→ 2026-09-14부터\n"
+                + "→ 월 / 수 / 토\n"
+                + "→ 하루 최대 2경기\n"
+                + "→ 2경기 진행일은 참가자 4명 중복 없음\n"
+                + "→ 경기당 2세트\n"
+                + "→ 5경기마다 라운드 변경"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    adminRegularReformButtonElement
+        .disabled = true;
+
+
+    adminRegularReformMessageElement
+        .textContent =
+            "정규리그 일정을 변경하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/regular-schedule/"
+                + "apply-two-set-format",
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "정규리그 일정 개편 실패"
+            );
+        }
+
+
+        adminRegularReformMessageElement
+            .textContent =
+                `${responseData.updated_count}경기 `
+                + "일정이 변경되었습니다.";
+
+
+        await loadAdminRegularSchedule();
+
+
+        alert(
+            "정규리그 일정 개편 완료\n\n"
+            + `${responseData.updated_count}경기 변경\n`
+            + "Fixture 6~20 → 2 SET\n"
+            + "화 / 목 / 토 → 하루 2경기"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminRegularReformMessageElement
+            .textContent =
+                error.message;
+
+
+    } finally {
+
+        adminRegularReformButtonElement
+            .disabled = false;
+    }
+}
+
+
+adminRegularReformButtonElement
+    ?.addEventListener(
+        "click",
+        applyAdminRegularReform
+    );
+
+// =========================================
 // 정규리그 일정 출력
 // =========================================
 
@@ -2436,14 +2588,28 @@ function openAdminResultEdit(
 
     const maxSets =
         isPlayoff
-            ? Number(result.best_of)
-            : 3;
+            ? Number(
+                result.best_of
+            )
+            : Number(
+                result.target_set_count
+                ?? result.sets?.length
+                ?? 3
+            );
+
+
+    const validSetCounts =
+        isPlayoff
+            ? [5, 7]
+            : [1, 2, 3];
 
 
     if (
         !Number.isInteger(maxSets)
         ||
-        ![3, 5, 7].includes(maxSets)
+        !validSetCounts.includes(
+            maxSets
+        )
     ) {
 
         alert(
@@ -2828,7 +2994,13 @@ adminResultEditSaveButtonElement
                         editingAdminResult
                             .best_of
                     )
-                    : 3;
+                    : Number(
+                        editingAdminResult
+                            .target_set_count
+                        ?? editingAdminResult
+                            .sets?.length
+                        ?? 3
+                    );
 
 
             const winsRequired =
