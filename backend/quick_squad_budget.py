@@ -18,6 +18,8 @@ META_BALANCE_GAP_WEIGHT = 0.35
 GENERATION_RESTRICTED_PENALTY = 1.5
 SUPPLY_RESTRICTED_PENALTY = 1.0
 GENERATION_RESTRICTED_OVR_ADVANTAGE = 3
+ICONTMB_DEPRIORITIZED_PENALTY = 0.75
+MAX_SEASON_VARIANTS_PER_PLAYER = 2
 CORE_SLOT_MIN_TARGET_RATIO = 0.20
 CORE_SLOT_UNDERINVEST_WEIGHT = 2.5
 
@@ -195,6 +197,193 @@ def _is_acquisition_restricted(
                 False,
             )
         )
+    )
+
+def _is_icontmb(
+    player,
+):
+    class_code = (
+        str(
+            player.get(
+                "supply_restriction_class",
+                "",
+            )
+            or ""
+        )
+        .strip()
+        .upper()
+    )
+
+    return (
+        class_code
+        ==
+        "ICONTMB"
+    )
+
+
+def _quick_squad_priority_rank(
+    player,
+):
+    # 낮을수록 우선
+    if bool(
+        player.get(
+            "generation_restricted",
+            False,
+        )
+    ):
+        return 3
+
+    if bool(
+        player.get(
+            "supply_restricted",
+            False,
+        )
+    ):
+        return 2
+
+    if _is_icontmb(
+        player
+    ):
+        return 1
+
+    return 0
+
+
+def _quick_squad_player_penalty(
+    player,
+):
+    # 생성 제한이 가장 강한 감점
+    if bool(
+        player.get(
+            "generation_restricted",
+            False,
+        )
+    ):
+        return (
+            GENERATION_RESTRICTED_PENALTY
+        )
+
+    # 그다음 공급 제한
+    if bool(
+        player.get(
+            "supply_restricted",
+            False,
+        )
+    ):
+        return (
+            SUPPLY_RESTRICTED_PENALTY
+        )
+
+    # ICONTMB는 제한 카드는 아니지만
+    # 에이전트 재료 가치를 고려해 일반 시즌보다 후순위
+    if _is_icontmb(
+        player
+    ):
+        return (
+            ICONTMB_DEPRIORITIZED_PENALTY
+        )
+
+    return 0.0
+
+def _quick_squad_player_name_key(
+    player,
+):
+    return (
+        str(
+            player.get(
+                "player_name",
+                "",
+            )
+            or ""
+        )
+        .strip()
+        .casefold()
+    )
+
+
+def _take_unique_player_names(
+    players,
+    limit,
+):
+    result = []
+    seen_names = set()
+
+    for player in players:
+
+        name_key = (
+            _quick_squad_player_name_key(
+                player
+            )
+        )
+
+        if (
+            not name_key
+            or name_key in seen_names
+        ):
+            continue
+
+        result.append(
+            player
+        )
+
+        seen_names.add(
+            name_key
+        )
+
+        if (
+            len(result)
+            >= limit
+        ):
+            break
+
+    return result
+
+
+def _quick_squad_squad_priority(
+    players,
+):
+    generation_count = 0
+    supply_count = 0
+    icontmb_count = 0
+
+
+    for player in players:
+
+        if bool(
+            player.get(
+                "generation_restricted",
+                False,
+            )
+        ):
+            generation_count += 1
+            continue
+
+
+        if bool(
+            player.get(
+                "supply_restricted",
+                False,
+            )
+        ):
+            supply_count += 1
+            continue
+
+
+        if _is_icontmb(
+            player
+        ):
+            icontmb_count += 1
+
+
+    # max()에서 큰 값이 우선되므로
+    # 제한 카드 수가 적을수록 큰 값이 되도록 음수 사용.
+    #
+    # 우선순위:
+    # 일반 > ICONTMB > 공급 제한 > 생성 제한
+    return (
+        -generation_count,
+        -supply_count,
+        -icontmb_count,
     )
 
 
@@ -419,34 +608,64 @@ def _prepare_options(
                 )
             ] = player
 
-
     values = list(
         selected.values()
     )
 
+
     # =========================================
-    # 생성 제한 선수 후순위
+    # 퀵 스쿼드 후보 우선순위
     #
-    # 같은 포지션에 충분히 경쟁력 있는
-    # 생성 가능 선수가 존재하면
-    # 생성 제한 선수는 후보에서 뒤로 미룬다.
+    # 1. 일반 획득 가능 시즌
+    # 2. ICONTMB
+    # 3. 공급 제한
+    # 4. 생성 제한
     #
-    # 단, 생성 제한 선수가 생성 가능 최고
-    # OVR보다 확실히 높으면 후보로 유지한다.
+    # 일반 시즌 후보가 충분하다면
+    # ICONTMB는 후보군에서 아예 제외한다.
+    #
+    # 작은 팀컬러 등 일반 후보가 부족할 때만
+    # ICONTMB를 fallback 후보로 다시 허용한다.
     # =========================================
 
-    generation_available_values = [
+
+    normal_available_values = [
         player
 
         for player
         in values
 
-        if not _is_acquisition_restricted(
-            player
+        if (
+            not _is_acquisition_restricted(
+                player
+            )
+            and
+            not _is_icontmb(
+                player
+            )
         )
     ]
 
-    generation_restricted_values = [
+
+    icontmb_values = [
+        player
+
+        for player
+        in values
+
+        if (
+            not _is_acquisition_restricted(
+                player
+            )
+            and
+            _is_icontmb(
+                player
+            )
+        )
+    ]
+
+
+    restricted_values = [
         player
 
         for player
@@ -457,82 +676,107 @@ def _prepare_options(
         )
     ]
 
-    if generation_restricted_values:
 
-        print(
-            "[QUICK SQUAD ACQUISITION RESTRICTED]",
-            [
-                {
-                    "sp_id":
-                        int(
-                            player[
-                                "sp_id"
-                            ]
-                        ),
+    # -----------------------------------------
+    # ICONTMB 허용 여부
+    #
+    # 코어 포지션은 일반 선수명 3명,
+    # 비코어 포지션은 일반 선수명 2명만 있어도
+    # ICONTMB를 후보에서 제거한다.
+    # -----------------------------------------
 
-                    "name":
-                        player.get(
-                            "player_name"
-                        ),
+    normal_minimum_unique_names = (
+        3
+        if core_slot
+        else 2
+    )
 
-                    "ovr":
-                        int(
-                            player[
-                                "ovr"
-                            ]
-                        ),
 
-                    "generation":
-                        bool(
-                            player.get(
-                                "generation_restricted",
-                                False,
-                            )
-                        ),
-
-                    "supply":
-                        bool(
-                            player.get(
-                                "supply_restricted",
-                                False,
-                            )
-                        ),
-
-                    "class":
-                        player.get(
-                            "supply_restriction_class"
-                        ),
-                }
-
-                for player
-                in generation_restricted_values
-            ],
-            flush=True,
+    normal_unique_names = {
+        str(
+            player[
+                "player_name"
+            ]
         )
+        .strip()
+        .casefold()
+
+        for player
+        in normal_available_values
+    }
+
 
     if (
-        generation_available_values
-        and generation_restricted_values
+        len(
+            normal_unique_names
+        )
+        >=
+        normal_minimum_unique_names
+    ):
+
+        # 일반 카드가 충분함.
+        # ICONTMB는 이번 슬롯 후보에서 완전히 제거.
+        preferred_available_values = list(
+            normal_available_values
+        )
+
+    else:
+
+        # 일반 카드가 부족한 작은 팀컬러.
+        # 이때만 ICONTMB를 fallback으로 허용.
+        preferred_available_values = (
+            list(
+                normal_available_values
+            )
+            +
+            list(
+                icontmb_values
+            )
+        )
+
+
+    # =========================================
+    # 생성 / 공급 제한은
+    # ICONTMB보다도 더 후순위
+    # =========================================
+
+    if (
+        preferred_available_values
+        and
+        restricted_values
     ):
 
         best_available_ovr = max(
-            int(player["ovr"])
+            int(
+                player[
+                    "ovr"
+                ]
+            )
+
             for player
-            in generation_available_values
+            in preferred_available_values
         )
 
 
         preferred_values = list(
-            generation_available_values
+            preferred_available_values
         )
 
 
+        # 제한 카드가 일반/ICONTMB 후보보다
+        # OVR이 확실히 높을 때만 예외적으로 유지.
         preferred_values.extend(
             player
+
             for player
-            in generation_restricted_values
+            in restricted_values
+
             if (
-                int(player["ovr"])
+                int(
+                    player[
+                        "ovr"
+                    ]
+                )
                 >=
                 best_available_ovr
                 +
@@ -542,7 +786,11 @@ def _prepare_options(
 
 
         preferred_unique_names = {
-            str(player["player_name"])
+            str(
+                player[
+                    "player_name"
+                ]
+            )
             .strip()
             .casefold()
 
@@ -551,120 +799,298 @@ def _prepare_options(
         }
 
 
-        # 작은 팀컬러에서 후보 부족으로
-        # 스쿼드 생성 자체가 실패하는 것을 방지.
-        generation_minimum_unique_names = (
+        restricted_minimum_unique_names = (
             3
             if core_slot
             else 2
         )
 
+
         if (
-            len(preferred_unique_names)
-            >= generation_minimum_unique_names
+            len(
+                preferred_unique_names
+            )
+            >=
+            restricted_minimum_unique_names
         ):
+
             values = preferred_values
 
+        else:
+
+            values = (
+                preferred_available_values
+                +
+                restricted_values
+            )
+
+
+    elif preferred_available_values:
+
+        values = (
+            preferred_available_values
+        )
+
+
+    elif icontmb_values:
+
+        # 일반 카드도 없고 제한되지 않은
+        # ICONTMB만 존재하는 극단적인 경우.
+        values = list(
+            icontmb_values
+        )
+
+
+    else:
+
+        # 일반 / ICONTMB 모두 없을 때만
+        # 제한 카드만으로 진행.
+        values = list(
+            restricted_values
+        )
+
+
     if core_slot:
+
         groups = (
-            sorted(
-                values,
-                key=lambda p: (
-                    -float(
-                        p.get("popularity_score", 0)
-                        or 0
+
+            # ---------------------------------
+            # 인기 우선
+            # 동일 선수는 한 시즌만
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+
+                        -float(
+                            p.get(
+                                "popularity_score",
+                                0,
+                            )
+                            or 0
+                        ),
+
+                        -p["ovr"],
+                        p["price"],
                     ),
-                    -p["ovr"],
-                    p["price"],
                 ),
-            )[:10],
+                10,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    -p["ovr"],
-                    p["price"],
+            # ---------------------------------
+            # 성능 우선
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+                        -p["ovr"],
+                        p["price"],
+                    ),
                 ),
-            )[:10],
+                10,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    abs(p["price"] - target) / target,
-                    -p["ovr"],
-                ),
-            )[:10],
+            # ---------------------------------
+            # 목표 예산 근접
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    -p["price"],
-                    -p["ovr"],
+                        abs(
+                            p["price"]
+                            - target
+                        )
+                        / target,
+
+                        -p["ovr"],
+                    ),
                 ),
-            )[:6],
+                10,
+            ),
+
+            # ---------------------------------
+            # 고가 카드 보존
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+                        -p["price"],
+                        -p["ovr"],
+                    ),
+                ),
+                6,
+            ),
         )
 
     else:
+
         groups = (
-            sorted(
-                values,
-                key=lambda p: (
-                    -float(
-                        p.get("popularity_score", 0)
-                        or 0
+
+            # ---------------------------------
+            # 인기
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+
+                        -float(
+                            p.get(
+                                "popularity_score",
+                                0,
+                            )
+                            or 0
+                        ),
+
+                        -p["ovr"],
+                        p["salary"],
+                        p["price"],
                     ),
-                    -p["ovr"],
-                    p["salary"],
-                    p["price"],
                 ),
-            )[:8],
+                8,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    -p["ovr"],
-                    p["salary"],
-                    p["price"],
+            # ---------------------------------
+            # OVR
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+                        -p["ovr"],
+                        p["salary"],
+                        p["price"],
+                    ),
                 ),
-            )[:8],
+                8,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    p["salary"],
-                    -p["ovr"],
-                    p["price"],
+            # ---------------------------------
+            # 저급여
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+                        p["salary"],
+                        -p["ovr"],
+                        p["price"],
+                    ),
                 ),
-            )[:10],
+                10,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    p["price"],
-                    -p["ovr"],
-                    p["salary"],
+            # ---------------------------------
+            # 저가
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+                        p["price"],
+                        -p["ovr"],
+                        p["salary"],
+                    ),
                 ),
-            )[:10],
+                10,
+            ),
 
-            sorted(
-                values,
-                key=lambda p: (
-                    abs(p["price"] - target) / target,
-                    -p["ovr"],
-                    p["salary"],
+            # ---------------------------------
+            # 목표 예산 근접
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        _quick_squad_priority_rank(p),
+
+                        abs(
+                            p["price"]
+                            - target
+                        )
+                        / target,
+
+                        -p["ovr"],
+                        p["salary"],
+                    ),
                 ),
-            )[:8],
+                8,
+            ),
         )
 
     chosen = {}
 
-    for group in groups:
-        for p in group:
-            chosen[
-                (int(p["sp_id"]), int(p["grade"]))
-            ] = p
+    chosen_name_counts = {}
 
-    return list(chosen.values())[:40]
+
+    for group in groups:
+
+        for player in group:
+
+            card_key = (
+                int(
+                    player["sp_id"]
+                ),
+                int(
+                    player["grade"]
+                ),
+            )
+
+
+            if card_key in chosen:
+                continue
+
+
+            name_key = (
+                _quick_squad_player_name_key(
+                    player
+                )
+            )
+
+
+            if (
+                chosen_name_counts.get(
+                    name_key,
+                    0,
+                )
+                >=
+                MAX_SEASON_VARIANTS_PER_PLAYER
+            ):
+                continue
+
+
+            chosen[
+                card_key
+            ] = player
+
+
+            chosen_name_counts[
+                name_key
+            ] = (
+                chosen_name_counts.get(
+                    name_key,
+                    0,
+                )
+                + 1
+            )
+
+
+    return list(
+        chosen.values()
+    )[:40]
 
 
 def search_budget_squad(
@@ -1292,39 +1718,12 @@ def search_budget_squad(
             / n
         )
 
-        generation_restricted_count = sum(
-            1
+        deprioritized_penalty = sum(
+            _quick_squad_player_penalty(
+                player
+            )
             for player
             in state[0]
-            if bool(
-                player.get(
-                    "generation_restricted",
-                    False,
-                )
-            )
-        )
-
-        supply_restricted_only_count = sum(
-            1
-
-            for player
-            in state[0]
-
-            if (
-                bool(
-                    player.get(
-                        "supply_restricted",
-                        False,
-                    )
-                )
-                and
-                not bool(
-                    player.get(
-                        "generation_restricted",
-                        False,
-                    )
-                )
-            )
         )
 
         weakest_ovr = state[9]
@@ -1503,10 +1902,8 @@ def search_budget_squad(
                 *
                 total_budget_ratio
 
-                -
-                GENERATION_RESTRICTED_PENALTY
-                *
-                generation_restricted_count
+-
+                deprioritized_penalty
             )
 
 
@@ -1655,10 +2052,10 @@ def search_budget_squad(
                 core_slot_underinvestment
 
                 -
-                GENERATION_RESTRICTED_PENALTY
-                *
-                generation_restricted_count
+                deprioritized_penalty
+
             )
+
 
 
         return (
@@ -1666,9 +2063,6 @@ def search_budget_squad(
 
             + META_POPULARITY_WEIGHT
             * popularity_average
-
-            - GENERATION_RESTRICTED_PENALTY
-            * generation_restricted_count
 
             - META_BALANCE_GAP_WEIGHT
             * balance_gap
@@ -1697,9 +2091,17 @@ def search_budget_squad(
         state,
     ):
 
+        squad_priority = (
+            _quick_squad_squad_priority(
+                state[0]
+            )
+        )
+
         if recommendation_mode == "value":
 
             return (
+                squad_priority,
+
                 final_score(
                     state
                 ),
@@ -1721,6 +2123,8 @@ def search_budget_squad(
         if recommendation_mode == "performance":
 
             return (
+                squad_priority,
+
                 final_score(
                     state
                 ),
@@ -1744,6 +2148,8 @@ def search_budget_squad(
         # =====================================
 
         return (
+            squad_priority,
+
             final_score(
                 state
             ),
