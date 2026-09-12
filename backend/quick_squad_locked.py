@@ -18,8 +18,39 @@ from backend.quick_squad_budget import (
     summarize_budget_plan,
 )
 
+from backend.player_supply_restriction import (
+    get_supply_restriction_status_by_season_id,
+)
+
 
 LOCKED_RECOMMENDATION_GATE = BoundedSemaphore(1)
+
+QUICK_SQUAD_POPULARITY_POSITION_MAP = {
+
+    # 공격
+    "LS": "ST",
+    "RS": "ST",
+
+    "LF": "CF",
+    "RF": "CF",
+
+    # 공격형 미드필더
+    "LAM": "CAM",
+    "RAM": "CAM",
+
+    # 중앙 미드필더
+    "LCM": "CM",
+    "RCM": "CM",
+
+    # 수비형 미드필더
+    "LDM": "CDM",
+    "RDM": "CDM",
+
+    # 센터백
+    "LCB": "CB",
+    "RCB": "CB",
+    "SW": "CB",
+}
 
 
 class LockedPlayerInput(BaseModel):
@@ -77,6 +108,127 @@ class LockedSquadService:
     def name_key(value):
         return str(value).strip().casefold()
 
+    @staticmethod
+    def apply_slot_popularity(
+        player,
+        slot_index,
+        slot_position,
+    ):
+
+        result = dict(
+            player
+        )
+
+
+        normalized_slot = (
+            str(
+                slot_position
+            )
+            .strip()
+            .upper()
+        )
+
+
+        popularity_position = (
+            QUICK_SQUAD_POPULARITY_POSITION_MAP
+            .get(
+                normalized_slot,
+                normalized_slot,
+            )
+        )
+
+
+        popularity_by_position = (
+            result.pop(
+                "popularity_by_position",
+                {},
+            )
+            or {}
+        )
+
+
+        popularity = (
+            popularity_by_position.get(
+                popularity_position
+            )
+        )
+
+
+        result[
+            "slot_index"
+        ] = slot_index
+
+        result[
+            "slot_position"
+        ] = normalized_slot
+
+
+        if popularity is None:
+
+            result[
+                "usage_count"
+            ] = 0
+
+            result[
+                "usage_rate"
+            ] = 0.0
+
+            result[
+                "popularity_score"
+            ] = 0.0
+
+            result[
+                "popularity_position"
+            ] = popularity_position
+
+            result[
+                "popularity_snapshot_date"
+            ] = None
+
+
+        else:
+
+            result[
+                "usage_count"
+            ] = int(
+                popularity.get(
+                    "usage_count"
+                )
+                or 0
+            )
+
+            result[
+                "usage_rate"
+            ] = float(
+                popularity.get(
+                    "usage_rate"
+                )
+                or 0
+            )
+
+            result[
+                "popularity_score"
+            ] = float(
+                popularity.get(
+                    "popularity_score"
+                )
+                or 0
+            )
+
+            result[
+                "popularity_position"
+            ] = popularity_position
+
+            result[
+                "popularity_snapshot_date"
+            ] = popularity.get(
+                "snapshot_date"
+            )
+
+
+        return result
+
+
     def resolve(
         self,
         entries,
@@ -116,6 +268,20 @@ class LockedSquadService:
                         p.position,
                         p.salary,
                         p.ovr,
+                        COALESCE(
+                            gs.generation_restricted,
+                            FALSE
+                        ) AS generation_restricted,
+
+                        gs.source_type
+                            AS generation_status_source,
+
+                        gs.source_note
+                            AS generation_status_note,
+
+                        gs.effective_date
+                            AS generation_status_effective_date,
+
                         CASE
                             WHEN %s::integer IS NULL
                             THEN TRUE
@@ -127,6 +293,11 @@ class LockedSquadService:
                             )
                         END AS team_color_match
                     FROM fconline_players p
+
+                    LEFT JOIN
+                        fconline_player_generation_status gs
+                        ON gs.sp_id = p.sp_id
+
                     WHERE p.sp_id = ANY(%s)
                     """,
                     (team_color_id, team_color_id, ids),
@@ -136,6 +307,16 @@ class LockedSquadService:
                     int(row["sp_id"]): row
                     for row in cursor.fetchall()
                 }
+
+        for row in rows.values():
+
+            row.update(
+                get_supply_restriction_status_by_season_id(
+                    row.get(
+                        "season_id"
+                    )
+                )
+            )
 
         result = []
         names = set()
@@ -243,6 +424,66 @@ class LockedSquadService:
                     + self.bonus[entry.grade]
                 ),
                 "price": int(price),
+                "popularity_by_position":
+                    row.get(
+                        "popularity_by_position"
+                    )
+                    or {},
+                "generation_restricted":
+                    bool(
+                        row.get(
+                            "generation_restricted",
+                            False,
+                        )
+                    ),
+
+                "generation_status_source":
+                    row.get(
+                        "generation_status_source"
+                    ),
+
+                "generation_status_note":
+                    row.get(
+                        "generation_status_note"
+                    ),
+
+                "supply_restricted":
+                    bool(
+                        row.get(
+                            "supply_restricted",
+                            False,
+                        )
+                    ),
+
+                "supply_restriction_class":
+                    row.get(
+                        "supply_restriction_class"
+                    ),
+
+                "supply_restriction_source":
+                    row.get(
+                        "supply_restriction_source"
+                    ),
+
+                "supply_restriction_notice_sn":
+                    row.get(
+                        "supply_restriction_notice_sn"
+                    ),
+
+                "supply_restriction_effective_date":
+                    row.get(
+                        "supply_restriction_effective_date"
+                    ),
+
+                "supply_restriction_note":
+                    row.get(
+                        "supply_restriction_note"
+                    ),
+
+                "generation_status_effective_date":
+                    row.get(
+                        "generation_status_effective_date"
+                    ),
                 "slot_index": index,
                 "slot_position": (
                     slots[index]
@@ -501,6 +742,7 @@ class LockedSquadService:
         players,
         locked_count,
         allocation_plan=None,
+        recommendation_mode="meta",
     ):
         total = sum(p["price"] for p in players)
         salary = sum(p["salary"] for p in players)
@@ -533,6 +775,8 @@ class LockedSquadService:
         )
 
         result = {
+            "recommendation_mode":
+                recommendation_mode,
             "team_color_id": team_color_id,
             "team_name": self.team_name(team_color_id),
             "formation": formation,
@@ -660,6 +904,11 @@ class LockedSquadService:
                 fixed,
                 len(fixed),
                 allocation_plan,
+                getattr(
+                    request,
+                    "recommendation_mode",
+                    "meta",
+                ),
             )
 
         remaining_budget = budget - cost
@@ -816,24 +1065,164 @@ class LockedSquadService:
                             + self.bonus[grade]
                         ),
                         "price": int(price),
+                        "popularity_by_position":
+                            row.get(
+                                "popularity_by_position"
+                            )
+                            or {},
+
+                        "generation_restricted":
+                            bool(
+                                row.get(
+                                    "generation_restricted",
+                                    False,
+                                )
+                            ),
+
+                        "generation_status_source":
+                            row.get(
+                                "generation_status_source"
+                            ),
+
+                        "generation_status_note":
+                            row.get(
+                                "generation_status_note"
+                            ),
+
+                        "generation_status_effective_date":
+                            row.get(
+                                "generation_status_effective_date"
+                            ),
+
+                        "supply_restricted":
+                            bool(
+                                row.get(
+                                    "supply_restricted",
+                                    False,
+                                )
+                            ),
+
+                        "supply_restriction_class":
+                            row.get(
+                                "supply_restriction_class"
+                            ),
+
+                        "supply_restriction_source":
+                            row.get(
+                                "supply_restriction_source"
+                            ),
+
+                        "supply_restriction_notice_sn":
+                            row.get(
+                                "supply_restriction_notice_sn"
+                            ),
+
+                        "supply_restriction_effective_date":
+                            row.get(
+                                "supply_restriction_effective_date"
+                            ),
+
+                        "supply_restriction_note":
+                            row.get(
+                                "supply_restriction_note"
+                            ),
+
                         "locked": False,
                     })
 
-            by_slot = [
-                [
-                    {
-                        **player,
-                        "slot_index": i,
-                        "slot_position": slot,
-                    }
-                    for player in options
-                    if player["position"] in self.positions.get(
-                        slot,
-                        [slot],
-                    )
+                    by_slot = [
+                        [
+                            self.apply_slot_popularity(
+                                player,
+                                i,
+                                slot,
+                            )
+
+                            for player
+                            in options
+
+                            if (
+                                player[
+                                    "position"
+                                ]
+                                in
+                                self.positions.get(
+                                    slot,
+                                    [slot],
+                                )
+                            )
+                        ]
+
+                        for i, slot
+                        in remaining
+                    ]
+
+        print(
+            "[QUICK SQUAD SLOT CANDIDATES]",
+            flush=True,
+        )
+
+        for (
+            slot_order,
+            (
+                slot_index,
+                slot_position,
+            ),
+        ) in enumerate(remaining):
+
+            slot_options = (
+                by_slot[
+                    slot_order
                 ]
-                for i, slot in remaining
-            ]
+            )
+
+            print(
+                "slot_index=",
+                slot_index,
+                "slot=",
+                slot_position,
+                "count=",
+                len(
+                    slot_options
+                ),
+                "min_salary=",
+                (
+                    min(
+                        int(
+                            player["salary"]
+                        )
+                        for player
+                        in slot_options
+                    )
+                    if slot_options
+                    else None
+                ),
+                "min_price=",
+                (
+                    min(
+                        int(
+                            player["price"]
+                        )
+                        for player
+                        in slot_options
+                    )
+                    if slot_options
+                    else None
+                ),
+                "max_ovr=",
+                (
+                    max(
+                        int(
+                            player["ovr"]
+                        )
+                        for player
+                        in slot_options
+                    )
+                    if slot_options
+                    else None
+                ),
+                flush=True,
+            )
 
             if request.enhancement_grade is not None:
                 max_high = 11
@@ -858,6 +1247,11 @@ class LockedSquadService:
                     remaining_salary,
                     excluded_names,
                     max_high,
+                    recommendation_mode=getattr(
+                        request,
+                        "recommendation_mode",
+                        "meta",
+                    ),
                 )
 
             else:

@@ -370,6 +370,77 @@
 
             </div>
 
+        <!-- =================================
+            RECOMMENDATION MODE
+        ================================== -->
+
+        <div class="quick-squad-recommendation-mode">
+
+            <span class="quick-squad-recommendation-mode-label">
+                추천 방식
+            </span>
+
+
+            <div
+                class="quick-squad-recommendation-mode-buttons"
+                role="group"
+                aria-label="퀵 스쿼드 추천 방식"
+            >
+
+                <button
+                    type="button"
+                    class="
+                        quick-squad-recommendation-mode-button
+                        is-active
+                    "
+                    data-quick-squad-recommendation-mode="meta"
+                    aria-pressed="true"
+                >
+                    <strong>
+                        메타 추천
+                    </strong>
+
+                    <small>
+                        실사용률 + 성능
+                    </small>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="quick-squad-recommendation-mode-button"
+                    data-quick-squad-recommendation-mode="performance"
+                    aria-pressed="false"
+                >
+                    <strong>
+                        성능 추천
+                    </strong>
+
+                    <small>
+                        OVR + 체급 우선
+                    </small>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="quick-squad-recommendation-mode-button"
+                    data-quick-squad-recommendation-mode="value"
+                    aria-pressed="false"
+                >
+                    <strong>
+                        가성비 추천
+                    </strong>
+
+                    <small>
+                        성능 대비 가격
+                    </small>
+                </button>
+
+            </div>
+
+        </div>
+
 
             <p class="quick-squad-condition-help">
                 선택한 팀컬러와 구단가치 범위 안에서
@@ -764,7 +835,7 @@
 
     <script
         type="module"
-        src="./js/quick-squad.js?v=6"
+        src="./js/quick-squad.js?v=7"
     ></script>
 
 </body>

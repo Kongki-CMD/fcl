@@ -42,6 +42,15 @@ from backend.quick_squad_locked import (
     LockedSquadService,
 )
 
+from backend.player_popularity import (
+    get_latest_player_popularity_map,
+    sync_player_popularity,
+)
+
+from backend.player_supply_restriction import (
+    get_supply_restriction_status,
+)
+
 import re
 
 import httpx
@@ -70,6 +79,15 @@ from fastapi.staticfiles import StaticFiles
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 from typing import Literal
+
+from backend.player_generation_notice import (
+    sync_generation_notices,
+    get_generation_notice_status,
+    get_generation_notice_preview,
+    get_generation_action_preview,
+    get_generation_resolution_preview,
+    sync_generation_status_from_notices,
+)
 
 
 
@@ -134,6 +152,10 @@ ADMIN_SESSION_SECONDS = (
 ADMIN_SESSIONS = {}
 
 FC_ONLINE_SYNC_LOCK = (
+    threading.Lock()
+)
+
+PLAYER_POPULARITY_SYNC_LOCK = (
     threading.Lock()
 )
 
@@ -615,6 +637,315 @@ def get_db_connection():
         DATABASE_URL,
         row_factory=dict_row,
     )
+
+
+def attach_quick_squad_popularity(candidate_rows):
+    candidates = [
+        dict(row)
+        for row in candidate_rows
+    ]
+
+    if not candidates:
+        return candidates
+
+
+    sp_ids = list({
+        int(candidate["sp_id"])
+        for candidate in candidates
+    })
+
+    season_ids = list({
+        int(
+            candidate.get(
+                "season_id"
+            )
+            or
+            (
+                int(
+                    candidate[
+                        "sp_id"
+                    ]
+                )
+                //
+                1_000_000
+            )
+        )
+
+        for candidate
+        in candidates
+    })
+
+
+    # =====================================
+    # 시즌 ID → 클래스명
+    #
+    # DB snapshot을 우선 사용하고,
+    # 없는 시즌만 Nexon 메타데이터로 보완한다.
+    # =====================================
+
+    season_class_by_id = {}
+
+
+    with get_db_connection() as connection:
+
+        # =====================================
+        # 저장된 시즌 클래스명
+        # =====================================
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    season_id,
+                    class_name
+
+                FROM
+                    fconline_season_snapshots
+
+                WHERE
+                    season_id = ANY(%s)
+                """,
+                (
+                    season_ids,
+                ),
+            )
+
+
+            season_snapshot_rows = (
+                cursor.fetchall()
+            )
+
+
+        season_class_by_id.update({
+            int(
+                row[
+                    "season_id"
+                ]
+            ):
+                row.get(
+                    "class_name"
+                )
+
+            for row
+            in season_snapshot_rows
+        })
+
+        # =====================================
+        # 포지션별 공식 인기 데이터
+        # =====================================
+
+        popularity_map = (
+            get_latest_player_popularity_map(
+                connection
+            )
+        )
+
+
+        # =====================================
+        # 생성 제한 상태
+        # =====================================
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    sp_id,
+                    generation_restricted,
+                    source_type,
+                    source_note,
+                    effective_date
+                FROM
+                    fconline_player_generation_status
+                WHERE
+                    sp_id = ANY(%s)
+                """,
+                (
+                    sp_ids,
+                ),
+            )
+
+            generation_rows = (
+                cursor.fetchall()
+            )
+
+    missing_season_ids = [
+        season_id
+
+        for season_id
+        in season_ids
+
+        if season_id
+        not in season_class_by_id
+    ]
+
+
+    if missing_season_ids:
+
+        try:
+
+            live_season_metadata = (
+                get_season_metadata()
+            )
+
+
+            for season_id in missing_season_ids:
+
+                season = (
+                    live_season_metadata.get(
+                        season_id
+                    )
+                )
+
+
+                if season:
+
+                    season_class_by_id[
+                        season_id
+                    ] = (
+                        season.get(
+                            "class_name"
+                        )
+                    )
+
+
+        except Exception as error:
+
+            print(
+                "[QUICK SQUAD SUPPLY] "
+                "시즌 메타데이터 보완 실패:",
+                error,
+                flush=True,
+            )
+
+
+    popularity_by_spid = {}
+
+    for (
+        (sp_id, position),
+        popularity,
+    ) in popularity_map.items():
+
+        popularity_by_spid.setdefault(
+            sp_id,
+            {},
+        )[position] = popularity
+
+
+    generation_by_spid = {
+        int(row["sp_id"]): {
+            "generation_restricted":
+                bool(
+                    row[
+                        "generation_restricted"
+                    ]
+                ),
+
+            "generation_status_source":
+                row.get(
+                    "source_type"
+                ),
+
+            "generation_status_note":
+                row.get(
+                    "source_note"
+                ),
+
+            "generation_status_effective_date":
+                (
+                    row["effective_date"].isoformat()
+                    if row.get(
+                        "effective_date"
+                    )
+                    else None
+                ),
+        }
+
+        for row
+        in generation_rows
+    }
+
+
+    for candidate in candidates:
+
+        sp_id = int(
+            candidate["sp_id"]
+        )
+
+
+        candidate[
+            "popularity_by_position"
+        ] = dict(
+            popularity_by_spid.get(
+                sp_id,
+                {},
+            )
+        )
+
+        season_id = int(
+            candidate.get(
+                "season_id"
+            )
+            or
+            (
+                sp_id
+                //
+                1_000_000
+            )
+        )
+
+
+        class_name = (
+            season_class_by_id.get(
+                season_id
+            )
+        )
+
+
+        candidate.update(
+            get_supply_restriction_status(
+                class_name
+            )
+        )
+
+
+        generation = (
+            generation_by_spid.get(
+                sp_id
+            )
+        )
+
+
+        if generation is None:
+
+            candidate[
+                "generation_restricted"
+            ] = False
+
+            candidate[
+                "generation_status_source"
+            ] = None
+
+            candidate[
+                "generation_status_note"
+            ] = None
+
+            candidate[
+                "generation_status_effective_date"
+            ] = None
+
+        else:
+
+            candidate.update(
+                generation
+            )
+
+
+    return candidates
+
+
+
 
 # =========================
 # SERIES 목표 세트 수
@@ -6510,12 +6841,488 @@ def admin_sync_fconline_batch(
         FC_ONLINE_SYNC_LOCK.release()
 
 # =========================
+# ADMIN PLAYER POPULARITY
+# FC Online 데이터센터
+# 인기 선수 동기화
+# =========================
+
+@app.post(
+    "/api/admin/player-popularity/sync"
+)
+def admin_sync_player_popularity(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 동시에 두 번 실행 방지
+    # =========================
+
+    acquired = (
+        PLAYER_POPULARITY_SYNC_LOCK
+        .acquire(
+            blocking=False
+        )
+    )
+
+
+    if not acquired:
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "인기 선수 데이터 동기화가 "
+                "이미 진행 중입니다."
+            ),
+        )
+
+
+    try:
+
+        with get_db_connection() as connection:
+
+            result = (
+                sync_player_popularity(
+                    connection
+                )
+            )
+
+
+        return {
+            "success":
+                True,
+
+            "message":
+                (
+                    "FC Online 인기 선수 "
+                    "데이터 동기화가 "
+                    "완료되었습니다."
+                ),
+
+            **result,
+        }
+
+
+    except httpx.HTTPError as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 데이터센터 "
+                "조회에 실패했습니다. "
+                f"{error}"
+            ),
+        )
+
+
+    except RuntimeError as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=str(
+                error
+            ),
+        )
+
+
+    finally:
+
+        PLAYER_POPULARITY_SYNC_LOCK.release()
+
+# =========================
 # ADMIN USERS
 # =========================
 
 @app.get(
     "/api/admin/users"
 )
+
+@app.get(
+    "/api/admin/player-popularity/status"
+)
+def admin_get_player_popularity_status(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 테이블 존재 여부
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    to_regclass(
+                        'public.'
+                        'fconline_player_popularity'
+                    )
+                    AS table_name
+                """
+            )
+
+
+            table_row = (
+                cursor.fetchone()
+            )
+
+
+            table_exists = (
+                table_row[
+                    "table_name"
+                ]
+                is not None
+            )
+
+
+            if not table_exists:
+
+                return {
+                    "exists":
+                        False,
+
+                    "snapshot_date":
+                        None,
+
+                    "player_count":
+                        0,
+
+                    "position_count":
+                        0,
+
+                    "updated_at":
+                        None,
+                }
+
+
+            # =========================
+            # 최신 Snapshot 조회
+            # =========================
+
+            cursor.execute(
+                """
+                WITH latest AS (
+                    SELECT
+                        MAX(snapshot_date)
+                            AS snapshot_date
+
+                    FROM
+                        fconline_player_popularity
+                )
+
+                SELECT
+                    latest.snapshot_date,
+
+                    COUNT(p.id)
+                        AS player_count,
+
+                    COUNT(
+                        DISTINCT p.position
+                    )
+                        AS position_count,
+
+                    MAX(
+                        p.updated_at
+                    )
+                        AS updated_at
+
+                FROM latest
+
+                LEFT JOIN
+                    fconline_player_popularity AS p
+
+                    ON
+                        p.snapshot_date =
+                        latest.snapshot_date
+
+                GROUP BY
+                    latest.snapshot_date
+                """
+            )
+
+
+            row = (
+                cursor.fetchone()
+            )
+
+
+    return {
+        "exists":
+            True,
+
+        "snapshot_date":
+            (
+                row[
+                    "snapshot_date"
+                ].isoformat()
+
+                if row[
+                    "snapshot_date"
+                ]
+
+                else None
+            ),
+
+        "player_count":
+            int(
+                row[
+                    "player_count"
+                ]
+                or 0
+            ),
+
+        "position_count":
+            int(
+                row[
+                    "position_count"
+                ]
+                or 0
+            ),
+
+        "updated_at":
+            (
+                row[
+                    "updated_at"
+                ].isoformat()
+
+                if row[
+                    "updated_at"
+                ]
+
+                else None
+            ),
+    }
+
+
+@app.post(
+    "/api/admin/"
+    "player-generation-notices/sync"
+)
+def admin_sync_player_generation_notices(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    with get_db_connection() as connection:
+
+        result = (
+            sync_generation_notices(
+                connection
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        "message":
+            (
+                "FC Online 생성 제한/해제 "
+                "공식 공지 동기화가 "
+                "완료되었습니다."
+            ),
+
+        **result,
+    }
+
+
+@app.get(
+    "/api/admin/"
+    "player-generation-notices/status"
+)
+def admin_player_generation_notice_status(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    with get_db_connection() as connection:
+
+        status = (
+            get_generation_notice_status(
+                connection
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        **status,
+    }
+
+
+@app.get(
+    "/api/admin/"
+    "player-generation-notices/preview"
+)
+def admin_player_generation_notice_preview(
+    limit: int = 30,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    safe_limit = max(
+        1,
+        min(
+            int(limit),
+            100,
+        ),
+    )
+
+    with get_db_connection() as connection:
+
+        notices = (
+            get_generation_notice_preview(
+                connection,
+                limit=safe_limit,
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        "count":
+            len(notices),
+
+        "notices":
+            notices,
+    }
+
+
+@app.get(
+    "/api/admin/"
+    "player-generation-notices/"
+    "preview-actions"
+)
+def admin_player_generation_action_preview(
+    limit: int = 100,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    safe_limit = max(
+        1,
+        min(
+            int(limit),
+            300,
+        ),
+    )
+
+    with get_db_connection() as connection:
+
+        notices = (
+            get_generation_action_preview(
+                connection,
+                limit=safe_limit,
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        "notice_count":
+            len(notices),
+
+        "action_count":
+            sum(
+                int(
+                    notice[
+                        "action_count"
+                    ]
+                )
+                for notice
+                in notices
+            ),
+
+        "notices":
+            notices,
+    }
+
+@app.get(
+    "/api/admin/"
+    "player-generation-notices/"
+    "preview-resolutions"
+)
+def admin_player_generation_resolution_preview(
+    limit: int = 100,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    safe_limit = max(
+        1,
+        min(
+            int(limit),
+            300,
+        ),
+    )
+
+    with get_db_connection() as connection:
+
+        result = (
+            get_generation_resolution_preview(
+                connection,
+                limit=safe_limit,
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        **result,
+    }
+
+@app.post(
+    "/api/admin/"
+    "player-generation-status/sync"
+)
+def admin_sync_player_generation_status(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+    with get_db_connection() as connection:
+
+        result = (
+            sync_generation_status_from_notices(
+                connection
+            )
+        )
+
+    return {
+        "success":
+            True,
+
+        "message":
+            (
+                "FC Online 공식 공지를 기준으로 "
+                "선수 생성 제한 상태 동기화가 "
+                "완료되었습니다."
+            ),
+
+        **result,
+    }
+
+
 def get_admin_users(
     admin_token = Depends(
         require_admin
@@ -29135,6 +29942,47 @@ QUICK_SQUAD_POSITION_CANDIDATES = {
     ],
 }
 
+QUICK_SQUAD_POPULARITY_POSITION_MAP = {
+    "LS": "ST",
+    "RS": "ST",
+
+    "LF": "CF",
+    "RF": "CF",
+
+    "LAM": "CAM",
+    "RAM": "CAM",
+
+    "LCM": "CM",
+    "RCM": "CM",
+
+    "LDM": "CDM",
+    "RDM": "CDM",
+
+    "LCB": "CB",
+    "RCB": "CB",
+    "SW": "CB",
+}
+
+
+def get_quick_squad_popularity_position(
+    slot,
+):
+
+    normalized = (
+        str(
+            slot
+        )
+        .strip()
+        .upper()
+    )
+
+    return (
+        QUICK_SQUAD_POPULARITY_POSITION_MAP
+        .get(
+            normalized,
+            normalized,
+        )
+    )
 
 QUICK_SQUAD_PRICE_CACHE_SECONDS = (
     20
@@ -29178,6 +30026,12 @@ class QuickSquadRecommendRequest(BaseModel):
         le=300,
         strict=True,
     )
+
+    recommendation_mode: Literal[
+        "meta",
+        "performance",
+        "value",
+    ] = "meta"
 
 def get_quick_squad_cached_prices(
     sp_id: int,
@@ -30918,62 +31772,183 @@ def get_budget_quick_squad_candidate_rows(
 ):
     """
     예산 배분용 후보 수집.
-    모든 포지션을 한 번의 SQL로 조회하고,
-    급여 구간별 고/저 OVR 후보를 함께 확보한다.
+
+    기존:
+    - 급여 구간별 고 OVR
+    - 급여 구간별 저 OVR
+
+    추가:
+    - 실제 FC Online 포지션별 인기 선수
+
+    인기 선수가 OVR 사전 필터에서
+    탈락하지 않도록 별도 후보 통로를 유지한다.
     """
-    unique_slots = list(dict.fromkeys(
-        str(slot).strip().upper()
-        for slot in slots
-    ))
+
+    unique_slots = list(
+        dict.fromkeys(
+            str(
+                slot
+            )
+            .strip()
+            .upper()
+
+            for slot
+            in slots
+        )
+    )
+
 
     if not unique_slots:
         return []
 
+
     per_slot = max(
-        1,
-        total_limit // len(unique_slots),
+        6,
+
+        total_limit
+        //
+        len(
+            unique_slots
+        ),
     )
+
 
     rank_limit = max(
         1,
-        min(2, per_salary_limit // 2),
+        min(
+            2,
+            per_salary_limit
+            // 2,
+        ),
     )
+
+
+    # =====================================
+    # 인기 후보는 자리당 최대 몇 명을
+    # SQL에서 확보할지
+    # =====================================
+
+    popularity_rank_limit = max(
+        2,
+        min(
+            8,
+            per_salary_limit
+            * 2,
+        ),
+    )
+
 
     specifications = [
         (
             index,
-            QUICK_SQUAD_POSITION_CANDIDATES.get(
+
+            QUICK_SQUAD_POSITION_CANDIDATES
+            .get(
                 slot,
-                [slot],
+                [
+                    slot
+                ],
+            ),
+
+            get_quick_squad_popularity_position(
+                slot
             ),
         )
-        for index, slot in enumerate(unique_slots)
+
+        for (
+            index,
+            slot,
+        )
+        in enumerate(
+            unique_slots
+        )
     ]
 
+
     placeholders = ", ".join(
-        ["(%s::integer, %s::text[])"]
-        * len(specifications)
+        [
+            (
+                "("
+                "%s::integer, "
+                "%s::text[], "
+                "%s::text"
+                ")"
+            )
+        ]
+        *
+        len(
+            specifications
+        )
     )
+
 
     parameters = [
         value
-        for specification in specifications
-        for value in specification
+
+        for specification
+        in specifications
+
+        for value
+        in specification
     ]
 
+
     with get_db_connection() as connection:
+
         with connection.cursor() as cursor:
+
             cursor.execute(
                 f"""
                 WITH requested(
                     slot_index,
-                    positions
+                    positions,
+                    popularity_position
                 ) AS (
-                    VALUES {placeholders}
+
+                    VALUES
+                        {placeholders}
                 ),
+
+                latest_snapshot AS (
+
+                    SELECT
+                        MAX(
+                            snapshot_date
+                        )
+                            AS snapshot_date
+
+                    FROM
+                        fconline_player_popularity
+                ),
+
+                latest_popularity AS (
+
+                    SELECT
+                        pp.sp_id,
+                        pp.position,
+                        pp.usage_count,
+                        pp.usage_rate,
+                        pp.popularity_score
+
+                    FROM
+                        fconline_player_popularity
+                        AS pp
+
+                    JOIN latest_snapshot
+                        AS latest
+
+                        ON
+                            pp.snapshot_date
+                            =
+                            latest.snapshot_date
+                ),
+
                 eligible AS (
+
                     SELECT
                         r.slot_index,
+                        r.popularity_position,
+
                         p.sp_id,
                         p.player_name,
                         p.season_id,
@@ -30981,51 +31956,158 @@ def get_budget_quick_squad_candidate_rows(
                         p.position,
                         p.salary,
                         p.ovr,
+
+                        COALESCE(
+                            popularity.usage_count,
+                            0
+                        )
+                            AS slot_usage_count,
+
+                        COALESCE(
+                            popularity.usage_rate,
+                            0
+                        )
+                            AS slot_usage_rate,
+
+                        COALESCE(
+                            popularity.popularity_score,
+                            0
+                        )
+                            AS slot_popularity_score,
+
                         CASE
-                            WHEN p.salary <= 15 THEN 0
-                            WHEN p.salary <= 22 THEN 1
-                            WHEN p.salary <= 28 THEN 2
+                            WHEN p.salary <= 15
+                                THEN 0
+
+                            WHEN p.salary <= 22
+                                THEN 1
+
+                            WHEN p.salary <= 28
+                                THEN 2
+
                             ELSE 3
-                        END AS salary_band
-                    FROM requested r
-                    JOIN fconline_players p
-                        ON p.position = ANY(r.positions)
-                    WHERE COALESCE(p.salary, 0)
+                        END
+                            AS salary_band
+
+                    FROM
+                        requested
+                        AS r
+
+                    JOIN
+                        fconline_players
+                        AS p
+
+                        ON
+                            p.position
+                            =
+                            ANY(
+                                r.positions
+                            )
+
+                    LEFT JOIN
+                        latest_popularity
+                        AS popularity
+
+                        ON
+                            popularity.sp_id
+                            =
+                            p.sp_id
+
+                            AND
+
+                            popularity.position
+                            =
+                            r.popularity_position
+
+                    WHERE
+                        COALESCE(
+                            p.salary,
+                            0
+                        )
                         BETWEEN 1 AND %s
-                    AND COALESCE(p.ovr, 0) > 0
-                    AND EXISTS (
-                        SELECT 1
-                        FROM fconline_player_teams t
-                        WHERE t.sp_id = p.sp_id
-                        AND t.team_color_id = %s
-                    )
+
+                        AND
+
+                        COALESCE(
+                            p.ovr,
+                            0
+                        )
+                        > 0
+
+                        AND EXISTS (
+
+                            SELECT
+                                1
+
+                            FROM
+                                fconline_player_teams
+                                AS t
+
+                            WHERE
+                                t.sp_id
+                                =
+                                p.sp_id
+
+                                AND
+
+                                t.team_color_id
+                                =
+                                %s
+                        )
                 ),
+
                 ranked AS (
+
                     SELECT
                         *,
+
                         ROW_NUMBER() OVER (
                             PARTITION BY
                                 slot_index,
                                 salary_band
+
                             ORDER BY
                                 ovr DESC,
                                 sp_id DESC
-                        ) AS best_rank,
+                        )
+                            AS best_rank,
+
                         ROW_NUMBER() OVER (
                             PARTITION BY
-                                slot_index,
-                                salary_band
+                                slot_index
+
                             ORDER BY
-                                ovr ASC,
-                                sp_id DESC
-                        ) AS cheap_rank
-                    FROM eligible
+                                slot_popularity_score
+                                    DESC,
+
+                                slot_usage_count
+                                    DESC,
+
+                                ovr
+                                    DESC,
+
+                                sp_id
+                                    DESC
+                        )
+                            AS popularity_rank
+
+                    FROM
+                        eligible
                 )
+
                 SELECT
                     slot_index,
+                    popularity_position,
+
                     salary_band,
+
                     best_rank,
-                    cheap_rank,
+                    popularity_rank,
+
+                    slot_usage_count,
+                    slot_usage_rate,
+                    slot_popularity_score,
+
                     sp_id,
                     player_name,
                     season_id,
@@ -31033,86 +32115,548 @@ def get_budget_quick_squad_candidate_rows(
                     position,
                     salary,
                     ovr
-                FROM ranked
+
+                FROM
+                    ranked
+
                 WHERE
                     best_rank <= %s
-                    OR cheap_rank <= %s
+
+                    OR (
+
+                        popularity_rank <= %s
+
+                        AND
+
+                        slot_popularity_score > 0
+                    )
+
                 ORDER BY
                     slot_index,
+                    popularity_rank,
                     salary_band,
-                    best_rank,
-                    cheap_rank
+                    best_rank
                 """,
                 (
                     *parameters,
-                    QUICK_SQUAD_SALARY_CAP - 10,
+
+                    QUICK_SQUAD_SALARY_CAP
+                    - 10,
+
                     team_color_id,
+
                     rank_limit,
-                    rank_limit,
+                    popularity_rank_limit,
                 ),
             )
 
-            rows = cursor.fetchall()
 
-    # 급여 구간별로 후보를 교차 선택한다.
-    # 한 구간의 선수만 앞쪽에 몰리지 않도록 한다.
+            rows = (
+                cursor.fetchall()
+            )
+
+            # =====================================
+            # 생성 제한 후보 별도 확보
+            #
+            # 기존 OVR / 인기 후보 사전 컷에서
+            # 생성 제한 카드가 사라지면
+            # 이후 +3 OVR 비교 자체가 불가능하다.
+            #
+            # 실제 추천 우선순위 결정은
+            # quick_squad_budget._prepare_options()
+            # 에서 수행한다.
+            #
+            # 여기서는 비교 대상으로만 확보한다.
+            # =====================================
+
+            all_candidate_positions = sorted({
+                position
+
+                for (
+                    _,
+                    positions,
+                    _,
+                )
+                in specifications
+
+                for position
+                in positions
+            })
+
+
+            cursor.execute(
+                """
+                WITH restricted_candidates AS (
+
+                    SELECT
+                        p.sp_id,
+                        p.player_name,
+                        p.season_id,
+                        p.image_url,
+                        p.position,
+                        p.salary,
+                        p.ovr,
+
+                        ROW_NUMBER() OVER (
+                            PARTITION BY
+                                p.position,
+
+                                CASE
+                                    WHEN p.salary <= 15
+                                        THEN 0
+
+                                    WHEN p.salary <= 22
+                                        THEN 1
+
+                                    WHEN p.salary <= 28
+                                        THEN 2
+
+                                    ELSE 3
+                                END
+
+                            ORDER BY
+                                p.ovr DESC,
+                                p.sp_id DESC
+                        )
+                            AS restricted_rank
+
+                    FROM
+                        fconline_player_generation_status
+                        AS generation
+
+                    JOIN
+                        fconline_players
+                        AS p
+
+                        ON
+                            p.sp_id
+                            =
+                            generation.sp_id
+
+                    WHERE
+                        generation.generation_restricted
+                        =
+                        TRUE
+
+                        AND
+
+                        p.position
+                        =
+                        ANY(%s)
+
+                        AND
+
+                        COALESCE(
+                            p.salary,
+                            0
+                        )
+                        BETWEEN 1 AND %s
+
+                        AND
+
+                        COALESCE(
+                            p.ovr,
+                            0
+                        )
+                        > 0
+
+                        AND EXISTS (
+
+                            SELECT
+                                1
+
+                            FROM
+                                fconline_player_teams
+                                AS t
+
+                            WHERE
+                                t.sp_id
+                                =
+                                p.sp_id
+
+                                AND
+
+                                t.team_color_id
+                                =
+                                %s
+                        )
+                )
+
+                SELECT
+                    sp_id,
+                    player_name,
+                    season_id,
+                    image_url,
+                    position,
+                    salary,
+                    ovr
+
+                FROM
+                    restricted_candidates
+
+                WHERE
+                    restricted_rank
+                    <= 2
+
+                ORDER BY
+                    position,
+                    ovr DESC,
+                    sp_id DESC
+                """,
+                (
+                    all_candidate_positions,
+
+                    QUICK_SQUAD_SALARY_CAP
+                    - 10,
+
+                    team_color_id,
+                ),
+            )
+
+
+            restricted_rows = (
+                cursor.fetchall()
+            )
+
+
+    # =====================================
+    # 슬롯별 후보 저장
+    # =====================================
+
     groups = {
-        i: {
-            band: {
-                "best": {},
-                "cheap": {},
-            }
-            for band in range(4)
+        index: {
+            "popular": {},
+
+            "best": {
+                band: {}
+                for band
+                in range(4)
+            },
         }
-        for i in range(len(unique_slots))
+
+        for index
+        in range(
+            len(
+                unique_slots
+            )
+        )
     }
 
+
     for row in rows:
-        index = int(row["slot_index"])
-        band = int(row["salary_band"])
 
-        if row["best_rank"] <= rank_limit:
-            groups[index][band]["best"][
-                int(row["best_rank"])
+        index = int(
+            row[
+                "slot_index"
+            ]
+        )
+
+        band = int(
+            row[
+                "salary_band"
+            ]
+        )
+
+
+        popularity_score = float(
+            row[
+                "slot_popularity_score"
+            ]
+            or 0
+        )
+
+
+        if popularity_score > 0:
+
+            popularity_rank = int(
+                row[
+                    "popularity_rank"
+                ]
+            )
+
+            if (
+                popularity_rank
+                <=
+                popularity_rank_limit
+            ):
+
+                groups[
+                    index
+                ][
+                    "popular"
+                ][
+                    popularity_rank
+                ] = row
+
+
+        if (
+            int(
+                row[
+                    "best_rank"
+                ]
+            )
+            <=
+            rank_limit
+        ):
+
+            groups[
+                index
+            ][
+                "best"
+            ][
+                band
+            ][
+                int(
+                    row[
+                        "best_rank"
+                    ]
+                )
             ] = row
 
-        if row["cheap_rank"] <= rank_limit:
-            groups[index][band]["cheap"][
-                int(row["cheap_rank"])
-            ] = row
+
+    # =====================================
+    # 슬롯별 최종 후보
+    #
+    # 절반 정도는 인기 후보를 우선 확보하고,
+    # 나머지는 기존 OVR/저비용 다양성으로 채움
+    # =====================================
 
     selected = {}
 
-    for index in range(len(unique_slots)):
+
+    for index in range(
+        len(
+            unique_slots
+        )
+    ):
+
         slot_selected = {}
 
-        for rank in range(1, rank_limit + 1):
-            for kind in ("best", "cheap"):
+
+        # 인기 후보 2자리는 보장하되,
+        # 기존 4개 급여 구간의
+        # 최고 OVR 후보도 모두 살려둔다.
+        popularity_keep = min(
+            2,
+
+            max(
+                1,
+                per_slot - 4,
+            ),
+        )
+
+
+        # =================================
+        # 1. 인기 후보
+        # =================================
+
+        popular_rows = sorted(
+            groups[
+                index
+            ][
+                "popular"
+            ].values(),
+
+            key=lambda row: (
+                -float(
+                    row[
+                        "slot_popularity_score"
+                    ]
+                    or 0
+                ),
+
+                -int(
+                    row[
+                        "ovr"
+                    ]
+                    or 0
+                ),
+            ),
+        )
+
+
+        for row in popular_rows[
+            :popularity_keep
+        ]:
+
+            slot_selected.setdefault(
+                int(
+                    row[
+                        "sp_id"
+                    ]
+                ),
+                row,
+            )
+
+
+        # =================================
+        # 2. 기존 성능 / 저비용 후보
+        # =================================
+
+        for rank in range(
+            1,
+            rank_limit + 1,
+        ):
+
+            for rank in range(
+                1,
+                rank_limit + 1,
+            ):
+
                 for band in range(4):
+
                     row = (
-                        groups[index][band][kind]
-                        .get(rank)
+                        groups[
+                            index
+                        ][
+                            "best"
+                        ][
+                            band
+                        ]
+                        .get(
+                            rank
+                        )
                     )
+
 
                     if row is None:
                         continue
 
-                    spid = int(row["sp_id"])
 
                     slot_selected.setdefault(
-                        spid,
+                        int(
+                            row[
+                                "sp_id"
+                            ]
+                        ),
                         row,
                     )
 
+
+                    if (
+                        len(
+                            slot_selected
+                        )
+                        >=
+                        per_slot
+                    ):
+                        break
+
+
+                if (
+                    len(
+                        slot_selected
+                    )
+                    >=
+                    per_slot
+                ):
+                    break
+
+                for band in range(4):
+
+                    row = (
+                        groups[
+                            index
+                        ][
+                            "best"
+                        ][
+                            band
+                        ]
+                        .get(
+                            rank
+                        )
+                    )
+
+
+                    if row is None:
+                        continue
+
+
+                    slot_selected.setdefault(
+                        int(
+                            row[
+                                "sp_id"
+                            ]
+                        ),
+                        row,
+                    )
+
+
+                    if (
+                        len(
+                            slot_selected
+                        )
+                        >=
+                        per_slot
+                    ):
+                        break
+
+
+                if (
+                    len(
+                        slot_selected
+                    )
+                    >=
+                    per_slot
+                ):
+                    break
+
+
+            if (
+                len(
+                    slot_selected
+                )
+                >=
+                per_slot
+            ):
+                break
+
+
         for row in list(
             slot_selected.values()
-        )[:per_slot]:
+        )[
+            :per_slot
+        ]:
+
             selected.setdefault(
-                int(row["sp_id"]),
+                int(
+                    row[
+                        "sp_id"
+                    ]
+                ),
                 row,
             )
 
-    return list(selected.values())
+
+    # =====================================
+    # 최종적으로 전체 포지션별 인기도를
+    # 붙여 quick_squad_locked로 전달
+    # =====================================
+
+    # =====================================
+    # 생성 제한 후보는 기존 후보 수를
+    # 빼앗지 않고 비교 후보로 추가한다.
+    # =====================================
+
+    for row in restricted_rows:
+
+        selected.setdefault(
+            int(
+                row[
+                    "sp_id"
+                ]
+            ),
+            row,
+        )
+
+
+    return attach_quick_squad_popularity(
+        list(
+            selected.values()
+        )
+    )
+
+
 
 def get_fixed_quick_squad_options(
     candidate_rows: list[dict],
@@ -32574,7 +34118,6 @@ def get_fconline_player_market_prices(
         ),
         flags=re.IGNORECASE,
     )
-
 
     parsed_prices = {}
 

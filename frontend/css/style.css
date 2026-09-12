@@ -17050,6 +17050,201 @@ body.player-recommend-open {
         translateY(-1px);
 }
 
+/* =========================================
+   QUICK SQUAD RECOMMENDATION MODE
+========================================= */
+
+.quick-squad-recommendation-mode {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    margin-top: 16px;
+    padding-top: 16px;
+
+    border-top:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+}
+
+
+.quick-squad-recommendation-mode-label {
+    flex:
+        0
+        0
+        auto;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.55
+        );
+
+    font-size: 11px;
+    font-weight: 800;
+
+    white-space: nowrap;
+}
+
+
+.quick-squad-recommendation-mode-buttons {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            3,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 8px;
+
+    width: 100%;
+}
+
+
+.quick-squad-recommendation-mode-button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+
+    min-width: 0;
+    min-height: 58px;
+
+    padding:
+        9px
+        13px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.10
+        );
+
+    border-radius: 8px;
+
+    background:
+        rgba(
+            18,
+            20,
+            24,
+            0.92
+        );
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.72
+        );
+
+    font-family: inherit;
+
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+.quick-squad-recommendation-mode-button:hover {
+    border-color:
+        rgba(
+            213,
+            169,
+            65,
+            0.45
+        );
+
+    transform:
+        translateY(-1px);
+}
+
+
+.quick-squad-recommendation-mode-button strong {
+    font-size: 12px;
+    font-weight: 900;
+
+    line-height: 1.3;
+}
+
+
+.quick-squad-recommendation-mode-button small {
+    margin-top: 3px;
+
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.36
+        );
+
+    font-size: 9px;
+    font-weight: 700;
+
+    line-height: 1.3;
+}
+
+
+.quick-squad-recommendation-mode-button.is-active {
+    border-color:
+        rgba(
+            217,
+            182,
+            77,
+            0.78
+        );
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(
+                217,
+                182,
+                77,
+                0.20
+            ),
+            rgba(
+                217,
+                182,
+                77,
+                0.07
+            )
+        );
+
+    color: #f1d67e;
+}
+
+
+.quick-squad-recommendation-mode-button.is-active small {
+    color:
+        rgba(
+            241,
+            214,
+            126,
+            0.62
+        );
+}
+
 
 .quick-squad-condition-help {
     margin:
@@ -17461,6 +17656,180 @@ body.player-recommend-open {
             0,
             0.34
         );
+}
+
+/* =========================================
+   QUICK SQUAD GENERATION RESTRICTED
+========================================= */
+
+.quick-squad-player-card.quick-squad-player-card-generation-restricted {
+    border:
+        2px solid
+        rgba(
+            235,
+            76,
+            76,
+            0.95
+        );
+
+    box-shadow:
+        0
+        0
+        0
+        1px
+        rgba(
+            235,
+            76,
+            76,
+            0.12
+        ),
+        0
+        8px
+        22px
+        rgba(
+            0,
+            0,
+            0,
+            0.34
+        ),
+        0
+        0
+        14px
+        rgba(
+            235,
+            76,
+            76,
+            0.16
+        );
+}
+
+
+.quick-squad-generation-restricted-label {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    margin-top: 4px;
+
+    padding:
+        2px
+        6px;
+
+    border:
+        1px solid
+        rgba(
+            235,
+            76,
+            76,
+            0.48
+        );
+
+    border-radius: 999px;
+
+    background:
+        rgba(
+            235,
+            76,
+            76,
+            0.10
+        );
+
+    color: #ff7474;
+
+    font-size: 7px;
+    font-weight: 900;
+
+    line-height: 1.25;
+
+    white-space: nowrap;
+}
+
+/* =========================================
+   QUICK SQUAD SUPPLY RESTRICTED
+========================================= */
+
+.quick-squad-player-card.quick-squad-player-card-supply-restricted {
+    border:
+        2px solid
+        rgba(
+            245,
+            158,
+            11,
+            0.95
+        );
+
+    box-shadow:
+        0
+        0
+        0
+        1px
+        rgba(
+            245,
+            158,
+            11,
+            0.12
+        ),
+        0
+        8px
+        22px
+        rgba(
+            0,
+            0,
+            0,
+            0.34
+        ),
+        0
+        0
+        14px
+        rgba(
+            245,
+            158,
+            11,
+            0.16
+        );
+}
+
+
+.quick-squad-supply-restricted-label {
+    display: inline-flex;
+
+    align-items: center;
+    justify-content: center;
+
+    margin-top: 4px;
+
+    padding:
+        2px
+        6px;
+
+    border:
+        1px solid
+        rgba(
+            245,
+            158,
+            11,
+            0.55
+        );
+
+    border-radius: 999px;
+
+    background:
+        rgba(
+            245,
+            158,
+            11,
+            0.11
+        );
+
+    color: #f5b942;
+
+    font-size: 7px;
+    font-weight: 900;
+
+    line-height: 1.25;
+
+    white-space: nowrap;
 }
 
 
@@ -17880,6 +18249,37 @@ body.player-recommend-open {
             );
     }
 
+    .quick-squad-recommendation-mode {
+        align-items: stretch;
+        flex-direction: column;
+
+        gap: 8px;
+    }
+
+
+    .quick-squad-recommendation-mode-buttons {
+        gap: 6px;
+    }
+
+
+    .quick-squad-recommendation-mode-button {
+        min-height: 54px;
+
+        padding:
+            8px
+            9px;
+    }
+
+
+    .quick-squad-recommendation-mode-button strong {
+        font-size: 11px;
+    }
+
+
+    .quick-squad-recommendation-mode-button small {
+        font-size: 8px;
+    }
+
 
     .quick-squad-result {
         grid-template-columns:
@@ -18019,6 +18419,26 @@ body.player-recommend-open {
             5px
             4px
             6px;
+    }
+
+    .quick-squad-generation-restricted-label,
+    .quick-squad-supply-restricted-label {
+        position: absolute;
+
+        right: 3px;
+        top: 3px;
+
+        margin-top: 0;
+
+        padding:
+            1px
+            4px;
+
+        font-size: 6px;
+
+        line-height: 1.2;
+
+        z-index: 2;
     }
 
 

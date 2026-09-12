@@ -1656,7 +1656,7 @@ function createQuickSquadPlayerHtml(
         >
 
             <div
-                class="quick-squad-player-card ${player.locked ? "quick-squad-player-card-locked" : ""}"
+                class="quick-squad-player-card ${player.locked ? "quick-squad-player-card-locked" : ""} ${player.generation_restricted === true ? "quick-squad-player-card-generation-restricted" : (player.supply_restricted === true ? "quick-squad-player-card-supply-restricted" : "")}"
                 data-quick-squad-player-index="${index}"
             >
 
@@ -1756,6 +1756,29 @@ function createQuickSquadPlayerHtml(
                         player.price
                     )}
                 </span>
+
+                ${player.generation_restricted === true
+                    ? `
+                        <span
+                            class="quick-squad-generation-restricted-label"
+                            title="FC Online 공식 생성 제한 선수"
+                        >
+                            생성 제한
+                        </span>
+                    `
+                    : (
+                        player.supply_restricted === true
+                            ? `
+                                <span
+                                    class="quick-squad-supply-restricted-label"
+                                    title="FC Online 공식 공급 제한 클래스"
+                                >
+                                    공급 제한
+                                </span>
+                            `
+                            : ""
+                    )
+                }
 
             </div>
 
@@ -2218,6 +2241,47 @@ function closeQuickSquadPlayerModal() {
     quickSquadDetailModal.close();
 }
 
+function getQuickSquadRecommendationMode() {
+
+    const activeButton =
+        document.querySelector(
+            (
+                ".quick-squad-"
+                +
+                "recommendation-mode-button"
+                +
+                ".is-active"
+            )
+        );
+
+
+    const mode =
+        (
+            activeButton
+                ?.dataset
+                ?.quickSquadRecommendationMode
+            ??
+            "meta"
+        );
+
+
+    if (
+        ![
+            "meta",
+            "performance",
+            "value",
+        ].includes(
+            mode
+        )
+    ) {
+
+        return "meta";
+    }
+
+
+    return mode;
+}
+
 // =========================================
 // GENERATE SQUAD
 // =========================================
@@ -2364,6 +2428,9 @@ async function generateQuickSquad() {
                 slot => slot.position
             ),
 
+        recommendation_mode:
+            getQuickSquadRecommendationMode(),
+
         enhancement_grade:
             enhancementGrade,
 
@@ -2482,6 +2549,32 @@ async function generateQuickSquad() {
             );
         }
 
+        console.log(
+            "[GENERATION RAW]",
+            data.players
+                ?.filter(
+                    player =>
+                        player.generation_restricted
+                        ===
+                        true
+                )
+                .map(
+                    player => ({
+                        sp_id:
+                            player.sp_id,
+
+                        name:
+                            player.player_name,
+
+                        generation_restricted:
+                            player.generation_restricted,
+
+                        source:
+                            player.generation_status_source,
+                    })
+                )
+        );
+
         const savedLocks = new Map(
             readQuickSquadLocks().map(entry => [
                 entry.sp_id,
@@ -2516,30 +2609,73 @@ async function generateQuickSquad() {
             currentQuickSquadSlots
         );
 
+        console.log(
+            "[GENERATION NORMALIZED]",
+            result.players
+                ?.filter(
+                    player =>
+                        player?.generation_restricted
+                        ===
+                        true
+                )
+                .map(
+                    player => ({
+                        sp_id:
+                            player.sp_id,
+
+                        name:
+                            player.player_name,
+
+                        generation_restricted:
+                            player.generation_restricted,
+
+                        source:
+                            player.generation_status_source,
+                    })
+                )
+        );
+
         currentQuickSquadResult = result;
 
         renderQuickSquadResult(result);
 
 
-    } catch (error) {
+} catch (error) {
 
-        console.error(
-            error
+    console.error(
+        error
+    );
+
+
+    const errorMessage =
+        (
+            error?.message
+            ||
+            "스쿼드 추천 중 오류가 발생했습니다."
         );
 
 
-        if (
-            quickSquadResultStatusElement
-        ) {
+    if (
+        quickSquadResultStatusElement
+    ) {
 
-            quickSquadResultStatusElement
-                .textContent =
-                    (
-                        error.message
-                        ??
-                        "스쿼드 추천에 실패했습니다."
-                    );
-        }
+        quickSquadResultStatusElement
+            .textContent =
+                (
+                    "추천 실패: "
+                    +
+                    errorMessage
+                );
+    }
+
+
+    window.alert(
+        (
+            "퀵 스쿼드 추천에 실패했습니다.\n\n"
+            +
+            errorMessage
+        )
+    );
 
 
     } finally {
@@ -2566,6 +2702,63 @@ async function generateQuickSquad() {
 // =========================================
 // EVENTS
 // =========================================
+
+document
+    .querySelectorAll(
+        (
+            ".quick-squad-"
+            +
+            "recommendation-mode-button"
+        )
+    )
+    .forEach(
+        button => {
+
+            button.addEventListener(
+                "click",
+                () => {
+
+                    document
+                        .querySelectorAll(
+                            (
+                                ".quick-squad-"
+                                +
+                                "recommendation-mode-button"
+                            )
+                        )
+                        .forEach(
+                            item => {
+
+                                const selected =
+                                    (
+                                        item
+                                        ===
+                                        button
+                                    );
+
+
+                                item
+                                    .classList
+                                    .toggle(
+                                        "is-active",
+                                        selected
+                                    );
+
+
+                                item
+                                    .setAttribute(
+                                        "aria-pressed",
+                                        String(
+                                            selected
+                                        )
+                                    );
+                            }
+                        );
+                }
+            );
+        }
+    );
+
 
 quickSquadGenerateButtonElement
     ?.addEventListener(
@@ -2627,6 +2820,86 @@ document.addEventListener(
 // =========================================
 
 async function initializeQuickSquad() {
+
+    // =========================================
+    // 실제 브라우저 새로고침일 때만 초기화
+    // =========================================
+
+    const navigationEntry =
+        performance
+            .getEntriesByType(
+                "navigation"
+            )
+            ?.[0];
+
+
+    const isPageReload =
+        (
+            navigationEntry
+                ?.type
+            ===
+            "reload"
+        );
+
+
+    if (
+        isPageReload
+    ) {
+
+        try {
+
+            localStorage.removeItem(
+                "fcl.quick-squad.locks.v1"
+            );
+
+            localStorage.removeItem(
+                "fcl.quick-squad.saved.v1"
+            );
+
+            localStorage.removeItem(
+                "fcl.quick-squad.budget.v1"
+            );
+
+        } catch (error) {
+
+            console.warn(
+                "퀵 스쿼드 저장 상태 초기화 실패:",
+                error
+            );
+        }
+
+
+        if (
+            quickSquadTeamColorElement
+        ) {
+
+            quickSquadTeamColorElement.value =
+                "";
+        }
+
+
+        if (
+            quickSquadBudgetElement
+        ) {
+
+            quickSquadBudgetElement.value =
+                "";
+        }
+
+
+        if (
+            quickSquadEnhancementGradeElement
+        ) {
+
+            quickSquadEnhancementGradeElement.value =
+                "auto";
+        }
+
+
+        currentQuickSquadResult =
+            null;
+    }
+
 
     renderQuickSquadFormation();
 
