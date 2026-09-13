@@ -331,6 +331,48 @@ class LockedSquadService:
                     f"선수 카드 {entry.sp_id}를 DB에서 찾을 수 없습니다.",
                 )
 
+            forbidden_player = (
+                bool(
+                    row.get(
+                        "generation_restricted",
+                        False,
+                    )
+                )
+                or
+                bool(
+                    row.get(
+                        "supply_restricted",
+                        False,
+                    )
+                )
+                or
+                (
+                    str(
+                        row.get(
+                            "supply_restriction_class",
+                            "",
+                        )
+                        or ""
+                    )
+                    .strip()
+                    .upper()
+                    ==
+                    "ICONTMB"
+                )
+            )
+
+
+            if forbidden_player:
+                raise HTTPException(
+                    422,
+                    (
+                        f"{row['player_name']}: "
+                        "공급 제한, 생성 제한 또는 "
+                        "ICONTMB 선수는 퀵 스쿼드에서 "
+                        "사용할 수 없습니다."
+                    ),
+                )
+
             name = self.name_key(row["player_name"])
 
             if name in names:
@@ -926,8 +968,7 @@ class LockedSquadService:
         # 1차: 적은 후보로 빠르게 구성.
         # 2차: 필요한 경우에만 후보 범위를 확대.
         for per_salary, limit in (
-            (2, 48),
-            (4, 96),
+            (8, 240),
         ):
             candidate_source = (
                 self.budget_candidates
@@ -940,6 +981,51 @@ class LockedSquadService:
                 per_salary_limit=per_salary,
                 total_limit=limit,
             )
+
+            # =========================================
+            # 금지 선수는 시세 조회 전에 제거
+            #
+            # 공급 제한 / 생성 제한 / ICONTMB가
+            # 240명 후보 자리를 차지한 뒤
+            # 나중에 제거되는 문제를 완화한다.
+            # =========================================
+
+            rows = [
+                row
+
+                for row
+                in rows
+
+                if not (
+                    bool(
+                        row.get(
+                            "generation_restricted",
+                            False,
+                        )
+                    )
+                    or
+                    bool(
+                        row.get(
+                            "supply_restricted",
+                            False,
+                        )
+                    )
+                    or
+                    (
+                        str(
+                            row.get(
+                                "supply_restriction_class",
+                                "",
+                            )
+                            or ""
+                        )
+                        .strip()
+                        .upper()
+                        ==
+                        "ICONTMB"
+                    )
+                )
+            ]
 
             print(
                 "[QUICK SQUAD] CANDIDATES",
@@ -1051,6 +1137,40 @@ class LockedSquadService:
                     ):
                         continue
 
+                    forbidden_player = (
+                        bool(
+                            row.get(
+                                "generation_restricted",
+                                False,
+                            )
+                        )
+                        or
+                        bool(
+                            row.get(
+                                "supply_restricted",
+                                False,
+                            )
+                        )
+                        or
+                        (
+                            str(
+                                row.get(
+                                    "supply_restriction_class",
+                                    "",
+                                )
+                                or ""
+                            )
+                            .strip()
+                            .upper()
+                            ==
+                            "ICONTMB"
+                        )
+                    )
+
+
+                    if forbidden_player:
+                        continue
+
                     options.append({
                         "sp_id": spid,
                         "player_name": row["player_name"],
@@ -1130,32 +1250,38 @@ class LockedSquadService:
                         "locked": False,
                     })
 
-                    by_slot = [
-                        [
-                            self.apply_slot_popularity(
-                                player,
-                                i,
-                                slot,
-                            )
+        by_slot = [
+            [
+                self.apply_slot_popularity(
+                    player,
+                    i,
+                    slot,
+                )
 
-                            for player
-                            in options
+                for player
+                in options
 
-                            if (
-                                player[
-                                    "position"
-                                ]
-                                in
-                                self.positions.get(
-                                    slot,
-                                    [slot],
-                                )
-                            )
-                        ]
-
-                        for i, slot
-                        in remaining
+                if (
+                    player[
+                        "position"
                     ]
+                    in
+                    self.positions.get(
+                        slot,
+                        [slot],
+                    )
+                )
+            ]
+
+            for i, slot
+            in remaining
+        ]
+
+
+        print(
+            "[QUICK SQUAD SLOT CANDIDATES]",
+            flush=True,
+        )
 
         print(
             "[QUICK SQUAD SLOT CANDIDATES]",
@@ -1224,47 +1350,44 @@ class LockedSquadService:
                 flush=True,
             )
 
-            if request.enhancement_grade is not None:
-                max_high = 11
-            else:
-                max_high = max(
-                    0,
-                    2 - sum(
-                        p["grade"] >= 9 for p in fixed
-                    ),
-                )
+        if request.enhancement_grade is not None:
+            max_high = 11
+        else:
+            max_high = max(
+                0,
+                2 - sum(
+                    p["grade"] >= 9 for p in fixed
+                ),
+            )
 
-            excluded_names = {
-                self.name_key(p["player_name"])
-                for p in fixed
-            }
+        excluded_names = {
+            self.name_key(p["player_name"])
+            for p in fixed
+        }
 
-            if allocation_plan is not None:
-                best = search_budget_squad(
-                    by_slot,
-                    [i for i, _ in remaining],
-                    allocation_plan,
-                    remaining_salary,
-                    excluded_names,
-                    max_high,
-                    recommendation_mode=getattr(
-                        request,
-                        "recommendation_mode",
-                        "meta",
-                    ),
-                )
+        if allocation_plan is not None:
+            best = search_budget_squad(
+                by_slot,
+                [i for i, _ in remaining],
+                allocation_plan,
+                remaining_salary,
+                excluded_names,
+                max_high,
+                recommendation_mode=getattr(
+                    request,
+                    "recommendation_mode",
+                    "meta",
+                ),
+            )
 
-            else:
-                best = self._solve(
-                    by_slot,
-                    remaining_budget,
-                    remaining_salary,
-                    excluded_names,
-                    max_high,
-                )
-
-            if best is not None:
-                break
+        else:
+            best = self._solve(
+                by_slot,
+                remaining_budget,
+                remaining_salary,
+                excluded_names,
+                max_high,
+            )
 
         if best is None:
             print(
@@ -1306,10 +1429,21 @@ class LockedSquadService:
                     "잠시 후 다시 시도해주세요.",
                 )
 
+            if fixed:
+                detail = (
+                    "고정 선수를 유지하면서 예산과 급여를 "
+                    "만족하는 조합을 찾지 못했습니다."
+                )
+            else:
+                detail = (
+                    "예산과 급여를 만족하는 "
+                    "스쿼드 조합을 찾지 못했습니다."
+                )
+
+
             raise HTTPException(
                 422,
-                "고정 선수를 유지하면서 예산과 급여를 "
-                "만족하는 조합을 찾지 못했습니다.",
+                detail,
             )
 
         return self._summary(

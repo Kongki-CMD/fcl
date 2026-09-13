@@ -1,9 +1,11 @@
-const STORAGE_KEY = "fcl.quick-squad.saved.v1";
+import {
+    DEFAULT_ADAPTATION_LEVEL,
+    calculatePlayerStatSnapshot,
+    normalizeAdaptationLevel,
+    normalizeTeamColorBonus,
+} from "./player-stat-engine.js?v=1";
 
-const BONUS = [
-    0, 0, 1, 2, 4, 6, 8,
-    11, 15, 17, 19, 21, 24, 27,
-];
+const STORAGE_KEY = "fcl.quick-squad.saved.v1";
 
 const positiveId = value =>
     Number.isSafeInteger(Number(value))
@@ -48,30 +50,51 @@ function normalizePlayer(player, index, position) {
     }
 
     const adaptation =
-        Number(player.adaptation) === 5 ? 5 : 1;
+        normalizeAdaptationLevel(
+            player.adaptation,
+            DEFAULT_ADAPTATION_LEVEL
+        );
 
-    const teamColor = Math.max(
-        0,
-        Math.min(
-            9,
-            integer(player.team_color_bonus ?? 0, 0)
+    const teamColor =
+        normalizeTeamColorBonus(
+            player.team_color_bonus
+            ??
+            0
+        );
+
+
+    const sourceAbilityBonus =
+        (
+            player.manual_saved
+            &&
+            Number.isFinite(
+                Number(
+                    player.ability_bonus
+                )
+            )
         )
-    );
+            ? Number(
+                player.ability_bonus
+            )
+            : null;
+
+
+    const snapshot =
+        calculatePlayerStatSnapshot({
+            player,
+            grade,
+            adaptation,
+            teamColorBonus:
+                teamColor,
+            sourceAbilityBonus,
+        });
+
 
     const bonus =
-        BONUS[grade]
-        + (adaptation === 5 ? 4 : 0)
-        + teamColor;
+        snapshot.ability_bonus;
 
-    const oldBonus =
-        player.manual_saved
-        && Number.isFinite(Number(player.ability_bonus))
-            ? Number(player.ability_bonus)
-            : BONUS[grade];
-
-    const base = positiveId(player.base_ovr)
-        ? Number(player.base_ovr)
-        : amount(player.ovr) - oldBonus;
+    const base =
+        snapshot.base_ovr;
 
     if (!Number.isFinite(base) || base <= 0) {
         throw new Error(
@@ -103,7 +126,8 @@ function normalizePlayer(player, index, position) {
         team_color_bonus: teamColor,
         ability_bonus: bonus,
         base_ovr: base,
-        ovr: base + bonus,
+        ovr:
+            snapshot.final_ovr,
         price,
         locked_grade: lockedGrade,
     };
@@ -488,10 +512,27 @@ export function normalizeQuickSquadLockSettings(value) {
         return null;
     }
 
+    const snapshot =
+        calculatePlayerStatSnapshot({
+            player: {
+                base_ovr:
+                    baseOvr,
+            },
+
+            grade,
+
+            adaptation,
+
+            teamColorBonus:
+                teamColor,
+
+            sourceAbilityBonus:
+                0,
+        });
+
+
     const bonus =
-        BONUS[grade]
-        + (adaptation === 5 ? 4 : 0)
-        + teamColor;
+        snapshot.ability_bonus;
 
     return {
         grade,
@@ -499,7 +540,8 @@ export function normalizeQuickSquadLockSettings(value) {
         team_color_bonus: teamColor,
         ability_bonus: bonus,
         base_ovr: baseOvr,
-        ovr: baseOvr + bonus,
+        ovr:
+            snapshot.final_ovr,
         price,
 
         price_checked_at:

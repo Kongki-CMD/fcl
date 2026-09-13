@@ -6,6 +6,11 @@ import {
     addQuickSquadLock,
 } from "./quick-squad-locks.js?v=1";
 
+import {
+    DEFAULT_ADAPTATION_LEVEL,
+    calculatePlayerStatSnapshot,
+} from "./player-stat-engine.js?v=1";
+
 const playerCompareModalElement =
     document.querySelector(
         "#player-compare-modal"
@@ -244,13 +249,15 @@ const compareControlState = {
 
     left: {
         grade: 1,
-        adaptation: 1,
+        adaptation:
+            DEFAULT_ADAPTATION_LEVEL,
         teamColor: 0,
     },
 
     right: {
         grade: 1,
-        adaptation: 1,
+        adaptation:
+            DEFAULT_ADAPTATION_LEVEL,
         teamColor: 0,
     },
 
@@ -278,29 +285,6 @@ const playerTraitsLoadingSpIds =
 
 const playerTraitsErrorBySpId =
     new Map();
-
-
-const enhancementBonusMap = {
-    1: 0,
-    2: 1,
-    3: 2,
-    4: 4,
-    5: 6,
-    6: 8,
-    7: 11,
-    8: 15,
-    9: 17,
-    10: 19,
-    11: 21,
-    12: 24,
-    13: 27,
-};
-
-
-const adaptationBonusMap = {
-    1: 0,
-    5: 4,
-};
 
 // =========================================
 // NATION / TEAM STATE
@@ -1668,6 +1652,13 @@ function buildSearchParams(
     const params =
         new URLSearchParams();
 
+    params.set(
+        "adaptation",
+        String(
+            DEFAULT_ADAPTATION_LEVEL
+        )
+    );
+
     const playerName =
         playerNameInputElement
             .value
@@ -1945,7 +1936,8 @@ function getPlayerCardState(
             numericSpId,
             {
                 grade: 1,
-                adaptation: 1,
+                adaptation:
+                    DEFAULT_ADAPTATION_LEVEL,
                 teamColor: 0,
             }
         );
@@ -2102,128 +2094,67 @@ function createPlayerTeamColorOptionsHtml(
         );
 }
 
-function getAdjustedPlayer(
-    player
+function applyPlayerDisplayState(
+    player,
+    state
 ) {
+    const snapshot =
+        calculatePlayerStatSnapshot({
+            player,
 
-    const state =
-        getPlayerCardState(
-            player.sp_id
-        );
+            grade:
+                state.grade,
 
+            adaptation:
+                state.adaptation,
 
-    const gradeBonus =
-        enhancementBonusMap[
-            state.grade
-        ]
-        ?? 0;
-
-
-    const adaptationBonus =
-        adaptationBonusMap[
-            state.adaptation
-        ]
-        ?? 0;
-
-
-    const teamColorBonus =
-        Number(
-            state.teamColor
-            ?? 0
-        );
-
-
-    const newAbilityBonus =
-        gradeBonus
-        +
-        adaptationBonus
-        +
-        teamColorBonus;
-
-
-    /*
-     * API에서 내려온 stats에는
-     * 검색 당시 ability_bonus가 들어가 있으므로
-     * 먼저 원본값으로 되돌린다.
-     */
-    const sourceAbilityBonus =
-        Number(
-            player.ability_bonus
-            ?? 0
-        );
-
-
-    const adjustedStats =
-        Object.fromEntries(
-            Object.entries(
-                player.stats
-                ?? {}
-            )
-                .map(
-                    (
-                        [
-                            statName,
-                            statValue,
-                        ]
-                    ) => {
-
-                        const baseStat =
-                            Number(
-                                statValue
-                            )
-                            -
-                            sourceAbilityBonus;
-
-
-                        return [
-                            statName,
-                            baseStat
-                            +
-                            newAbilityBonus,
-                        ];
-                    }
-                )
-        );
-
-
-    const baseOvr =
-        Number(
-            player.base_ovr
-            ??
-            (
-                Number(
-                    player.ovr
-                    ?? 0
-                )
-                -
-                sourceAbilityBonus
-            )
-        );
+            teamColorBonus:
+                state.teamColor,
+        });
 
 
     return {
         ...player,
 
         grade:
-            state.grade,
+            snapshot.grade,
 
         adaptation:
-            state.adaptation,
+            snapshot.adaptation_level,
 
         team_color_bonus:
-            state.teamColor,
+            snapshot.team_color_bonus,
 
         ability_bonus:
-            newAbilityBonus,
+            snapshot.ability_bonus,
+
+        base_ovr:
+            snapshot.base_ovr,
 
         ovr:
-            baseOvr
-            +
-            newAbilityBonus,
+            snapshot.final_ovr,
+
+        base_stats:
+            snapshot.base_stats,
 
         stats:
-            adjustedStats,
+            snapshot.final_stats,
     };
+}
+
+function getAdjustedPlayer(
+    player
+) {
+    const state =
+        getPlayerCardState(
+            player.sp_id
+        );
+
+
+    return applyPlayerDisplayState(
+        player,
+        state
+    );
 }
 
 function createPlayerStatsHtml(
@@ -3644,7 +3575,6 @@ function getComparePlayer(
     spId,
     side
 ) {
-
     const numericSpId =
         Number(
             spId
@@ -3673,214 +3603,42 @@ function getComparePlayer(
     }
 
 
-    const gradeBonus =
-        enhancementBonusMap[
-            state.grade
-        ]
-        ?? 0;
-
-
-    const adaptationBonus =
-        adaptationBonusMap[
-            state.adaptation
-        ]
-        ?? 0;
-
-
-    const teamColorBonus =
-        Number(
-            state.teamColor
-            ?? 0
-        );
-
-
-    const newAbilityBonus =
-        gradeBonus
-        +
-        adaptationBonus
-        +
-        teamColorBonus;
-
-
-    const sourceAbilityBonus =
-        Number(
-            originalPlayer.ability_bonus
-            ?? 0
-        );
-
-
-    const adjustedStats =
-        Object.fromEntries(
-            Object.entries(
-                originalPlayer.stats
-                ?? {}
-            )
-                .map(
-                    (
-                        [
-                            statName,
-                            statValue,
-                        ]
-                    ) => {
-
-                        const baseStat =
-                            Number(
-                                statValue
-                            )
-                            -
-                            sourceAbilityBonus;
-
-
-                        return [
-                            statName,
-                            baseStat
-                            +
-                            newAbilityBonus,
-                        ];
-                    }
-                )
-        );
-
-
-    const baseOvr =
-        Number(
-            originalPlayer.base_ovr
-            ??
-            (
-                Number(
-                    originalPlayer.ovr
-                    ?? 0
-                )
-                -
-                sourceAbilityBonus
-            )
-        );
-
-
-    return {
-        ...originalPlayer,
-
-        grade:
-            state.grade,
-
-        adaptation:
-            state.adaptation,
-
-        team_color_bonus:
-            state.teamColor,
-
-        ability_bonus:
-            newAbilityBonus,
-
-        ovr:
-            baseOvr
-            +
-            newAbilityBonus,
-
-        stats:
-            adjustedStats,
-    };
+    return applyPlayerDisplayState(
+        originalPlayer,
+        state
+    );
 }
 
 function getRecommendBasePlayer(
     spId
 ) {
     const numericSpId =
-        Number(spId);
+        Number(
+            spId
+        );
+
 
     const originalPlayer =
         playerDataBySpId.get(
             numericSpId
         );
 
+
     if (!originalPlayer) {
         return null;
     }
+
 
     const state =
         getPlayerCardState(
             numericSpId
         );
 
-    const gradeBonus =
-        enhancementBonusMap[
-            Number(
-                state.grade ?? 1
-            )
-        ] ?? 0;
 
-    const adaptationBonus =
-        adaptationBonusMap[
-            Number(
-                state.adaptation ?? 1
-            )
-        ] ?? 0;
-
-    const teamColorBonus =
-        Number(
-            state.teamColor ?? 0
-        );
-
-    const newAbilityBonus =
-        gradeBonus +
-        adaptationBonus +
-        teamColorBonus;
-
-    const sourceAbilityBonus =
-        Number(
-            originalPlayer.ability_bonus
-            ?? 0
-        );
-
-    const adjustedStats =
-        Object.fromEntries(
-            Object.entries(
-                originalPlayer.stats ?? {}
-            ).map(
-                ([statName, statValue]) => {
-                    const baseStat =
-                        Number(statValue) -
-                        sourceAbilityBonus;
-
-                    return [
-                        statName,
-                        baseStat +
-                        newAbilityBonus,
-                    ];
-                }
-            )
-        );
-
-    const baseOvr =
-        Number(
-            originalPlayer.base_ovr
-            ?? (
-                Number(
-                    originalPlayer.ovr ?? 0
-                ) - sourceAbilityBonus
-            )
-        );
-
-    return {
-        ...originalPlayer,
-        grade:
-            Number(
-                state.grade ?? 1
-            ),
-        adaptation:
-            Number(
-                state.adaptation ?? 1
-            ),
-        team_color_bonus:
-            teamColorBonus,
-        ability_bonus:
-            newAbilityBonus,
-        ovr:
-            baseOvr +
-            newAbilityBonus,
-        stats:
-            adjustedStats,
-    };
+    return applyPlayerDisplayState(
+        originalPlayer,
+        state
+    );
 }
 
 let recommendationRows = [];
@@ -5347,7 +5105,8 @@ async function loadPlayerRecommendations(
         "adaptation",
         String(
             basePlayer.adaptation
-            ?? 1
+            ??
+            DEFAULT_ADAPTATION_LEVEL
         )
     );
 
@@ -5829,7 +5588,8 @@ function openRecommendedPlayerCompare(
     const sharedAdaptation =
         Number(
             baseCardState.adaptation
-            ?? 1
+            ??
+            DEFAULT_ADAPTATION_LEVEL
         );
 
 
@@ -6227,7 +5987,8 @@ function initializeCompareControlState() {
         adaptation:
             Number(
                 leftState.adaptation
-                ?? 1
+                ??
+                DEFAULT_ADAPTATION_LEVEL
             ),
 
         teamColor:
@@ -6248,7 +6009,8 @@ function initializeCompareControlState() {
         adaptation:
             Number(
                 rightState.adaptation
-                ?? 1
+                ??
+                DEFAULT_ADAPTATION_LEVEL
             ),
 
         teamColor:

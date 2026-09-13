@@ -49,6 +49,7 @@ from backend.player_popularity import (
 
 from backend.player_supply_restriction import (
     get_supply_restriction_status,
+    get_supply_restriction_status_by_season_id,
 )
 
 import re
@@ -31814,11 +31815,10 @@ def get_budget_quick_squad_candidate_rows(
 
 
     rank_limit = max(
-        1,
+        4,
         min(
-            2,
-            per_salary_limit
-            // 2,
+            12,
+            per_salary_limit,
         ),
     )
 
@@ -32155,168 +32155,88 @@ def get_budget_quick_squad_candidate_rows(
                 cursor.fetchall()
             )
 
-            # =====================================
-            # 생성 제한 후보 별도 확보
-            #
-            # 기존 OVR / 인기 후보 사전 컷에서
-            # 생성 제한 카드가 사라지면
-            # 이후 +3 OVR 비교 자체가 불가능하다.
-            #
-            # 실제 추천 우선순위 결정은
-            # quick_squad_budget._prepare_options()
-            # 에서 수행한다.
-            #
-            # 여기서는 비교 대상으로만 확보한다.
-            # =====================================
 
-            all_candidate_positions = sorted({
-                position
+    # =====================================
+    # 제한 상태를 슬롯 후보 선별 전에 적용
+    #
+    # 공급제한 / 생성제한 / ICONTMB가
+    # best_rank 자리를 차지한 뒤 제거되면
+    # 정상 카드가 후보군에 들어오지 못한다.
+    # =====================================
 
-                for (
-                    _,
-                    positions,
-                    _,
+    rows = attach_quick_squad_popularity(
+        rows
+    )
+
+
+    allowed_rows = []
+
+
+    for row in rows:
+
+        candidate = dict(
+            row
+        )
+
+
+        supply_status = (
+            get_supply_restriction_status_by_season_id(
+                candidate.get(
+                    "season_id"
                 )
-                in specifications
-
-                for position
-                in positions
-            })
+            )
+        )
 
 
-            cursor.execute(
-                """
-                WITH restricted_candidates AS (
+        candidate.update(
+            supply_status
+        )
 
-                    SELECT
-                        p.sp_id,
-                        p.player_name,
-                        p.season_id,
-                        p.image_url,
-                        p.position,
-                        p.salary,
-                        p.ovr,
 
-                        ROW_NUMBER() OVER (
-                            PARTITION BY
-                                p.position,
+        generation_restricted = bool(
+            candidate.get(
+                "generation_restricted",
+                False,
+            )
+        )
 
-                                CASE
-                                    WHEN p.salary <= 15
-                                        THEN 0
 
-                                    WHEN p.salary <= 22
-                                        THEN 1
+        supply_restricted = bool(
+            candidate.get(
+                "supply_restricted",
+                False,
+            )
+        )
 
-                                    WHEN p.salary <= 28
-                                        THEN 2
 
-                                    ELSE 3
-                                END
-
-                            ORDER BY
-                                p.ovr DESC,
-                                p.sp_id DESC
-                        )
-                            AS restricted_rank
-
-                    FROM
-                        fconline_player_generation_status
-                        AS generation
-
-                    JOIN
-                        fconline_players
-                        AS p
-
-                        ON
-                            p.sp_id
-                            =
-                            generation.sp_id
-
-                    WHERE
-                        generation.generation_restricted
-                        =
-                        TRUE
-
-                        AND
-
-                        p.position
-                        =
-                        ANY(%s)
-
-                        AND
-
-                        COALESCE(
-                            p.salary,
-                            0
-                        )
-                        BETWEEN 1 AND %s
-
-                        AND
-
-                        COALESCE(
-                            p.ovr,
-                            0
-                        )
-                        > 0
-
-                        AND EXISTS (
-
-                            SELECT
-                                1
-
-                            FROM
-                                fconline_player_teams
-                                AS t
-
-                            WHERE
-                                t.sp_id
-                                =
-                                p.sp_id
-
-                                AND
-
-                                t.team_color_id
-                                =
-                                %s
-                        )
+        class_code = (
+            str(
+                candidate.get(
+                    "supply_restriction_class",
+                    "",
                 )
-
-                SELECT
-                    sp_id,
-                    player_name,
-                    season_id,
-                    image_url,
-                    position,
-                    salary,
-                    ovr
-
-                FROM
-                    restricted_candidates
-
-                WHERE
-                    restricted_rank
-                    <= 2
-
-                ORDER BY
-                    position,
-                    ovr DESC,
-                    sp_id DESC
-                """,
-                (
-                    all_candidate_positions,
-
-                    QUICK_SQUAD_SALARY_CAP
-                    - 10,
-
-                    team_color_id,
-                ),
+                or ""
             )
+            .strip()
+            .upper()
+        )
 
 
-            restricted_rows = (
-                cursor.fetchall()
-            )
+        if (
+            generation_restricted
+            or
+            supply_restricted
+            or class_code == "ICONTMB"
+        ):
+            continue
+
+
+        allowed_rows.append(
+            candidate
+        )
+
+
+    rows = allowed_rows
 
 
     # =====================================
@@ -32633,27 +32553,9 @@ def get_budget_quick_squad_candidate_rows(
     # 붙여 quick_squad_locked로 전달
     # =====================================
 
-    # =====================================
-    # 생성 제한 후보는 기존 후보 수를
-    # 빼앗지 않고 비교 후보로 추가한다.
-    # =====================================
 
-    for row in restricted_rows:
-
-        selected.setdefault(
-            int(
-                row[
-                    "sp_id"
-                ]
-            ),
-            row,
-        )
-
-
-    return attach_quick_squad_popularity(
-        list(
-            selected.values()
-        )
+    return list(
+        selected.values()
     )
 
 
@@ -34265,7 +34167,7 @@ def search_player_database_api(
     position: str = "",
     positions: str = "",
     grade: int = 1,
-    adaptation: int = 1,
+    adaptation: int = 5,
     team_color: int = 0,
     salary_min: int | None = None,
     salary_max: int | None = None,
@@ -34417,7 +34319,7 @@ def search_player_database_api(
 def recommend_player_database_api(
     base_sp_id: int,
     grade: int = 1,
-    adaptation: int = 1,
+    adaptation: int = 5,
     team_color: int = 0,
     position_mode: str = "same",
     salary_mode: str = "any",

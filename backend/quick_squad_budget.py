@@ -13,24 +13,106 @@ CORE_POSITIONS = frozenset(
     """.split()
 )
 
-META_POPULARITY_WEIGHT = 6.0
+META_POPULARITY_WEIGHT = 10.0
 META_BALANCE_GAP_WEIGHT = 0.35
 GENERATION_RESTRICTED_PENALTY = 1.5
 SUPPLY_RESTRICTED_PENALTY = 1.0
 GENERATION_RESTRICTED_OVR_ADVANTAGE = 3
-ICONTMB_DEPRIORITIZED_PENALTY = 0.75
+ICONTMB_DEPRIORITIZED_PENALTY = 2.0
 MAX_SEASON_VARIANTS_PER_PLAYER = 2
-CORE_SLOT_MIN_TARGET_RATIO = 0.20
-CORE_SLOT_UNDERINVEST_WEIGHT = 2.5
+CORE_SLOT_MIN_TARGET_RATIO_BASE = 0.35
+CORE_SLOT_MIN_TARGET_RATIO_MAX = 0.55
+CORE_SLOT_UNDERINVEST_WEIGHT = 4.0
+BALANCED_CORE_SLOT_MIN_TARGET_RATIO = 0.30
+CORE_CANDIDATE_MIN_RATIO_FACTOR = 0.0
 
 CORE_SLOT_OVER_TARGET_RATIO = 3.0
 CORE_SLOT_OVERINVEST_WEIGHT = 0.75
+
+SIDE_POSITION_PAIRS = (
+    ("LS", "RS"),
+    ("LF", "RF"),
+    ("LW", "RW"),
+    ("LAM", "RAM"),
+    ("LCM", "RCM"),
+    ("LDM", "RDM"),
+    ("LM", "RM"),
+    ("LCB", "RCB"),
+    ("LB", "RB"),
+    ("LWB", "RWB"),
+)
+
+CORE_SIDE_PAIR_PRICE_WEIGHT = 1.25
+CORE_SIDE_PAIR_OVR_WEIGHT = 0.35
+
+OTHER_SIDE_PAIR_PRICE_WEIGHT = 0.50
+OTHER_SIDE_PAIR_OVR_WEIGHT = 0.15
+
+SIDE_PAIR_FREE_PRICE_RATIO = 1.60
+SIDE_PAIR_FREE_OVR_GAP = 3
+
+# =========================================
+# VALUE MODE BALANCE
+# =========================================
+
+# 가성비라도 코어 자리는
+# 해당 슬롯 최고 후보와 체급 차이를 크게 허용하지 않는다.
+VALUE_CORE_MAX_OVR_GAP = 4
+
+# 풀백 / 윙백 / GK는 코어보다 조금 더 절약 가능.
+VALUE_OTHER_MAX_OVR_GAP = 7
+
+# 전체 평균 OVR 대비 최저 OVR 차이.
+#
+# 먼저 8 이내 조합을 사용하고,
+# 불가능한 팀컬러에서만 11까지 완화한다.
+VALUE_STRICT_BALANCE_GAP = 8
+VALUE_RELAXED_BALANCE_GAP = 11
 
 
 def is_core(position):
     return (
         str(position).strip().upper()
         in CORE_POSITIONS
+    )
+
+def get_core_slot_min_target_ratio(
+    plan,
+):
+    strength = int(
+        plan.get(
+            "core_strength",
+            100,
+        )
+        or 100
+    )
+
+
+    strength = max(
+        100,
+        min(
+            300,
+            strength,
+        ),
+    )
+
+
+    progress = (
+        strength
+        - 100
+    ) / 200
+
+
+    return (
+        CORE_SLOT_MIN_TARGET_RATIO_BASE
+        +
+        (
+            CORE_SLOT_MIN_TARGET_RATIO_MAX
+            -
+            CORE_SLOT_MIN_TARGET_RATIO_BASE
+        )
+        *
+        progress
     )
 
 
@@ -123,6 +205,30 @@ def make_budget_plan(
     return {
         "mode": mode,
         "core_strength": strength,
+
+        "slots": [
+            str(slot)
+            .strip()
+            .upper()
+            for slot in slots
+        ],
+
+        "locked_slots": {
+            int(player["slot_index"]): {
+                "price": int(
+                    player["price"]
+                ),
+                "ovr": int(
+                    player.get(
+                        "ovr",
+                        0,
+                    )
+                    or 0
+                ),
+            }
+            for player in locked
+        },
+
         "budget_bp": int(budget),
         "locked_total_price": locked_cost,
         "remaining_budget": remaining,
@@ -220,18 +326,51 @@ def _is_icontmb(
         "ICONTMB"
     )
 
+def _is_quick_squad_forbidden(
+    player,
+):
+    return (
+        bool(
+            player.get(
+                "generation_restricted",
+                False,
+            )
+        )
+        or
+        bool(
+            player.get(
+                "supply_restricted",
+                False,
+            )
+        )
+        or
+        _is_icontmb(
+            player
+        )
+    )
+
 
 def _quick_squad_priority_rank(
     player,
 ):
     # 낮을수록 우선
+    #
+    # 0 일반
+    # 1 공급 제한
+    # 2 생성 제한
+    # 3 ICONTMB
+    #
+    # ICONTMB는 제한 카드는 아니지만
+    # 자동 추천에서는 최후순위로 둔다.
+
     if bool(
         player.get(
             "generation_restricted",
             False,
         )
     ):
-        return 3
+        return 2
+
 
     if bool(
         player.get(
@@ -239,15 +378,16 @@ def _quick_squad_priority_rank(
             False,
         )
     ):
-        return 2
+        return 1
+
 
     if _is_icontmb(
         player
     ):
-        return 1
+        return 3
+
 
     return 0
-
 
 def _quick_squad_player_penalty(
     player,
@@ -344,46 +484,75 @@ def _quick_squad_squad_priority(
 ):
     generation_count = 0
     supply_count = 0
+    acquisition_restricted_count = 0
     icontmb_count = 0
 
 
     for player in players:
 
-        if bool(
+        generation_restricted = bool(
             player.get(
                 "generation_restricted",
                 False,
             )
-        ):
-            generation_count += 1
-            continue
+        )
 
 
-        if bool(
+        supply_restricted = bool(
             player.get(
                 "supply_restricted",
                 False,
             )
-        ):
+        )
+
+
+        acquisition_restricted = (
+            generation_restricted
+            or
+            supply_restricted
+        )
+
+
+        if generation_restricted:
+            generation_count += 1
+
+
+        if supply_restricted:
             supply_count += 1
-            continue
 
 
-        if _is_icontmb(
-            player
+        if acquisition_restricted:
+            acquisition_restricted_count += 1
+
+
+        # 제한 카드가 아닌 ICONTMB만
+        # 별도의 최후순위 카드로 계산.
+        if (
+            not acquisition_restricted
+            and
+            _is_icontmb(
+                player
+            )
         ):
             icontmb_count += 1
 
 
-    # max()에서 큰 값이 우선되므로
-    # 제한 카드 수가 적을수록 큰 값이 되도록 음수 사용.
+    # max()에서 큰 tuple이 우선.
     #
-    # 우선순위:
-    # 일반 > ICONTMB > 공급 제한 > 생성 제한
+    # 최종 우선순위:
+    #
+    # 1. ICONTMB가 적은 스쿼드
+    # 2. 공급/생성 제한 카드가 적은 스쿼드
+    # 3. 생성 제한이 적은 스쿼드
+    # 4. 공급 제한이 적은 스쿼드
+    #
+    # 따라서 일반 선수만으로 가능하면
+    # 제한 카드나 ICONTMB는 절대 먼저 선택되지 않는다.
     return (
+        -icontmb_count,
+        -acquisition_restricted_count,
         -generation_count,
         -supply_count,
-        -icontmb_count,
     )
 
 
@@ -393,15 +562,24 @@ def _prepare_options(
     budget,
     allow_high,
     core_slot,
+    core_min_ratio=0.0,
+    recommendation_mode="meta",
 ):
     values = [
-        p for p in options
+        p
+        for p in options
         if (
             0 < int(p["price"]) <= budget
+
             and int(p["salary"]) > 0
+
             and (
                 allow_high
                 or int(p["grade"]) < 9
+            )
+
+            and not _is_quick_squad_forbidden(
+                p
             )
         )
     ]
@@ -414,6 +592,128 @@ def _prepare_options(
         1,
         int(target),
     )
+
+    # =========================================
+    # 급여 한도 충족용 후보 보존
+    #
+    # OVR 필터에서 탈락하더라도
+    # 정상 획득 가능한 저급여 선수 일부는
+    # 반드시 탐색 후보에 남긴다.
+    # =========================================
+
+    feasibility_values = (
+        _take_unique_player_names(
+            sorted(
+                values,
+                key=lambda player: (
+                    int(
+                        player["salary"]
+                    ),
+                    -int(
+                        player["ovr"]
+                    ),
+                    int(
+                        player["price"]
+                    ),
+                ),
+            ),
+            8 if core_slot else 6,
+        )
+    )
+
+    # =========================================
+    # 코어 슬롯 최소 투자 후보 필터
+    #
+    # 최종 단계에서 싸구려 코어를 감점하는 게 아니라
+    # 충분한 정상 후보가 존재한다면 애초에
+    # 지나치게 싼 카드를 후보군에서 제외한다.
+    #
+    # 작은 팀컬러에서는 자동 완화한다.
+    # =========================================
+
+    if (
+        core_slot
+        and core_min_ratio > 0
+    ):
+
+        strict_price_floor = int(
+            target
+            *
+            core_min_ratio
+        )
+
+
+        strict_values = [
+            player
+
+            for player
+            in values
+
+            if (
+                int(player["price"])
+                >=
+                strict_price_floor
+            )
+        ]
+
+
+        strict_unique_names = {
+            _quick_squad_player_name_key(
+                player
+            )
+
+            for player
+            in strict_values
+        }
+
+
+        if (
+            len(strict_unique_names)
+            >= 3
+        ):
+
+            values = strict_values
+
+
+        else:
+
+            relaxed_price_floor = int(
+                strict_price_floor
+                *
+                0.75
+            )
+
+
+            relaxed_values = [
+                player
+
+                for player
+                in values
+
+                if (
+                    int(player["price"])
+                    >=
+                    relaxed_price_floor
+                )
+            ]
+
+
+            relaxed_unique_names = {
+                _quick_squad_player_name_key(
+                    player
+                )
+
+                for player
+                in relaxed_values
+            }
+
+
+            if (
+                len(relaxed_unique_names)
+                >= 2
+            ):
+
+                values = relaxed_values
 
 
     # =========================================
@@ -608,251 +908,146 @@ def _prepare_options(
                 )
             ] = player
 
+    # OVR 경쟁력 후보와 별개로
+    # 저급여 정상 선수 후보를 다시 합친다.
+    for player in feasibility_values:
+
+        selected.setdefault(
+            (
+                int(
+                    player["sp_id"]
+                ),
+                int(
+                    player["grade"]
+                ),
+            ),
+            player,
+        )
+
+    # =========================================
+    # 가성비 전용 후보
+    #
+    # 인기도와 관계없이 현재 슬롯의 좋은 카드보다
+    # OVR이 크게 떨어지지 않으면서 저렴한 카드를
+    # 별도로 beam까지 보존한다.
+    #
+    # 코어: 최고 OVR -6
+    # 비코어: 최고 OVR -9
+    # =========================================
+
+    if recommendation_mode == "value":
+
+        value_allowed_gap = (
+            VALUE_CORE_MAX_OVR_GAP
+            if core_slot
+            else VALUE_OTHER_MAX_OVR_GAP
+        )
+
+
+        value_quality_floor = (
+            best_slot_ovr
+            -
+            value_allowed_gap
+        )
+
+
+        value_candidates = [
+            player
+
+            for player
+            in values
+
+            if (
+                int(player["ovr"])
+                >=
+                value_quality_floor
+            )
+        ]
+
+
+        value_candidates = (
+            _take_unique_player_names(
+                sorted(
+                    value_candidates,
+                    key=lambda player: (
+                        int(player["price"]),
+                        int(player["salary"]),
+                        -int(player["ovr"]),
+                    ),
+                ),
+                (
+                    14
+                    if core_slot
+                    else 12
+                ),
+            )
+        )
+
+
+        for player in value_candidates:
+
+            selected.setdefault(
+                (
+                    int(player["sp_id"]),
+                    int(player["grade"]),
+                ),
+                player,
+            )
+
+
     values = list(
         selected.values()
     )
 
 
     # =========================================
-    # 퀵 스쿼드 후보 우선순위
+    # 가성비 전용 저가 후보 그룹
     #
-    # 1. 일반 획득 가능 시즌
-    # 2. ICONTMB
-    # 3. 공급 제한
-    # 4. 생성 제한
-    #
-    # 일반 시즌 후보가 충분하다면
-    # ICONTMB는 후보군에서 아예 제외한다.
-    #
-    # 작은 팀컬러 등 일반 후보가 부족할 때만
-    # ICONTMB를 fallback 후보로 다시 허용한다.
+    # 코어 포지션도 성능 후보만 남지 않도록
+    # 허용 OVR 범위 안의 저렴한 카드를
+    # 별도 그룹으로 보존한다.
     # =========================================
 
+    value_price_group = []
 
-    normal_available_values = [
-        player
 
-        for player
-        in values
+    if recommendation_mode == "value":
 
-        if (
-            not _is_acquisition_restricted(
-                player
+        value_price_group = (
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda player: (
+                        int(
+                            player["price"]
+                        ),
+
+                        -int(
+                            player["ovr"]
+                        ),
+
+                        int(
+                            player["salary"]
+                        ),
+                    ),
+                ),
+                (
+                    14
+                    if core_slot
+                    else 10
+                ),
             )
-            and
-            not _is_icontmb(
-                player
-            )
-        )
-    ]
-
-
-    icontmb_values = [
-        player
-
-        for player
-        in values
-
-        if (
-            not _is_acquisition_restricted(
-                player
-            )
-            and
-            _is_icontmb(
-                player
-            )
-        )
-    ]
-
-
-    restricted_values = [
-        player
-
-        for player
-        in values
-
-        if _is_acquisition_restricted(
-            player
-        )
-    ]
-
-
-    # -----------------------------------------
-    # ICONTMB 허용 여부
-    #
-    # 코어 포지션은 일반 선수명 3명,
-    # 비코어 포지션은 일반 선수명 2명만 있어도
-    # ICONTMB를 후보에서 제거한다.
-    # -----------------------------------------
-
-    normal_minimum_unique_names = (
-        3
-        if core_slot
-        else 2
-    )
-
-
-    normal_unique_names = {
-        str(
-            player[
-                "player_name"
-            ]
-        )
-        .strip()
-        .casefold()
-
-        for player
-        in normal_available_values
-    }
-
-
-    if (
-        len(
-            normal_unique_names
-        )
-        >=
-        normal_minimum_unique_names
-    ):
-
-        # 일반 카드가 충분함.
-        # ICONTMB는 이번 슬롯 후보에서 완전히 제거.
-        preferred_available_values = list(
-            normal_available_values
-        )
-
-    else:
-
-        # 일반 카드가 부족한 작은 팀컬러.
-        # 이때만 ICONTMB를 fallback으로 허용.
-        preferred_available_values = (
-            list(
-                normal_available_values
-            )
-            +
-            list(
-                icontmb_values
-            )
-        )
-
-
-    # =========================================
-    # 생성 / 공급 제한은
-    # ICONTMB보다도 더 후순위
-    # =========================================
-
-    if (
-        preferred_available_values
-        and
-        restricted_values
-    ):
-
-        best_available_ovr = max(
-            int(
-                player[
-                    "ovr"
-                ]
-            )
-
-            for player
-            in preferred_available_values
-        )
-
-
-        preferred_values = list(
-            preferred_available_values
-        )
-
-
-        # 제한 카드가 일반/ICONTMB 후보보다
-        # OVR이 확실히 높을 때만 예외적으로 유지.
-        preferred_values.extend(
-            player
-
-            for player
-            in restricted_values
-
-            if (
-                int(
-                    player[
-                        "ovr"
-                    ]
-                )
-                >=
-                best_available_ovr
-                +
-                GENERATION_RESTRICTED_OVR_ADVANTAGE
-            )
-        )
-
-
-        preferred_unique_names = {
-            str(
-                player[
-                    "player_name"
-                ]
-            )
-            .strip()
-            .casefold()
-
-            for player
-            in preferred_values
-        }
-
-
-        restricted_minimum_unique_names = (
-            3
-            if core_slot
-            else 2
-        )
-
-
-        if (
-            len(
-                preferred_unique_names
-            )
-            >=
-            restricted_minimum_unique_names
-        ):
-
-            values = preferred_values
-
-        else:
-
-            values = (
-                preferred_available_values
-                +
-                restricted_values
-            )
-
-
-    elif preferred_available_values:
-
-        values = (
-            preferred_available_values
-        )
-
-
-    elif icontmb_values:
-
-        # 일반 카드도 없고 제한되지 않은
-        # ICONTMB만 존재하는 극단적인 경우.
-        values = list(
-            icontmb_values
-        )
-
-
-    else:
-
-        # 일반 / ICONTMB 모두 없을 때만
-        # 제한 카드만으로 진행.
-        values = list(
-            restricted_values
         )
 
 
     if core_slot:
 
         groups = (
+
+            # ---------------------------------
+            # 가성비 모드 전용 저가 후보
+            # ---------------------------------
+            value_price_group,
 
             # ---------------------------------
             # 인기 우선
@@ -893,6 +1088,29 @@ def _prepare_options(
                 ),
                 10,
             ),
+
+            # ---------------------------------
+            # 저급여 fallback
+            #
+            # 공격/미드/CB를 코어로 유지하면서도
+            # 급여 310 안에서 조합 자체가
+            # 성립할 수 있도록 후보를 보존한다.
+            # ---------------------------------
+            _take_unique_player_names(
+                sorted(
+                    values,
+                    key=lambda p: (
+                        p["salary"],
+                        _quick_squad_priority_rank(
+                            p
+                        ),
+                        p["price"],
+                        -p["ovr"],
+                    ),
+                ),
+                8,
+            ),
+
 
             # ---------------------------------
             # 목표 예산 근접
@@ -1090,7 +1308,7 @@ def _prepare_options(
 
     return list(
         chosen.values()
-    )[:40]
+    )[:48]
 
 
 def search_budget_squad(
@@ -1146,6 +1364,26 @@ def search_budget_squad(
         for i in slot_indices
     ]
 
+    final_core_min_ratio = (
+        BALANCED_CORE_SLOT_MIN_TARGET_RATIO
+
+        if (
+            plan.get("mode")
+            == "balanced"
+        )
+
+        else get_core_slot_min_target_ratio(
+            plan
+        )
+    )
+
+
+    candidate_core_min_ratio = (
+        final_core_min_ratio
+        *
+        CORE_CANDIDATE_MIN_RATIO_FACTOR
+    )
+
     prepared = [
         _prepare_options(
             options,
@@ -1156,6 +1394,8 @@ def search_budget_squad(
                 slot_indices[i]
                 in plan["core_indices"]
             ),
+            candidate_core_min_ratio,
+            recommendation_mode,
         )
         for i, (
             options,
@@ -1185,6 +1425,24 @@ def search_budget_squad(
 
     ordered_core = [
         slot_indices[i] in plan["core_indices"]
+        for i in order
+    ]
+
+    ordered_slot_indices = [
+        slot_indices[i]
+        for i in order
+    ]
+
+
+    ordered_positions = [
+        str(
+            plan["slots"][
+                slot_indices[i]
+            ]
+        )
+        .strip()
+        .upper()
+
         for i in order
     ]
 
@@ -1233,6 +1491,507 @@ def search_budget_squad(
         )
     ]
 
+    def side_pair_balance_penalty(
+        players,
+        positions,
+    ):
+        by_position = {}
+
+
+        for position, player in zip(
+            positions,
+            players,
+        ):
+            by_position[
+                str(position)
+                .strip()
+                .upper()
+            ] = {
+                "price": int(
+                    player["price"]
+                ),
+                "ovr": int(
+                    player["ovr"]
+                ),
+            }
+
+
+        # 고정 선수도 좌우 균형 계산에 포함한다.
+        for (
+            locked_index,
+            locked_player,
+        ) in (
+            plan.get(
+                "locked_slots",
+                {},
+            )
+            or {}
+        ).items():
+
+            locked_index = int(
+                locked_index
+            )
+
+
+            if (
+                locked_index
+                < 0
+                or locked_index
+                >= len(
+                    plan["slots"]
+                )
+            ):
+                continue
+
+
+            position = (
+                str(
+                    plan["slots"][
+                        locked_index
+                    ]
+                )
+                .strip()
+                .upper()
+            )
+
+
+            by_position[
+                position
+            ] = {
+                "price": int(
+                    locked_player.get(
+                        "price",
+                        0,
+                    )
+                    or 0
+                ),
+                "ovr": int(
+                    locked_player.get(
+                        "ovr",
+                        0,
+                    )
+                    or 0
+                ),
+            }
+
+
+        penalty = 0.0
+
+
+        for (
+            left_position,
+            right_position,
+        ) in SIDE_POSITION_PAIRS:
+
+            left = by_position.get(
+                left_position
+            )
+
+            right = by_position.get(
+                right_position
+            )
+
+
+            # 두 자리가 모두 존재할 때만 비교.
+            if (
+                left is None
+                or right is None
+            ):
+                continue
+
+
+            left_price = max(
+                1,
+                int(left["price"]),
+            )
+
+            right_price = max(
+                1,
+                int(right["price"]),
+            )
+
+
+            expensive_price = max(
+                left_price,
+                right_price,
+            )
+
+            cheap_price = min(
+                left_price,
+                right_price,
+            )
+
+
+            price_ratio = (
+                expensive_price
+                /
+                cheap_price
+            )
+
+
+            price_gap = max(
+                0.0,
+                price_ratio
+                -
+                SIDE_PAIR_FREE_PRICE_RATIO,
+            )
+
+
+            # 극단적인 가격 차이가 점수를
+            # 무한정 지배하지 않도록 상한 설정.
+            price_gap = min(
+                3.0,
+                price_gap,
+            )
+
+
+            left_ovr = int(
+                left["ovr"]
+            )
+
+            right_ovr = int(
+                right["ovr"]
+            )
+
+
+            ovr_gap = max(
+                0,
+                abs(
+                    left_ovr
+                    -
+                    right_ovr
+                )
+                -
+                SIDE_PAIR_FREE_OVR_GAP,
+            )
+
+
+            ovr_gap = min(
+                10,
+                ovr_gap,
+            )
+
+
+            core_pair = (
+                is_core(
+                    left_position
+                )
+                and
+                is_core(
+                    right_position
+                )
+            )
+
+
+            if core_pair:
+
+                penalty += (
+                    CORE_SIDE_PAIR_PRICE_WEIGHT
+                    *
+                    price_gap
+                )
+
+                penalty += (
+                    CORE_SIDE_PAIR_OVR_WEIGHT
+                    *
+                    ovr_gap
+                )
+
+            else:
+
+                penalty += (
+                    OTHER_SIDE_PAIR_PRICE_WEIGHT
+                    *
+                    price_gap
+                )
+
+                penalty += (
+                    OTHER_SIDE_PAIR_OVR_WEIGHT
+                    *
+                    ovr_gap
+                )
+
+
+        return penalty
+
+    def side_pair_balance_is_valid(
+        players,
+        positions,
+        *,
+        price_ratio_limit,
+        ovr_gap_limit,
+    ):
+        by_position = {}
+
+
+        for position, player in zip(
+            positions,
+            players,
+        ):
+            by_position[
+                str(position)
+                .strip()
+                .upper()
+            ] = {
+                "price": int(
+                    player["price"]
+                ),
+                "ovr": int(
+                    player["ovr"]
+                ),
+            }
+
+
+        # 고정 선수도 pair 검증에 포함.
+        for (
+            locked_index,
+            locked_player,
+        ) in (
+            plan.get(
+                "locked_slots",
+                {},
+            )
+            or {}
+        ).items():
+
+            locked_index = int(
+                locked_index
+            )
+
+
+            if (
+                locked_index < 0
+                or locked_index >= len(
+                    plan["slots"]
+                )
+            ):
+                continue
+
+
+            position = (
+                str(
+                    plan["slots"][
+                        locked_index
+                    ]
+                )
+                .strip()
+                .upper()
+            )
+
+
+            by_position[
+                position
+            ] = {
+                "price": max(
+                    1,
+                    int(
+                        locked_player.get(
+                            "price",
+                            0,
+                        )
+                        or 0
+                    ),
+                ),
+                "ovr": int(
+                    locked_player.get(
+                        "ovr",
+                        0,
+                    )
+                    or 0
+                ),
+            }
+
+
+        for (
+            left_position,
+            right_position,
+        ) in SIDE_POSITION_PAIRS:
+
+            left = by_position.get(
+                left_position
+            )
+
+            right = by_position.get(
+                right_position
+            )
+
+
+            if (
+                left is None
+                or right is None
+            ):
+                continue
+
+
+            left_price = max(
+                1,
+                int(left["price"]),
+            )
+
+            right_price = max(
+                1,
+                int(right["price"]),
+            )
+
+
+            price_ratio = (
+                max(
+                    left_price,
+                    right_price,
+                )
+                /
+                min(
+                    left_price,
+                    right_price,
+                )
+            )
+
+
+            ovr_gap = abs(
+                int(left["ovr"])
+                -
+                int(right["ovr"])
+            )
+
+
+            if (
+                price_ratio
+                >
+                price_ratio_limit
+            ):
+                return False
+
+
+            if (
+                ovr_gap
+                >
+                ovr_gap_limit
+            ):
+                return False
+
+
+        return True
+
+    def calculate_value_efficiency(
+        players,
+    ):
+        if not players:
+            return 0.0
+
+
+        total_value = 0.0
+
+
+        for i, player in enumerate(
+            players
+        ):
+
+            slot_target = max(
+                1,
+                ordered_targets[i],
+            )
+
+
+            slot_best_ovr = max(
+                int(option["ovr"])
+
+                for option
+                in ordered[i]
+            )
+
+
+            player_ovr = int(
+                player["ovr"]
+            )
+
+
+            player_price = int(
+                player["price"]
+            )
+
+
+            allowed_gap = (
+                VALUE_CORE_MAX_OVR_GAP
+                if ordered_core[i]
+                else VALUE_OTHER_MAX_OVR_GAP
+            )
+
+
+            quality_gap = max(
+                0,
+                slot_best_ovr
+                -
+                player_ovr,
+            )
+
+
+            # 허용 OVR 범위 안에서는
+            # 체급 손실을 완전히 0점 처리하지 않는다.
+            #
+            # 예:
+            # 최고 OVR -2인데 가격이 절반이라면
+            # 충분히 좋은 가성비 카드로 평가한다.
+            quality_factor = max(
+                0.35,
+                1.0
+                -
+                (
+                    quality_gap
+                    /
+                    max(
+                        allowed_gap
+                        + 2,
+                        1,
+                    )
+                ),
+            )
+
+
+            # 목표 예산보다 저렴할수록 좋지만
+            # 65% 이상 절약부터는 추가 보너스를 주지 않는다.
+            #
+            # 초저가 쓰레기 카드가 과도하게 유리해지는 것 방지.
+            saving_ratio = max(
+                0.0,
+                1.0
+                -
+                (
+                    player_price
+                    /
+                    slot_target
+                ),
+            )
+
+
+            saving_score = (
+                min(
+                    0.65,
+                    saving_ratio,
+                )
+                /
+                0.65
+            )
+
+
+            player_value = (
+                0.50
+                *
+                quality_factor
+
+                +
+
+                0.50
+                *
+                saving_score
+            )
+
+
+        return (
+            total_value
+            /
+            len(players)
+        )
+
     serial = count()
 
     def offer(heap, rank, state):
@@ -1245,6 +2004,10 @@ def search_budget_squad(
 
     for depth, options in enumerate(ordered):
         heaps = (
+            [],
+            [],
+            [],
+            [],
             [],
             [],
             [],
@@ -1277,6 +2040,11 @@ def search_budget_squad(
         ) in beam:
 
             for p in options:
+                if _is_quick_squad_forbidden(
+                    p
+                ):
+                    continue
+
                 name = (
                     str(p["player_name"])
                     .strip()
@@ -1311,10 +2079,6 @@ def search_budget_squad(
                         budget / (n * 4),
                         1,
                     ),
-                )
-
-                next_quality = (
-                    quality + int(p["ovr"])
                 )
 
                 player_ovr = int(
@@ -1352,27 +2116,68 @@ def search_budget_squad(
                     )
                 )
 
-                next_restricted_count = (
-                    sum(
-                        1
-                        for selected_player
-                        in selected
-                        if bool(
-                            selected_player.get(
-                                "generation_restricted",
-                                False,
-                            )
+                selected_generation_count = sum(
+                    1
+
+                    for selected_player
+                    in selected
+
+                    if bool(
+                        selected_player.get(
+                            "generation_restricted",
+                            False,
                         )
                     )
-                    +
-                    int(
-                        bool(
-                            p.get(
-                                "generation_restricted",
-                                False,
-                            )
+                )
+
+
+                selected_supply_count = sum(
+                    1
+
+                    for selected_player
+                    in selected
+
+                    if bool(
+                        selected_player.get(
+                            "supply_restricted",
+                            False,
                         )
                     )
+                )
+
+
+                selected_acquisition_count = sum(
+                    1
+
+                    for selected_player
+                    in selected
+
+                    if _is_acquisition_restricted(
+                        selected_player
+                    )
+                )
+
+
+                player_generation_restricted = bool(
+                    p.get(
+                        "generation_restricted",
+                        False,
+                    )
+                )
+
+
+                player_supply_restricted = bool(
+                    p.get(
+                        "supply_restricted",
+                        False,
+                    )
+                )
+
+
+                player_acquisition_restricted = (
+                    player_generation_restricted
+                    or
+                    player_supply_restricted
                 )
 
                 next_core = core_cost + (
@@ -1381,8 +2186,39 @@ def search_budget_squad(
                     else 0
                 )
 
+                next_selected = (
+                    selected
+                    +
+                    (p,)
+                )
+
+
+                next_side_pair_penalty = (
+                    side_pair_balance_penalty(
+                        next_selected,
+                        ordered_positions[
+                            :depth + 1
+                        ],
+                    )
+                )
+
+                next_other_salary = sum(
+                    int(
+                        selected_player[
+                            "salary"
+                        ]
+                    )
+
+                    for i, selected_player
+                    in enumerate(
+                        next_selected
+                    )
+
+                    if not ordered_core[i]
+                )
+
                 state = (
-                    selected + (p,),
+                    next_selected,
                     used | {name},
                     next_cost,
                     next_salary,
@@ -1414,72 +2250,38 @@ def search_budget_squad(
 
                 # 품질, 예산 활용, 목표 근접도를
                 # 모두 평가하는 점수.
-                fit = (
-                    average_ovr
-
-
-                    # 실제 유저 선호도
-                    +
-                    META_POPULARITY_WEIGHT
-                    *
+                popularity_average = (
+                    next_popularity
+                    /
                     (
-                        next_popularity
-                        /
-                        (
-                            depth
-                            + 1
-                        )
+                        depth
+                        + 1
                     )
-
-                    -
-                    GENERATION_RESTRICTED_PENALTY
-                    *
-                    (
-                        next_restricted_count
-                        /
-                        (
-                            depth
-                            + 1
-                        )
-                    )
-
-                    -
-                    META_BALANCE_GAP_WEIGHT
-                    *
-                    balance_gap
-
-                    # 목표 예산 활용
-                    +
-                    8
-                    *
-                    min(
-                        1.0,
-
-                        next_cost
-                        /
-                        max(
-                            assigned_target,
-                            1,
-                        ),
-                    )
+                )
 
 
-                    # 포지션별 목표 예산 편차
-                    -
-                    10
-                    *
+                error_average = (
                     next_error
                     /
                     (
                         depth
                         + 1
                     )
+                )
 
 
-                    # 코어 포지션 투자 비율
-                    -
-                    5
-                    *
+                budget_usage = min(
+                    1.0,
+                    next_cost
+                    /
+                    max(
+                        assigned_target,
+                        1,
+                    ),
+                )
+
+
+                core_target_error = (
                     abs(
                         next_core
                         -
@@ -1491,6 +2293,133 @@ def search_budget_squad(
                         1,
                     )
                 )
+
+
+                # =====================================
+                # 성능
+                # =====================================
+
+                if recommendation_mode == "performance":
+
+                    fit = (
+                        1.25
+                        *
+                        average_ovr
+
+                        +
+                        0.75
+                        *
+                        next_weakest_ovr
+
+                        -
+                        0.10
+                        *
+                        balance_gap
+
+                        -
+                        0.15
+                        *
+                        error_average
+
+                        -
+                        1.25
+                        *
+                        next_side_pair_penalty
+                    )
+
+
+                # =====================================
+                # 가성비
+                # =====================================
+
+                elif recommendation_mode == "value":
+
+                    partial_value_efficiency = (
+                        calculate_value_efficiency(
+                            next_selected
+                        )
+                    )
+
+
+                    fit = (
+                        0.25
+                        *
+                        average_ovr
+
+                        +
+                        0.20
+                        *
+                        next_weakest_ovr
+
+                        +
+                        34.0
+                        *
+                        partial_value_efficiency
+
+                        -
+                        0.40
+                        *
+                        balance_gap
+
+                        -
+                        0.35
+                        *
+                        error_average
+
+                        -
+                        1.50
+                        *
+                        next_side_pair_penalty
+                    )
+
+
+                # =====================================
+                # 메타
+                # =====================================
+
+                else:
+
+                    # =====================================
+                    # META
+                    #
+                    # 1순위: 실제 유저 사용률
+                    # 2순위: 선수 체급
+                    #
+                    # 인기도 데이터가 존재하는 선수라면
+                    # OVR이 조금 낮더라도 메타 추천에서
+                    # 적극적으로 살아남도록 한다.
+                    # =====================================
+
+                    fit = (
+                        100.0
+                        *
+                        popularity_average
+
+                        +
+                        0.20
+                        *
+                        average_ovr
+
+                        +
+                        0.05
+                        *
+                        next_weakest_ovr
+
+                        -
+                        0.20
+                        *
+                        balance_gap
+
+                        -
+                        0.50
+                        *
+                        error_average
+
+                        -
+                        1.50
+                        *
+                        next_side_pair_penalty
+                    )
 
                 offer(
                     heaps[0],
@@ -1564,6 +2493,93 @@ def search_budget_squad(
                     state,
                 )
 
+                # 좌우 pair가 고르게 투자된 조합을
+                # 별도 beam으로 보존한다.
+                offer(
+                    heaps[6],
+                    (
+                        -next_side_pair_penalty,
+                        next_quality,
+                        next_popularity,
+                        next_core,
+                        -next_error,
+                        next_cost,
+                    ),
+                    state,
+                )
+
+                # 비코어인 풀백/윙백/GK의
+                # 급여를 낮춘 조합을 별도로 보존한다.
+                #
+                # 코어 ST/CM/윙/CB 급여가 부족하면
+                # 비코어 쪽에서 급여를 확보하기 위함.
+                offer(
+                    heaps[7],
+                    (
+                        -next_other_salary,
+                        next_core,
+                        next_quality,
+                        next_popularity,
+                        -next_error,
+                        next_cost,
+                    ),
+                    state,
+                )
+
+                # 전체 급여가 낮은 경로도 별도로 보존.
+                #
+                # 후반부에 급여 310 때문에
+                # 정상적인 조합 경로가 beam에서
+                # 미리 사라지는 것을 막는다.
+                offer(
+                    heaps[8],
+                    (
+                        -next_salary,
+                        next_quality,
+                        next_core,
+                        next_popularity,
+                        -next_error,
+                        next_cost,
+                    ),
+                    state,
+                )
+
+                # =====================================
+                # 추천 모드 전용 beam
+                # =====================================
+
+                if recommendation_mode == "meta":
+
+                    # 실제 사용률이 높은 조합을
+                    # 별도 경로로 끝까지 보존한다.
+                    offer(
+                        heaps[9],
+                        (
+                            next_popularity,
+                            next_quality,
+                            next_weakest_ovr,
+                            -next_salary,
+                            -next_error,
+                        ),
+                        state,
+                    )
+
+                elif recommendation_mode == "performance":
+
+                    # 성능 모드는 인기도와 무관하게
+                    # 총 OVR / 최저 OVR이 높은 경로 보존.
+                    offer(
+                        heaps[9],
+                        (
+                            next_quality,
+                            next_weakest_ovr,
+                            -next_salary,
+                            -next_error,
+                            next_cost,
+                        ),
+                        state,
+                    )
+
         merged = {}
 
         for heap in heaps:
@@ -1615,6 +2631,16 @@ def search_budget_squad(
     other_target = max(
         1,
         raw_other_target,
+    )
+
+    core_slot_min_target_ratio = (
+        BALANCED_CORE_SLOT_MIN_TARGET_RATIO
+
+        if balanced_mode
+
+        else get_core_slot_min_target_ratio(
+            plan
+        )
     )
 
 
@@ -1680,6 +2706,310 @@ def search_budget_squad(
             if state[7] >= core_floor
         ]
 
+    # =========================================
+    # 코어 개별 슬롯 투자 하한
+    #
+    # 총 코어 지출만 높은 조합이 아니라
+    # 모든 코어 자리가 일정 수준 이상
+    # 투자된 조합을 우선한다.
+    #
+    # 조건을 만족하는 조합이 전혀 없으면
+    # 하한을 75%까지 완화하고,
+    # 그래도 없으면 기존 eligible을 유지한다.
+    # =========================================
+
+    def minimum_core_slot_spend_ratio(
+        state,
+    ):
+        ratios = [
+            (
+                int(
+                    player[
+                        "price"
+                    ]
+                )
+                /
+                max(
+                    1,
+                    ordered_targets[i],
+                )
+            )
+
+            for i, player
+            in enumerate(
+                state[0]
+            )
+
+            if ordered_core[i]
+        ]
+
+
+        if not ratios:
+            return 1.0
+
+
+        return min(
+            ratios
+        )
+
+
+
+
+    strict_core_slot_eligible = [
+        state
+
+        for state
+        in eligible
+
+        if (
+            minimum_core_slot_spend_ratio(
+                state
+            )
+            >=
+            core_slot_min_target_ratio
+        )
+    ]
+
+
+    if strict_core_slot_eligible:
+
+        eligible = (
+            strict_core_slot_eligible
+        )
+
+
+    else:
+
+        relaxed_core_slot_ratio = (
+            core_slot_min_target_ratio
+            * 0.75
+        )
+
+
+        relaxed_core_slot_eligible = [
+            state
+
+            for state
+            in eligible
+
+            if (
+                minimum_core_slot_spend_ratio(
+                    state
+                )
+                >=
+                relaxed_core_slot_ratio
+            )
+        ]
+
+
+        if relaxed_core_slot_eligible:
+
+            eligible = (
+                relaxed_core_slot_eligible
+            )
+
+
+        else:
+
+            # strict/relaxed 기준을 만족하는 조합이
+            # 하나도 없더라도 기존 후보 전체로
+            # 되돌아가지는 않는다.
+            #
+            # 현재 beam에서 가능한 최선의
+            # "가장 약한 코어 투자비율"을 구하고,
+            # 그 값의 90% 이상인 조합만 남긴다.
+            best_core_slot_ratio = max(
+                minimum_core_slot_spend_ratio(
+                    state
+                )
+                for state
+                in eligible
+            )
+
+
+            fallback_core_slot_ratio = (
+                best_core_slot_ratio
+                * 0.90
+            )
+
+
+            eligible = [
+                state
+
+                for state
+                in eligible
+
+                if (
+                    minimum_core_slot_spend_ratio(
+                        state
+                    )
+                    >=
+                    fallback_core_slot_ratio
+                )
+            ]
+
+    # =========================================
+    # 최종 좌우 pair hard gate
+    #
+    # soft penalty만으로는 급여 압박 상황에서
+    # 한쪽 코어를 완전히 버리는 조합이 살아날 수 있다.
+    #
+    # 1차:
+    #   가격 2.5배 이내
+    #   OVR 5 이내
+    #
+    # 2차 fallback:
+    #   가격 4배 이내
+    #   OVR 7 이내
+    #
+    # 이것도 불가능할 때만 기존 후보 중
+    # pair penalty가 가장 작은 조합군을 사용한다.
+    # =========================================
+
+    strict_pair_eligible = [
+        state
+
+        for state
+        in eligible
+
+        if side_pair_balance_is_valid(
+            state[0],
+            ordered_positions,
+            price_ratio_limit=2.5,
+            ovr_gap_limit=5,
+        )
+    ]
+
+
+    if strict_pair_eligible:
+
+        eligible = (
+            strict_pair_eligible
+        )
+
+
+    else:
+
+        relaxed_pair_eligible = [
+            state
+
+            for state
+            in eligible
+
+            if side_pair_balance_is_valid(
+                state[0],
+                ordered_positions,
+                price_ratio_limit=4.0,
+                ovr_gap_limit=7,
+            )
+        ]
+
+
+        if relaxed_pair_eligible:
+
+            eligible = (
+                relaxed_pair_eligible
+            )
+
+
+        else:
+
+            best_pair_penalty = min(
+                side_pair_balance_penalty(
+                    state[0],
+                    ordered_positions,
+                )
+                for state
+                in eligible
+            )
+
+
+            eligible = [
+                state
+
+                for state
+                in eligible
+
+                if (
+                    side_pair_balance_penalty(
+                        state[0],
+                        ordered_positions,
+                    )
+                    <=
+                    best_pair_penalty
+                    + 0.50
+                )
+            ]
+
+    # =========================================
+    # 가성비 전체 체급 균형
+    #
+    # 싼 선수 한 명을 지나치게 낮춰
+    # 전체 가성비 점수를 만드는 조합 방지.
+    #
+    # 평균 OVR - 최저 OVR
+    #
+    # 1차: 8 이내
+    # 2차: 11 이내
+    #
+    # 작은 팀컬러에서 두 조건 모두 불가능하면
+    # 기존 eligible을 유지해서 추천 실패는 막는다.
+    # =========================================
+
+    if recommendation_mode == "value":
+
+        strict_value_balance = [
+            state
+
+            for state
+            in eligible
+
+            if (
+                (
+                    state[4]
+                    / n
+                )
+                -
+                state[9]
+                <=
+                VALUE_STRICT_BALANCE_GAP
+            )
+        ]
+
+
+        if strict_value_balance:
+
+            eligible = (
+                strict_value_balance
+            )
+
+        else:
+
+            relaxed_value_balance = [
+                state
+
+                for state
+                in eligible
+
+                if (
+                    (
+                        state[4]
+                        / n
+                    )
+                    -
+                    state[9]
+                    <=
+                    VALUE_RELAXED_BALANCE_GAP
+                )
+            ]
+
+
+            if relaxed_value_balance:
+
+                eligible = (
+                    relaxed_value_balance
+                )
+
 
     print(
         "[QUICK SQUAD META]",
@@ -1727,6 +3057,13 @@ def search_budget_squad(
         )
 
         weakest_ovr = state[9]
+
+        side_pair_penalty = (
+            side_pair_balance_penalty(
+                state[0],
+                ordered_positions,
+            )
+        )
 
 
         balance_gap = max(
@@ -1795,64 +3132,62 @@ def search_budget_squad(
         core_slot_overinvestment = 0.0
 
 
-        # balanced에서는 자리별 코어 투자 감점도 사용하지 않음
-        if not balanced_mode:
 
-            for i, player in enumerate(
-                state[0]
+
+        for i, player in enumerate(
+            state[0]
+        ):
+
+            if not ordered_core[i]:
+                continue
+
+
+            slot_target = max(
+                1,
+                ordered_targets[i],
+            )
+
+
+            spend_ratio = (
+                int(
+                    player["price"]
+                )
+                / slot_target
+            )
+
+
+            if (
+                spend_ratio
+                <
+                core_slot_min_target_ratio
             ):
 
-                if not ordered_core[i]:
-                    continue
-
-
-                slot_target = max(
-                    1,
-                    ordered_targets[i],
+                core_slot_underinvestment += (
+                    (
+                        core_slot_min_target_ratio
+                        - spend_ratio
+                    )
+                    /
+                    core_slot_min_target_ratio
                 )
 
 
-                spend_ratio = (
-                    int(
-                        player["price"]
+            # 목표의 3배를 넘어가는 코어 몰빵
+            if (
+                spend_ratio
+                >
+                CORE_SLOT_OVER_TARGET_RATIO
+            ):
+
+                core_slot_overinvestment += min(
+                    2.0,
+                    (
+                        spend_ratio
+                        - CORE_SLOT_OVER_TARGET_RATIO
                     )
-                    / slot_target
+                    /
+                    CORE_SLOT_OVER_TARGET_RATIO,
                 )
-
-
-                # 목표의 20%보다 적게 쓰는 코어 자리
-                if (
-                    spend_ratio
-                    <
-                    CORE_SLOT_MIN_TARGET_RATIO
-                ):
-
-                    core_slot_underinvestment += (
-                        (
-                            CORE_SLOT_MIN_TARGET_RATIO
-                            - spend_ratio
-                        )
-                        /
-                        CORE_SLOT_MIN_TARGET_RATIO
-                    )
-
-
-                # 목표의 3배를 넘어가는 코어 몰빵
-                if (
-                    spend_ratio
-                    >
-                    CORE_SLOT_OVER_TARGET_RATIO
-                ):
-
-                    core_slot_overinvestment += min(
-                        2.0,
-                        (
-                            spend_ratio
-                            - CORE_SLOT_OVER_TARGET_RATIO
-                        )
-                        /
-                        CORE_SLOT_OVER_TARGET_RATIO,
-                    )
 
         # =========================================
         # 성능 추천
@@ -1902,6 +3237,11 @@ def search_budget_squad(
                 *
                 total_budget_ratio
 
+                -
+                2.0
+                *
+                side_pair_penalty
+
 -
                 deprioritized_penalty
             )
@@ -1923,126 +3263,47 @@ def search_budget_squad(
 
         if recommendation_mode == "value":
 
-            value_efficiency = 0.0
-
-
-            for i, player in enumerate(
-                state[0]
-            ):
-
-                slot_target = max(
-                    1,
-                    ordered_targets[i],
+            value_efficiency = (
+                calculate_value_efficiency(
+                    state[0]
                 )
-
-
-                player_price = int(
-                    player[
-                        "price"
-                    ]
-                )
-
-
-                player_ovr = int(
-                    player[
-                        "ovr"
-                    ]
-                )
-
-
-                saving_ratio = max(
-                    0.0,
-                    1.0
-                    -
-                    min(
-                        1.0,
-                        player_price
-                        /
-                        slot_target,
-                    ),
-                )
-
-
-                slot_best_ovr = max(
-                    int(
-                        option[
-                            "ovr"
-                        ]
-                    )
-
-                    for option
-                    in ordered[i]
-                )
-
-
-                allowed_gap = (
-                    10
-                    if ordered_core[i]
-                    else 16
-                )
-
-
-                quality_gap = max(
-                    0,
-                    slot_best_ovr
-                    -
-                    player_ovr,
-                )
-
-
-                quality_factor = max(
-                    0.0,
-                    1.0
-                    -
-                    (
-                        quality_gap
-                        /
-                        max(
-                            allowed_gap,
-                            1,
-                        )
-                    ),
-                )
-
-
-                value_efficiency += (
-                    saving_ratio
-                    *
-                    quality_factor
-                )
-
-
-            value_efficiency /= max(
-                n,
-                1,
             )
 
 
             return (
+                0.30
+                *
                 average_ovr
 
                 +
-                12.0
+
+                0.22
+                *
+                weakest_ovr
+
+                +
+
+                34.0
                 *
                 value_efficiency
 
                 -
-                0.25
+                0.20
                 *
                 balance_gap
 
                 +
-                3.5
+                2.0
                 *
                 core_ratio
 
                 -
-                3.0
+                2.0
                 *
                 other_overspend
 
                 -
-                1.0
+                0.75
                 *
                 core_error
 
@@ -2052,10 +3313,10 @@ def search_budget_squad(
                 core_slot_underinvestment
 
                 -
-                deprioritized_penalty
-
+                1.50
+                *
+                side_pair_penalty
             )
-
 
 
         return (
@@ -2084,6 +3345,9 @@ def search_budget_squad(
 
             + 1.5
             * total_budget_ratio
+
+            - 2.25
+            * side_pair_penalty
         )
 
 
@@ -2106,57 +3370,70 @@ def search_budget_squad(
                     state
                 ),
 
-                # 먼저 성능
-                state[4],
-
-                # 가장 약한 포지션
-                state[9],
-
-                # 동급이면 더 저렴한 조합
+                # 가성비가 같다면 더 저렴한 팀
                 -state[2],
 
-                # 마지막 동점에서 인기도
+                # 그다음 가장 약한 자리
+                state[9],
+
+                # 그다음 전체 성능
+                state[4],
+
+                # 인기도는 최후
                 state[8],
             )
-
 
         if recommendation_mode == "performance":
 
             return (
                 squad_priority,
 
+                # 1순위: 11명 총 OVR
+                state[4],
+
+                # 2순위: 최약 포지션 OVR
+                state[9],
+
+                # 3순위: 성능 내부 종합 점수
                 final_score(
                     state
                 ),
 
-                # 총 OVR
-                state[4],
-
-                # 가장 약한 자리
-                state[9],
-
-                # 동일 성능이면 적게 쓰는 쪽
+                # 같은 성능이라면 적게 쓰는 쪽
                 -state[2],
-
-                state[8],
             )
 
 
         # =====================================
         # META
-        # 기존 우선순위 유지
+        #
+        # 실제 유저 사용률이 가장 중요하다.
+        #
+        # popularity_score 합계가 높은 조합을
+        # 먼저 선택하고, 그다음 성능을 본다.
         # =====================================
 
         return (
             squad_priority,
 
+            # 1순위: 실제 사용 인기
+            round(
+                state[8],
+                6,
+            ),
+
+            # 2순위: 메타 내부 종합 점수
             final_score(
                 state
             ),
 
+            # 3순위: 총 OVR
             state[4],
-            state[8],
+
+            # 4순위: 가장 약한 포지션 OVR
             state[9],
+
+            # 마지막: 사용 예산
             state[2],
         )
 

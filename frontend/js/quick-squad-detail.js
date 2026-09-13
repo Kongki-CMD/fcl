@@ -1,3 +1,9 @@
+import {
+    DEFAULT_ADAPTATION_LEVEL,
+    calculatePlayerStatSnapshot,
+    normalizeAdaptationLevel,
+} from "./player-stat-engine.js?v=1";
+
 // Quick Squad player detail controller
 export function createQuickSquadDetailModal({
     apiBaseUrl,
@@ -13,10 +19,7 @@ export function createQuickSquadDetailModal({
             <h2 id="quick-squad-player-modal-title" class="quick-squad-player-modal-title">선수 상세 정보</h2>
             <p class="quick-squad-player-modal-kicker">퀵 스쿼드 추천 선수 상세 보기</p>`;
     }
-    const BONUS = {
-        1: 0, 2: 1, 3: 2, 4: 4, 5: 6, 6: 8, 7: 11,
-        8: 15, 9: 17, 10: 19, 11: 21, 12: 24, 13: 27,
-    };
+
     const cache = new Map();
     let state = null;
     let generation = 0;
@@ -155,14 +158,38 @@ const footHtml = (
     }
 
     function calculate() {
-        const bonus = BONUS[state.grade] + (state.adaptation === 5 ? 4 : 0) + state.teamColor;
-        const player = state.detail;
-        const stats = Object.fromEntries(
-            Object.entries(player.stats ?? {}).map(([name, value]) => [
-                name, value === null || value === undefined ? null : number(value) + bonus,
-            ])
-        );
-        return { bonus, ovr: number(player.base_ovr) + bonus, stats };
+        const snapshot =
+            calculatePlayerStatSnapshot({
+                player:
+                    state.detail,
+
+                grade:
+                    state.grade,
+
+                adaptation:
+                    state.adaptation,
+
+                teamColorBonus:
+                    state.teamColor,
+            });
+
+
+        return {
+            bonus:
+                snapshot.ability_bonus,
+
+            ovr:
+                snapshot.final_ovr,
+
+            stats:
+                snapshot.final_stats,
+
+            enhancementBonus:
+                snapshot.enhancement_bonus,
+
+            adaptationBonus:
+                snapshot.adaptation_bonus,
+        };
     }
 
     function selectedPrice() {
@@ -254,13 +281,28 @@ const footHtml = (
 
     function refreshValues() {
         if (!state?.detail) return;
-        const { bonus, ovr, stats } = calculate();
+        const {
+            bonus,
+            ovr,
+            stats,
+            enhancementBonus,
+            adaptationBonus,
+        } = calculate();
         const ovrElement = $('[data-qs-ovr]');
         if (ovrElement) ovrElement.textContent = ovr;
         const cardOvr = $('[data-qs-card-ovr]');
         if (cardOvr) cardOvr.textContent = ovr;
         const bonusElement = $('[data-qs-bonus]');
-        if (bonusElement) bonusElement.textContent = `강화 +${BONUS[state.grade]} · 적응도 +${state.adaptation === 5 ? 4 : 0} · 팀컬러 +${state.teamColor} = 총 +${bonus}`;
+        if (bonusElement) {
+            bonusElement.textContent =
+                `강화 +${enhancementBonus}`
+                +
+                ` · 적응도 +${adaptationBonus}`
+                +
+                ` · 팀컬러 +${state.teamColor}`
+                +
+                ` = 총 +${bonus}`;
+        }
         all('[data-qs-stat]').forEach((element) => {
             const value = stats[element.dataset.qsStat];
             element.textContent = value === null || value === undefined ? "-" : value;
@@ -462,9 +504,10 @@ const seasonId = [
             ),
 
             adaptation:
-                number(summary.adaptation, 1) === 5
-                    ? 5
-                    : 1,
+                normalizeAdaptationLevel(
+                    summary.adaptation,
+                    DEFAULT_ADAPTATION_LEVEL
+                ),
 
             teamColor: Math.max(
                 0,
@@ -559,7 +602,13 @@ const seasonId = [
         }
         const adaptationButton = event.target.closest("[data-qs-adaptation]");
         if (adaptationButton && body.contains(adaptationButton) && state?.detail) {
-            state.adaptation = number(adaptationButton.dataset.qsAdaptation, 1);
+            state.adaptation =
+                normalizeAdaptationLevel(
+                    adaptationButton
+                        .dataset
+                        .qsAdaptation,
+                    DEFAULT_ADAPTATION_LEVEL
+                );
             refreshValues();
             return;
         }

@@ -3,12 +3,16 @@ import {
 } from "./config.js";
 
 import {
+    DEFAULT_ADAPTATION_LEVEL,
+} from "./player-stat-engine.js?v=1";
+
+import {
     createQuickSquadDetailModal,
-} from "./quick-squad-detail.js?v=5";
+} from "./quick-squad-detail.js?v=6";
 
 import {
     createQuickSquadLockController,
-} from "./quick-squad-locks.js?v=2";
+} from "./quick-squad-locks.js?v=3";
 
 import {
     readQuickSquadLocks,
@@ -26,7 +30,7 @@ import {
     readSavedQuickSquad,
     writeSavedQuickSquad,
     mergeQuickSquadLockSettings,
-} from "./quick-squad-state.js?v=2";
+} from "./quick-squad-state.js?v=3";
 
 // =========================================
 // DOM
@@ -1739,7 +1743,11 @@ function createQuickSquadPlayerHtml(
                 ${player.manual_saved
                     ? `
                         <span class="quick-squad-player-setting-meta">
-                            적${Number(player.adaptation ?? 1)}
+                            적${Number(
+                                player.adaptation
+                                ??
+                                DEFAULT_ADAPTATION_LEVEL
+                            )}
                             · 팀+${Number(
                                 player.team_color_bonus ?? 0
                             )}

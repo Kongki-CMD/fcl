@@ -17,7 +17,7 @@ OFFICIAL_SUPPLY_RESTRICTION_EFFECTIVE_DATE = (
 )
 
 
-OFFICIAL_SUPPLY_RESTRICTED_CLASSES = {
+CURRENT_SUPPLY_RESTRICTED_CLASSES = {
     "2017",
     "2018",
     "2019",
@@ -96,6 +96,24 @@ OFFICIAL_SUPPLY_RESTRICTED_CLASSES = {
     "WC22",
 }
 
+# =========================================
+# 과거 공급 제한 이력
+# =========================================
+
+HISTORICAL_SUPPLY_RESTRICTED_CLASSES = {
+    "MCFC",
+    "LKI",
+    "ICONTM",
+}
+
+
+# 기존 참조 호환용 통합 목록.
+OFFICIAL_SUPPLY_RESTRICTED_CLASSES = (
+    CURRENT_SUPPLY_RESTRICTED_CLASSES
+    |
+    HISTORICAL_SUPPLY_RESTRICTED_CLASSES
+)
+
 
 def normalize_supply_class_name(
     value,
@@ -130,11 +148,69 @@ def get_supply_restriction_status(
     )
 
 
-    restricted = (
+    current_restricted = (
         class_code
         in
-        OFFICIAL_SUPPLY_RESTRICTED_CLASSES
+        CURRENT_SUPPLY_RESTRICTED_CLASSES
     )
+
+
+    historical_restricted = (
+        class_code
+        in
+        HISTORICAL_SUPPLY_RESTRICTED_CLASSES
+    )
+
+
+    restricted = (
+        current_restricted
+        or
+        historical_restricted
+    )
+
+
+    if current_restricted:
+
+        source = (
+            "official_notice"
+        )
+
+        notice_sn = (
+            OFFICIAL_SUPPLY_RESTRICTION_NOTICE_SN
+        )
+
+        effective_date = (
+            OFFICIAL_SUPPLY_RESTRICTION_EFFECTIVE_DATE
+        )
+
+        note = (
+            "FC Online 공식 공지 "
+            f"#{OFFICIAL_SUPPLY_RESTRICTION_NOTICE_SN}"
+            " 공급 제한 클래스"
+        )
+
+
+    elif historical_restricted:
+
+        source = (
+            "historical_official_notice"
+        )
+
+        notice_sn = None
+
+        effective_date = None
+
+        note = (
+            "FC Online 과거 공급 제한 이력 클래스"
+        )
+
+
+    else:
+
+        source = None
+        notice_sn = None
+        effective_date = None
+        note = None
 
 
     return {
@@ -149,36 +225,16 @@ def get_supply_restriction_status(
             ),
 
         "supply_restriction_source":
-            (
-                "official_notice"
-                if restricted
-                else None
-            ),
+            source,
 
         "supply_restriction_notice_sn":
-            (
-                OFFICIAL_SUPPLY_RESTRICTION_NOTICE_SN
-                if restricted
-                else None
-            ),
+            notice_sn,
 
         "supply_restriction_effective_date":
-            (
-                OFFICIAL_SUPPLY_RESTRICTION_EFFECTIVE_DATE
-                if restricted
-                else None
-            ),
+            effective_date,
 
         "supply_restriction_note":
-            (
-                (
-                    "FC Online 공식 공지 "
-                    f"#{OFFICIAL_SUPPLY_RESTRICTION_NOTICE_SN}"
-                    " 공급 제한 클래스"
-                )
-                if restricted
-                else None
-            ),
+            note,
     }
 
 @lru_cache(
