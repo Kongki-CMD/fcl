@@ -41,6 +41,11 @@ const quickSquadTeamColorElement =
         "quick-squad-team-color"
     );
 
+const quickSquadTeamColorSearchElement =
+    document.getElementById(
+        "quick-squad-team-color-search"
+    );
+
 
 const quickSquadBudgetElement =
     document.getElementById(
@@ -134,6 +139,252 @@ let currentQuickSquadResult = null;
 let quickSquadLocksController = null;
 
 let quickSquadBudgetController = null;
+
+let quickSquadTeamColors = [];
+
+const QUICK_SQUAD_CONDITION_STORAGE_KEY =
+    "fcl.quick-squad.conditions.v1";
+
+
+function readQuickSquadConditions() {
+
+    try {
+
+        const raw =
+            localStorage.getItem(
+                QUICK_SQUAD_CONDITION_STORAGE_KEY
+            );
+
+
+        if (!raw) {
+            return null;
+        }
+
+
+        const data =
+            JSON.parse(
+                raw
+            );
+
+
+        if (
+            !data
+            ||
+            typeof data !== "object"
+        ) {
+            return null;
+        }
+
+
+        return data;
+
+    } catch {
+
+        return null;
+    }
+}
+
+
+function saveQuickSquadConditions() {
+
+    try {
+
+        const data = {
+            team_color_id:
+                quickSquadTeamColorElement
+                    ?.value
+                ??
+                "",
+
+            budget:
+                quickSquadBudgetElement
+                    ?.value
+                ??
+                "",
+
+            enhancement_grade:
+                quickSquadEnhancementGradeElement
+                    ?.value
+                ??
+                "auto",
+
+            formation:
+                quickSquadFormationElement
+                    ?.value
+                ??
+                "",
+
+            recommendation_mode:
+                getQuickSquadRecommendationMode(),
+        };
+
+
+        localStorage.setItem(
+            QUICK_SQUAD_CONDITION_STORAGE_KEY,
+            JSON.stringify(
+                data
+            )
+        );
+
+    } catch (error) {
+
+        console.warn(
+            "퀵 스쿼드 조건 저장 실패:",
+            error
+        );
+    }
+}
+
+
+function restoreQuickSquadConditions() {
+
+    const saved =
+        readQuickSquadConditions();
+
+
+    if (!saved) {
+        return false;
+    }
+
+
+    if (
+        saved.team_color_id
+        &&
+        [
+            ...quickSquadTeamColorElement.options,
+        ].some(
+            option =>
+                option.value
+                ===
+                String(
+                    saved.team_color_id
+                )
+        )
+    ) {
+
+        quickSquadTeamColorElement.value =
+            String(
+                saved.team_color_id
+            );
+    }
+
+
+    if (
+        saved.formation
+        &&
+        [
+            ...quickSquadFormationElement.options,
+        ].some(
+            option =>
+                option.value
+                ===
+                String(
+                    saved.formation
+                )
+        )
+    ) {
+
+        quickSquadFormationElement.value =
+            String(
+                saved.formation
+            );
+    }
+
+
+    if (
+        quickSquadBudgetElement
+        &&
+        saved.budget !== undefined
+    ) {
+
+        quickSquadBudgetElement.value =
+            String(
+                saved.budget
+                ??
+                ""
+            );
+    }
+
+
+    if (
+        quickSquadEnhancementGradeElement
+        &&
+        saved.enhancement_grade
+        &&
+        [
+            ...quickSquadEnhancementGradeElement.options,
+        ].some(
+            option =>
+                option.value
+                ===
+                String(
+                    saved.enhancement_grade
+                )
+        )
+    ) {
+
+        quickSquadEnhancementGradeElement.value =
+            String(
+                saved.enhancement_grade
+            );
+    }
+
+
+    const recommendationMode =
+        [
+            "meta",
+            "performance",
+            "value",
+        ].includes(
+            saved.recommendation_mode
+        )
+            ? saved.recommendation_mode
+            : "meta";
+
+
+    document
+        .querySelectorAll(
+            (
+                ".quick-squad-"
+                +
+                "recommendation-mode-button"
+            )
+        )
+        .forEach(
+            button => {
+
+                const selected =
+                    (
+                        button.dataset
+                            .quickSquadRecommendationMode
+                        ===
+                        recommendationMode
+                    );
+
+
+                button.classList.toggle(
+                    "is-active",
+                    selected
+                );
+
+                button.setAttribute(
+                    "aria-pressed",
+                    String(
+                        selected
+                    )
+                );
+            }
+        );
+
+    saveQuickSquadConditions();
+
+
+    renderQuickSquadFormation();
+    updateQuickSquadConditionSummary();
+
+
+    return true;
+}
 
 // =========================================
 // 기존에 위치를 확정한 포메이션
@@ -1121,6 +1372,188 @@ function renderQuickSquadFormation() {
 // TEAM COLORS
 // =========================================
 
+function normalizeQuickSquadTeamColorSearch(
+    value
+) {
+
+    return (
+        String(
+            value
+            ??
+            ""
+        )
+            .trim()
+            .toLocaleLowerCase(
+                "ko-KR"
+            )
+            .replace(
+                /\s+/g,
+                ""
+            )
+    );
+}
+
+
+function renderQuickSquadTeamColorOptions() {
+
+    if (
+        !quickSquadTeamColorElement
+    ) {
+        return;
+    }
+
+
+    const selectedValue =
+        String(
+            quickSquadTeamColorElement.value
+            ??
+            ""
+        );
+
+
+    const query =
+        normalizeQuickSquadTeamColorSearch(
+            quickSquadTeamColorSearchElement
+                ?.value
+            ??
+            ""
+        );
+
+
+    let visibleTeams =
+        query
+            ? quickSquadTeamColors.filter(
+                team =>
+                    normalizeQuickSquadTeamColorSearch(
+                        team.team_name
+                    )
+                        .includes(
+                            query
+                        )
+            )
+            : [
+                ...quickSquadTeamColors,
+            ];
+
+
+    // 검색 중이어도 현재 선택된 팀컬러는
+    // select에서 사라지지 않게 유지한다.
+    if (
+        selectedValue
+        &&
+        !visibleTeams.some(
+            team =>
+                String(
+                    team.team_color_id
+                )
+                ===
+                selectedValue
+        )
+    ) {
+
+        const selectedTeam =
+            quickSquadTeamColors.find(
+                team =>
+                    String(
+                        team.team_color_id
+                    )
+                    ===
+                    selectedValue
+            );
+
+
+        if (
+            selectedTeam
+        ) {
+
+            visibleTeams = [
+                selectedTeam,
+                ...visibleTeams,
+            ];
+        }
+    }
+
+
+    quickSquadTeamColorElement
+        .innerHTML =
+            "";
+
+
+    const defaultOption =
+        document.createElement(
+            "option"
+        );
+
+
+    defaultOption.value =
+        "";
+
+
+    defaultOption.textContent =
+        query
+            ? (
+                visibleTeams.length
+                    ? "검색 결과에서 선택"
+                    : "검색 결과 없음"
+            )
+            : "팀컬러 선택";
+
+
+    quickSquadTeamColorElement
+        .appendChild(
+            defaultOption
+        );
+
+
+    visibleTeams.forEach(
+        team => {
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                String(
+                    team.team_color_id
+                );
+
+
+            option.textContent =
+                team.team_name;
+
+
+            option.dataset.teamName =
+                team.team_name;
+
+
+            quickSquadTeamColorElement
+                .appendChild(
+                    option
+                );
+        }
+    );
+
+
+    if (
+        selectedValue
+        &&
+        [
+            ...quickSquadTeamColorElement.options,
+        ].some(
+            option =>
+                option.value
+                ===
+                selectedValue
+        )
+    ) {
+
+        quickSquadTeamColorElement.value =
+            selectedValue;
+    }
+}
+
 async function loadQuickSquadTeamColors() {
 
     if (
@@ -1164,68 +1597,40 @@ async function loadQuickSquadTeamColors() {
         }
 
 
-        const teams =
+        quickSquadTeamColors =
             (
                 data.teams
                 ??
                 []
-            );
+            )
+                .map(
+                    team => ({
+                        team_color_id:
+                            Number(
+                                team.team_color_id
+                            ),
+
+                        team_name:
+                            String(
+                                team.team_name
+                                ??
+                                ""
+                            ),
+                    })
+                )
+                .filter(
+                    team =>
+                        Number.isInteger(
+                            team.team_color_id
+                        )
+                        &&
+                        team.team_color_id > 0
+                        &&
+                        team.team_name
+                );
 
 
-        quickSquadTeamColorElement
-            .innerHTML =
-                "";
-
-
-        const defaultOption =
-            document.createElement(
-                "option"
-            );
-
-
-        defaultOption.value =
-            "";
-
-
-        defaultOption.textContent =
-            "팀컬러 선택";
-
-
-        quickSquadTeamColorElement
-            .appendChild(
-                defaultOption
-            );
-
-
-        teams.forEach(
-            team => {
-
-                const option =
-                    document.createElement(
-                        "option"
-                    );
-
-
-                option.value =
-                    String(
-                        team.team_color_id
-                    );
-
-
-                option.textContent =
-                    team.team_name;
-
-
-                option.dataset.teamName =
-                    team.team_name;
-
-
-                quickSquadTeamColorElement
-                    .appendChild(
-                        option
-                    );
-            }
-        );
+            renderQuickSquadTeamColorOptions();
 
 
     } catch (error) {
@@ -2762,6 +3167,9 @@ document
                                     );
                             }
                         );
+
+
+                    saveQuickSquadConditions();
                 }
             );
         }
@@ -2782,23 +3190,77 @@ quickSquadFormationElement
             renderQuickSquadFormation();
 
             updateQuickSquadConditionSummary();
+
+            saveQuickSquadConditions();
+        }
+    );
+
+
+quickSquadTeamColorSearchElement
+    ?.addEventListener(
+        "input",
+        () => {
+
+            renderQuickSquadTeamColorOptions();
         }
     );
 
 
 quickSquadTeamColorElement
-    ?.addEventListener("change", () => {
-        updateQuickSquadConditionSummary();
-        quickSquadLocksController?.refresh();
-    });
+    ?.addEventListener(
+        "change",
+        () => {
+
+            // 팀컬러를 선택하면 검색어는 비우고
+            // 전체 목록 상태로 되돌린다.
+            if (
+                quickSquadTeamColorSearchElement
+            ) {
+
+                quickSquadTeamColorSearchElement.value =
+                    "";
+
+                renderQuickSquadTeamColorOptions();
+            }
+
+
+            updateQuickSquadConditionSummary();
+
+            saveQuickSquadConditions();
+
+            quickSquadLocksController?.refresh();
+        }
+    );
 
 
 quickSquadBudgetElement
     ?.addEventListener("input", () => {
+
         updateQuickSquadConditionSummary();
+
+        saveQuickSquadConditions();
+
         quickSquadLocksController?.updateBudget();
+
         quickSquadBudgetController?.clearResult();
     });
+
+quickSquadEnhancementGradeElement
+    ?.addEventListener(
+        "change",
+        () => {
+
+            saveQuickSquadConditions();
+        }
+    );
+
+window.addEventListener(
+    "pagehide",
+    () => {
+
+        saveQuickSquadConditions();
+    }
+);
 
 document.querySelectorAll(
     "[data-quick-squad-player-close]"
@@ -2868,6 +3330,10 @@ async function initializeQuickSquad() {
                 "fcl.quick-squad.budget.v1"
             );
 
+            localStorage.removeItem(
+                QUICK_SQUAD_CONDITION_STORAGE_KEY
+            );
+
         } catch (error) {
 
             console.warn(
@@ -2920,6 +3386,9 @@ async function initializeQuickSquad() {
                 loadQuickSquadFormations(),
             ]
         );
+
+    const restoredConditions =
+        restoreQuickSquadConditions();
 
     if (!quickSquadLocksController) {
         quickSquadLocksController =
@@ -3057,9 +3526,14 @@ async function initializeQuickSquad() {
     }
 
    // 마지막 저장본은 서버 추천과 별도로 복원한다.
-const savedSquad = readSavedQuickSquad();
+const savedSquad =
+    readSavedQuickSquad();
 
-if (savedSquad) {
+if (
+    savedSquad
+    &&
+    !restoredConditions
+) {
     const formationOption = [
         ...quickSquadFormationElement.options
     ].find(

@@ -2250,6 +2250,132 @@ function formatPlayerMarketPrice(
     );
 }
 
+function getPlayerCurrentMarketPrice(
+    player
+) {
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const state =
+        getPlayerCardState(
+            spId
+        );
+
+
+    const grade =
+        Number(
+            state.grade
+            ??
+            1
+        );
+
+
+    const marketData =
+        playerMarketPriceBySpId.get(
+            spId
+        );
+
+
+    if (!marketData) {
+        return null;
+    }
+
+
+    const priceData =
+        (
+            marketData.prices
+            ??
+            []
+        )
+            .find(
+                item =>
+                    Number(
+                        item.grade
+                    )
+                    ===
+                    grade
+            );
+
+
+    return (
+        priceData?.price
+        ??
+        null
+    );
+}
+
+
+function createPlayerCompactMarketPriceHtml(
+    player,
+    displayMode
+) {
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const price =
+        getPlayerCurrentMarketPrice(
+            player
+        );
+
+
+    const isLoading =
+        playerMarketPriceLoadingSpIds
+            .has(
+                spId
+            );
+
+
+    const errorMessage =
+        playerMarketPriceErrorBySpId
+            .get(
+                spId
+            );
+
+
+    let priceText =
+        formatPlayerMarketPrice(
+            price
+        );
+
+
+    if (isLoading) {
+        priceText =
+            "조회 중...";
+    }
+
+
+    if (errorMessage) {
+        priceText =
+            "조회 실패";
+    }
+
+
+    return `
+        <div
+            class="
+                player-database-compact-market-price
+                player-database-compact-market-price-${displayMode}
+            "
+        >
+            <span>
+                이적시장
+            </span>
+
+            <strong>
+                ${escapeHtml(
+                    priceText
+                )}
+            </strong>
+        </div>
+    `;
+}
+
 
 function createPlayerMarketPriceHtml(
     player
@@ -2912,6 +3038,228 @@ async function loadPlayerTraits(
     }
 }
 
+function createPlayerCompactTraitsHtml(
+    player
+) {
+    const spId =
+        Number(
+            player?.sp_id
+        );
+
+
+    const officialTraitData =
+        playerTraitsBySpId.get(
+            spId
+        );
+
+
+    // =====================================
+    // 공식 데이터 조회 완료
+    // 아이콘 + 이름 표시
+    // =====================================
+
+    if (
+        officialTraitData
+        &&
+        Array.isArray(
+            officialTraitData.traits
+        )
+        &&
+        officialTraitData.traits.length > 0
+    ) {
+
+        return officialTraitData
+            .traits
+            .map(
+                trait => {
+
+                    const traitName =
+                        String(
+                            trait?.name
+                            ??
+                            ""
+                        )
+                            .trim();
+
+
+                    const imageUrl =
+                        String(
+                            trait?.image_url
+                            ??
+                            ""
+                        )
+                            .trim();
+
+
+                    if (!traitName) {
+                        return "";
+                    }
+
+
+                    return `
+                        <span
+                            class="
+                                player-database-row-trait
+                                ${
+                                    imageUrl
+                                        ? "has-icon"
+                                        : "text-only"
+                                }
+                            "
+                            title="${escapeHtml(
+                                traitName
+                            )}"
+                        >
+
+                            ${
+                                imageUrl
+                                    ? `
+                                        <img
+                                            src="${escapeHtml(
+                                                imageUrl
+                                            )}"
+                                            alt=""
+                                            class="
+                                                player-database-row-trait-icon
+                                            "
+                                            loading="lazy"
+                                        >
+                                    `
+                                    : ""
+                            }
+
+                            <span>
+                                ${escapeHtml(
+                                    traitName
+                                )}
+                            </span>
+
+                        </span>
+                    `;
+                }
+            )
+            .filter(Boolean)
+            .join(
+                `
+                    <span
+                        class="player-database-row-trait-separator"
+                    >
+                        ·
+                    </span>
+                `
+            );
+    }
+
+
+    // =====================================
+    // 공식 아이콘 로드 전에는
+    // 기존 DB 특성명을 먼저 표시
+    // =====================================
+
+    const fallbackTraits =
+        Array.isArray(
+            player?.traits
+        )
+            ? player.traits
+                .map(
+                    trait =>
+                        String(
+                            trait?.name
+                            ??
+                            trait
+                            ??
+                            ""
+                        )
+                            .trim()
+                )
+                .filter(Boolean)
+            : [];
+
+
+    if (
+        fallbackTraits.length === 0
+    ) {
+        return `
+            <span
+                class="player-database-row-traits-empty"
+            >
+                특성 정보 없음
+            </span>
+        `;
+    }
+
+
+    return fallbackTraits
+        .map(
+            traitName => `
+                <span
+                    class="
+                        player-database-row-trait
+                        is-loading-icon
+                    "
+                >
+                    <span>
+                        ${escapeHtml(
+                            traitName
+                        )}
+                    </span>
+                </span>
+            `
+        )
+        .join(
+            `
+                <span
+                    class="player-database-row-trait-separator"
+                >
+                    ·
+                </span>
+            `
+        );
+}
+
+
+function createPlayerInlineGradeOptionsHtml(
+    selectedGrade
+) {
+    const grade =
+        Number(
+            selectedGrade
+            ??
+            1
+        );
+
+
+    return Array
+        .from(
+            {
+                length: 13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const value =
+                    index + 1;
+
+
+                return `
+                    <option
+                        value="${value}"
+                        ${
+                            value === grade
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        +${value}
+                    </option>
+                `;
+            }
+        )
+        .join("");
+}
+
 
 function createPlayerCardHtml(
     player
@@ -3101,16 +3449,50 @@ function createPlayerCardHtml(
             </span>
 
 
-            <strong
-                class="player-database-player-name"
-            >
-                ${escapeHtml(
-                    player.player_name
-                )}
-            </strong>
+                <div
+                    class="player-database-player-name-wrap"
+                >
+
+                    <strong
+                        class="player-database-player-name"
+                        title="${escapeHtml(
+                            player.player_name
+                        )}"
+                    >
+                        ${escapeHtml(
+                            player.player_name
+                        )}
+                    </strong>
+
+
+                    <span
+                        class="
+                            player-database-player-row-ovr
+                            ${getPlayerStatColorClass(
+                                player.ovr
+                            )}
+                        "
+                        title="현재 강화 및 적응도 적용 OVR"
+                    >
+                        OVR
+                        <b>
+                            ${Number(
+                                player.ovr
+                                ??
+                                0
+                            )}
+                        </b>
+                    </span>
+
+                </div>
 
 
                 <div class="player-database-player-row-actions">
+
+                    ${createPlayerCompactMarketPriceHtml(
+                        player,
+                        "desktop"
+                    )}
 
                     <button
                         type="button"
@@ -3118,7 +3500,8 @@ function createPlayerCardHtml(
                             player-database-recommend-button
                             player-database-recommend-button-row
                             qs-inline-register-button
-                        "
+                            qs-inline-register-button-desktop
+                            "
                         data-quick-squad-register="${player.sp_id}"
                         data-sp-id="${player.sp_id}"
                     >
@@ -3173,6 +3556,105 @@ function createPlayerCardHtml(
                 </div>
 
         </div>
+
+<div
+    class="player-database-player-quick-info"
+>
+
+    <!-- =================================
+        2줄 왼쪽: 특성
+    ================================== -->
+
+    <div
+        class="player-database-player-quick-traits"
+    >
+
+        <span
+            class="player-database-player-quick-label"
+        >
+            특성
+        </span>
+
+
+        <div
+            class="player-database-player-quick-trait-list"
+        >
+            ${createPlayerCompactTraitsHtml(
+                player
+            )}
+        </div>
+
+    </div>
+
+
+    <div
+        class="player-database-player-mobile-market-price"
+    >
+        ${createPlayerCompactMarketPriceHtml(
+            player,
+            "mobile"
+        )}
+    </div>
+
+
+    <!-- =================================
+        2줄 오른쪽: 강화
+    ================================== -->
+
+    <label
+        class="player-database-player-inline-grade"
+
+        <span
+            class="player-database-player-quick-label"
+        >
+            강화
+        </span>
+
+
+        <select
+            class="player-database-player-inline-grade-select"
+            data-inline-grade
+            data-sp-id="${player.sp_id}"
+            aria-label="${escapeHtml(
+                player.player_name
+            )} 강화등급"
+        >
+
+            ${createPlayerInlineGradeOptionsHtml(
+                playerCardState.grade
+            )}
+
+        </select>
+
+    </label>
+
+
+    <!-- =================================
+        3줄: 퀵 스쿼드 등록
+        모바일에서만 표시
+    ================================== -->
+
+    <div
+        class="player-database-player-mobile-register-row"
+    >
+
+        <button
+            type="button"
+            class="
+                player-database-recommend-button
+                player-database-recommend-button-row
+                qs-inline-register-button
+                qs-inline-register-button-mobile
+            "
+            data-quick-squad-register="${player.sp_id}"
+            data-sp-id="${player.sp_id}"
+        >
+            퀵 스쿼드 등록
+        </button>
+
+    </div>
+
+</div>
 
 
             <!-- =========================
@@ -8028,15 +8510,51 @@ function renderPlayers(
     }
 
 
-    playerResultListElement
-        .innerHTML =
-            data.players
-                .map(
-                    createPlayerCardHtml
+playerResultListElement
+    .innerHTML =
+        data.players
+            .map(
+                createPlayerCardHtml
+            )
+            .join(
+                ""
+            );
+
+        data.players
+            .forEach(
+                player => {
+
+                    loadPlayerMarketPrice(
+                        player.sp_id
+                    );
+                }
+            );
+
+
+// =====================================
+// 접힌 상태에서도 특성 아이콘 표시
+//
+// DB상 특성이 존재하는 선수만
+// 공식 특성 데이터를 추가 조회한다.
+// =====================================
+
+    data.players
+        .filter(
+            player =>
+                Array.isArray(
+                    player.traits
                 )
-                .join(
-                    ""
+                &&
+                player.traits.length > 0
+        )
+        .forEach(
+            player => {
+
+                loadPlayerTraits(
+                    player.sp_id
                 );
+            }
+        );
 
 
     moveCompareBasePlayerToTop();
@@ -8857,17 +9375,88 @@ playerResultListElement.addEventListener(
                 || "선수 등록에 실패했습니다."
             );
 
-            const current = playerResultListElement.querySelector(
+        playerResultListElement
+            .querySelectorAll(
                 `button[data-quick-squad-register="${spId}"]`
-            );
+            )
+            .forEach(
+                current => {
 
-            if (current) {
-                current.disabled = false;
-                current.textContent = "퀵 스쿼드 등록";
-            }
+                    current.disabled =
+                        false;
+
+                    current.textContent =
+                        "퀵 스쿼드 등록";
+                }
+            );
         }
     }
 );
+
+playerResultListElement
+    .addEventListener(
+        "change",
+        event => {
+
+            const gradeSelectElement =
+                event.target.closest(
+                    "select[data-inline-grade]"
+                );
+
+
+            if (
+                !gradeSelectElement
+            ) {
+                return;
+            }
+
+
+            const spId =
+                Number(
+                    gradeSelectElement
+                        .dataset
+                        .spId
+                );
+
+
+            const grade =
+                Number(
+                    gradeSelectElement.value
+                );
+
+
+            if (
+                !Number.isInteger(
+                    spId
+                )
+                ||
+                !Number.isInteger(
+                    grade
+                )
+                ||
+                grade < 1
+                ||
+                grade > 13
+            ) {
+                return;
+            }
+
+
+            const state =
+                getPlayerCardState(
+                    spId
+                );
+
+
+            state.grade =
+                grade;
+
+
+            rerenderPlayerCard(
+                spId
+            );
+        }
+    );
 
 playerResultListElement
     .addEventListener(
@@ -9690,7 +10279,11 @@ playerResultListElement
                     (
                         "button[data-compare-player],"
                         +
-                        "button[data-recommend-player]"
+                        "button[data-recommend-player],"
+                        +
+                        "button[data-quick-squad-register],"
+                        +
+                        "select[data-inline-grade]"
                     )
                 )
             ) {

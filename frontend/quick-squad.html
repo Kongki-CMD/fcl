@@ -110,123 +110,159 @@
 
         <section class="quick-squad-condition-card">
 
-            <div class="quick-squad-condition-grid">
+<div class="quick-squad-condition-layout">
+
+    <!-- =================================
+        1줄: 팀컬러 선택 / 검색
+    ================================== -->
+
+    <div class="quick-squad-condition-row quick-squad-team-row">
+
+        <div class="quick-squad-filter">
+
+            <label
+                for="quick-squad-team-color"
+                class="quick-squad-label"
+            >
+                팀컬러
+            </label>
+
+            <select
+                id="quick-squad-team-color"
+                class="quick-squad-select"
+            >
+                <option value="">
+                    팀컬러 선택
+                </option>
+            </select>
+
+        </div>
 
 
-                <!-- 팀컬러 -->
+        <div class="quick-squad-filter quick-squad-team-search-filter">
 
-                <div class="quick-squad-filter">
+            <label
+                for="quick-squad-team-color-search"
+                class="quick-squad-label quick-squad-label-placeholder"
+                aria-hidden="true"
+            >
+                팀컬러 검색
+            </label>
 
-                    <label
-                        for="quick-squad-team-color"
-                        class="quick-squad-label"
-                    >
-                        팀컬러
-                    </label>
+            <input
+                type="search"
+                id="quick-squad-team-color-search"
+                class="quick-squad-input"
+                placeholder="팀컬러 검색"
+                autocomplete="off"
+            >
 
+        </div>
 
-                    <select
-                        id="quick-squad-team-color"
-                        class="quick-squad-select"
-                    >
-
-                        <option value="">
-                            팀컬러 선택
-                        </option>
-
-                    </select>
-
-                </div>
-
-                <!-- 강화등급 -->
-                <div class="quick-squad-filter">
-
-                    <label
-                        for="quick-squad-enhancement-grade"
-                        class="quick-squad-label"
-                    >
-                        강화등급
-                    </label>
-
-                    <select
-                        id="quick-squad-enhancement-grade"
-                        class="quick-squad-select"
-                    >
-                        <option value="auto">자동</option>
-                        <option value="1">+1</option>
-                        <option value="2">+2</option>
-                        <option value="3">+3</option>
-                        <option value="4">+4</option>
-                        <option value="5">+5</option>
-                        <option value="6">+6</option>
-                        <option value="7">+7</option>
-                        <option value="8">+8</option>
-                        <option value="9">+9</option>
-                        <option value="10">+10</option>
-                        <option value="11">+11</option>
-                        <option value="12">+12</option>
-                        <option value="13">+13</option>
-                    </select>
-
-                </div>
+    </div>
 
 
-                <!-- 구단가치 -->
+    <!-- =================================
+        2줄: 구단가치 / 강화등급
+    ================================== -->
 
-                <div class="quick-squad-filter">
+    <div class="quick-squad-condition-row">
 
-                    <label
-                        for="quick-squad-budget"
-                        class="quick-squad-label"
-                    >
-                        구단가치
-                    </label>
+        <div class="quick-squad-filter">
 
+            <label
+                for="quick-squad-budget"
+                class="quick-squad-label"
+            >
+                구단가치
+            </label>
 
-                    <div class="quick-squad-budget-wrap">
+            <div class="quick-squad-budget-field">
 
-                        <input
-                            type="number"
-                            id="quick-squad-budget"
-                            class="quick-squad-input"
-                            min="1"
-                            step="1"
-                            placeholder="예: 500"
-                        >
+                <input
+                    type="number"
+                    id="quick-squad-budget"
+                    class="quick-squad-input quick-squad-budget-input"
+                    min="1"
+                    step="1"
+                    placeholder="예: 500"
+                >
 
-                        <span class="quick-squad-budget-unit">
-                            억 BP
-                        </span>
+                <span class="quick-squad-budget-unit">
+                    억 BP
+                </span>
 
-                    </div>
+            </div>
 
-                </div>
-
-
-                <!-- 포메이션 -->
-
-                <div class="quick-squad-filter">
-
-                    <label
-                        for="quick-squad-formation"
-                        class="quick-squad-label"
-                    >
-                        포메이션
-                    </label>
+        </div>
 
 
-                    <select
-                        id="quick-squad-formation"
-                        class="quick-squad-select"
-                    >
+        <div class="quick-squad-filter">
 
-                        <option value="">
-                            포메이션 불러오는 중...
-                        </option>
+            <label
+                for="quick-squad-enhancement-grade"
+                class="quick-squad-label"
+            >
+                강화등급
+            </label>
 
-                    </select>
+            <select
+                id="quick-squad-enhancement-grade"
+                class="quick-squad-select"
+            >
+                <option value="auto" selected>
+                    자동
+                </option>
 
-                </div>
+                <option value="1">+1</option>
+                <option value="2">+2</option>
+                <option value="3">+3</option>
+                <option value="4">+4</option>
+                <option value="5">+5</option>
+                <option value="6">+6</option>
+                <option value="7">+7</option>
+                <option value="8">+8</option>
+                <option value="9">+9</option>
+                <option value="10">+10</option>
+                <option value="11">+11</option>
+                <option value="12">+12</option>
+                <option value="13">+13</option>
+            </select>
+
+        </div>
+
+    </div>
+
+
+    <!-- =================================
+        3줄: 포메이션
+    ================================== -->
+
+    <div class="quick-squad-formation-row">
+
+        <div class="quick-squad-filter quick-squad-formation-filter">
+
+            <label
+                for="quick-squad-formation"
+                class="quick-squad-label"
+            >
+                포메이션
+            </label>
+
+            <select
+                id="quick-squad-formation"
+                class="quick-squad-select"
+            >
+                <option value="">
+                    포메이션 불러오는 중...
+                </option>
+            </select>
+
+        </div>
+
+    </div>
+
+</div>
 
                 <!-- 예산 배분 -->
                 <fieldset

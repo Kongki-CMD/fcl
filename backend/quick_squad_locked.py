@@ -414,16 +414,49 @@ class LockedSquadService:
 
                     occupied.add(index)
 
-                    accepted = self.positions.get(
-                        slots[index],
-                        [slots[index]],
+                    player_position = (
+                        str(
+                            row.get(
+                                "position"
+                            )
+                            or ""
+                        )
+                        .strip()
+                        .upper()
                     )
 
-                    if row["position"] not in accepted:
+                    target_position = (
+                        str(
+                            slots[index]
+                        )
+                        .strip()
+                        .upper()
+                    )
+
+
+                    if player_position == "GK":
+
+                        allowed_position = (
+                            target_position
+                            ==
+                            "GK"
+                        )
+
+                    else:
+
+                        allowed_position = (
+                            target_position
+                            !=
+                            "GK"
+                        )
+
+
+                    if not allowed_position:
                         raise HTTPException(
                             422,
                             f"{row['player_name']}: "
-                            f"{slots[index]} 포지션에 배치할 수 없습니다.",
+                            f"{target_position} 포지션에 "
+                            "배치할 수 없습니다.",
                         )
 
             try:
@@ -540,8 +573,43 @@ class LockedSquadService:
                 "locked": True,
                 "allowed_positions": [
                     slot
-                    for slot, accepted in self.positions.items()
-                    if row["position"] in accepted
+
+                    for slot
+                    in self.positions.keys()
+
+                    if (
+                        (
+                            str(
+                                row.get(
+                                    "position"
+                                )
+                                or ""
+                            )
+                            .strip()
+                            .upper()
+                            ==
+                            "GK"
+                        )
+                        and
+                        slot == "GK"
+                    )
+                    or
+                    (
+                        (
+                            str(
+                                row.get(
+                                    "position"
+                                )
+                                or ""
+                            )
+                            .strip()
+                            .upper()
+                            !=
+                            "GK"
+                        )
+                        and
+                        slot != "GK"
+                    )
                 ],
             })
 

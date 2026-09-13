@@ -37,6 +37,45 @@ const safeImage = value => {
     }
 };
 
+const canUseLockedSlot = (
+    playerPosition,
+    slotPosition
+) => {
+    const player =
+        String(
+            playerPosition
+            ??
+            ""
+        )
+            .trim()
+            .toUpperCase();
+
+    const slot =
+        String(
+            slotPosition
+            ??
+            ""
+        )
+            .trim()
+            .toUpperCase();
+
+
+    if (!slot) {
+        return false;
+    }
+
+
+    // GK는 GK 자리에만 배치 가능.
+    if (player === "GK") {
+        return slot === "GK";
+    }
+
+
+    // 필드 플레이어는 GK를 제외한
+    // 모든 포지션에 자유롭게 고정 가능.
+    return slot !== "GK";
+};
+
 export function readQuickSquadLocks() {
     try {
         const raw = JSON.parse(
@@ -284,9 +323,17 @@ export function createQuickSquadLockController({
         const occupied = new Set();
 
         for (const entry of entries) {
-            const player = getPlayer(entry.sp_id);
-            const allowed = player?.allowed_positions
-                || (entry.position ? [entry.position] : []);
+            const player =
+                getPlayer(
+                    entry.sp_id
+                );
+
+            const playerPosition =
+                player?.position
+                ||
+                entry.position
+                ||
+                "";
 
             let index = entry.slot_index;
 
@@ -296,16 +343,21 @@ export function createQuickSquadLockController({
                     !slots[index]
                     || slots[index].position
                         !== entry.slot_position
-                    || !allowed.includes(
+                    || !canUseLockedSlot(
+                        playerPosition,
                         slots[index].position
+                    )
                     )
                     || occupied.has(index)
                 )
-            ) {
+             {
                 index = slots.findIndex(
                     (slot, i) =>
                         slot.position === entry.slot_position
-                        && allowed.includes(slot.position)
+                        && canUseLockedSlot(
+                            playerPosition,
+                            slot.position
+                        )
                         && !occupied.has(i)
                 );
 
@@ -323,7 +375,10 @@ export function createQuickSquadLockController({
             ) {
                 index = slots.findIndex(
                     (slot, i) =>
-                        allowed.includes(slot.position)
+                        canUseLockedSlot(
+                            playerPosition,
+                            slot.position
+                        )
                         && !occupied.has(i)
                 );
 
@@ -424,14 +479,20 @@ export function createQuickSquadLockController({
                             .map(e => e.slot_index)
                     );
 
-                    const allowed =
-                        p?.allowed_positions
-                        || (entry.position ? [entry.position] : []);
+                    const playerPosition =
+                        p?.position
+                        ||
+                        entry.position
+                        ||
+                        "";
 
                     const options = slots
                         .map((slot, i) => ({slot, i}))
                         .filter(({slot, i}) =>
-                            allowed.includes(slot.position)
+                            canUseLockedSlot(
+                                playerPosition,
+                                slot.position
+                            )
                             && !occupied.has(i)
                         )
                         .map(({slot, i}) => `
@@ -722,7 +783,8 @@ async function refresh({force = false} = {}) {
             && (
                 !Number.isInteger(index)
                 || !slots[index]
-                || !player?.allowed_positions.includes(
+                || !canUseLockedSlot(
+                    player?.position,
                     slots[index].position
                 )
                 || entries.some(p =>

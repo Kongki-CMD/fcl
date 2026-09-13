@@ -12607,16 +12607,12 @@ body.site-auth-modal-open {
     }
 
     .player-database-player-row {
+        display: grid;
+
         grid-template-columns:
-            auto
             30px
-            minmax(0, 1fr)
-            auto
-            !important;
-
-        gap: 6px;
-
-        align-items: center;
+            minmax(120px, 1fr)
+            auto;
     }
 
     .player-database-player-season {
@@ -18958,3 +18954,974 @@ body.player-recommend-open {
     }
 }
 
+.quick-squad-team-color-search {
+    width: 100%;
+    margin-bottom: 8px;
+}
+
+/* =========================================
+   QUICK SQUAD CONDITION LAYOUT
+========================================= */
+
+.quick-squad-condition-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    width: 100%;
+}
+
+
+/* -----------------------------------------
+   공통 2열
+----------------------------------------- */
+
+.quick-squad-condition-row {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1fr)
+        minmax(0, 1fr);
+    gap: 14px;
+    width: 100%;
+    align-items: end;
+}
+
+
+.quick-squad-filter {
+    min-width: 0;
+    width: 100%;
+}
+
+
+/* -----------------------------------------
+   label
+----------------------------------------- */
+
+.quick-squad-label {
+    display: block;
+    margin-bottom: 7px;
+}
+
+
+/*
+검색창도 왼쪽 select와 정확히 같은
+수직 위치를 갖게 하기 위한 공간 확보.
+텍스트 자체만 숨긴다.
+*/
+
+.quick-squad-label-placeholder {
+    visibility: hidden;
+}
+
+
+/* -----------------------------------------
+   input / select 높이 통일
+----------------------------------------- */
+
+.quick-squad-condition-layout
+.quick-squad-input,
+
+.quick-squad-condition-layout
+.quick-squad-select {
+    width: 100%;
+    height: 48px;
+    box-sizing: border-box;
+    margin: 0;
+}
+
+
+/* =========================================
+   팀컬러
+========================================= */
+
+.quick-squad-team-row {
+    align-items: end;
+}
+
+
+.quick-squad-team-search-filter {
+    min-width: 0;
+}
+
+
+/* =========================================
+   구단가치
+========================================= */
+
+.quick-squad-budget-field {
+    position: relative;
+    width: 100%;
+}
+
+
+.quick-squad-budget-input {
+    width: 100%;
+    padding-right: 70px;
+}
+
+
+.quick-squad-budget-unit {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    margin: 0;
+
+    white-space: nowrap;
+    pointer-events: none;
+
+    line-height: 1;
+}
+
+
+/* =========================================
+   포메이션
+========================================= */
+
+.quick-squad-formation-row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+
+.quick-squad-formation-filter {
+    width: min(360px, 100%);
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 700px) {
+
+    .quick-squad-condition-layout {
+        gap: 14px;
+    }
+
+
+    .quick-squad-condition-row {
+        gap: 10px;
+    }
+
+
+    .quick-squad-condition-layout
+    .quick-squad-input,
+
+    .quick-squad-condition-layout
+    .quick-squad-select {
+        min-width: 0;
+
+        /*
+        iPhone Safari input focus 자동 확대 방지용.
+        나중 체크리스트 9번에서도 전체 사이트에
+        공통 적용할 예정.
+        */
+        font-size: 16px;
+    }
+
+
+    .quick-squad-budget-input {
+        padding-right: 62px;
+    }
+
+
+    .quick-squad-budget-unit {
+        right: 12px;
+    }
+
+
+    .quick-squad-formation-filter {
+        width: min(360px, 100%);
+    }
+}
+
+/* =========================================
+   PLAYER DATABASE - QUICK INFO ROW
+========================================= */
+
+.player-database-player-quick-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+
+    min-height: 38px;
+
+    padding:
+        7px
+        16px
+        7px
+        72px;
+
+    box-sizing: border-box;
+
+    border-top:
+        1px solid
+        rgba(255, 255, 255, 0.05);
+
+    background:
+        rgba(255, 255, 255, 0.018);
+}
+
+
+.player-database-player-quick-traits {
+    display: flex;
+    align-items: center;
+
+    min-width: 0;
+
+    gap: 9px;
+}
+
+
+.player-database-player-quick-label {
+    flex-shrink: 0;
+
+    color:
+        rgba(255, 255, 255, 0.48);
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+.player-database-player-quick-trait-list {
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    white-space: nowrap;
+
+    color:
+        rgba(255, 255, 255, 0.8);
+
+    font-size: 12px;
+}
+
+
+.player-database-row-trait {
+    flex-shrink: 0;
+}
+
+
+.player-database-row-trait-separator {
+    flex-shrink: 0;
+
+    color:
+        rgba(255, 255, 255, 0.25);
+}
+
+
+.player-database-row-traits-empty {
+    color:
+        rgba(255, 255, 255, 0.3);
+}
+
+
+.player-database-player-inline-grade {
+    display: flex;
+    align-items: center;
+
+    flex-shrink: 0;
+
+    gap: 8px;
+}
+
+
+.player-database-player-inline-grade-select {
+    width: 72px;
+    height: 28px;
+
+    padding:
+        0
+        26px
+        0
+        9px;
+
+    box-sizing: border-box;
+
+    border:
+        1px solid
+        rgba(255, 255, 255, 0.14);
+
+    border-radius: 6px;
+
+    background:
+        rgba(10, 12, 16, 0.92);
+
+    color: #ffffff;
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+/* =========================================
+   PLAYER DATABASE
+   MOBILE 3 ROW CARD
+========================================= */
+
+.qs-inline-register-button-mobile {
+    display: none;
+}
+
+
+.player-database-player-mobile-register-row {
+    display: none;
+}
+
+
+@media (max-width: 700px) {
+
+    /* =====================================
+       전체 카드
+    ====================================== */
+
+    .player-database-player-item {
+        overflow: hidden;
+    }
+
+
+    /* =====================================
+       1줄
+       시즌 / 이름+OVR / 추천 비교 화살표
+    ====================================== */
+
+    .player-database-player-row {
+        display: grid;
+
+        grid-template-columns:
+            30px
+            minmax(0, 1fr)
+            auto;
+
+        align-items: center;
+
+        column-gap: 6px;
+
+        min-height: 48px;
+
+        padding:
+            7px
+            8px;
+
+        box-sizing: border-box;
+    }
+
+
+    /* 모바일 목록에서는 포지션 숨김 */
+    .player-database-player-row
+    .player-database-player-position {
+        display: none;
+    }
+
+
+    .player-database-player-season {
+        grid-column: 1;
+
+        width: 28px;
+        min-width: 28px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+
+    .player-database-player-season-icon {
+        max-width: 28px;
+        max-height: 22px;
+    }
+
+
+    .player-database-player-name-wrap {
+        grid-column: 2;
+
+        display: flex;
+        align-items: center;
+
+        width: 100%;
+        min-width: 0;
+
+        gap: 5px;
+
+        overflow: hidden;
+    }
+
+
+    .player-database-player-name-wrap
+    .player-database-player-name {
+        display: block !important;
+
+        flex: 1 1 auto;
+
+        width: auto;
+        min-width: 50px;
+        max-width: none;
+
+        overflow: hidden;
+
+        white-space: nowrap;
+        text-overflow: ellipsis;
+
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+
+    .player-database-player-name-wrap
+    .player-database-player-row-ovr {
+        flex: 0 0 auto;
+    }
+
+
+    .player-database-player-row-ovr {
+        flex-shrink: 0;
+
+        display: inline-flex;
+        align-items: center;
+
+        gap: 3px;
+
+        padding:
+            2px
+            4px;
+
+        font-size: 8px;
+
+        line-height: 1;
+
+        border-radius: 4px;
+    }
+
+
+    .player-database-player-row-ovr b {
+        font-size: 10px;
+    }
+
+
+    /* =====================================
+       오른쪽 추천 / 비교 / ▼
+    ====================================== */
+
+    .player-database-player-row-actions {
+        grid-column: 3;
+
+        display: flex;
+        align-items: center;
+
+        gap: 4px;
+
+        margin: 0;
+    }
+
+
+    /* PC용 등록 버튼은 모바일에서 제거 */
+    .qs-inline-register-button-desktop {
+        display: none !important;
+    }
+
+
+    .player-database-player-row-actions
+    .player-database-recommend-button-row,
+
+    .player-database-player-row-actions
+    .player-database-compare-button-row {
+        min-width: 38px;
+        height: 27px;
+
+        padding:
+            0
+            7px;
+
+        font-size: 9px;
+
+        white-space: nowrap;
+    }
+
+
+    .player-database-player-row-actions
+    .player-database-player-arrow {
+        display: flex;
+
+        align-items: center;
+        justify-content: center;
+
+        width: 18px;
+        min-width: 18px;
+        height: 27px;
+
+        margin: 0;
+
+        font-size: 10px;
+    }
+
+
+    /* =====================================
+       2 + 3줄 영역
+    ====================================== */
+
+    .player-database-player-quick-info {
+        display: grid;
+
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+        grid-template-areas:
+            "traits grade"
+            "price register";
+
+        align-items: center;
+
+        column-gap: 8px;
+        row-gap: 7px;
+
+        width: 100%;
+
+        min-height: 0;
+
+        padding:
+            6px
+            8px
+            8px;
+
+        box-sizing: border-box;
+
+        overflow: visible;
+    }
+
+
+    /* =====================================
+       2줄 왼쪽: 특성
+    ====================================== */
+
+    .player-database-player-quick-traits {
+        grid-area: traits;
+
+        display: flex;
+        align-items: center;
+
+        gap: 6px;
+
+        min-width: 0;
+
+        overflow: visible;
+    }
+
+
+    .player-database-player-quick-label {
+        flex-shrink: 0;
+
+        font-size: 10px;
+    }
+
+
+    .player-database-player-quick-trait-list {
+        display: flex;
+        align-items: center;
+
+        flex-wrap: wrap;
+
+        gap: 4px;
+
+        min-width: 0;
+        max-width: 100%;
+
+        width: auto;
+
+        overflow: visible;
+
+        white-space: normal;
+    }
+
+
+    /*
+       모바일:
+       아이콘이 있는 특성은 이름 숨김
+    */
+
+    .player-database-row-trait.has-icon
+    > span {
+        display: none;
+    }
+
+
+    .player-database-row-trait-separator {
+        display: none;
+    }
+
+
+    .player-database-row-trait {
+        display: inline-flex;
+
+        align-items: center;
+        justify-content: center;
+
+        flex:
+            0
+            0
+            auto;
+
+        margin: 0;
+    }
+
+
+    .player-database-row-trait-icon {
+        display: block;
+
+        width: 18px;
+        height: 18px;
+
+        flex:
+            0
+            0
+            18px;
+
+        object-fit: contain;
+
+        margin: 0;
+    }
+
+
+    /*
+       공식 아이콘이 없는 예외 특성만
+       이름 fallback 허용
+    */
+
+    .player-database-row-trait.text-only
+    > span {
+        display: inline;
+
+        font-size: 9px;
+
+        white-space: nowrap;
+    }
+
+
+    /* =====================================
+       2줄 오른쪽: 강화
+    ====================================== */
+
+    .player-database-player-inline-grade {
+        grid-area: grade;
+
+        display: flex;
+        align-items: center;
+
+        gap: 5px;
+
+        justify-self: end;
+
+        margin: 0;
+    }
+
+
+    .player-database-player-inline-grade-select {
+        width: 70px;
+        height: 30px;
+
+        margin: 0;
+
+        padding:
+            0
+            24px
+            0
+            8px;
+
+        /*
+        iPhone Safari 자동 확대 방지
+        */
+        font-size: 16px;
+    }
+
+    .player-database-player-mobile-market-price {
+        grid-area: price;
+
+        display: flex;
+
+        align-items: center;
+
+        min-width: 0;
+    }
+
+
+    /* =====================================
+    모바일에서는 PC용 시세 완전 제거
+    ===================================== */
+
+    .player-database-player-row-actions
+    .player-database-compact-market-price-desktop {
+        display: none !important;
+    }
+
+
+    /* =====================================
+    3번째 줄 왼쪽: 이적시장 시세
+    ===================================== */
+
+    .player-database-player-mobile-market-price {
+        grid-area: price;
+
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+
+        justify-self: start;
+        align-self: center;
+
+        width: auto;
+        min-width: 0;
+
+        margin: 0;
+        padding: 0;
+    }
+
+
+    .player-database-player-mobile-market-price
+    .player-database-compact-market-price-mobile {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+
+        gap: 5px;
+
+        margin: 0;
+        padding: 0;
+
+        white-space: nowrap;
+    }
+
+
+    .player-database-player-mobile-market-price
+    .player-database-compact-market-price-mobile span {
+        font-size: 9px;
+    }
+
+
+    .player-database-player-mobile-market-price
+    .player-database-compact-market-price-mobile strong {
+        font-size: 10px;
+    }
+
+
+    .player-database-compact-market-price-mobile span {
+        font-size: 9px;
+    }
+
+
+    .player-database-compact-market-price-mobile strong {
+        font-size: 10px;
+    }
+
+
+    /* =====================================
+       3줄: 퀵 스쿼드 등록
+    ====================================== */
+
+    .player-database-player-mobile-register-row {
+        grid-area: register;
+
+        display: flex;
+
+        align-items: center;
+        justify-content: flex-end;
+
+        justify-self: end;
+        align-self: center;
+
+        width: auto;
+
+        margin: 0;
+        padding: 0;
+    }
+
+
+    .qs-inline-register-button-mobile {
+        display: inline-flex;
+
+        align-items: center;
+        justify-content: center;
+
+        min-width: 104px;
+        height: 29px;
+
+        padding:
+            0
+            10px;
+
+        font-size: 9px;
+
+        white-space: nowrap;
+    }
+
+}
+
+/* =========================================
+   PLAYER DATABASE ROW NAME + OVR
+========================================= */
+
+.player-database-player-name-wrap {
+    display: flex;
+    align-items: center;
+
+    min-width: 0;
+
+    gap: 9px;
+}
+
+
+.player-database-player-name-wrap
+.player-database-player-name {
+    min-width: 0;
+}
+
+
+.player-database-player-row-ovr {
+    display: inline-flex;
+    align-items: center;
+
+    flex-shrink: 0;
+
+    gap: 4px;
+
+    padding:
+        3px
+        7px;
+
+    border-radius: 5px;
+
+    background:
+        rgba(255, 255, 255, 0.06);
+
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+
+.player-database-player-row-ovr b {
+    font-size: 12px;
+    font-weight: 900;
+}
+
+
+/* =========================================
+   COMPACT TRAIT ICON
+========================================= */
+
+.player-database-row-trait {
+    display: inline-flex;
+    align-items: center;
+
+    gap: 4px;
+
+    flex-shrink: 0;
+}
+
+
+.player-database-row-trait-icon {
+    display: block;
+
+    width: 18px;
+    height: 18px;
+
+    flex:
+        0
+        0
+        18px;
+
+    object-fit: contain;
+}
+
+
+.player-database-row-trait-separator {
+    flex-shrink: 0;
+
+    margin:
+        0
+        1px;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 700px) {
+
+    .player-database-player-name-wrap {
+        gap: 5px;
+    }
+
+
+    .player-database-player-row-ovr {
+        padding:
+            2px
+            5px;
+
+        font-size: 9px;
+    }
+
+
+    .player-database-player-row-ovr b {
+        font-size: 11px;
+    }
+
+
+    .player-database-row-trait-icon {
+        width: 16px;
+        height: 16px;
+
+        flex-basis: 16px;
+    }
+
+}
+
+/* =========================================
+   PLAYER DATABASE - COMPACT MARKET PRICE
+========================================= */
+
+.player-database-compact-market-price {
+    display: flex;
+    align-items: center;
+
+    gap: 6px;
+
+    white-space: nowrap;
+}
+
+
+.player-database-compact-market-price span {
+    color:
+        rgba(255, 255, 255, 0.48);
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+
+.player-database-compact-market-price strong {
+    color: #e7b94f;
+
+    font-size: 11px;
+    font-weight: 900;
+}
+
+
+.player-database-compact-market-price-mobile {
+    display: none;
+}
+
+
+.player-database-player-mobile-market-price {
+    display: none;
+}
