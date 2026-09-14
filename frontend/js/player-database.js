@@ -71,6 +71,11 @@ const playerNationClearElement =
         "#player-database-nation-clear"
     );
 
+const playerNationSearchInputElement =
+    document.querySelector(
+        "#player-database-nation-search"
+    );
+
 const playerContinentOptionsElement =
     document.querySelector(
         "#player-database-continent-options"
@@ -104,6 +109,11 @@ const playerTeamSummaryElement =
 const playerTeamClearElement =
     document.querySelector(
         "#player-database-team-clear"
+    );
+
+const playerTeamSearchInputElement =
+    document.querySelector(
+        "#player-database-team-search"
     );
 
 const playerLeagueOptionsElement =
@@ -310,6 +320,8 @@ let selectedNationId =
 let selectedNationName =
     "";
 
+let nationSearchQuery =
+    "";
 
 let selectedTeamColorId =
     null;
@@ -317,41 +329,83 @@ let selectedTeamColorId =
 let selectedTeamName =
     "";
 
-const playerPositions = [
-    "GK",
+let teamSearchQuery =
+    "";
 
-    "SW",
-    "RWB",
-    "RB",
-    "RCB",
-    "CB",
-    "LCB",
-    "LB",
-    "LWB",
+const officialPositionGroups = [
 
-    "RDM",
-    "CDM",
-    "LDM",
+    {
+        key:
+            "FW",
 
-    "RM",
-    "RCM",
-    "CM",
-    "LCM",
-    "LM",
+        label:
+            "FW",
 
-    "RAM",
-    "CAM",
-    "LAM",
+        className:
+            "position-fw",
 
-    "RF",
-    "CF",
-    "LF",
+        positions: [
+            "ST",
+            "CF",
+            "LW",
+            "RW",
+        ],
+    },
 
-    "RW",
-    "RS",
-    "ST",
-    "LS",
-    "LW",
+
+    {
+        key:
+            "MF",
+
+        label:
+            "MF",
+
+        className:
+            "position-mf",
+
+        positions: [
+            "CM",
+            "CAM",
+            "CDM",
+            "LM",
+            "RM",
+        ],
+    },
+
+
+    {
+        key:
+            "DF",
+
+        label:
+            "DF",
+
+        className:
+            "position-df",
+
+        positions: [
+            "CB",
+            "RB",
+            "LB",
+            "RWB",
+            "LWB",
+        ],
+    },
+
+
+    {
+        key:
+            "GK",
+
+        label:
+            "GK",
+
+        className:
+            "position-gk",
+
+        positions: [],
+    },
+
 ];
 
 // =========================================
@@ -458,27 +512,98 @@ function renderPositionOptions() {
 
     playerPositionOptionsElement
         .innerHTML =
-            playerPositions
+            officialPositionGroups
                 .map(
-                    position => {
+                    group => {
 
-                        const groupClass =
-                            getPositionGroupClass(
-                                position
+                        const groupSelected =
+                            selectedPositions.has(
+                                group.key
                             );
 
 
+                        const positionButtonsHtml =
+                            group.positions
+                                .map(
+                                    position => {
+
+                                        const selected =
+                                            selectedPositions.has(
+                                                position
+                                            );
+
+
+                                        return `
+                                            <button
+                                                type="button"
+                                                class="
+                                                    player-database-position-option
+                                                    ${group.className}
+                                                    ${
+                                                        selected
+                                                            ? "selected"
+                                                            : ""
+                                                    }
+                                                "
+                                                data-position="${position}"
+                                            >
+                                                ${position}
+                                            </button>
+                                        `;
+                                    }
+                                )
+                                .join(
+                                    ""
+                                );
+
+
                         return `
-                            <button
-                                type="button"
+                            <div
                                 class="
-                                    player-database-position-option
-                                    ${groupClass}
+                                    player-database-position-group
+                                    ${group.className}
                                 "
-                                data-position="${position}"
+                                data-position-group-wrapper="${group.key}"
                             >
-                                ${position}
-                            </button>
+
+                                <strong
+                                    class="
+                                        player-database-position-group-title
+                                    "
+                                >
+                                    ${group.label}
+                                </strong>
+
+
+                                <div
+                                    class="
+                                        player-database-position-group-buttons
+                                    "
+                                >
+
+                                    <button
+                                        type="button"
+                                        class="
+                                            player-database-position-option
+                                            player-database-position-group-all
+                                            ${group.className}
+                                            ${
+                                                groupSelected
+                                                    ? "selected"
+                                                    : ""
+                                            }
+                                        "
+                                        data-position-group="${group.key}"
+                                    >
+                                        전체
+                                    </button>
+
+
+                                    ${positionButtonsHtml}
+
+                                </div>
+
+                            </div>
                         `;
                     }
                 )
@@ -590,32 +715,139 @@ function renderContinentOptions() {
 
 function renderNationOptions() {
 
-    const group =
-        nationGroups.find(
-            item =>
-                Number(
-                    item.continent_id
-                )
-                ===
-                Number(
-                    activeContinentId
-                )
-        );
+    const searchQuery =
+        nationSearchQuery
+            .trim()
+            .toLowerCase();
 
 
-    if (!group) {
+    let nations =
+        [];
+
+
+    // =====================================
+    // 검색 중
+    //
+    // 선택된 대륙에 관계없이
+    // 전체 국적에서 검색
+    // =====================================
+
+    if (searchQuery) {
+
+        nations =
+            nationGroups
+                .flatMap(
+                    group => {
+
+                        return (
+                            group.nations
+                            ?? []
+                        )
+                            .map(
+                                nation => ({
+                                    ...nation,
+
+                                    continent_id:
+                                        group.continent_id,
+
+                                    continent_name:
+                                        group.continent_name,
+                                })
+                            );
+                    }
+                )
+                .filter(
+                    nation => {
+
+                        return String(
+                            nation.nation_name
+                            ?? ""
+                        )
+                            .toLowerCase()
+                            .includes(
+                                searchQuery
+                            );
+                    }
+                );
+
+    } else {
+
+        // =================================
+        // 일반 상태
+        // 현재 선택된 대륙만 표시
+        // =================================
+
+        const group =
+            nationGroups.find(
+                item =>
+                    Number(
+                        item.continent_id
+                    )
+                    ===
+                    Number(
+                        activeContinentId
+                    )
+            );
+
+
+        if (!group) {
+
+            playerNationOptionsElement
+                .innerHTML =
+                    "";
+
+            return;
+        }
+
+
+        nations =
+            (
+                group.nations
+                ?? []
+            )
+                .map(
+                    nation => ({
+                        ...nation,
+
+                        continent_id:
+                            group.continent_id,
+
+                        continent_name:
+                            group.continent_name,
+                    })
+                );
+    }
+
+
+    // =====================================
+    // 검색 결과 없음
+    // =====================================
+
+    if (
+        nations.length
+        === 0
+    ) {
 
         playerNationOptionsElement
-            .innerHTML =
-                "";
+            .innerHTML = `
+                <div
+                    class="player-database-hierarchy-empty"
+                >
+                    검색 결과가 없습니다.
+                </div>
+            `;
 
         return;
     }
 
 
+    // =====================================
+    // 결과
+    // =====================================
+
     playerNationOptionsElement
         .innerHTML =
-            group.nations
+            nations
                 .map(
                     nation => {
 
@@ -644,6 +876,7 @@ function renderNationOptions() {
                                 data-nation-name="${escapeHtml(
                                     nation.nation_name
                                 )}"
+                                data-continent-id="${nation.continent_id}"
                             >
 
                                 <span>
@@ -651,6 +884,7 @@ function renderNationOptions() {
                                         nation.nation_name
                                     )}
                                 </span>
+
 
                                 <small>
                                     ${nation.player_count}
@@ -664,6 +898,7 @@ function renderNationOptions() {
                     ""
                 );
 }
+
 
 
 // =========================================
@@ -716,32 +951,139 @@ function renderLeagueOptions() {
 
 function renderTeamOptions() {
 
-    const group =
-        teamGroups.find(
-            item =>
-                Number(
-                    item.league_id
-                )
-                ===
-                Number(
-                    activeLeagueId
-                )
-        );
+    const searchQuery =
+        teamSearchQuery
+            .trim()
+            .toLowerCase();
 
 
-    if (!group) {
+    let teams =
+        [];
+
+
+    // =====================================
+    // 검색 중
+    //
+    // 선택된 리그에 관계없이
+    // 전체 소속팀에서 검색
+    // =====================================
+
+    if (searchQuery) {
+
+        teams =
+            teamGroups
+                .flatMap(
+                    group => {
+
+                        return (
+                            group.teams
+                            ?? []
+                        )
+                            .map(
+                                team => ({
+                                    ...team,
+
+                                    league_id:
+                                        group.league_id,
+
+                                    league_name:
+                                        group.league_name,
+                                })
+                            );
+                    }
+                )
+                .filter(
+                    team => {
+
+                        return String(
+                            team.team_name
+                            ?? ""
+                        )
+                            .toLowerCase()
+                            .includes(
+                                searchQuery
+                            );
+                    }
+                );
+
+    } else {
+
+        // =================================
+        // 일반 상태
+        // 현재 선택된 리그만 표시
+        // =================================
+
+        const group =
+            teamGroups.find(
+                item =>
+                    Number(
+                        item.league_id
+                    )
+                    ===
+                    Number(
+                        activeLeagueId
+                    )
+            );
+
+
+        if (!group) {
+
+            playerTeamOptionsElement
+                .innerHTML =
+                    "";
+
+            return;
+        }
+
+
+        teams =
+            (
+                group.teams
+                ?? []
+            )
+                .map(
+                    team => ({
+                        ...team,
+
+                        league_id:
+                            group.league_id,
+
+                        league_name:
+                            group.league_name,
+                    })
+                );
+    }
+
+
+    // =====================================
+    // 검색 결과 없음
+    // =====================================
+
+    if (
+        teams.length
+        === 0
+    ) {
 
         playerTeamOptionsElement
-            .innerHTML =
-                "";
+            .innerHTML = `
+                <div
+                    class="player-database-hierarchy-empty"
+                >
+                    검색 결과가 없습니다.
+                </div>
+            `;
 
         return;
     }
 
 
+    // =====================================
+    // 결과
+    // =====================================
+
     playerTeamOptionsElement
         .innerHTML =
-            group.teams
+            teams
                 .map(
                     team => {
 
@@ -770,6 +1112,7 @@ function renderTeamOptions() {
                                 data-team-name="${escapeHtml(
                                     team.team_name
                                 )}"
+                                data-league-id="${team.league_id}"
                             >
 
                                 <span>
@@ -777,6 +1120,7 @@ function renderTeamOptions() {
                                         team.team_name
                                     )}
                                 </span>
+
 
                                 <small>
                                     ${team.player_count}
@@ -790,6 +1134,7 @@ function renderTeamOptions() {
                     ""
                 );
 }
+
 
 // =========================================
 // HTML ESCAPE
@@ -1009,19 +1354,125 @@ playerPositionOptionsElement
         "click",
         event => {
 
-            const buttonElement =
+            const groupButtonElement =
+                event.target.closest(
+                    "button[data-position-group]"
+                );
+
+
+            const positionButtonElement =
                 event.target.closest(
                     "button[data-position]"
                 );
 
 
-            if (!buttonElement) {
+            if (
+                !groupButtonElement
+                &&
+                !positionButtonElement
+            ) {
                 return;
             }
 
 
+            // =================================
+            // 그룹 전체
+            // =================================
+
+            if (groupButtonElement) {
+
+                const groupKey =
+                    groupButtonElement
+                        .dataset
+                        .positionGroup;
+
+
+                const group =
+                    officialPositionGroups
+                        .find(
+                            item =>
+                                item.key
+                                ===
+                                groupKey
+                        );
+
+
+                if (!group) {
+                    return;
+                }
+
+
+                const wasSelected =
+                    selectedPositions.has(
+                        groupKey
+                    );
+
+
+                // 같은 그룹 기존 선택 제거
+                selectedPositions.delete(
+                    groupKey
+                );
+
+
+                group.positions
+                    .forEach(
+                        position => {
+
+                            selectedPositions.delete(
+                                position
+                            );
+                        }
+                    );
+
+
+                // 이미 전체가 선택돼 있지 않았으면
+                // 그룹 전체 선택
+                if (!wasSelected) {
+
+                    selectedPositions.add(
+                        groupKey
+                    );
+                }
+
+
+                renderPositionOptions();
+
+                updatePositionSummary();
+
+                return;
+            }
+
+
+            // =================================
+            // 개별 공식 포지션
+            // =================================
+
             const position =
-                buttonElement.dataset.position;
+                positionButtonElement
+                    .dataset
+                    .position;
+
+
+            const group =
+                officialPositionGroups
+                    .find(
+                        item =>
+                            item.positions
+                                .includes(
+                                    position
+                                )
+                    );
+
+
+            if (group) {
+
+                // 그룹 전체 선택 상태에서
+                // 개별 포지션을 누르면
+                // 전체 선택 해제
+                selectedPositions.delete(
+                    group.key
+                );
+            }
 
 
             if (
@@ -1034,27 +1485,54 @@ playerPositionOptionsElement
                     position
                 );
 
-                buttonElement
-                    .classList
-                    .remove(
-                        "selected"
-                    );
-
             } else {
 
                 selectedPositions.add(
                     position
                 );
-
-                buttonElement
-                    .classList
-                    .add(
-                        "selected"
-                    );
             }
 
 
+            renderPositionOptions();
+
             updatePositionSummary();
+        }
+    );
+
+// =========================================
+// NATION SEARCH
+// =========================================
+
+playerNationSearchInputElement
+    ?.addEventListener(
+        "input",
+        event => {
+
+            nationSearchQuery =
+                event.target.value
+                    ?? "";
+
+
+            renderNationOptions();
+        }
+    );
+
+
+// =========================================
+// TEAM SEARCH
+// =========================================
+
+playerTeamSearchInputElement
+    ?.addEventListener(
+        "input",
+        event => {
+
+            teamSearchQuery =
+                event.target.value
+                    ?? "";
+
+
+            renderTeamOptions();
         }
     );
 
@@ -1082,6 +1560,19 @@ playerContinentOptionsElement
                 Number(
                     buttonElement.dataset.continentId
                 );
+
+
+            nationSearchQuery =
+                "";
+
+
+            if (
+                playerNationSearchInputElement
+            ) {
+
+                playerNationSearchInputElement.value =
+                    "";
+            }
 
 
             renderContinentOptions();
@@ -1119,12 +1610,37 @@ playerNationOptionsElement
             selectedNationName =
                 buttonElement.dataset.nationName;
 
+            if (
+                buttonElement.dataset
+                    .continentId
+            ) {
+
+                activeContinentId =
+                    Number(
+                        buttonElement.dataset
+                            .continentId
+                    );
+            }
+
+
+            nationSearchQuery =
+                "";
+
+
+            if (
+                playerNationSearchInputElement
+            ) {
+
+                playerNationSearchInputElement.value =
+                    "";
+            }
+
 
             playerNationSummaryElement
                 .textContent =
                     selectedNationName;
 
-
+            renderContinentOptions();
             renderNationOptions();
 
             closeNationPanel();
@@ -1156,6 +1672,19 @@ playerLeagueOptionsElement
                 Number(
                     buttonElement.dataset.leagueId
                 );
+
+
+            teamSearchQuery =
+                "";
+
+
+            if (
+                playerTeamSearchInputElement
+            ) {
+
+                playerTeamSearchInputElement.value =
+                    "";
+            }
 
 
             renderLeagueOptions();
@@ -1193,12 +1722,37 @@ playerTeamOptionsElement
             selectedTeamName =
                 buttonElement.dataset.teamName;
 
+            if (
+                buttonElement.dataset
+                    .leagueId
+            ) {
+
+                activeLeagueId =
+                    Number(
+                        buttonElement.dataset
+                            .leagueId
+                    );
+            }
+
+
+            teamSearchQuery =
+                "";
+
+
+            if (
+                playerTeamSearchInputElement
+            ) {
+
+                playerTeamSearchInputElement.value =
+                    "";
+            }
+
 
             playerTeamSummaryElement
                 .textContent =
                     selectedTeamName;
 
-
+            renderLeagueOptions();
             renderTeamOptions();
 
             closeTeamPanel();
@@ -1327,6 +1881,17 @@ playerNationClearElement
             selectedNationName =
                 "";
 
+            nationSearchQuery =
+                "";
+
+
+            if (
+                playerNationSearchInputElement
+            ) {
+
+                playerNationSearchInputElement.value =
+                    "";
+            }
 
             playerNationSummaryElement
                 .textContent =
@@ -1350,6 +1915,18 @@ playerTeamClearElement
 
             selectedTeamName =
                 "";
+
+            teamSearchQuery =
+                "";
+
+
+            if (
+                playerTeamSearchInputElement
+            ) {
+
+                playerTeamSearchInputElement.value =
+                    "";
+            }
 
 
             playerTeamSummaryElement
@@ -8987,6 +9564,18 @@ function resetSearchConditions() {
     selectedNationName =
         "";
 
+    nationSearchQuery =
+        "";
+
+
+    if (
+        playerNationSearchInputElement
+    ) {
+
+        playerNationSearchInputElement.value =
+            "";
+    }
+
 
     playerNationSummaryElement
         .textContent =
@@ -9016,6 +9605,18 @@ function resetSearchConditions() {
 
     selectedTeamName =
         "";
+
+    teamSearchQuery =
+        "";
+
+
+    if (
+        playerTeamSearchInputElement
+    ) {
+
+        playerTeamSearchInputElement.value =
+            "";
+    }
 
 
     playerTeamSummaryElement

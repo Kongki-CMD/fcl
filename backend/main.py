@@ -1196,6 +1196,158 @@ def change_user_points(
             transaction["created_at"],
     }
 
+PENALTY_SHOOTOUT_GOAL_TIME_MIN = (
+    (2 ** 24) * 4
+)
+
+
+def get_match_special_goal_stats(
+    match_info,
+):
+
+    shoot = (
+        match_info.get(
+            "shoot"
+        )
+        or {}
+    )
+
+
+    # =========================
+    # 자책골
+    #
+    # FC Online API에서는
+    # 선수별이 아니라 참가자 단위
+    # =========================
+
+    own_goals = int(
+        shoot.get(
+            "ownGoal",
+            0,
+        )
+        or 0
+    )
+
+
+    # =========================
+    # PK 득점 선수
+    #
+    # shootDetail
+    # type = 9   → PK
+    # result = 3 → 득점
+    #
+    # 승부차기는 제외
+    # =========================
+
+    penalty_goals_by_sp_id = {}
+
+
+    for shot in (
+        match_info.get(
+            "shootDetail"
+        )
+        or []
+    ):
+
+        try:
+
+            shot_type = int(
+                shot.get(
+                    "type",
+                    0,
+                )
+                or 0
+            )
+
+            shot_result = int(
+                shot.get(
+                    "result",
+                    0,
+                )
+                or 0
+            )
+
+            goal_time = int(
+                shot.get(
+                    "goalTime",
+                    0,
+                )
+                or 0
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            continue
+
+
+        if shot_type != 9:
+            continue
+
+
+        if shot_result != 3:
+            continue
+
+
+        # =========================
+        # 승부차기 제외
+        # =========================
+
+        if (
+            goal_time
+            >=
+            PENALTY_SHOOTOUT_GOAL_TIME_MIN
+        ):
+
+            continue
+
+
+        sp_id = (
+            shot.get(
+                "spId"
+            )
+        )
+
+
+        if sp_id is None:
+            continue
+
+
+        try:
+
+            sp_id = int(
+                sp_id
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            continue
+
+
+        penalty_goals_by_sp_id[
+            sp_id
+        ] = (
+            penalty_goals_by_sp_id.get(
+                sp_id,
+                0,
+            )
+            + 1
+        )
+
+
+    return {
+        "own_goals":
+            own_goals,
+
+        "penalty_goals_by_sp_id":
+            penalty_goals_by_sp_id,
+    }
+
 
 def save_series_set_squad_players(
     series_id,
@@ -1206,14 +1358,17 @@ def save_series_set_squad_players(
     detected_matches,
 ):
 
-    spid_metadata = get_spid_metadata()
+    spid_metadata = (
+        get_spid_metadata()
+    )
+
 
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
 
             # =========================
-            # SERIES의 SET ID 조회
+            # SERIES SET ID
             # =========================
 
             cursor.execute(
@@ -1233,22 +1388,29 @@ def save_series_set_squad_players(
                 ),
             )
 
-            series_sets = cursor.fetchall()
+
+            series_sets = (
+                cursor.fetchall()
+            )
 
 
             set_id_map = {
-                series_set["set_number"]:
-                    series_set["id"]
+                int(
+                    series_set[
+                        "set_number"
+                    ]
+                ):
+                    series_set[
+                        "id"
+                    ]
 
-                for series_set in series_sets
+                for series_set
+                in series_sets
             }
 
 
             # =========================
             # 기존 Snapshot 초기화
-            #
-            # 재동기화 시 같은 SET의
-            # 스쿼드를 중복 저장하지 않음
             # =========================
 
             cursor.execute(
@@ -1275,7 +1437,7 @@ def save_series_set_squad_players(
 
 
             # =========================
-            # SET별 Snapshot 저장
+            # SET별 저장
             # =========================
 
             for (
@@ -1305,17 +1467,99 @@ def save_series_set_squad_players(
 
 
                 match_data = (
-                    detected_match["data"]
+                    detected_match[
+                        "data"
+                    ]
                 )
 
 
                 participant_map = {
-                    match_info["nickname"]:
+                    match_info[
+                        "nickname"
+                    ]:
                         match_info
 
                     for match_info
-                    in match_data["matchInfo"]
+                    in match_data[
+                        "matchInfo"
+                    ]
                 }
+
+
+                team_a_match_info = (
+                    participant_map.get(
+                        nickname_a
+                    )
+                )
+
+                team_b_match_info = (
+                    participant_map.get(
+                        nickname_b
+                    )
+                )
+
+
+                if (
+                    team_a_match_info
+                    is None
+                    or
+                    team_b_match_info
+                    is None
+                ):
+
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            f"{set_number}세트의 "
+                            "참가자 경기 정보를 "
+                            "찾을 수 없습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 자책골 / PK 분석
+                # =========================
+
+                team_a_special = (
+                    get_match_special_goal_stats(
+                        team_a_match_info
+                    )
+                )
+
+                team_b_special = (
+                    get_match_special_goal_stats(
+                        team_b_match_info
+                    )
+                )
+
+
+                # =========================
+                # 팀 단위 자책골 저장
+                # =========================
+
+                cursor.execute(
+                    """
+                    UPDATE series_sets
+
+                    SET
+                        team_a_own_goals = %s,
+                        team_b_own_goals = %s
+
+                    WHERE id = %s
+                    """,
+                    (
+                        team_a_special[
+                            "own_goals"
+                        ],
+
+                        team_b_special[
+                            "own_goals"
+                        ],
+
+                        series_set_id,
+                    ),
+                )
 
 
                 squad_sides = [
@@ -1323,11 +1567,15 @@ def save_series_set_squad_players(
                         "team_a",
                         team_a_id,
                         nickname_a,
+                        team_a_match_info,
+                        team_a_special,
                     ),
                     (
                         "team_b",
                         team_b_id,
                         nickname_b,
+                        team_b_match_info,
+                        team_b_special,
                     ),
                 ]
 
@@ -1336,50 +1584,51 @@ def save_series_set_squad_players(
                     side,
                     participant_id,
                     nickname,
+                    match_info,
+                    special_stats,
                 ) in squad_sides:
 
-                    match_info = (
-                        participant_map.get(
-                            nickname
-                        )
+                    penalty_goals_by_sp_id = (
+                        special_stats[
+                            "penalty_goals_by_sp_id"
+                        ]
                     )
-
-
-                    if match_info is None:
-
-                        raise HTTPException(
-                            status_code=500,
-                            detail=(
-                                f"{set_number}세트의 "
-                                f"{nickname} 스쿼드를 "
-                                "찾을 수 없습니다."
-                            ),
-                        )
 
 
                     for (
                         source_order,
                         player,
                     ) in enumerate(
-                        match_info["player"]
+                        match_info[
+                            "player"
+                        ]
                     ):
 
-                        status = player["status"]
+                        status = (
+                            player[
+                                "status"
+                            ]
+                        )
 
-                        sp_id = player["spId"]
 
+                        sp_id = int(
+                            player[
+                                "spId"
+                            ]
+                        )
 
-                        # =========================
-                        # 시즌 이미지 Snapshot 보장
-                        # =========================
 
                         season_id = (
-                            int(sp_id)
+                            sp_id
                             // 1_000_000
                         )
 
 
-                        if season_id not in ensured_season_ids:
+                        if (
+                            season_id
+                            not in
+                            ensured_season_ids
+                        ):
 
                             ensure_fconline_season_snapshot(
                                 sp_id
@@ -1394,6 +1643,14 @@ def save_series_set_squad_players(
                             get_player_name(
                                 sp_id,
                                 spid_metadata,
+                            )
+                        )
+
+
+                        penalty_goals = int(
+                            penalty_goals_by_sp_id.get(
+                                sp_id,
+                                0,
                             )
                         )
 
@@ -1415,6 +1672,7 @@ def save_series_set_squad_players(
 
                                     rating,
                                     goals,
+                                    penalty_goals,
                                     assists,
 
                                     image_url
@@ -1435,6 +1693,7 @@ def save_series_set_squad_players(
                                 %s,
                                 %s,
                                 %s,
+                                %s,
 
                                 %s
                             )
@@ -1448,19 +1707,36 @@ def save_series_set_squad_players(
                                 sp_id,
                                 player_name,
 
-                                player["spPosition"],
-                                player["spGrade"],
+                                player[
+                                    "spPosition"
+                                ],
+
+                                player[
+                                    "spGrade"
+                                ],
 
                                 float(
-                                    status["spRating"]
+                                    status[
+                                        "spRating"
+                                    ]
                                 ),
 
                                 int(
-                                    status["goal"]
+                                    status.get(
+                                        "goal",
+                                        0,
+                                    )
+                                    or 0
                                 ),
 
+                                penalty_goals,
+
                                 int(
-                                    status["assist"]
+                                    status.get(
+                                        "assist",
+                                        0,
+                                    )
+                                    or 0
                                 ),
 
                                 get_player_image_url(
@@ -1477,6 +1753,7 @@ def save_series_set_squad_players(
 
 
     return inserted_count
+
 
 def save_series_player_stats(
     series_id,
@@ -2544,6 +2821,43 @@ def initialize_database():
                 """
             )
 
+            # =========================
+            # SERIES 특수 득점
+            # 자책골
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE series_sets
+
+                ADD COLUMN IF NOT EXISTS
+                    team_a_own_goals INTEGER
+                    NOT NULL
+                    DEFAULT 0,
+
+                ADD COLUMN IF NOT EXISTS
+                    team_b_own_goals INTEGER
+                    NOT NULL
+                    DEFAULT 0
+                """
+            )
+
+            # =========================
+            # 선수별 PK 득점
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    series_set_squad_players
+
+                ADD COLUMN IF NOT EXISTS
+                    penalty_goals INTEGER
+                    NOT NULL
+                    DEFAULT 0
+                """
+            )
+
 
             # =========================
             # SERIES MVP
@@ -3353,7 +3667,6 @@ NEXON_GOAL_TIME_BLOCK = (
     2 ** 24
 )
 
-
 def get_match_score_pair(
     match_data,
     nickname_a,
@@ -3361,28 +3674,69 @@ def get_match_score_pair(
     include_extra_time_result=False,
 ):
 
-    participant_map = {
-        match_info["nickname"]:
-            match_info
-
-        for match_info
-        in match_data.get(
+    match_info_list = (
+        match_data.get(
             "matchInfo",
             [],
         )
-    }
+        or []
+    )
+
+
+    participant_map = {}
+
+
+    for match_info in match_info_list:
+
+        nickname = (
+            str(
+                match_info.get(
+                    "nickname",
+                    ""
+                )
+                or ""
+            )
+            .strip()
+        )
+
+
+        if not nickname:
+            continue
+
+
+        participant_map[
+            nickname
+        ] = match_info
+
+
+    normalized_nickname_a = (
+        str(
+            nickname_a
+            or ""
+        )
+        .strip()
+    )
+
+
+    normalized_nickname_b = (
+        str(
+            nickname_b
+            or ""
+        )
+        .strip()
+    )
 
 
     team_a_info = (
         participant_map.get(
-            nickname_a
+            normalized_nickname_a
         )
     )
 
 
     team_b_info = (
         participant_map.get(
-            nickname_b
+            normalized_nickname_b
         )
     )
 
@@ -3393,6 +3747,29 @@ def get_match_score_pair(
         team_b_info is None
     ):
 
+        print(
+            "[FCL SCORE LOOKUP ERROR]",
+            {
+                "requested_a":
+                    normalized_nickname_a,
+
+                "requested_b":
+                    normalized_nickname_b,
+
+                "match_nicknames":
+                    list(
+                        participant_map.keys()
+                    ),
+
+                "match_id":
+                    match_data.get(
+                        "matchId"
+                    ),
+            },
+            flush=True,
+        )
+
+
         return None
 
 
@@ -3400,13 +3777,43 @@ def get_match_score_pair(
         match_info
     ):
 
-        return int(
-            match_info
-            .get(
+        shoot = (
+            match_info.get(
                 "shoot",
                 {},
             )
-            .get(
+            or {}
+        )
+
+
+        goal_total_display = (
+            shoot.get(
+                "goalTotalDisplay"
+            )
+        )
+
+
+        if (
+            goal_total_display
+            is not None
+        ):
+
+            try:
+
+                return int(
+                    goal_total_display
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                pass
+
+
+        return int(
+            shoot.get(
                 "goalTotal",
                 0,
             )
@@ -3430,9 +3837,205 @@ def get_match_score_pair(
 
     # =========================
     # 연장 포함
+    # =========================
+
+    if include_extra_time_result:
+
+        return (
+            team_a_total_score,
+            team_b_total_score,
+        )
+
+
+    # =========================
+    # 정규시간만
     #
-    # goalTotal 그대로 사용
-    # 승부차기는 별도 winner_side 처리
+    # 최종 표시 점수에서
+    # 연장 득점만 제거
+    # =========================
+
+    def count_extra_time_goals(
+        match_info
+    ):
+
+        extra_time_goals = 0
+
+
+        for shot in (
+            match_info.get(
+                "shootDetail",
+                [],
+            )
+            or []
+        ):
+
+            try:
+
+                shot_result = int(
+                    shot.get(
+                        "result",
+                        0,
+                    )
+                    or 0
+                )
+
+
+                goal_time = int(
+                    shot.get(
+                        "goalTime",
+                        0,
+                    )
+                    or 0
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+
+                continue
+
+
+            if shot_result != 3:
+                continue
+
+
+            period_index = (
+                goal_time
+                //
+                NEXON_GOAL_TIME_BLOCK
+            )
+
+
+            if period_index in (
+                2,
+                3,
+            ):
+
+                extra_time_goals += 1
+
+
+        return extra_time_goals
+
+
+    team_a_extra_goals = (
+        count_extra_time_goals(
+            team_a_info
+        )
+    )
+
+
+    team_b_extra_goals = (
+        count_extra_time_goals(
+            team_b_info
+        )
+    )
+
+
+    team_a_regulation_score = max(
+        0,
+        (
+            team_a_total_score
+            -
+            team_a_extra_goals
+        ),
+    )
+
+
+    team_b_regulation_score = max(
+        0,
+        (
+            team_b_total_score
+            -
+            team_b_extra_goals
+        ),
+    )
+
+
+    return (
+        team_a_regulation_score,
+        team_b_regulation_score,
+    )
+
+
+def get_total_score(
+    match_info
+):
+
+    shoot = (
+        match_info.get(
+            "shoot",
+            {},
+        )
+        or {}
+    )
+
+
+    # =========================
+    # 실제 경기 종료 화면 점수
+    #
+    # goalTotal:
+    #   선수들의 직접 득점 합계
+    #
+    # goalTotalDisplay:
+    #   자책골까지 포함된
+    #   실제 경기 표시 점수
+    #
+    # FCL 경기 결과 비교에는
+    # goalTotalDisplay를 사용한다.
+    # =========================
+
+    goal_total_display = (
+        shoot.get(
+            "goalTotalDisplay"
+        )
+    )
+
+
+    if (
+        goal_total_display
+        is not None
+    ):
+
+        return int(
+            goal_total_display
+            or 0
+        )
+
+
+    # =========================
+    # 구형 / 비정상 API 데이터
+    # fallback
+    # =========================
+
+    return int(
+        shoot.get(
+            "goalTotal",
+            0,
+        )
+        or 0
+    )
+
+
+    team_a_total_score = (
+        get_total_score(
+            team_a_info
+        )
+    )
+
+
+    team_b_total_score = (
+        get_total_score(
+            team_b_info
+        )
+    )
+
+
+    # =========================
+    # 연장 포함
+    #
+    # 실제 경기 표시 점수 사용
+    # goalTotalDisplay 우선
     # =========================
 
     if include_extra_time_result:
@@ -4394,7 +4997,7 @@ FCONLINE_NICKNAMES = {
     "이준석": "똭똭",
     "주은성": "펜쉬차일드",
     "이상": "지수사",
-    "서종원": "붉은심장베컴",
+    "서종원": "끠끼의팬텀드리블",
 }
 
 # =========================
@@ -25487,6 +26090,10 @@ def get_series_squads(
 
                     ss.team_a_score,
                     ss.team_b_score,
+
+                    ss.team_a_own_goals,
+                    ss.team_b_own_goals,
+
                     ss.winner_side,
                     ss.result_method,
 
@@ -25501,6 +26108,7 @@ def get_series_squads(
 
                     sssp.rating,
                     sssp.goals,
+                    sssp.penalty_goals,
                     sssp.assists,
 
                     sssp.image_url
@@ -25571,6 +26179,22 @@ def get_series_squads(
                         "team_b_score"
                     ],
 
+                "team_a_own_goals":
+                    int(
+                        row[
+                            "team_a_own_goals"
+                        ]
+                        or 0
+                    ),
+
+                "team_b_own_goals":
+                    int(
+                        row[
+                            "team_b_own_goals"
+                        ]
+                        or 0
+                    ),
+
                 "winner_side":
                     row[
                         "winner_side"
@@ -25629,6 +26253,14 @@ def get_series_squads(
                 row[
                     "goals"
                 ],
+
+            "penalty_goals":
+                int(
+                    row[
+                        "penalty_goals"
+                    ]
+                    or 0
+                ),
 
             "assists":
                 row[

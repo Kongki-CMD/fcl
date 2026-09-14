@@ -95,6 +95,245 @@ export function normalizeTeamColorBonus(
     );
 }
 
+// =========================================
+// OFFICIAL TEAM COLOR STAT EFFECTS
+//
+// 팀컬러는 단순 +N이 아니라
+// 능력치별 효과를 가진다.
+//
+// "__all__"은 "전체 능력치"를 의미한다.
+// =========================================
+
+export function normalizeStatBonusMap(
+    value
+) {
+    if (
+        !value
+        ||
+        typeof value !== "object"
+        ||
+        Array.isArray(value)
+    ) {
+        return {};
+    }
+
+
+    const result = {};
+
+
+    Object
+        .entries(value)
+        .forEach(
+            ([
+                statName,
+                rawBonus,
+            ]) => {
+
+                const normalizedName =
+                    String(
+                        statName
+                        ??
+                        ""
+                    )
+                        .trim();
+
+
+                const bonus =
+                    Number(
+                        rawBonus
+                    );
+
+
+                if (
+                    !normalizedName
+                    ||
+                    !Number.isFinite(
+                        bonus
+                    )
+                    ||
+                    bonus === 0
+                ) {
+                    return;
+                }
+
+
+                result[
+                    normalizedName
+                ] =
+                    (
+                        result[
+                            normalizedName
+                        ]
+                        ??
+                        0
+                    )
+                    +
+                    bonus;
+            }
+        );
+
+
+    return result;
+}
+
+
+export function mergeStatBonusMaps(
+    ...bonusMaps
+) {
+    const result = {};
+
+
+    bonusMaps
+        .forEach(
+            bonusMap => {
+
+                const normalized =
+                    normalizeStatBonusMap(
+                        bonusMap
+                    );
+
+
+                Object
+                    .entries(
+                        normalized
+                    )
+                    .forEach(
+                        ([
+                            statName,
+                            bonus,
+                        ]) => {
+
+                            result[
+                                statName
+                            ] =
+                                (
+                                    result[
+                                        statName
+                                    ]
+                                    ??
+                                    0
+                                )
+                                +
+                                bonus;
+                        }
+                    );
+            }
+        );
+
+
+    return result;
+}
+
+
+export function getActiveTeamColorStatBonus(
+    activeTeamColors = []
+) {
+    if (
+        !Array.isArray(
+            activeTeamColors
+        )
+    ) {
+        return {};
+    }
+
+
+    return mergeStatBonusMaps(
+        ...activeTeamColors
+            .map(
+                teamColor =>
+                    teamColor?.effects
+                    ??
+                    {}
+            )
+    );
+}
+
+
+export function applyStatBonusMap(
+    baseStats,
+    bonusMap
+) {
+    const normalizedBonusMap =
+        normalizeStatBonusMap(
+            bonusMap
+        );
+
+
+    const allStatBonus =
+        Number(
+            normalizedBonusMap.__all__
+            ??
+            0
+        );
+
+
+    return Object.fromEntries(
+        Object
+            .entries(
+                baseStats
+                ??
+                {}
+            )
+            .map(
+                ([
+                    statName,
+                    statValue,
+                ]) => {
+
+                    if (
+                        statValue === null
+                        ||
+                        statValue === undefined
+                    ) {
+                        return [
+                            statName,
+                            null,
+                        ];
+                    }
+
+
+                    const numericValue =
+                        Number(
+                            statValue
+                        );
+
+
+                    if (
+                        !Number.isFinite(
+                            numericValue
+                        )
+                    ) {
+                        return [
+                            statName,
+                            null,
+                        ];
+                    }
+
+
+                    const specificBonus =
+                        Number(
+                            normalizedBonusMap[
+                                statName
+                            ]
+                            ??
+                            0
+                        );
+
+
+                    return [
+                        statName,
+
+                        numericValue
+                        +
+                        allStatBonus
+                        +
+                        specificBonus,
+                    ];
+                }
+            )
+    );
+}
+
 
 export function getEnhancementBonus(
     grade
@@ -149,7 +388,17 @@ export function calculatePlayerStatSnapshot({
     player,
     grade = 1,
     adaptation = DEFAULT_ADAPTATION_LEVEL,
+
+    // 기존 화면 호환용.
+    // 공식 팀컬러 적용이 완료되면 제거 예정.
     teamColorBonus = 0,
+
+    // 실제 활성 팀컬러.
+    activeTeamColors = [],
+
+    // 실제 활성 강화 팀컬러.
+    activeEnhancementTeamColor = null,
+
     sourceAbilityBonus = null,
 }) {
     const normalizedGrade =
@@ -173,17 +422,50 @@ export function calculatePlayerStatSnapshot({
             normalizedGrade
         );
 
-    const adaptationBonus =
-        getAdaptationBonus(
-            normalizedAdaptation
-        );
+const adaptationBonus =
+    getAdaptationBonus(
+        normalizedAdaptation
+    );
 
-    const abilityBonus =
-        enhancementBonus
-        +
-        adaptationBonus
-        +
-        normalizedTeamColorBonus;
+
+// =========================================
+// 기존 공통 상승치
+//
+// 강화 + 적응도 + 기존 수동 팀컬러
+// =========================================
+
+const abilityBonus =
+    enhancementBonus
+    +
+    adaptationBonus
+    +
+    normalizedTeamColorBonus;
+
+
+// =========================================
+// 실제 공식 팀컬러 효과
+// =========================================
+
+const teamColorStatBonus =
+    getActiveTeamColorStatBonus(
+        [
+            ...(
+                Array.isArray(
+                    activeTeamColors
+                )
+                    ? activeTeamColors
+                    : []
+            ),
+
+            ...(
+                activeEnhancementTeamColor
+                    ? [
+                        activeEnhancementTeamColor,
+                    ]
+                    : []
+            ),
+        ]
+    );
 
 
     let sourceBonus =
@@ -300,23 +582,33 @@ export function calculatePlayerStatSnapshot({
         );
 
 
-    const finalStats =
+    const statsBeforeTeamColor =
         Object.fromEntries(
-            Object.entries(
-                baseStats
-            )
+            Object
+                .entries(
+                    baseStats
+                )
                 .map(
                     ([
                         statName,
                         statValue,
                     ]) => [
                         statName,
+
                         statValue === null
                             ? null
                             : statValue
-                                + abilityBonus,
+                                +
+                                abilityBonus,
                     ]
                 )
+        );
+
+
+    const finalStats =
+        applyStatBonusMap(
+            statsBeforeTeamColor,
+            teamColorStatBonus
         );
 
 
@@ -329,6 +621,19 @@ export function calculatePlayerStatSnapshot({
 
         team_color_bonus:
             normalizedTeamColorBonus,
+
+        active_team_colors:
+            Array.isArray(
+                activeTeamColors
+            )
+                ? activeTeamColors
+                : [],
+
+        active_enhancement_team_color:
+            activeEnhancementTeamColor,
+
+        team_color_stat_bonus:
+            teamColorStatBonus,
 
         enhancement_bonus:
             enhancementBonus,
@@ -349,6 +654,9 @@ export function calculatePlayerStatSnapshot({
 
         base_stats:
             baseStats,
+
+        stats_before_team_color:
+            statsBeforeTeamColor,
 
         final_stats:
             finalStats,

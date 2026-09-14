@@ -19925,3 +19925,319 @@ body.player-recommend-open {
 .player-database-player-mobile-market-price {
     display: none;
 }
+
+/* =========================================
+   RESULT DETAIL - SPECIAL GOALS
+========================================= */
+
+.result-detail-penalty-goal {
+    min-width: 27px;
+    padding: 1px 4px;
+    border: 1px solid rgba(
+        215,
+        188,
+        120,
+        0.55
+    );
+    border-radius: 4px;
+    color: #d7bc78;
+    font-size: 8px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+
+/* =========================================
+   RESULT DETAIL - OWN GOAL
+========================================= */
+
+.result-detail-own-goal {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 20;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+
+    min-height: 28px;
+    padding: 4px 8px;
+
+    border: 1px solid rgba(
+        255,
+        70,
+        70,
+        0.7
+    );
+    border-radius: 999px;
+
+    background: rgba(
+        20,
+        20,
+        20,
+        0.88
+    );
+
+    color: #ff5656;
+
+    box-shadow:
+        0 2px 8px
+        rgba(0, 0, 0, 0.35);
+}
+
+
+.result-detail-own-goal-ball {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 18px;
+    height: 18px;
+
+    flex: 0 0 18px;
+}
+
+
+.result-detail-own-goal-ball svg {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+}
+
+
+.own-goal-ball-bg {
+    fill: #e53935;
+    stroke: #ff7774;
+    stroke-width: 1;
+}
+
+
+.own-goal-ball-center {
+    fill: #ffffff;
+}
+
+
+.own-goal-ball-line {
+    fill: none;
+    stroke: #ffffff;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+}
+
+
+.result-detail-own-goal-label {
+    color: #ff6b68;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+
+.result-detail-own-goal strong {
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* =========================================
+   MOBILE FORM ZOOM PREVENTION
+========================================= */
+
+@media (max-width: 768px) {
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
+    }
+
+}
+
+/* =========================================
+   PLAYER DATABASE - OFFICIAL POSITION FILTER
+========================================= */
+
+.player-database-position-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+    width: 100%;
+}
+
+
+.player-database-position-group {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    align-items: center;
+    gap: 8px;
+}
+
+
+.player-database-position-group-title {
+    font-size: 11px;
+    font-weight: 900;
+    text-align: center;
+}
+
+
+.player-database-position-group.position-fw
+.player-database-position-group-title {
+    color: #e36d6d;
+}
+
+
+.player-database-position-group.position-mf
+.player-database-position-group-title {
+    color: #67b9e8;
+}
+
+
+.player-database-position-group.position-df
+.player-database-position-group-title {
+    color: #72c98f;
+}
+
+
+.player-database-position-group.position-gk
+.player-database-position-group-title {
+    color: #f0cb80;
+}
+
+
+.player-database-position-group-buttons {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(
+                0,
+                1fr
+            )
+        );
+
+    gap: 5px;
+}
+
+
+.player-database-position-group-all {
+    font-weight: 800;
+}
+
+
+@media (max-width: 768px) {
+
+    .player-database-position-group {
+        grid-template-columns:
+            30px
+            1fr;
+    }
+
+
+    .player-database-position-group-buttons {
+        grid-template-columns:
+            repeat(
+                3,
+                minmax(
+                    0,
+                    1fr
+                )
+            );
+    }
+
+}
+
+/* =========================================
+   PLAYER DATABASE - HIERARCHY SEARCH
+========================================= */
+
+.player-database-hierarchy-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+}
+
+
+.player-database-hierarchy-search {
+    flex: 1;
+
+    min-width: 0;
+    height: 32px;
+
+    padding: 0 10px;
+
+    border: 1px solid #292929;
+    border-radius: 5px;
+
+    outline: none;
+
+    background: #090909;
+
+    color: #e5e5e5;
+
+    font-family: inherit;
+    font-size: 12px;
+
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+
+
+.player-database-hierarchy-search::placeholder {
+    color: #666;
+}
+
+
+.player-database-hierarchy-search:hover {
+    border-color: #3b3b3b;
+}
+
+
+.player-database-hierarchy-search:focus {
+    border-color: #9b814c;
+
+    background: #0d0d0d;
+}
+
+
+.player-database-hierarchy-clear {
+    flex-shrink: 0;
+}
+
+
+.player-database-hierarchy-empty {
+    grid-column: 1 / -1;
+
+    padding: 28px 12px;
+
+    color: #666;
+
+    font-size: 12px;
+    text-align: center;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .player-database-hierarchy-search {
+        /*
+         * #10 모바일 자동 확대 방지와 충돌하지 않도록
+         * 반드시 16px 유지
+         */
+        font-size: 16px;
+    }
+
+}

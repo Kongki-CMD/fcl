@@ -142,6 +142,211 @@ POSITION_FILTERS = {
     ],
 }
 
+# =========================================
+# OFFICIAL PLAYER DATABASE POSITION FILTER
+#
+# FC Online 공식 데이터센터에 노출되는
+# 포지션 필터 → 내부 상세 포지션 변환
+# =========================================
+
+OFFICIAL_POSITION_FILTERS = {
+
+    # =====================================
+    # FW
+    # =====================================
+
+    "FW": [
+        "RS",
+        "ST",
+        "LS",
+        "RF",
+        "CF",
+        "LF",
+        "LW",
+        "RW",
+    ],
+
+    "ST": [
+        "RS",
+        "ST",
+        "LS",
+    ],
+
+    "CF": [
+        "RF",
+        "CF",
+        "LF",
+    ],
+
+    "LW": [
+        "LW",
+    ],
+
+    "RW": [
+        "RW",
+    ],
+
+
+    # =====================================
+    # MF
+    # =====================================
+
+    "MF": [
+        "RCM",
+        "CM",
+        "LCM",
+
+        "RAM",
+        "CAM",
+        "LAM",
+
+        "RDM",
+        "CDM",
+        "LDM",
+
+        "LM",
+        "RM",
+    ],
+
+    "CM": [
+        "RCM",
+        "CM",
+        "LCM",
+    ],
+
+    "CAM": [
+        "RAM",
+        "CAM",
+        "LAM",
+    ],
+
+    "CDM": [
+        "RDM",
+        "CDM",
+        "LDM",
+    ],
+
+    "LM": [
+        "LM",
+    ],
+
+    "RM": [
+        "RM",
+    ],
+
+
+    # =====================================
+    # DF
+    # =====================================
+
+    "DF": [
+        "SW",
+
+        "RCB",
+        "CB",
+        "LCB",
+
+        "RB",
+        "LB",
+
+        "RWB",
+        "LWB",
+    ],
+
+    "CB": [
+        "RCB",
+        "CB",
+        "LCB",
+    ],
+
+    "RB": [
+        "RB",
+    ],
+
+    "LB": [
+        "LB",
+    ],
+
+    "RWB": [
+        "RWB",
+    ],
+
+    "LWB": [
+        "LWB",
+    ],
+
+
+    # =====================================
+    # GK
+    # =====================================
+
+    "GK": [
+        "GK",
+    ],
+}
+
+
+def expand_player_catalog_positions(
+    values,
+):
+
+    expanded_positions = []
+
+    seen_positions = set()
+
+
+    for raw_value in values:
+
+        position = (
+            str(
+                raw_value
+                or
+                ""
+            )
+            .strip()
+            .upper()
+        )
+
+
+        if not position:
+            continue
+
+
+        mapped_positions = (
+            OFFICIAL_POSITION_FILTERS
+            .get(
+                position,
+                [
+                    position,
+                ],
+            )
+        )
+
+
+        for mapped_position in (
+            mapped_positions
+        ):
+
+            if (
+                mapped_position
+                in
+                seen_positions
+            ):
+                continue
+
+
+            seen_positions.add(
+                mapped_position
+            )
+
+
+            expanded_positions.append(
+                mapped_position
+            )
+
+
+    return expanded_positions
+
 EXTRA_NATIONS = [
     {
         "nation_id": 205,
@@ -3535,14 +3740,24 @@ def search_player_catalog(
 
     if position:
 
+        expanded_positions = (
+            expand_player_catalog_positions(
+                [
+                    position,
+                ]
+            )
+        )
+
+
         where_clauses.append(
             """
-            p.position = %s
+            p.position = ANY(%s)
             """
         )
 
+
         query_params.append(
-            position
+            expanded_positions
         )
 
     if (
@@ -3582,7 +3797,7 @@ def search_player_catalog(
     # 다중 포지션
     # =====================================
 
-    position_list = [
+    position_tokens = [
         value
             .strip()
             .upper()
@@ -3595,6 +3810,13 @@ def search_player_catalog(
     ]
 
 
+    position_list = (
+        expand_player_catalog_positions(
+            position_tokens
+        )
+    )
+
+
     if position_list:
 
         where_clauses.append(
@@ -3602,6 +3824,7 @@ def search_player_catalog(
             p.position = ANY(%s)
             """
         )
+
 
         query_params.append(
             position_list

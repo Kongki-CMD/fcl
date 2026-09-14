@@ -719,6 +719,50 @@ function closeResultDetail() {
         "team_a";
 }
 
+function getResultDetailGoalBreakdown(
+    player
+) {
+
+    const totalGoals =
+        Math.max(
+            0,
+            Number(
+                player.goals
+                ?? 0
+            )
+        );
+
+
+    const rawPenaltyGoals =
+        Math.max(
+            0,
+            Number(
+                player.penalty_goals
+                ?? 0
+            )
+        );
+
+
+    const penaltyGoals =
+        Math.min(
+            totalGoals,
+            rawPenaltyGoals
+        );
+
+
+    return {
+        normalGoals:
+            Math.max(
+                0,
+                totalGoals
+                -
+                penaltyGoals
+            ),
+
+        penaltyGoals,
+    };
+}
+
 
 // =========================================
 // 스쿼드 선수 카드
@@ -729,6 +773,14 @@ function createSquadPlayerHtml(
 ) {
 
     const recordText = [];
+
+    const {
+        normalGoals,
+        penaltyGoals,
+    } =
+        getResultDetailGoalBreakdown(
+            player
+        );
 
     if (player.goals > 0) {
 
@@ -801,10 +853,60 @@ function createFormationPlayerHtml(
     }
 
 
+    // =========================================
+    // 골 / PK골 분리
+    // =========================================
+
+    const totalGoals =
+        Math.max(
+            0,
+            Number(
+                player.goals
+                ?? 0
+            )
+        );
+
+
+    const penaltyGoals =
+        Math.min(
+            totalGoals,
+            Math.max(
+                0,
+                Number(
+                    player.penalty_goals
+                    ?? 0
+                )
+            )
+        );
+
+
+    const normalGoals =
+        Math.max(
+            0,
+            totalGoals
+            -
+            penaltyGoals
+        );
+
+
+    const assists =
+        Math.max(
+            0,
+            Number(
+                player.assists
+                ?? 0
+            )
+        );
+
+
     const recordText = [];
 
 
-    if (player.goals > 0) {
+    // =========================================
+    // 일반 골
+    // =========================================
+
+    if (normalGoals > 0) {
 
         recordText.push(`
             <span class="result-detail-record-item">
@@ -813,14 +915,38 @@ function createFormationPlayerHtml(
                     ⚽
                 </span>
 
-                ${player.goals}
+                ${normalGoals}
 
             </span>
         `);
     }
 
 
-    if (player.assists > 0) {
+    // =========================================
+    // PK 골
+    // =========================================
+
+    if (penaltyGoals > 0) {
+
+        recordText.push(`
+            <span
+                class="
+                    result-detail-record-item
+                    result-detail-penalty-goal
+                "
+                title="페널티킥 득점"
+            >
+                PK ${penaltyGoals}
+            </span>
+        `);
+    }
+
+
+    // =========================================
+    // 도움
+    // =========================================
+
+    if (assists > 0) {
 
         recordText.push(`
             <span class="result-detail-record-item">
@@ -829,7 +955,7 @@ function createFormationPlayerHtml(
                     A
                 </span>
 
-                ${player.assists}
+                ${assists}
 
             </span>
         `);
@@ -880,16 +1006,22 @@ function createFormationPlayerHtml(
 
                 </strong>
 
+
                 <span>
-                    ${player.rating.toFixed(1)}
+                    ${Number(
+                        player.rating
+                        ?? 0
+                    ).toFixed(1)}
+
                     &nbsp;
-                ${
-                    recordText.length > 0
-                        ? `
-                            ${recordText.join(" · ")}
-                        `
-                        : ""
-                }
+
+                    ${
+                        recordText.length > 0
+                            ? `
+                                ${recordText.join(" · ")}
+                            `
+                            : ""
+                    }
                 </span>
 
             </div>
@@ -897,6 +1029,7 @@ function createFormationPlayerHtml(
         </div>
     `;
 }
+
 
 // =========================================
 // 선택 SET 스쿼드 출력
@@ -939,6 +1072,88 @@ function renderResultDetailSquadView(
             ? setData.team_a_squad
             : setData.team_b_squad;
 
+    const ownGoals =
+        Number(
+            isTeamA
+                ? (
+                    setData
+                        .team_a_own_goals
+                    ?? 0
+                )
+                : (
+                    setData
+                        .team_b_own_goals
+                    ?? 0
+                )
+        );
+
+
+    const ownGoalHtml =
+        ownGoals > 0
+            ? `
+                <div
+                    class="result-detail-own-goal"
+                    title="자책골 ${ownGoals}"
+                >
+                    <span
+                        class="result-detail-own-goal-ball"
+                        aria-hidden="true"
+                    >
+                        <svg
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <circle
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                class="own-goal-ball-bg"
+                            />
+
+                            <polygon
+                                points="
+                                    12,6.5
+                                    15.2,8.8
+                                    14,12.5
+                                    10,12.5
+                                    8.8,8.8
+                                "
+                                class="own-goal-ball-center"
+                            />
+
+                            <path
+                                d="
+                                    M12 2
+                                    L12 6.5
+
+                                    M3.8 7
+                                    L8.8 8.8
+
+                                    M5.2 17.5
+                                    L10 12.5
+
+                                    M18.8 17.5
+                                    L14 12.5
+
+                                    M20.2 7
+                                    L15.2 8.8
+                                "
+                                class="own-goal-ball-line"
+                            />
+                        </svg>
+                    </span>
+
+                    <span class="result-detail-own-goal-label">
+                        OG
+                    </span>
+
+                    <strong>
+                        ${ownGoals}
+                    </strong>
+                </div>
+            `
+            : "";
+
 
     const startingPlayers =
         squad.filter(
@@ -963,6 +1178,8 @@ function renderResultDetailSquadView(
     squadViewElement.innerHTML = `
 
     <div class="result-detail-pitch">
+
+        ${ownGoalHtml}
 
         <div class="result-detail-pitch-center-line"></div>
 
