@@ -20241,3 +20241,250 @@ body.player-recommend-open {
     }
 
 }
+
+/* =========================================
+   PLAYER DATABASE
+   SEARCH RESULT BULK GRADE
+========================================= */
+
+.player-database-results-header {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+}
+
+
+.player-database-result-grade-dropdown {
+    position: relative;
+
+    flex-shrink: 0;
+}
+
+
+.player-database-result-grade-dropdown > summary {
+    list-style: none;
+}
+
+
+.player-database-result-grade-dropdown
+> summary::-webkit-details-marker {
+    display: none;
+}
+
+
+.player-database-result-grade-trigger {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    min-width: 68px;
+    height: 34px;
+
+    padding:
+        0
+        9px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    border-radius: 7px;
+
+    background:
+        rgba(
+            10,
+            10,
+            10,
+            0.9
+        );
+
+    cursor: pointer;
+
+    user-select: none;
+
+    transition:
+        border-color 0.15s,
+        background 0.15s;
+}
+
+
+.player-database-result-grade-trigger:hover {
+    border-color:
+        rgba(
+            201,
+            149,
+            52,
+            0.55
+        );
+
+    background:
+        rgba(
+            22,
+            18,
+            10,
+            0.95
+        );
+}
+
+
+.player-database-result-grade-trigger
+.player-database-card-grade {
+    pointer-events: none;
+
+    margin: 0;
+}
+
+
+.player-database-result-grade-arrow {
+    color:
+        rgba(
+            255,
+            255,
+            255,
+            0.42
+        );
+
+    font-size: 9px;
+
+    transition:
+        transform 0.15s;
+}
+
+
+.player-database-result-grade-dropdown[open]
+.player-database-result-grade-arrow {
+    transform:
+        rotate(
+            180deg
+        );
+}
+
+
+/* =========================================
+   DROPDOWN MENU
+========================================= */
+
+.player-database-result-grade-options {
+    position: absolute;
+
+    top:
+        calc(
+            100%
+            +
+            7px
+        );
+
+    right: 0;
+
+    z-index: 80;
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            5,
+            34px
+        );
+
+    gap: 6px;
+
+    width: max-content;
+
+    padding: 10px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.12
+        );
+
+    border-radius: 8px;
+
+    background:
+        rgba(
+            10,
+            10,
+            10,
+            0.98
+        );
+
+    box-shadow:
+        0
+        14px
+        32px
+        rgba(
+            0,
+            0,
+            0,
+            0.45
+        );
+}
+
+
+.player-database-result-grade-options
+.player-database-card-grade {
+    width: 34px;
+    min-width: 34px;
+    height: 23px;
+
+    margin: 0;
+
+    cursor: pointer;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .player-database-results-header {
+        gap: 10px;
+    }
+
+
+    .player-database-results-title {
+        min-width: 0;
+    }
+
+
+    .player-database-result-grade-trigger {
+        min-width: 62px;
+
+        height: 34px;
+
+        padding:
+            0
+            7px;
+    }
+
+
+    .player-database-result-grade-options {
+        grid-template-columns:
+            repeat(
+                4,
+                34px
+            );
+
+        gap: 6px;
+
+        padding: 9px;
+    }
+
+}

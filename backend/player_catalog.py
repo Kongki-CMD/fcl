@@ -7728,7 +7728,12 @@ def save_player_to_database(
         column
         for column
         in columns
-        if column != "sp_id"
+
+        if column
+        not in {
+            "sp_id",
+            "image_url",
+        }
     ]
 
 

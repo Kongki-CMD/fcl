@@ -141,6 +141,23 @@ const playerResultCountElement =
         "#player-database-result-count"
     );
 
+const playerResultGradeDropdownElement =
+    document.querySelector(
+        "#player-database-result-grade-dropdown"
+    );
+
+
+const playerResultGradeBadgeElement =
+    document.querySelector(
+        "#player-database-result-grade-badge"
+    );
+
+
+const playerResultGradeOptionsElement =
+    document.querySelector(
+        "#player-database-result-grade-options"
+    );
+
 const playerPaginationElement =
     document.querySelector(
         "#player-database-pagination"
@@ -213,6 +230,13 @@ const playerPositionSummaryElement =
 // =========================================
 
 let currentPage = 1;
+
+// =========================================
+// SEARCH RESULT BULK GRADE
+// =========================================
+
+let resultBulkGrade =
+    1;
 
 const pageSize = 20;
 
@@ -2512,10 +2536,14 @@ function getPlayerCardState(
         playerCardStates.set(
             numericSpId,
             {
-                grade: 1,
+                grade:
+                    resultBulkGrade,
+
                 adaptation:
                     DEFAULT_ADAPTATION_LEVEL,
-                teamColor: 0,
+
+                teamColor:
+                    0,
             }
         );
     }
@@ -2524,6 +2552,164 @@ function getPlayerCardState(
     return playerCardStates.get(
         numericSpId
     );
+}
+
+// =========================================
+// SEARCH RESULT BULK GRADE
+// =========================================
+
+function createResultBulkGradeOptionsHtml() {
+
+    return Array
+        .from(
+            {
+                length:
+                    13,
+            },
+            (
+                _,
+                index
+            ) => {
+
+                const grade =
+                    index + 1;
+
+
+                return `
+                    <button
+                        type="button"
+                        class="
+                            player-database-card-grade
+                            grade-${grade}
+                            ${
+                                grade
+                                ===
+                                resultBulkGrade
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+                        data-result-bulk-grade="${grade}"
+                        aria-label="${grade}강 일괄 적용"
+                        title="${grade}강"
+                    >
+                        +${grade}
+                    </button>
+                `;
+            }
+        )
+        .join(
+            ""
+        );
+}
+
+
+function updateResultBulkGradeControl() {
+
+    if (
+        playerResultGradeBadgeElement
+    ) {
+
+        playerResultGradeBadgeElement
+            .className =
+                (
+                    "player-database-card-grade "
+                    +
+                    `grade-${resultBulkGrade}`
+                );
+
+
+        playerResultGradeBadgeElement
+            .textContent =
+                `+${resultBulkGrade}`;
+    }
+
+
+    if (
+        playerResultGradeOptionsElement
+    ) {
+
+        playerResultGradeOptionsElement
+            .innerHTML =
+                createResultBulkGradeOptionsHtml();
+    }
+}
+
+
+function applyResultBulkGrade(
+    grade
+) {
+
+    const numericGrade =
+        Number(
+            grade
+        );
+
+
+    if (
+        !Number.isInteger(
+            numericGrade
+        )
+        ||
+        numericGrade < 1
+        ||
+        numericGrade > 13
+    ) {
+
+        return;
+    }
+
+
+    resultBulkGrade =
+        numericGrade;
+
+
+    // =====================================
+    // 이미 만들어진 모든 선수 상태 변경
+    // =====================================
+
+    playerCardStates
+        .forEach(
+            state => {
+
+                state.grade =
+                    resultBulkGrade;
+            }
+        );
+
+
+    // =====================================
+    // 현재 화면 선수 카드 재렌더링
+    //
+    // playerDataBySpId에는 현재까지 불러온
+    // 선수 데이터가 저장되어 있음
+    // =====================================
+
+    playerDataBySpId
+        .forEach(
+            (
+                _,
+                spId
+            ) => {
+
+                rerenderPlayerCard(
+                    spId
+                );
+            }
+        );
+
+
+    updateResultBulkGradeControl();
+
+
+    if (
+        playerResultGradeDropdownElement
+    ) {
+
+        playerResultGradeDropdownElement
+            .open =
+                false;
+    }
 }
 
 
@@ -9357,6 +9543,43 @@ function renderPagination(
             );
 }
 
+// =========================================
+// SEARCH RESULT BULK GRADE EVENT
+// =========================================
+
+playerResultGradeOptionsElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const buttonElement =
+                event.target.closest(
+                    "button[data-result-bulk-grade]"
+                );
+
+
+            if (!buttonElement) {
+                return;
+            }
+
+
+            const grade =
+                Number(
+                    buttonElement
+                        .dataset
+                        .resultBulkGrade
+                );
+
+
+            applyResultBulkGrade(
+                grade
+            );
+        }
+    );
+
+
+updateResultBulkGradeControl();
+
 
 // =========================================
 // SEARCH
@@ -9739,7 +9962,18 @@ function resetSearchConditions() {
         playerPaginationElement.innerHTML =
             "";
     }
+
+    // =====================================
+    // 검색결과 일괄 강화 초기화
+    // =====================================
+
+    applyResultBulkGrade(
+        1
+    );
+
 }
+
+
 
 
 // =========================================
