@@ -21772,3 +21772,72 @@ button {
     }
 
 }
+
+/* =========================================
+   QUICK SQUAD RESULT
+   RESPONSIVE SAFETY
+========================================= */
+
+.quick-squad-field-column {
+    width: 100%;
+    min-width: 0;
+}
+
+
+.quick-squad-field {
+    width: 100%;
+    min-width: 0;
+}
+
+
+/*
+    노트북 / 작은 데스크톱에서는
+    경기장 + 요약을 억지로 2열로 압축하지 않음
+*/
+@media (max-width: 1100px) {
+
+    .quick-squad-result {
+        grid-template-columns:
+            minmax(0, 1fr);
+    }
+
+
+    .quick-squad-summary {
+        position: static;
+
+        width: 100%;
+        min-width: 0;
+    }
+
+
+    .quick-squad-field-column {
+        width: 100%;
+    }
+
+}
+
+
+/* 태블릿 이하 */
+@media (max-width: 768px) {
+
+    .quick-squad-field-header {
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+        width: 100%;
+    }
+
+
+    .quick-squad-team-color-panel {
+        max-width: 48vw;
+    }
+
+
+    .quick-squad-active-team-colors {
+        justify-content: flex-end;
+
+        flex-wrap: wrap;
+    }
+
+}
