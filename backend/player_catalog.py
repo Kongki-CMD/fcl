@@ -2861,6 +2861,75 @@ def get_player_catalog_filter_options():
 
             team_rows = cursor.fetchall()
 
+            # =============================
+            # 공식 팀컬러
+            #
+            # affiliation / feature만
+            # enhance는 선수 SPID 목록이 없으므로 제외
+            # =============================
+
+            cursor.execute(
+                """
+                SELECT
+                    tc.team_color_id,
+                    tc.team_name,
+                    tc.category,
+                    tc.team_color_type,
+                    tc.icon_url,
+
+                    COUNT(
+                        DISTINCT tcp.sp_id
+                    ) AS player_count
+
+                FROM
+                    fconline_team_colors
+                    AS tc
+
+                JOIN
+                    fconline_team_color_players
+                    AS tcp
+                ON
+                    tcp.team_color_id
+                    =
+                    tc.team_color_id
+
+                WHERE
+                    tc.is_active
+                    =
+                    TRUE
+
+                AND
+                    tc.category
+                    IN (
+                        'affiliation',
+                        'feature'
+                    )
+
+                GROUP BY
+                    tc.team_color_id,
+                    tc.team_name,
+                    tc.category,
+                    tc.team_color_type,
+                    tc.icon_url
+
+                HAVING
+                    COUNT(
+                        DISTINCT tcp.sp_id
+                    )
+                    >
+                    0
+
+                ORDER BY
+                    tc.category ASC,
+                    tc.team_name ASC
+                """
+            )
+
+
+            official_team_color_rows = (
+                cursor.fetchall()
+            )
+
     # =============================
     # 시즌 이름
     # =============================
@@ -3360,6 +3429,120 @@ def get_player_catalog_filter_options():
             }
         )
 
+    # =====================================
+    # 공식 팀컬러 필터
+    # =====================================
+
+    official_team_color_group_map = {
+
+        "affiliation": {
+            "category":
+                "affiliation",
+
+            "category_name":
+                "소속 / 국적 / 시즌",
+
+            "team_colors":
+                [],
+        },
+
+        "feature": {
+            "category":
+                "feature",
+
+            "category_name":
+                "특성",
+
+            "team_colors":
+                [],
+        },
+    }
+
+
+    for row in (
+        official_team_color_rows
+    ):
+
+        category = str(
+            row[
+                "category"
+            ]
+            or ""
+        )
+
+
+        group = (
+            official_team_color_group_map
+            .get(
+                category
+            )
+        )
+
+
+        if not group:
+            continue
+
+
+        group[
+            "team_colors"
+        ].append(
+            {
+                "team_color_id":
+                    int(
+                        row[
+                            "team_color_id"
+                        ]
+                    ),
+
+                "team_name":
+                    row[
+                        "team_name"
+                    ],
+
+                "category":
+                    category,
+
+                "team_color_type":
+                    row[
+                        "team_color_type"
+                    ],
+
+                "icon_url":
+                    (
+                        row[
+                            "icon_url"
+                        ]
+                        or ""
+                    ),
+
+                "player_count":
+                    int(
+                        row[
+                            "player_count"
+                        ]
+                        or 0
+                    ),
+            }
+        )
+
+
+    official_team_color_groups = [
+
+        group
+
+        for group
+        in (
+            official_team_color_group_map
+            .values()
+        )
+
+        if (
+            group[
+                "team_colors"
+            ]
+        )
+    ]
+
     return {
         "seasons":
             seasons,
@@ -3466,6 +3649,28 @@ def get_player_catalog_filter_options():
 
             for row in team_rows
         ],
+
+        "official_team_color_groups":
+            official_team_color_groups,
+
+        "enhancement_grades":
+            [
+                {
+                    "grade":
+                        grade,
+
+                    "bonus":
+                        ENHANCEMENT_BONUS[
+                            grade
+                        ],
+                }
+
+                for grade
+                in range(
+                    1,
+                    14
+                )
+            ],
     }
 
 def search_player_catalog(
@@ -3475,6 +3680,7 @@ def search_player_catalog(
     nation_id=None,
     nation_name="",
     team_color_id=None,
+    official_team_color_id=None,
     team_name="",
     position="",
     positions="",
@@ -3790,6 +3996,45 @@ def search_player_catalog(
         query_params.append(
             int(
                 team_color_id
+            )
+        )
+
+    # =====================================
+    # 공식 팀컬러
+    # =====================================
+
+    if (
+        official_team_color_id
+        is not None
+    ):
+
+        where_clauses.append(
+            """
+            EXISTS (
+                SELECT
+                    1
+
+                FROM
+                    fconline_team_color_players
+                    AS official_team_color_filter
+
+                WHERE
+                    official_team_color_filter.sp_id
+                    =
+                    p.sp_id
+
+                AND
+                    official_team_color_filter.team_color_id
+                    =
+                    %s
+            )
+            """
+        )
+
+
+        query_params.append(
+            int(
+                official_team_color_id
             )
         )
 

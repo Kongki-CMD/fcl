@@ -4,11 +4,11 @@ import {
 
 import {
     DEFAULT_ADAPTATION_LEVEL,
-} from "./player-stat-engine.js?v=1";
+} from "./player-stat-engine.js?v=2";
 
 import {
     createQuickSquadDetailModal,
-} from "./quick-squad-detail.js?v=6";
+} from "./quick-squad-detail.js?v=7";
 
 import {
     createQuickSquadLockController,
@@ -67,6 +67,11 @@ const quickSquadFormationElement =
 const quickSquadFormationTitleElement =
     document.getElementById(
         "quick-squad-formation-title"
+    );
+
+const quickSquadActiveTeamColorsElement =
+    document.getElementById(
+        "quick-squad-active-team-colors"
     );
 
 
@@ -141,6 +146,16 @@ let quickSquadLocksController = null;
 let quickSquadBudgetController = null;
 
 let quickSquadTeamColors = [];
+
+
+// =========================================
+// ACTIVE TEAM COLOR TOOLTIP STATE
+// =========================================
+
+let currentQuickSquadActiveTeamColors = [];
+
+let quickSquadTeamColorTooltipTarget = null;
+
 
 const QUICK_SQUAD_CONDITION_STORAGE_KEY =
     "fcl.quick-squad.conditions.v1";
@@ -1330,6 +1345,24 @@ function renderQuickSquadFormation() {
     currentQuickSquadResult =
         null;
 
+    currentQuickSquadActiveTeamColors =
+    [];
+
+    hideQuickSquadTeamColorTooltip();
+
+    if (
+        quickSquadActiveTeamColorsElement
+    ) {
+
+        quickSquadActiveTeamColorsElement
+            .innerHTML =
+                "";
+
+
+        quickSquadActiveTeamColorsElement
+            .hidden =
+                true;
+    }
 
     quickSquadPlayerLayerElement
         .innerHTML =
@@ -2011,6 +2044,1134 @@ function formatQuickSquadBp(
 
 }
 
+// =========================================
+// ACTIVE TEAM COLORS
+// =========================================
+
+function createQuickSquadActiveTeamColorTitle(
+    teamColor
+) {
+
+    const teamName =
+        String(
+            teamColor.team_name
+            ?? ""
+        );
+
+
+    const stage =
+        Number(
+            teamColor.stage
+            ?? 0
+        );
+
+
+    const matchedPlayers =
+        Number(
+            teamColor.matched_players
+            ?? 0
+        );
+
+
+    const requiredPlayers =
+        Number(
+            teamColor.required_players
+            ?? 0
+        );
+
+
+    const effects =
+        Array.isArray(
+            teamColor.effects
+        )
+            ? teamColor.effects
+            : [];
+
+
+    const effectText =
+        effects
+            .map(
+                effect => {
+
+                    const statName =
+                        String(
+                            effect.stat_name
+                            ?? ""
+                        );
+
+
+                    const bonus =
+                        Number(
+                            effect.bonus
+                            ?? 0
+                        );
+
+
+                    if (!statName) {
+                        return "";
+                    }
+
+
+                    return (
+                        `${statName} `
+                        +
+                        `${bonus >= 0 ? "+" : ""}`
+                        +
+                        `${bonus}`
+                    );
+                }
+            )
+            .filter(Boolean)
+            .join(" · ");
+
+
+    return [
+        teamName,
+
+        stage > 0
+            ? `${stage}단계`
+            : "",
+
+        (
+            matchedPlayers > 0
+            &&
+            requiredPlayers > 0
+        )
+            ? (
+                `${matchedPlayers}명 매칭`
+                +
+                ` / ${requiredPlayers}명 필요`
+            )
+            : "",
+
+        effectText,
+    ]
+        .filter(Boolean)
+        .join(" · ");
+}
+
+
+function createQuickSquadActiveTeamColorHtml(
+    teamColor,
+    index
+) {
+
+    const teamName =
+        escapeQuickSquadHtml(
+            teamColor.team_name
+            ?? ""
+        );
+
+
+    const iconUrl =
+        escapeQuickSquadHtml(
+            teamColor.icon_url
+            ?? ""
+        );
+
+
+    const stage =
+        Number(
+            teamColor.stage
+            ?? 0
+        );
+
+
+    const category =
+        String(
+            teamColor.category
+            ?? ""
+        );
+
+
+    const isSelected =
+        teamColor.is_selected_team_color
+        === true;
+
+
+    const ariaLabel =
+        escapeQuickSquadHtml(
+            createQuickSquadActiveTeamColorTitle(
+                teamColor
+            )
+        );
+
+
+    return `
+        <button
+            type="button"
+            class="
+                quick-squad-active-team-color
+                ${
+                    isSelected
+                        ? "is-selected"
+                        : ""
+                }
+                ${
+                    category === "enhance"
+                        ? "is-enhancement"
+                        : ""
+                }
+            "
+            data-quick-squad-team-color-index="${index}"
+            aria-label="${ariaLabel}"
+        >
+
+            ${
+                iconUrl
+                    ? `
+                        <img
+                            src="${iconUrl}"
+                            alt=""
+                            class="
+                                quick-squad-active-team-color-icon
+                            "
+                            loading="lazy"
+                        >
+                    `
+                    : `
+                        <span
+                            class="
+                                quick-squad-active-team-color-fallback
+                            "
+                        >
+                            TC
+                        </span>
+                    `
+            }
+
+
+            ${
+                stage > 0
+                    ? `
+                        <span
+                            class="
+                                quick-squad-active-team-color-stage
+                            "
+                        >
+                            ${stage}
+                        </span>
+                    `
+                    : ""
+            }
+
+        </button>
+    `;
+}
+
+// =========================================
+// ACTIVE TEAM COLOR CUSTOM TOOLTIP
+// =========================================
+
+function getQuickSquadTeamColorTooltipElement() {
+
+    let tooltipElement =
+        document.getElementById(
+            "quick-squad-team-color-tooltip"
+        );
+
+
+    if (tooltipElement) {
+        return tooltipElement;
+    }
+
+
+    tooltipElement =
+        document.createElement(
+            "div"
+        );
+
+
+    tooltipElement.id =
+        "quick-squad-team-color-tooltip";
+
+
+    tooltipElement.className =
+        "quick-squad-team-color-tooltip";
+
+
+    tooltipElement.hidden =
+        true;
+
+
+    tooltipElement.setAttribute(
+        "role",
+        "tooltip"
+    );
+
+
+    document.body.appendChild(
+        tooltipElement
+    );
+
+
+    return tooltipElement;
+}
+
+function escapeQuickSquadTeamColorTooltipHtml(
+    value
+) {
+
+    return String(
+        value
+        ??
+        ""
+    )
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+        .replaceAll(
+            "\"",
+            "&quot;"
+        )
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+}
+
+
+function getQuickSquadTeamColorMatchedPlayers(
+    teamColor
+) {
+
+    const matchedSpIds =
+        new Set(
+            (
+                Array.isArray(
+                    teamColor
+                        ?.matched_sp_ids
+                )
+                    ? (
+                        teamColor
+                            .matched_sp_ids
+                    )
+                    : []
+            )
+                .map(
+                    value =>
+                        Number(
+                            value
+                        )
+                )
+                .filter(
+                    value =>
+                        Number
+                            .isSafeInteger(
+                                value
+                            )
+                )
+        );
+
+
+    if (
+        matchedSpIds.size
+        === 0
+    ) {
+
+        return [];
+    }
+
+
+    const players =
+        Array.isArray(
+            currentQuickSquadResult
+                ?.players
+        )
+            ? (
+                currentQuickSquadResult
+                    .players
+            )
+            : [];
+
+
+    return players
+        .filter(
+            player =>
+                matchedSpIds.has(
+                    Number(
+                        player.sp_id
+                    )
+                )
+        );
+}
+
+
+function getQuickSquadPlayerSeasonIconUrl(
+    player
+) {
+
+    const explicitSeasonId =
+        Number(
+            player?.season_id
+        );
+
+
+    const spId =
+        Number(
+            player?.sp_id
+        );
+
+
+    const derivedSeasonId =
+        Number.isSafeInteger(
+            spId
+        )
+            ? Math.floor(
+                spId
+                /
+                1_000_000
+            )
+            : 0;
+
+
+    const seasonId =
+        (
+            Number.isSafeInteger(
+                explicitSeasonId
+            )
+            &&
+            explicitSeasonId > 0
+        )
+            ? explicitSeasonId
+            : derivedSeasonId;
+
+
+    if (
+        !seasonId
+    ) {
+
+        return "";
+    }
+
+
+    return (
+        `${apiBaseUrl}`
+        +
+        "/api/fconline/"
+        +
+        "metadata/seasons/"
+        +
+        `${seasonId}/image`
+    );
+}
+
+
+function createQuickSquadTeamColorTooltipHtml(
+    teamColor
+) {
+
+    const escape =
+        escapeQuickSquadTeamColorTooltipHtml;
+
+
+    const teamName =
+        escape(
+            teamColor
+                ?.team_name
+            ??
+            "팀컬러"
+        );
+
+
+    const iconUrl =
+        escape(
+            teamColor
+                ?.icon_url
+            ??
+            ""
+        );
+
+
+    const stage =
+        Number(
+            teamColor
+                ?.stage
+            ??
+            teamColor
+                ?.active_stage
+            ??
+            0
+        );
+
+
+    const matchedPlayersCount =
+        Number(
+            teamColor
+                ?.matched_players
+            ??
+            0
+        );
+
+
+    const requiredPlayers =
+        Number(
+            teamColor
+                ?.required_players
+            ??
+            0
+        );
+
+
+    const effects =
+        Array.isArray(
+            teamColor
+                ?.effects
+        )
+            ? (
+                teamColor
+                    .effects
+            )
+            : [];
+
+
+    const matchedPlayers =
+        getQuickSquadTeamColorMatchedPlayers(
+            teamColor
+        );
+
+
+    const effectsHtml =
+        effects
+            .map(
+                effect => {
+
+                    const statName =
+                        escape(
+                            effect
+                                ?.stat_name
+                            ??
+                            effect
+                                ?.stat_key
+                            ??
+                            ""
+                        );
+
+
+                    const bonus =
+                        Number(
+                            effect
+                                ?.bonus
+                            ??
+                            0
+                        );
+
+
+                    if (
+                        !statName
+                        ||
+                        !bonus
+                    ) {
+
+                        return "";
+                    }
+
+
+                    return `
+                        <span>
+                            ${statName}
+                            +${bonus}
+                        </span>
+                    `;
+                }
+            )
+            .filter(
+                Boolean
+            )
+            .join(
+                ""
+            );
+
+
+    const playerRowsHtml =
+        matchedPlayers
+            .map(
+                player => {
+
+                    const seasonIconUrl =
+                        escape(
+                            getQuickSquadPlayerSeasonIconUrl(
+                                player
+                            )
+                        );
+
+
+                    const playerName =
+                        escape(
+                            player
+                                ?.player_name
+                            ??
+                            "-"
+                        );
+
+
+                    const playerOvr =
+                        Number(
+                            player
+                                ?.ovr
+                        );
+
+
+                    return `
+                        <div
+                            class="
+                                quick-squad-team-color-tooltip-player
+                            "
+                        >
+
+                            <span
+                                class="
+                                    quick-squad-team-color-tooltip-player-season
+                                "
+                            >
+
+                                ${
+                                    seasonIconUrl
+                                        ? `
+                                            <img
+                                                src="${seasonIconUrl}"
+                                                alt=""
+                                                loading="lazy"
+                                            >
+                                        `
+                                        : ""
+                                }
+
+                            </span>
+
+
+                            <span
+                                class="
+                                    quick-squad-team-color-tooltip-player-name
+                                "
+                            >
+                                ${playerName}
+                            </span>
+
+
+                            <strong
+                                class="
+                                    quick-squad-team-color-tooltip-player-ovr
+                                "
+                            >
+                                ${
+                                    Number.isFinite(
+                                        playerOvr
+                                    )
+                                        ? playerOvr
+                                        : "-"
+                                }
+                            </strong>
+
+                        </div>
+                    `;
+                }
+            )
+            .join(
+                ""
+            );
+
+
+    return `
+        <div
+            class="
+                quick-squad-team-color-tooltip-header
+            "
+        >
+
+            ${
+                iconUrl
+                    ? `
+                        <img
+                            class="
+                                quick-squad-team-color-tooltip-icon
+                            "
+                            src="${iconUrl}"
+                            alt=""
+                        >
+                    `
+                    : ""
+            }
+
+
+            <div
+                class="
+                    quick-squad-team-color-tooltip-title
+                "
+            >
+
+                <strong>
+                    ${teamName}
+                </strong>
+
+
+                ${
+                    stage > 0
+                        ? `
+                            <small>
+                                ${stage}단계
+                            </small>
+                        `
+                        : ""
+                }
+
+            </div>
+
+        </div>
+
+
+        <div
+            class="
+                quick-squad-team-color-tooltip-meta
+            "
+        >
+
+            ${
+                matchedPlayersCount > 0
+                    ? `
+                        <span>
+                            매칭 ${matchedPlayersCount}명
+                        </span>
+                    `
+                    : ""
+            }
+
+
+            ${
+                requiredPlayers > 0
+                    ? `
+                        <span>
+                            필요 ${requiredPlayers}명
+                        </span>
+                    `
+                    : ""
+            }
+
+        </div>
+
+
+        ${
+            effectsHtml
+                ? `
+                    <div
+                        class="
+                            quick-squad-team-color-tooltip-effects
+                        "
+                    >
+                        ${effectsHtml}
+                    </div>
+                `
+                : ""
+        }
+
+
+        ${
+            playerRowsHtml
+                ? `
+                    <div
+                        class="
+                            quick-squad-team-color-tooltip-player-list
+                        "
+                    >
+                        ${playerRowsHtml}
+                    </div>
+                `
+                : ""
+        }
+    `;
+}
+
+
+function positionQuickSquadTeamColorTooltip(
+    targetElement,
+    tooltipElement
+) {
+
+    const targetRect =
+        targetElement.getBoundingClientRect();
+
+
+    tooltipElement.style.visibility =
+        "hidden";
+
+    tooltipElement.style.left =
+        "0px";
+
+    tooltipElement.style.top =
+        "0px";
+
+    tooltipElement.hidden =
+        false;
+
+
+    const tooltipRect =
+        tooltipElement.getBoundingClientRect();
+
+
+    const viewportWidth =
+        document.documentElement.clientWidth;
+
+
+    const viewportHeight =
+        window.innerHeight;
+
+
+    const margin =
+        10;
+
+
+    const gap =
+        8;
+
+
+    let left =
+        (
+            targetRect.right
+            -
+            tooltipRect.width
+        );
+
+
+    if (
+        left < margin
+    ) {
+
+        left =
+            margin;
+    }
+
+
+    if (
+        left
+        +
+        tooltipRect.width
+        >
+        viewportWidth
+        -
+        margin
+    ) {
+
+        left =
+            (
+                viewportWidth
+                -
+                tooltipRect.width
+                -
+                margin
+            );
+    }
+
+
+    let top =
+        (
+            targetRect.bottom
+            +
+            gap
+        );
+
+
+    if (
+        top
+        +
+        tooltipRect.height
+        >
+        viewportHeight
+        -
+        margin
+    ) {
+
+        top =
+            (
+                targetRect.top
+                -
+                tooltipRect.height
+                -
+                gap
+            );
+    }
+
+
+    if (
+        top < margin
+    ) {
+
+        top =
+            margin;
+    }
+
+
+    tooltipElement.style.left =
+        `${Math.round(left)}px`;
+
+
+    tooltipElement.style.top =
+        `${Math.round(top)}px`;
+
+
+    tooltipElement.style.visibility =
+        "";
+}
+
+
+function showQuickSquadTeamColorTooltip(
+    targetElement
+) {
+
+    const index =
+        Number(
+            targetElement.dataset
+                .quickSquadTeamColorIndex
+        );
+
+
+    if (
+        !Number.isInteger(index)
+        ||
+        index < 0
+        ||
+        index
+        >=
+        currentQuickSquadActiveTeamColors.length
+    ) {
+
+        return;
+    }
+
+
+    const teamColor =
+        currentQuickSquadActiveTeamColors[
+            index
+        ];
+
+
+    const tooltipElement =
+        getQuickSquadTeamColorTooltipElement();
+
+
+    if (
+        quickSquadTeamColorTooltipTarget
+        &&
+        quickSquadTeamColorTooltipTarget
+        !==
+        targetElement
+    ) {
+
+        quickSquadTeamColorTooltipTarget
+            .classList
+            .remove(
+                "is-tooltip-open"
+            );
+    }
+
+
+    quickSquadTeamColorTooltipTarget =
+        targetElement;
+
+
+    targetElement.classList.add(
+        "is-tooltip-open"
+    );
+
+
+    tooltipElement.innerHTML =
+        createQuickSquadTeamColorTooltipHtml(
+            teamColor
+        );
+
+
+    positionQuickSquadTeamColorTooltip(
+        targetElement,
+        tooltipElement
+    );
+}
+
+
+function hideQuickSquadTeamColorTooltip() {
+
+    const tooltipElement =
+        document.getElementById(
+            "quick-squad-team-color-tooltip"
+        );
+
+
+    if (tooltipElement) {
+
+        tooltipElement.hidden =
+            true;
+    }
+
+
+    if (
+        quickSquadTeamColorTooltipTarget
+    ) {
+
+        quickSquadTeamColorTooltipTarget
+            .classList
+            .remove(
+                "is-tooltip-open"
+            );
+    }
+
+
+    quickSquadTeamColorTooltipTarget =
+        null;
+}
+
+
+function renderQuickSquadActiveTeamColors(
+    data
+) {
+
+    if (
+        !quickSquadActiveTeamColorsElement
+    ) {
+        return;
+    }
+
+    hideQuickSquadTeamColorTooltip();
+
+
+    currentQuickSquadActiveTeamColors =
+        [];
+
+
+    const activeTeamColors =
+        Array.isArray(
+            data?.active_team_colors
+        )
+            ? [
+                ...data.active_team_colors,
+            ]
+            : [];
+
+
+    if (
+        activeTeamColors.length
+        === 0
+    ) {
+
+        quickSquadActiveTeamColorsElement
+            .innerHTML =
+                "";
+
+
+        quickSquadActiveTeamColorsElement
+            .hidden =
+                true;
+
+
+        return;
+    }
+
+
+    // 선택 팀컬러 → 강화 팀컬러 → 나머지 순서
+    activeTeamColors.sort(
+        (
+            a,
+            b
+        ) => {
+
+            const aSelected =
+                a.is_selected_team_color === true
+                    ? 1
+                    : 0;
+
+
+            const bSelected =
+                b.is_selected_team_color === true
+                    ? 1
+                    : 0;
+
+
+            if (
+                aSelected
+                !==
+                bSelected
+            ) {
+
+                return (
+                    bSelected
+                    -
+                    aSelected
+                );
+            }
+
+
+            const aEnhancement =
+                a.category === "enhance"
+                    ? 1
+                    : 0;
+
+
+            const bEnhancement =
+                b.category === "enhance"
+                    ? 1
+                    : 0;
+
+
+            if (
+                aEnhancement
+                !==
+                bEnhancement
+            ) {
+
+                return (
+                    bEnhancement
+                    -
+                    aEnhancement
+                );
+            }
+
+
+            return String(
+                a.team_name
+                ?? ""
+            )
+                .localeCompare(
+                    String(
+                        b.team_name
+                        ?? ""
+                    ),
+                    "ko-KR"
+                );
+        }
+    );
+
+
+    currentQuickSquadActiveTeamColors =
+        activeTeamColors;
+
+
+    quickSquadActiveTeamColorsElement
+        .innerHTML =
+            activeTeamColors
+                .map(
+                    (
+                        teamColor,
+                        index
+                    ) =>
+                        createQuickSquadActiveTeamColorHtml(
+                            teamColor,
+                            index
+                        )
+                )
+                .join("");
+
+
+    quickSquadActiveTeamColorsElement
+        .hidden =
+            false;
+}
+
 
 function createQuickSquadPlayerHtml(
     player,
@@ -2267,6 +3428,13 @@ function renderQuickSquadResult(
 
     currentQuickSquadResult = normalized;
     data = normalized;
+
+    window.__FCL_QUICK_SQUAD_RESULT__ =
+        currentQuickSquadResult;
+
+    renderQuickSquadActiveTeamColors(
+        data
+    );
 
     const players = data.players;
 
@@ -2552,68 +3720,412 @@ function updateQuickSquadConditionSummary() {
 
 }
 
+// =========================================
+// QUICK SQUAD
+// TEAM COLOR RECALCULATION
+// =========================================
+
+async function recalculateQuickSquadTeamColors(
+    data
+) {
+
+    const players =
+        Array.isArray(
+            data?.players
+        )
+            ? data.players
+                .filter(
+                    Boolean
+                )
+            : [];
+
+
+    if (
+        players.length
+        !== 11
+    ) {
+
+        throw new Error(
+            "팀컬러를 재계산할 11명의 선수가 없습니다."
+        );
+    }
+
+
+    const teamColorId =
+        Number(
+            data.team_color_id
+        );
+
+
+    if (
+        !Number.isSafeInteger(
+            teamColorId
+        )
+        ||
+        teamColorId <= 0
+    ) {
+
+        throw new Error(
+            "현재 스쿼드의 기준 팀컬러를 확인할 수 없습니다."
+        );
+    }
+
+
+    const response =
+        await fetch(
+            (
+                `${apiBaseUrl}`
+                +
+                "/api/quick-squad/"
+                +
+                "team-colors/recalculate"
+            ),
+            {
+                method:
+                    "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body:
+                    JSON.stringify(
+                        {
+                            team_color_id:
+                                teamColorId,
+
+                            players:
+                                players.map(
+                                    player => ({
+                                        sp_id:
+                                            Number(
+                                                player.sp_id
+                                            ),
+
+                                        grade:
+                                            Number(
+                                                player.grade
+                                            ),
+                                    })
+                                ),
+                        }
+                    ),
+            }
+        );
+
+
+    const text =
+        await response.text();
+
+
+    let result =
+        null;
+
+
+    try {
+
+        result =
+            text
+                ? JSON.parse(
+                    text
+                )
+                : null;
+
+    } catch {
+
+        throw new Error(
+            (
+                "팀컬러 재계산 응답을 "
+                +
+                "읽을 수 없습니다."
+            )
+        );
+    }
+
+
+    if (
+        !response.ok
+    ) {
+
+        throw new Error(
+            (
+                typeof result?.detail
+                ===
+                "string"
+            )
+                ? result.detail
+
+                : (
+                    "팀컬러를 재계산하지 "
+                    +
+                    "못했습니다."
+                )
+        );
+    }
+
+
+    if (
+        !result
+        ||
+        !Array.isArray(
+            result.active_team_colors
+        )
+    ) {
+
+        throw new Error(
+            "팀컬러 재계산 결과가 올바르지 않습니다."
+        );
+    }
+
+
+    return result;
+}
+
 async function saveQuickSquadPlayerSettings(
     summary,
     selection
 ) {
-    const data = currentQuickSquadResult;
-    const slotIndex = summary.slot_index;
+
+    const data =
+        currentQuickSquadResult;
+
+
+    const slotIndex =
+        summary.slot_index;
+
 
     if (
-        !Number.isInteger(slotIndex)
-        || slotIndex < 0
-        || slotIndex >= 11
-        || !data?.players?.[slotIndex]
-        || Number(data.players[slotIndex].sp_id)
-            !== Number(summary.sp_id)
+        !Number.isInteger(
+            slotIndex
+        )
+        ||
+        slotIndex < 0
+        ||
+        slotIndex >= 11
+        ||
+        !data?.players?.[
+            slotIndex
+        ]
+        ||
+        Number(
+            data.players[
+                slotIndex
+            ].sp_id
+        )
+        !==
+        Number(
+            summary.sp_id
+        )
     ) {
+
         throw new Error(
             "현재 스쿼드에서 해당 선수를 찾지 못했습니다."
         );
     }
 
-    const originalPlayer = data.players[slotIndex];
 
-    const next = applyQuickSquadPlayerSettings(
-        data,
-        slotIndex,
-        selection,
-        currentQuickSquadSlots
-    );
+    const originalPlayer =
+        data.players[
+            slotIndex
+        ];
 
-    // 고정 선수라면 추천용 강화등급도 변경.
-    if (originalPlayer.locked) {
-        next.players[slotIndex].locked_grade =
-            Number(selection.grade);
+
+    // =====================================
+    // 1. 먼저 수정한 선수 설정을
+    //    로컬 스쿼드에 반영
+    //
+    // 이 시점의 팀컬러는 아직 이전 판정
+    // =====================================
+
+    let next =
+        applyQuickSquadPlayerSettings(
+            data,
+            slotIndex,
+            selection,
+            currentQuickSquadSlots
+        );
+
+
+    if (
+        originalPlayer.locked
+    ) {
+
+        next.players[
+            slotIndex
+        ].locked_grade =
+            Number(
+                selection.grade
+            );
     }
 
-    const savedKey = "fcl.quick-squad.saved.v1";
-    const previousSaved = localStorage.getItem(savedKey);
 
-    // 먼저 스쿼드 저장을 시도한다.
-    writeSavedQuickSquad(next);
+    // =====================================
+    // 2. 현재 11명의 SPID + 강화등급으로
+    //    서버에서 팀컬러 전체 재판정
+    // =====================================
+
+    const teamColorResult =
+        await recalculateQuickSquadTeamColors(
+            next
+        );
+
+
+    // =====================================
+    // 3. 새 팀컬러 판정을 기존 스쿼드에 합침
+    // =====================================
+
+    next = {
+        ...next,
+
+        active_non_enhancement_team_color_count:
+            Number(
+                teamColorResult
+                    .active_non_enhancement_team_color_count
+                ??
+                0
+            ),
+
+        active_enhancement_team_color_count:
+            Number(
+                teamColorResult
+                    .active_enhancement_team_color_count
+                ??
+                0
+            ),
+
+        active_enhancement_team_colors:
+            Array.isArray(
+                teamColorResult
+                    .active_enhancement_team_colors
+            )
+                ? (
+                    teamColorResult
+                        .active_enhancement_team_colors
+                )
+                : [],
+
+        active_team_color_count:
+            Number(
+                teamColorResult
+                    .active_team_color_count
+                ??
+                0
+            ),
+
+        active_team_colors:
+            teamColorResult
+                .active_team_colors,
+    };
+
+
+    // =====================================
+    // 4. 11명 전체 재정규화
+    //
+    // 여기서:
+    // - 선수별 팀컬러 다시 분리
+    // - 세부 능력치 다시 적용
+    // - 포지션 OVR 다시 계산
+    // =====================================
+
+    next =
+        normalizeQuickSquadResult(
+            next,
+            currentQuickSquadSlots
+        );
+
+
+    if (
+        originalPlayer.locked
+    ) {
+
+        next.players[
+            slotIndex
+        ].locked_grade =
+            Number(
+                selection.grade
+            );
+    }
+
+
+    // =====================================
+    // 5. 브라우저 저장
+    // =====================================
+
+    const savedKey =
+        "fcl.quick-squad.saved.v1";
+
+
+    const previousSaved =
+        localStorage.getItem(
+            savedKey
+        );
+
+
+    writeSavedQuickSquad(
+        next
+    );
+
+
+    // =====================================
+    // 6. 고정 선수라면
+    //    저장 설정도 최종 계산값으로 갱신
+    // =====================================
 
     try {
-        if (originalPlayer.locked) {
-            quickSquadLocksController.updateSavedSettings(
-                next.players[slotIndex]
+
+        if (
+            originalPlayer.locked
+        ) {
+
+            quickSquadLocksController
+                .updateSavedSettings(
+                    next.players[
+                        slotIndex
+                    ]
+                );
+        }
+
+    } catch (
+        error
+    ) {
+
+        // 고정 선수 저장 실패 시
+        // 이전 Quick Squad 저장본 복원
+        if (
+            previousSaved
+            === null
+        ) {
+
+            localStorage.removeItem(
+                savedKey
+            );
+
+        } else {
+
+            localStorage.setItem(
+                savedKey,
+                previousSaved
             );
         }
 
-    } catch (error) {
-        // 고정 선수 저장이 실패하면 이전 스쿼드 저장본 복원.
-        if (previousSaved === null) {
-            localStorage.removeItem(savedKey);
-        } else {
-            localStorage.setItem(savedKey, previousSaved);
-        }
 
         throw error;
     }
 
-    // 두 저장이 끝난 뒤 화면을 한 번만 갱신.
-    renderQuickSquadResult(next);
+
+    // =====================================
+    // 7. 화면 갱신
+    //
+    // renderQuickSquadResult 안에서
+    // 팀컬러 아이콘 + XI 전체가 같이 갱신됨
+    // =====================================
+
+    renderQuickSquadResult(
+        next
+    );
 }
+
 
 // =========================================
 // QUICK SQUAD PLAYER DETAIL
@@ -3181,6 +4693,191 @@ quickSquadGenerateButtonElement
         "click",
         generateQuickSquad
     );
+
+// =========================================
+// TEAM COLOR TOOLTIP EVENTS
+// =========================================
+
+function isQuickSquadHoverDevice() {
+
+    return window.matchMedia(
+        "(hover: hover) and (pointer: fine)"
+    ).matches;
+}
+
+
+quickSquadActiveTeamColorsElement
+    ?.addEventListener(
+        "mouseover",
+        event => {
+
+            if (
+                !isQuickSquadHoverDevice()
+            ) {
+                return;
+            }
+
+
+            const targetElement =
+                event.target.closest(
+                    "[data-quick-squad-team-color-index]"
+                );
+
+
+            if (
+                !targetElement
+                ||
+                !quickSquadActiveTeamColorsElement
+                    .contains(
+                        targetElement
+                    )
+            ) {
+                return;
+            }
+
+
+            if (
+                event.relatedTarget
+                &&
+                targetElement.contains(
+                    event.relatedTarget
+                )
+            ) {
+                return;
+            }
+
+
+            showQuickSquadTeamColorTooltip(
+                targetElement
+            );
+        }
+    );
+
+
+quickSquadActiveTeamColorsElement
+    ?.addEventListener(
+        "mouseout",
+        event => {
+
+            if (
+                !isQuickSquadHoverDevice()
+            ) {
+                return;
+            }
+
+
+            const targetElement =
+                event.target.closest(
+                    "[data-quick-squad-team-color-index]"
+                );
+
+
+            if (!targetElement) {
+                return;
+            }
+
+
+            if (
+                event.relatedTarget
+                &&
+                targetElement.contains(
+                    event.relatedTarget
+                )
+            ) {
+                return;
+            }
+
+
+            hideQuickSquadTeamColorTooltip();
+        }
+    );
+
+
+quickSquadActiveTeamColorsElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const targetElement =
+                event.target.closest(
+                    "[data-quick-squad-team-color-index]"
+                );
+
+
+            if (!targetElement) {
+                return;
+            }
+
+
+            // PC에서는 hover 사용.
+            if (
+                isQuickSquadHoverDevice()
+            ) {
+                return;
+            }
+
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
+
+            if (
+                quickSquadTeamColorTooltipTarget
+                ===
+                targetElement
+            ) {
+
+                hideQuickSquadTeamColorTooltip();
+
+                return;
+            }
+
+
+            showQuickSquadTeamColorTooltip(
+                targetElement
+            );
+        }
+    );
+
+
+document.addEventListener(
+    "click",
+    event => {
+
+        if (
+            !quickSquadTeamColorTooltipTarget
+        ) {
+            return;
+        }
+
+
+        if (
+            quickSquadActiveTeamColorsElement
+                ?.contains(
+                    event.target
+                )
+        ) {
+            return;
+        }
+
+
+        hideQuickSquadTeamColorTooltip();
+    }
+);
+
+
+window.addEventListener(
+    "resize",
+    hideQuickSquadTeamColorTooltip
+);
+
+
+window.addEventListener(
+    "scroll",
+    hideQuickSquadTeamColorTooltip,
+    true
+);
 
 quickSquadFormationElement
     ?.addEventListener(

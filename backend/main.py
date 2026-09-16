@@ -52,6 +52,11 @@ from backend.player_supply_restriction import (
     get_supply_restriction_status_by_season_id,
 )
 
+from backend.team_color_engine import (
+    get_active_team_colors_for_squad,
+    get_active_enhancement_team_colors_for_squad,
+)
+
 import re
 
 import httpx
@@ -639,6 +644,408 @@ def get_db_connection():
         row_factory=dict_row,
     )
 
+
+# =========================================
+# QUICK SQUAD
+# BASE PLAYER STATS
+# =========================================
+
+QUICK_SQUAD_BASE_STAT_KEYS = (
+    "sprint_speed",
+    "acceleration",
+    "finishing",
+    "shot_power",
+    "long_shots",
+    "positioning",
+    "volleys",
+    "penalties",
+
+    "short_pass",
+    "vision",
+    "crossing",
+    "long_pass",
+    "free_kick",
+    "curve",
+
+    "dribbling",
+    "ball_control",
+    "agility",
+    "balance",
+    "reactions",
+
+    "marking",
+    "tackle",
+    "interceptions",
+    "heading",
+    "sliding_tackle",
+
+    "strength",
+    "stamina",
+    "aggression",
+    "jumping",
+    "composure",
+
+    "gk_diving",
+    "gk_handling",
+    "gk_kick",
+    "gk_reflexes",
+    "gk_positioning",
+)
+
+
+def attach_quick_squad_player_base_stats(
+    connection,
+    players,
+):
+
+    sp_ids = [
+        int(
+            player.get(
+                "sp_id"
+            )
+        )
+
+        for player
+        in (
+            players
+            or []
+        )
+
+        if (
+            player.get(
+                "sp_id"
+            )
+            is not None
+        )
+    ]
+
+
+    if not sp_ids:
+        return
+
+
+    stat_select_sql = (
+        ",\n".join(
+            f"p.{stat_key}"
+
+            for stat_key
+            in QUICK_SQUAD_BASE_STAT_KEYS
+        )
+    )
+
+
+    with connection.cursor() as cursor:
+
+        cursor.execute(
+            f"""
+            SELECT
+                p.sp_id,
+                p.position,
+                p.ovr,
+                {stat_select_sql}
+
+            FROM
+                fconline_players
+                AS p
+
+            WHERE
+                p.sp_id
+                =
+                ANY(%s)
+            """,
+            (
+                sp_ids,
+            ),
+        )
+
+
+        rows = (
+            cursor.fetchall()
+        )
+
+
+    row_map = {
+        int(
+            row[
+                "sp_id"
+            ]
+        ):
+            row
+
+        for row
+        in rows
+    }
+
+
+    for player in players:
+
+        try:
+
+            sp_id = int(
+                player.get(
+                    "sp_id"
+                )
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+
+            continue
+
+
+        row = (
+            row_map.get(
+                sp_id
+            )
+        )
+
+
+        if not row:
+            continue
+
+
+        player[
+            "base_stats"
+        ] = {
+            stat_key:
+                (
+                    None
+
+                    if (
+                        row.get(
+                            stat_key
+                        )
+                        is None
+                    )
+
+                    else int(
+                        row[
+                            stat_key
+                        ]
+                    )
+                )
+
+            for stat_key
+            in QUICK_SQUAD_BASE_STAT_KEYS
+        }
+
+
+        if not (
+            player.get(
+                "position"
+            )
+        ):
+
+            player[
+                "position"
+            ] = (
+                row.get(
+                    "position"
+                )
+                or ""
+            )
+
+
+        if not (
+            player.get(
+                "base_ovr"
+            )
+        ):
+
+            player[
+                "base_ovr"
+            ] = int(
+                row.get(
+                    "ovr"
+                )
+                or 0
+            )
+
+# =========================================
+# QUICK SQUAD
+# ACTIVE TEAM COLOR ATTACH
+# =========================================
+
+def attach_quick_squad_active_team_colors(
+    result,
+):
+
+    if not isinstance(
+        result,
+        dict,
+    ):
+
+        return result
+
+
+    players = (
+        result.get(
+            "players"
+        )
+        or []
+    )
+
+
+    # =====================================
+    # 최종 XI가 아니면 판정하지 않음
+    # =====================================
+
+    if (
+        len(
+            players
+        )
+        != 11
+    ):
+
+        result[
+            "active_team_color_count"
+        ] = 0
+
+        result[
+            "active_team_colors"
+        ] = []
+
+        result[
+            "active_non_enhancement_team_color_count"
+        ] = 0
+
+        result[
+            "active_enhancement_team_color_count"
+        ] = 0
+
+        result[
+            "active_enhancement_team_colors"
+        ] = []
+
+        return result
+
+
+    # =====================================
+    # 일반 / 특성 + 강화 팀컬러
+    # =====================================
+
+    with get_db_connection() as connection:
+
+        # =====================================
+        # 11명 원본 세부 능력치
+        # =====================================
+
+        attach_quick_squad_player_base_stats(
+            connection,
+            players,
+        )
+
+
+        # =====================================
+        # 일반 / 특성 팀컬러
+        # =====================================
+
+        normal_team_colors = (
+            get_active_team_colors_for_squad(
+                connection,
+                players,
+            )
+        )
+
+
+        # =====================================
+        # 강화 팀컬러
+        # =====================================
+
+        enhancement_team_colors = (
+            get_active_enhancement_team_colors_for_squad(
+                connection,
+                players,
+            )
+        )
+
+
+    selected_team_color_id = int(
+        result.get(
+            "team_color_id"
+        )
+        or 0
+    )
+
+
+    # =====================================
+    # Quick Squad에서 직접 선택한
+    # 기준 팀컬러 표시
+    # =====================================
+
+    for team_color in (
+        normal_team_colors
+    ):
+
+        team_color[
+            "is_selected_team_color"
+        ] = (
+            int(
+                team_color[
+                    "team_color_id"
+                ]
+            )
+            ==
+            selected_team_color_id
+        )
+
+
+    # 강화 팀컬러는 사용자가
+    # 팀 선택창에서 선택한 팀컬러가 아니다.
+    for team_color in (
+        enhancement_team_colors
+    ):
+
+        team_color[
+            "is_selected_team_color"
+        ] = False
+
+
+    all_active_team_colors = (
+        normal_team_colors
+        +
+        enhancement_team_colors
+    )
+
+
+    result[
+        "active_non_enhancement_team_color_count"
+    ] = len(
+        normal_team_colors
+    )
+
+
+    result[
+        "active_enhancement_team_color_count"
+    ] = len(
+        enhancement_team_colors
+    )
+
+
+    result[
+        "active_enhancement_team_colors"
+    ] = (
+        enhancement_team_colors
+    )
+
+
+    result[
+        "active_team_color_count"
+    ] = len(
+        all_active_team_colors
+    )
+
+
+    result[
+        "active_team_colors"
+    ] = (
+        all_active_team_colors
+    )
+
+
+    return result
 
 def attach_quick_squad_popularity(candidate_rows):
     candidates = [
@@ -30666,6 +31073,43 @@ class QuickSquadRecommendRequest(BaseModel):
         "value",
     ] = "meta"
 
+# =========================================
+# QUICK SQUAD
+# TEAM COLOR RECALCULATION
+# =========================================
+
+class QuickSquadTeamColorRecalculatePlayer(
+    BaseModel
+):
+
+    sp_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+    grade: int = Field(
+        ge=1,
+        le=13,
+        strict=True,
+    )
+
+
+class QuickSquadTeamColorRecalculateRequest(
+    BaseModel
+):
+
+    team_color_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+    players: list[
+        QuickSquadTeamColorRecalculatePlayer
+    ] = Field(
+        default_factory=list,
+        max_length=11,
+    )
+
 def get_quick_squad_cached_prices(
     sp_id: int,
 ):
@@ -33706,6 +34150,163 @@ def create_locked_squad_service():
         cap=QUICK_SQUAD_SALARY_CAP,
     )
 
+# =========================================
+# QUICK SQUAD
+# TEAM COLOR RECALCULATION API
+# =========================================
+
+@app.post(
+    "/api/quick-squad/team-colors/recalculate"
+)
+def recalculate_quick_squad_team_colors(
+    request_data:
+        QuickSquadTeamColorRecalculateRequest,
+):
+
+    if (
+        len(
+            request_data.players
+        )
+        != 11
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "팀컬러 재계산에는 "
+                "11명의 선수가 필요합니다."
+            ),
+        )
+
+
+    players = [
+        {
+            "sp_id":
+                int(
+                    player.sp_id
+                ),
+
+            "grade":
+                int(
+                    player.grade
+                ),
+        }
+
+        for player
+        in request_data.players
+    ]
+
+
+    sp_ids = [
+        int(
+            player[
+                "sp_id"
+            ]
+        )
+
+        for player
+        in players
+    ]
+
+
+    if (
+        len(
+            set(
+                sp_ids
+            )
+        )
+        != 11
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "동일한 선수 카드가 "
+                "중복되어 있습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        normal_team_colors = (
+            get_active_team_colors_for_squad(
+                connection,
+                players,
+            )
+        )
+
+
+        enhancement_team_colors = (
+            get_active_enhancement_team_colors_for_squad(
+                connection,
+                players,
+            )
+        )
+
+
+    selected_team_color_id = int(
+        request_data.team_color_id
+    )
+
+
+    for team_color in (
+        normal_team_colors
+    ):
+
+        team_color[
+            "is_selected_team_color"
+        ] = (
+            int(
+                team_color[
+                    "team_color_id"
+                ]
+            )
+            ==
+            selected_team_color_id
+        )
+
+
+    for team_color in (
+        enhancement_team_colors
+    ):
+
+        team_color[
+            "is_selected_team_color"
+        ] = False
+
+
+    active_team_colors = (
+        normal_team_colors
+        +
+        enhancement_team_colors
+    )
+
+
+    return {
+
+        "active_non_enhancement_team_color_count":
+            len(
+                normal_team_colors
+            ),
+
+        "active_enhancement_team_color_count":
+            len(
+                enhancement_team_colors
+            ),
+
+        "active_enhancement_team_colors":
+            enhancement_team_colors,
+
+        "active_team_color_count":
+            len(
+                active_team_colors
+            ),
+
+        "active_team_colors":
+            active_team_colors,
+    }
+
 @app.post("/api/quick-squad/locked/preview")
 def preview_quick_squad_locked(
     request_data: LockedPreviewRequest,
@@ -33822,21 +34423,55 @@ def recommend_quick_squad(
         request_data.locked_players
         or request_data.budget_mode != "legacy"
     ):
-        return create_locked_squad_service().recommend(
-            request_data
+
+        result = (
+            create_locked_squad_service()
+            .recommend(
+                request_data
+            )
+        )
+
+
+        return (
+            attach_quick_squad_active_team_colors(
+                result
+            )
         )
 
     # =====================================
     # 고정 강화 추천
     # =====================================
 
-    if request_data.enhancement_grade is not None:
-        return recommend_fixed_quick_squad(
-            team_color_id=team_color_id,
-            budget_bp=budget_bp,
-            formation=formation,
-            slots=slots,
-            grade=request_data.enhancement_grade,
+    if (
+        request_data.enhancement_grade
+        is not None
+    ):
+
+        result = (
+            recommend_fixed_quick_squad(
+                team_color_id=
+                    team_color_id,
+
+                budget_bp=
+                    budget_bp,
+
+                formation=
+                    formation,
+
+                slots=
+                    slots,
+
+                grade=
+                    request_data
+                    .enhancement_grade,
+            )
+        )
+
+
+        return (
+            attach_quick_squad_active_team_colors(
+                result
+            )
         )
 
 
@@ -34340,7 +34975,7 @@ def recommend_quick_squad(
     )
 
 
-    return {
+    result = {
         "team_color_id":
             team_color_id,
 
@@ -34381,6 +35016,13 @@ def recommend_quick_squad(
                     "FC Online DataCenter",
             },
     }
+
+
+    return (
+        attach_quick_squad_active_team_colors(
+            result
+        )
+    )
 
 @app.get(
     "/api/player-database/filters/nations"
@@ -34795,6 +35437,7 @@ def search_player_database_api(
     nation_id: int | None = None,
     nation_name: str = "",
     team_color_id: int | None = None,
+    official_team_color_id: int | None = None,
     team_name: str = "",
     position: str = "",
     positions: str = "",
@@ -34878,6 +35521,9 @@ def search_player_database_api(
 
             team_color_id=
                 team_color_id,
+
+            official_team_color_id=
+                official_team_color_id,
 
             team_name=
                 team_name,

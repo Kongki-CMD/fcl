@@ -17306,21 +17306,25 @@ body.player-recommend-open {
 }
 
 
-.quick-squad-field-header {
+/* =========================================
+   LEFT - FORMATION
+========================================= */
+
+.quick-squad-field-header
+> .quick-squad-field-heading-main {
     display: flex;
 
-    align-items: flex-end;
-    justify-content: space-between;
+    flex-direction: column;
 
-    gap: 20px;
+    align-items: flex-start;
 
-    min-height: 48px;
+    gap: 4px;
 
-    margin-bottom: 14px;
+    min-width: 0;
 }
 
 
-.quick-squad-field-header > div {
+.quick-squad-field-formation-row {
     display: flex;
 
     align-items: baseline;
@@ -17329,36 +17333,55 @@ body.player-recommend-open {
 }
 
 
-.quick-squad-field-header span {
-    color:
-        rgba(
-            255,
-            255,
-            255,
-            0.34
-        );
+/* =========================================
+   RIGHT - TEAM COLOR
+========================================= */
 
-    font-size: 9px;
+.quick-squad-team-color-panel {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: flex-end;
+
+    gap: 7px;
+
+    min-width: 0;
+}
+
+
+.quick-squad-team-color-panel-title {
+    color: rgba(255, 255, 255, 0.5);
+
+    font-size: 10px;
+
     font-weight: 800;
 
+    line-height: 1;
+
     letter-spacing: 1px;
+
+    white-space: nowrap;
 }
 
 
-.quick-squad-field-header strong {
-    color: #ffffff;
+.quick-squad-active-team-colors {
+    display: flex;
 
-    font-size: 22px;
-    font-weight: 900;
+    align-items: center;
+
+    justify-content: flex-end;
+
+    flex-wrap: wrap;
+
+    gap: 7px;
+
+    margin: 0;
 }
 
 
-.quick-squad-result-status {
-    max-width: 380px;
-
-    text-align: right;
-
-    line-height: 1.5;
+.quick-squad-active-team-colors[hidden] {
+    display: none;
 }
 
 
@@ -20485,6 +20508,1267 @@ body.player-recommend-open {
         gap: 6px;
 
         padding: 9px;
+    }
+
+}
+
+/* =========================================
+   QUICK SQUAD - ACTIVE TEAM COLORS
+========================================= */
+
+.quick-squad-field-header {
+    align-items: flex-start;
+}
+
+
+.quick-squad-field-header
+> .quick-squad-field-heading-main {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+}
+
+
+.quick-squad-field-formation-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+
+
+.quick-squad-active-team-colors {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+
+    flex-wrap: wrap;
+
+    gap: 7px;
+
+    margin-left: auto;
+}
+
+
+.quick-squad-active-team-colors[hidden] {
+    display: none;
+}
+
+
+.quick-squad-active-team-color {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+
+    flex: 0 0 36px;
+
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(42, 42, 42, 0.96) 0%,
+            rgba(24, 24, 24, 0.96) 100%
+        );
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.06),
+        0 2px 8px rgba(0, 0, 0, 0.28);
+
+    cursor: help;
+
+    transition:
+        transform 0.15s,
+        border-color 0.15s,
+        background 0.15s,
+        box-shadow 0.15s;
+}
+
+
+.quick-squad-active-team-color:hover {
+    z-index: 5;
+
+    transform: translateY(-2px);
+
+    border-color: rgba(255, 255, 255, 0.38);
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(56, 56, 56, 0.98) 0%,
+            rgba(30, 30, 30, 0.98) 100%
+        );
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.08),
+        0 4px 12px rgba(0, 0, 0, 0.34);
+}
+
+
+.quick-squad-active-team-color.is-selected {
+    border-color: rgba(213, 163, 66, 0.82);
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(70, 55, 24, 0.96) 0%,
+            rgba(35, 28, 12, 0.96) 100%
+        );
+
+    box-shadow:
+        0 0 0 1px rgba(213, 163, 66, 0.14),
+        0 4px 10px rgba(0, 0, 0, 0.28);
+}
+
+
+.quick-squad-active-team-color.is-enhancement {
+    border-color: rgba(218, 184, 84, 0.78);
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(66, 54, 20, 0.96) 0%,
+            rgba(34, 28, 10, 0.96) 100%
+        );
+}
+
+
+.quick-squad-active-team-color-icon {
+    display: block;
+
+    width: 30px;
+    height: 30px;
+
+    object-fit: contain;
+
+    filter:
+        brightness(1.12)
+        contrast(1.08)
+        drop-shadow(0 1px 1px rgba(0, 0, 0, 0.28));
+}
+
+.quick-squad-active-team-color:not(.is-selected):not(.is-enhancement) {
+    border-color: rgba(150, 190, 255, 0.22);
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(48, 54, 66, 0.96) 0%,
+            rgba(25, 28, 35, 0.96) 100%
+        );
+}
+
+
+.quick-squad-active-team-color-fallback {
+    color: #777;
+
+    font-size: 8px;
+    font-weight: 900;
+}
+
+
+.quick-squad-active-team-color-stage {
+    position: absolute;
+
+    right: -4px;
+    bottom: -4px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 16px;
+    height: 16px;
+
+    border: 1px solid #111;
+    border-radius: 50%;
+
+    background: #d5a342;
+
+    color: #111;
+
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+
+@media (max-width: 768px) {
+
+    .quick-squad-field-header {
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+        gap: 10px;
+    }
+
+
+    .quick-squad-team-color-panel {
+        align-items: flex-end;
+
+        gap: 5px;
+    }
+
+
+    .quick-squad-team-color-panel-title {
+        font-size: 9px;
+    }
+
+
+    .quick-squad-active-team-colors {
+        justify-content: flex-end;
+
+        gap: 5px;
+    }
+
+
+    .quick-squad-active-team-color {
+        width: 31px;
+        height: 31px;
+
+        flex-basis: 31px;
+    }
+
+
+    .quick-squad-active-team-color-icon {
+        width: 25px;
+        height: 25px;
+    }
+
+}
+
+/* =========================================
+   QUICK SQUAD TEAM COLOR TOOLTIP
+========================================= */
+
+button.quick-squad-active-team-color {
+    padding: 0;
+
+    font: inherit;
+
+    appearance: none;
+    -webkit-appearance: none;
+}
+
+
+.quick-squad-active-team-color.is-tooltip-open {
+    transform: translateY(-2px);
+
+    border-color:
+        rgba(
+            213,
+            163,
+            66,
+            0.95
+        );
+
+    box-shadow:
+        0 0 0 1px
+        rgba(
+            213,
+            163,
+            66,
+            0.18
+        ),
+        0 5px 14px
+        rgba(
+            0,
+            0,
+            0,
+            0.4
+        );
+}
+
+
+.quick-squad-active-team-color:focus-visible {
+    outline:
+        2px solid
+        rgba(
+            213,
+            163,
+            66,
+            0.9
+        );
+
+    outline-offset: 2px;
+}
+
+
+/* =========================================
+   TOOLTIP BOX
+========================================= */
+
+.quick-squad-team-color-tooltip {
+    position: fixed;
+
+    z-index: 5000;
+
+    width:
+        min(
+            280px,
+            calc(
+                100vw
+                -
+                20px
+            )
+        );
+
+    padding: 13px;
+
+    border:
+        1px solid
+        rgba(
+            213,
+            163,
+            66,
+            0.45
+        );
+
+    border-radius: 10px;
+
+    background:
+        rgba(
+            12,
+            12,
+            12,
+            0.98
+        );
+
+    box-shadow:
+        0
+        12px
+        30px
+        rgba(
+            0,
+            0,
+            0,
+            0.55
+        );
+
+    pointer-events: none;
+}
+
+
+.quick-squad-team-color-tooltip[hidden] {
+    display: none;
+}
+
+
+/* =========================================
+   TOOLTIP HEADER
+========================================= */
+
+.quick-squad-team-color-tooltip-header {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding-bottom: 10px;
+
+    border-bottom:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+}
+
+
+.quick-squad-team-color-tooltip-icon {
+    width: 40px;
+    height: 40px;
+
+    flex: 0 0 40px;
+
+    object-fit: contain;
+
+    filter:
+        brightness(1.12)
+        contrast(1.08);
+}
+
+
+.quick-squad-team-color-tooltip-title {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 3px;
+
+    min-width: 0;
+}
+
+
+.quick-squad-team-color-tooltip-title strong {
+    overflow: hidden;
+
+    color: #f1f1f1;
+
+    font-size: 13px;
+    font-weight: 900;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.quick-squad-team-color-tooltip-title span {
+    color: #b79a60;
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+
+/* =========================================
+   MATCH INFO
+========================================= */
+
+.quick-squad-team-color-tooltip-meta {
+    display: flex;
+
+    gap: 8px;
+
+    margin-top: 10px;
+}
+
+
+.quick-squad-team-color-tooltip-meta span {
+    padding:
+        4px
+        7px;
+
+    border-radius: 5px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.05
+        );
+
+    color: #888;
+
+    font-size: 9px;
+}
+
+
+.quick-squad-team-color-tooltip-meta strong {
+    margin-left: 3px;
+
+    color: #ddd;
+
+    font-weight: 800;
+}
+
+
+/* =========================================
+   EFFECTS
+========================================= */
+
+.quick-squad-team-color-tooltip-effects {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 5px;
+
+    margin-top: 10px;
+}
+
+
+.quick-squad-team-color-tooltip-effect {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 16px;
+
+    min-height: 26px;
+
+    padding:
+        5px
+        8px;
+
+    border-radius: 5px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
+}
+
+
+.quick-squad-team-color-tooltip-effect span {
+    color: #aaa;
+
+    font-size: 10px;
+}
+
+
+.quick-squad-team-color-tooltip-effect strong {
+    color: #d7bc78;
+
+    font-size: 11px;
+    font-weight: 900;
+
+    white-space: nowrap;
+}
+
+
+.quick-squad-team-color-tooltip-empty {
+    color: #777;
+
+    font-size: 10px;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .quick-squad-team-color-tooltip {
+        width:
+            min(
+                260px,
+                calc(
+                    100vw
+                    -
+                    20px
+                )
+            );
+
+        padding: 12px;
+    }
+
+
+    .quick-squad-team-color-tooltip-icon {
+        width: 36px;
+        height: 36px;
+
+        flex-basis: 36px;
+    }
+
+
+    .quick-squad-team-color-tooltip-title strong {
+        font-size: 12px;
+    }
+
+
+    .quick-squad-team-color-tooltip-effect span {
+        font-size: 10px;
+    }
+
+
+    .quick-squad-team-color-tooltip-effect strong {
+        font-size: 11px;
+    }
+
+}
+
+/* =========================================
+   PLAYER DATABASE
+   OFFICIAL TEAM COLOR FILTER
+========================================= */
+
+.player-database-official-team-color-panel {
+    width: 420px;
+    max-width: min(420px, calc(100vw - 24px));
+
+    padding: 12px;
+}
+
+
+.player-database-official-team-color-categories {
+    display: grid;
+
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap: 6px;
+
+    margin:
+        10px
+        0;
+}
+
+
+.player-database-official-team-color-category {
+    min-height: 34px;
+
+    padding:
+        7px
+        10px;
+
+    border:
+        1px solid
+        #353535;
+
+    border-radius: 6px;
+
+    background:
+        #191919;
+
+    color:
+        #888;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.player-database-official-team-color-category:hover {
+    border-color:
+        #555;
+
+    color:
+        #ddd;
+}
+
+
+.player-database-official-team-color-category.selected {
+    border-color:
+        #9b814c;
+
+    background:
+        rgba(
+            155,
+            129,
+            76,
+            0.13
+        );
+
+    color:
+        #d7bc78;
+}
+
+
+.player-database-official-team-color-options {
+    display: flex;
+
+    flex-direction: column;
+
+    max-height: 360px;
+
+    overflow-y: auto;
+
+    border-top:
+        1px solid
+        #2c2c2c;
+}
+
+
+.player-database-official-team-color-option {
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 12px;
+
+    width: 100%;
+
+    min-height: 44px;
+
+    padding:
+        6px
+        8px;
+
+    border: 0;
+    border-bottom:
+        1px solid
+        #292929;
+
+    background:
+        transparent;
+
+    color:
+        #bbb;
+
+    text-align: left;
+
+    cursor: pointer;
+}
+
+
+.player-database-official-team-color-option:hover {
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.04
+        );
+
+    color:
+        #fff;
+}
+
+
+.player-database-official-team-color-option.selected {
+    background:
+        rgba(
+            155,
+            129,
+            76,
+            0.12
+        );
+
+    color:
+        #d7bc78;
+}
+
+
+.player-database-official-team-color-option-main {
+    display: flex;
+
+    align-items: center;
+
+    gap: 9px;
+
+    min-width: 0;
+}
+
+
+.player-database-official-team-color-option-main img {
+    width: 30px;
+    height: 30px;
+
+    flex:
+        0
+        0
+        30px;
+
+    object-fit: contain;
+}
+
+
+.player-database-official-team-color-option-main span {
+    overflow: hidden;
+
+    font-size: 11px;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.player-database-official-team-color-option small {
+    flex: 0 0 auto;
+
+    color:
+        #666;
+
+    font-size: 9px;
+}
+
+
+@media (max-width: 768px) {
+
+    .player-database-official-team-color-panel {
+        width:
+            min(
+                360px,
+                calc(
+                    100vw
+                    -
+                    24px
+                )
+            );
+    }
+
+
+    .player-database-official-team-color-options {
+        max-height: 300px;
+    }
+
+}
+
+/* =========================================
+   QUICK SQUAD DETAIL
+   CURRENT TEAM COLOR
+========================================= */
+
+.qsd-current-team-colors {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 7px;
+
+    margin-top: 9px;
+}
+
+
+.qsd-current-team-color-item {
+    padding: 8px 9px;
+
+    border:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.08
+        );
+
+    border-radius: 6px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
+}
+
+
+.qsd-current-team-color-main {
+    display: flex;
+
+    align-items: center;
+
+    gap: 8px;
+}
+
+
+.qsd-current-team-color-main img {
+    width: 28px;
+    height: 28px;
+
+    flex:
+        0
+        0
+        28px;
+
+    object-fit: contain;
+
+    filter:
+        brightness(1.12)
+        contrast(1.08);
+}
+
+
+.qsd-current-team-color-main div {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 2px;
+}
+
+
+.qsd-current-team-color-main strong {
+    color: #ddd;
+
+    font-size: 11px;
+}
+
+
+.qsd-current-team-color-main small {
+    color: #777;
+
+    font-size: 9px;
+}
+
+
+.qsd-current-team-color-item p {
+    margin-top: 6px;
+
+    color: #a8a8a8;
+
+    font-size: 10px;
+
+    line-height: 1.45;
+}
+
+
+.qsd-current-team-color-empty {
+    padding: 8px;
+
+    color: #777;
+
+    font-size: 10px;
+
+    text-align: center;
+}
+
+
+.qsd-current-team-color-note {
+    display: block;
+
+    margin-top: 8px;
+
+    color: #666;
+
+    font-size: 9px;
+
+    line-height: 1.45;
+}
+
+/* =========================================
+   QUICK SQUAD
+   TEAM COLOR TOOLTIP PLAYER LIST
+========================================= */
+
+.quick-squad-team-color-tooltip {
+    width:
+        min(
+            360px,
+            calc(
+                100vw
+                -
+                20px
+            )
+        );
+
+    max-height:
+        min(
+            620px,
+            calc(
+                100vh
+                -
+                20px
+            )
+        );
+
+    overflow-y: auto;
+}
+
+
+.quick-squad-team-color-tooltip-player-list {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 2px;
+
+    margin-top: 10px;
+
+    padding-top: 8px;
+
+    border-top:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.09
+        );
+}
+
+
+.quick-squad-team-color-tooltip-player {
+    display: grid;
+
+    grid-template-columns:
+        28px
+        minmax(0, 1fr)
+        auto;
+
+    align-items: center;
+
+    gap: 8px;
+
+    min-height: 34px;
+
+    padding:
+        3px
+        5px;
+
+    border-radius: 5px;
+}
+
+
+.quick-squad-team-color-tooltip-player:hover {
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.04
+        );
+}
+
+
+.quick-squad-team-color-tooltip-player-season {
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    width: 28px;
+    height: 28px;
+}
+
+
+.quick-squad-team-color-tooltip-player-season img {
+    display: block;
+
+    width: 24px;
+    height: 24px;
+
+    object-fit: contain;
+}
+
+
+.quick-squad-team-color-tooltip-player-name {
+    min-width: 0;
+
+    overflow: hidden;
+
+    color: #d9e1ea;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.quick-squad-team-color-tooltip-player-ovr {
+    min-width: 28px;
+
+    color: #f0ce77;
+
+    font-size: 12px;
+    font-weight: 800;
+
+    font-variant-numeric:
+        tabular-nums;
+
+    text-align: right;
+}
+
+
+@media (max-width: 768px) {
+
+    .quick-squad-team-color-tooltip {
+        width:
+            min(
+                340px,
+                calc(
+                    100vw
+                    -
+                    16px
+                )
+            );
+
+        max-height:
+            70vh;
+    }
+
+}
+
+/* =========================================
+   QUICK SQUAD RESULT HEADER
+   COMPACT LAYOUT
+========================================= */
+
+.quick-squad-field-column {
+    padding: 10px 12px;
+}
+
+
+.quick-squad-field-header {
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+
+    grid-template-rows:
+        auto
+        auto;
+
+    align-items: center;
+
+    column-gap: 18px;
+    row-gap: 3px;
+
+    min-height: 0;
+
+    margin-bottom: 8px;
+
+    padding: 6px 4px;
+}
+
+
+/* FORMATION 영역 */
+
+.quick-squad-field-header
+> div:first-child {
+    grid-column: 1;
+    grid-row: 1;
+
+    display: flex;
+
+    align-items: baseline;
+
+    gap: 8px;
+
+    min-width: 0;
+}
+
+
+.quick-squad-field-header
+> div:first-child span {
+    font-size: 11px;
+
+    line-height: 1;
+}
+
+
+.quick-squad-field-header
+> div:first-child strong {
+    font-size: 17px;
+
+    line-height: 1.1;
+}
+
+
+/* 추천 완료 / 남은 예산 */
+
+.quick-squad-result-status {
+    grid-column: 1;
+    grid-row: 2;
+
+    margin: 0;
+
+    font-size: 12px;
+
+    line-height: 1.25;
+
+    white-space: nowrap;
+}
+
+
+/* =========================================
+   ACTIVE TEAM COLOR PANEL
+========================================= */
+
+.quick-squad-team-color-panel {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+
+    align-self: center;
+    justify-self: end;
+
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: flex-end;
+
+    justify-content: center;
+
+    gap: 4px;
+
+    min-width: 0;
+
+    margin: 0;
+    padding: 0;
+}
+
+
+/* "팀컬러 적용" 글자 */
+
+.quick-squad-team-color-panel
+> :first-child {
+    margin: 0;
+
+    font-size: 9px;
+
+    line-height: 1;
+
+    white-space: nowrap;
+}
+
+
+/* 아이콘들이 들어있는 내부 영역 */
+
+.quick-squad-team-color-panel
+img {
+    width: 30px;
+    height: 30px;
+
+    object-fit: contain;
+}
+
+
+/* 아이콘 사이 여백도 축소 */
+
+.quick-squad-team-color-panel
+button {
+    margin: 0;
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .quick-squad-field-column {
+        padding: 8px;
+    }
+
+
+    .quick-squad-field-header {
+        grid-template-columns:
+            minmax(0, 1fr)
+            auto;
+
+        gap: 4px 10px;
+
+        padding: 5px 2px;
+
+        margin-bottom: 6px;
+    }
+
+
+    .quick-squad-field-header
+    > div:first-child strong {
+        font-size: 15px;
+    }
+
+
+    .quick-squad-result-status {
+        font-size: 10px;
+    }
+
+
+    .quick-squad-team-color-panel
+    img {
+        width: 27px;
+        height: 27px;
     }
 
 }

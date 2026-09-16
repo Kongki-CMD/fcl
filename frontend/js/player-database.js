@@ -126,6 +126,51 @@ const playerTeamOptionsElement =
         "#player-database-team-options"
     );
 
+// =========================================
+// OFFICIAL TEAM COLOR
+// =========================================
+
+const playerOfficialTeamColorToggleElement =
+    document.querySelector(
+        "#player-database-official-team-color-toggle"
+    );
+
+
+const playerOfficialTeamColorPanelElement =
+    document.querySelector(
+        "#player-database-official-team-color-panel"
+    );
+
+
+const playerOfficialTeamColorSummaryElement =
+    document.querySelector(
+        "#player-database-official-team-color-summary"
+    );
+
+
+const playerOfficialTeamColorSearchElement =
+    document.querySelector(
+        "#player-database-official-team-color-search"
+    );
+
+
+const playerOfficialTeamColorClearElement =
+    document.querySelector(
+        "#player-database-official-team-color-clear"
+    );
+
+
+const playerOfficialTeamColorCategoriesElement =
+    document.querySelector(
+        "#player-database-official-team-color-categories"
+    );
+
+
+const playerOfficialTeamColorOptionsElement =
+    document.querySelector(
+        "#player-database-official-team-color-options"
+    );
+
 const playerResultsElement =
     document.querySelector(
         "#player-database-results"
@@ -354,6 +399,29 @@ let selectedTeamName =
     "";
 
 let teamSearchQuery =
+    "";
+
+// =========================================
+// OFFICIAL TEAM COLOR STATE
+// =========================================
+
+let officialTeamColorGroups =
+    [];
+
+
+let activeOfficialTeamColorCategory =
+    "affiliation";
+
+
+let selectedOfficialTeamColorId =
+    null;
+
+
+let selectedOfficialTeamColorName =
+    "";
+
+
+let officialTeamColorSearchQuery =
     "";
 
 const officialPositionGroups = [
@@ -1161,6 +1229,259 @@ function renderTeamOptions() {
 
 
 // =========================================
+// OFFICIAL TEAM COLOR
+// =========================================
+
+function getOfficialTeamColors() {
+
+    return officialTeamColorGroups
+        .flatMap(
+            group =>
+                (
+                    group.team_colors
+                    ?? []
+                )
+        );
+}
+
+
+function renderOfficialTeamColorCategories() {
+
+    if (
+        !playerOfficialTeamColorCategoriesElement
+    ) {
+        return;
+    }
+
+
+    playerOfficialTeamColorCategoriesElement
+        .innerHTML =
+            officialTeamColorGroups
+                .map(
+                    group => {
+
+                        const selected =
+                            (
+                                group.category
+                                ===
+                                activeOfficialTeamColorCategory
+                            );
+
+
+                        return `
+                            <button
+                                type="button"
+                                class="
+                                    player-database-official-team-color-category
+                                    ${
+                                        selected
+                                            ? "selected"
+                                            : ""
+                                    }
+                                "
+                                data-official-team-color-category="${escapeHtml(
+                                    group.category
+                                )}"
+                            >
+                                ${escapeHtml(
+                                    group.category_name
+                                )}
+                            </button>
+                        `;
+                    }
+                )
+                .join("");
+}
+
+
+function renderOfficialTeamColorOptions() {
+
+    if (
+        !playerOfficialTeamColorOptionsElement
+    ) {
+        return;
+    }
+
+
+    const searchQuery =
+        officialTeamColorSearchQuery
+            .trim()
+            .toLowerCase();
+
+
+    let teamColors =
+        [];
+
+
+    if (
+        searchQuery
+    ) {
+
+        teamColors =
+            getOfficialTeamColors()
+                .filter(
+                    teamColor => {
+
+                        return String(
+                            teamColor.team_name
+                            ?? ""
+                        )
+                            .toLowerCase()
+                            .includes(
+                                searchQuery
+                            );
+                    }
+                );
+
+    } else {
+
+        const group =
+            officialTeamColorGroups
+                .find(
+                    item =>
+                        item.category
+                        ===
+                        activeOfficialTeamColorCategory
+                );
+
+
+        teamColors =
+            group?.team_colors
+            ?? [];
+    }
+
+
+    if (
+        teamColors.length
+        === 0
+    ) {
+
+        playerOfficialTeamColorOptionsElement
+            .innerHTML = `
+                <div
+                    class="player-database-hierarchy-empty"
+                >
+                    검색 결과가 없습니다.
+                </div>
+            `;
+
+        return;
+    }
+
+
+    playerOfficialTeamColorOptionsElement
+        .innerHTML =
+            teamColors
+                .map(
+                    teamColor => {
+
+                        const selected =
+                            (
+                                Number(
+                                    teamColor.team_color_id
+                                )
+                                ===
+                                Number(
+                                    selectedOfficialTeamColorId
+                                )
+                            );
+
+
+                        const iconUrl =
+                            escapeHtml(
+                                teamColor.icon_url
+                                ?? ""
+                            );
+
+
+                        return `
+                            <button
+                                type="button"
+                                class="
+                                    player-database-official-team-color-option
+                                    ${
+                                        selected
+                                            ? "selected"
+                                            : ""
+                                    }
+                                "
+                                data-official-team-color-id="${teamColor.team_color_id}"
+                                data-official-team-color-name="${escapeHtml(
+                                    teamColor.team_name
+                                )}"
+                                data-official-team-color-category="${escapeHtml(
+                                    teamColor.category
+                                )}"
+                            >
+
+                                <span
+                                    class="
+                                        player-database-official-team-color-option-main
+                                    "
+                                >
+
+                                    ${
+                                        iconUrl
+                                            ? `
+                                                <img
+                                                    src="${iconUrl}"
+                                                    alt=""
+                                                    loading="lazy"
+                                                >
+                                            `
+                                            : ""
+                                    }
+
+
+                                    <span>
+                                        ${escapeHtml(
+                                            teamColor.team_name
+                                        )}
+                                    </span>
+
+                                </span>
+
+
+                                <small>
+                                    ${Number(
+                                        teamColor.player_count
+                                        ?? 0
+                                    ).toLocaleString(
+                                        "ko-KR"
+                                    )}
+                                </small>
+
+                            </button>
+                        `;
+                    }
+                )
+                .join("");
+}
+
+
+function closeOfficialTeamColorPanel() {
+
+    if (
+        !playerOfficialTeamColorPanelElement
+    ) {
+        return;
+    }
+
+
+    playerOfficialTeamColorPanelElement
+        .hidden =
+            true;
+
+
+    playerOfficialTeamColorToggleElement
+        ?.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+}
+
+
+// =========================================
 // HTML ESCAPE
 // =========================================
 
@@ -1225,6 +1546,28 @@ async function loadPlayerFilters() {
             data.team_groups
             ?? [];
 
+        officialTeamColorGroups =
+            data.official_team_color_groups
+            ?? [];
+
+
+        if (
+            officialTeamColorGroups.length > 0
+            &&
+            !officialTeamColorGroups.some(
+                group =>
+                    group.category
+                    ===
+                    activeOfficialTeamColorCategory
+            )
+        ) {
+
+            activeOfficialTeamColorCategory =
+                officialTeamColorGroups[
+                    0
+                ].category;
+        }
+
 
         if (
             nationGroups.length
@@ -1255,6 +1598,9 @@ async function loadPlayerFilters() {
 
         renderLeagueOptions();
         renderTeamOptions();
+
+        renderOfficialTeamColorCategories();
+        renderOfficialTeamColorOptions();
 
 
 
@@ -1782,6 +2128,257 @@ playerTeamOptionsElement
             closeTeamPanel();
         }
     );
+
+// =========================================
+// OFFICIAL TEAM COLOR EVENTS
+// =========================================
+
+playerOfficialTeamColorToggleElement
+    ?.addEventListener(
+        "click",
+        () => {
+
+            const willOpen =
+                playerOfficialTeamColorPanelElement
+                    .hidden;
+
+
+            closeSeasonPanel();
+            closePositionPanel();
+            closeNationPanel();
+            closeTeamPanel();
+
+
+            playerOfficialTeamColorPanelElement
+                .hidden =
+                    !willOpen;
+
+
+            playerOfficialTeamColorToggleElement
+                .setAttribute(
+                    "aria-expanded",
+                    String(
+                        willOpen
+                    )
+                );
+        }
+    );
+
+
+playerOfficialTeamColorSearchElement
+    ?.addEventListener(
+        "input",
+        event => {
+
+            officialTeamColorSearchQuery =
+                event.target.value
+                ?? "";
+
+
+            renderOfficialTeamColorOptions();
+        }
+    );
+
+
+playerOfficialTeamColorCategoriesElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const buttonElement =
+                event.target.closest(
+                    "button[data-official-team-color-category]"
+                );
+
+
+            if (!buttonElement) {
+                return;
+            }
+
+
+            activeOfficialTeamColorCategory =
+                buttonElement.dataset
+                    .officialTeamColorCategory;
+
+
+            officialTeamColorSearchQuery =
+                "";
+
+
+            if (
+                playerOfficialTeamColorSearchElement
+            ) {
+
+                playerOfficialTeamColorSearchElement
+                    .value =
+                        "";
+            }
+
+
+            renderOfficialTeamColorCategories();
+            renderOfficialTeamColorOptions();
+        }
+    );
+
+
+playerOfficialTeamColorOptionsElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const buttonElement =
+                event.target.closest(
+                    "button[data-official-team-color-id]"
+                );
+
+
+            if (!buttonElement) {
+                return;
+            }
+
+
+            selectedOfficialTeamColorId =
+                Number(
+                    buttonElement.dataset
+                        .officialTeamColorId
+                );
+
+
+            selectedOfficialTeamColorName =
+                buttonElement.dataset
+                    .officialTeamColorName
+                ?? "";
+
+
+            if (
+                buttonElement.dataset
+                    .officialTeamColorCategory
+            ) {
+
+                activeOfficialTeamColorCategory =
+                    buttonElement.dataset
+                        .officialTeamColorCategory;
+            }
+
+
+            playerOfficialTeamColorSummaryElement
+                .textContent =
+                    selectedOfficialTeamColorName;
+
+
+            officialTeamColorSearchQuery =
+                "";
+
+
+            if (
+                playerOfficialTeamColorSearchElement
+            ) {
+
+                playerOfficialTeamColorSearchElement
+                    .value =
+                        "";
+            }
+
+
+            renderOfficialTeamColorCategories();
+            renderOfficialTeamColorOptions();
+
+            closeOfficialTeamColorPanel();
+        }
+    );
+
+
+playerOfficialTeamColorClearElement
+    ?.addEventListener(
+        "click",
+        () => {
+
+            selectedOfficialTeamColorId =
+                null;
+
+
+            selectedOfficialTeamColorName =
+                "";
+
+
+            officialTeamColorSearchQuery =
+                "";
+
+
+            if (
+                playerOfficialTeamColorSearchElement
+            ) {
+
+                playerOfficialTeamColorSearchElement
+                    .value =
+                        "";
+            }
+
+
+            if (
+                playerOfficialTeamColorSummaryElement
+            ) {
+
+                playerOfficialTeamColorSummaryElement
+                    .textContent =
+                        "전체 팀컬러";
+            }
+
+
+            renderOfficialTeamColorCategories();
+            renderOfficialTeamColorOptions();
+
+            closeOfficialTeamColorPanel();
+        }
+    );
+
+
+document.addEventListener(
+    "click",
+    event => {
+
+        if (
+            !playerOfficialTeamColorPanelElement
+            ||
+            playerOfficialTeamColorPanelElement.hidden
+        ) {
+            return;
+        }
+
+
+        const filterElement =
+            playerOfficialTeamColorToggleElement
+                ?.closest(
+                    ".player-database-multi-filter"
+                );
+
+
+        if (
+            !filterElement
+        ) {
+            return;
+        }
+
+
+        // =====================================
+        // render 과정에서 클릭한 버튼 DOM이
+        // 교체되더라도 원래 클릭 경로를 유지
+        // =====================================
+
+        const eventPath =
+            event.composedPath();
+
+
+        if (
+            !eventPath.includes(
+                filterElement
+            )
+        ) {
+
+            closeOfficialTeamColorPanel();
+        }
+    }
+);
 
 // =========================================
 // SEASON / POSITION PANEL
@@ -2331,6 +2928,31 @@ function buildSearchParams(
             )
         );
     }
+
+    if (
+        selectedOfficialTeamColorId
+        !== null
+    ) {
+
+        params.set(
+            "official_team_color_id",
+            String(
+                selectedOfficialTeamColorId
+            )
+        );
+    }
+
+
+    // =====================================
+    // 현재 검색결과 강화등급
+    // =====================================
+
+    params.set(
+        "grade",
+        String(
+            resultBulkGrade
+        )
+    );
 
     // =====================================
     // 상세검색 숫자 조건
@@ -9574,6 +10196,10 @@ playerResultGradeOptionsElement
             applyResultBulkGrade(
                 grade
             );
+
+            void searchPlayers(
+                1
+            );
         }
     );
 
@@ -9962,6 +10588,56 @@ function resetSearchConditions() {
         playerPaginationElement.innerHTML =
             "";
     }
+
+    // =====================================
+    // 공식 팀컬러 초기화
+    // =====================================
+
+    selectedOfficialTeamColorId =
+        null;
+
+
+    selectedOfficialTeamColorName =
+        "";
+
+
+    officialTeamColorSearchQuery =
+        "";
+
+
+    activeOfficialTeamColorCategory =
+        (
+            officialTeamColorGroups[
+                0
+            ]?.category
+            ??
+            "affiliation"
+        );
+
+
+    if (
+        playerOfficialTeamColorSearchElement
+    ) {
+
+        playerOfficialTeamColorSearchElement
+            .value =
+                "";
+    }
+
+
+    if (
+        playerOfficialTeamColorSummaryElement
+    ) {
+
+        playerOfficialTeamColorSummaryElement
+            .textContent =
+                "전체 팀컬러";
+    }
+
+
+    renderOfficialTeamColorCategories();
+    renderOfficialTeamColorOptions();
+    closeOfficialTeamColorPanel();
 
     // =====================================
     // 검색결과 일괄 강화 초기화

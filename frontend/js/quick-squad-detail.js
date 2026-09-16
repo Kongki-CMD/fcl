@@ -2,7 +2,7 @@ import {
     DEFAULT_ADAPTATION_LEVEL,
     calculatePlayerStatSnapshot,
     normalizeAdaptationLevel,
-} from "./player-stat-engine.js?v=1";
+} from "./player-stat-engine.js?v=2";
 
 // Quick Squad player detail controller
 export function createQuickSquadDetailModal({
@@ -157,40 +157,255 @@ const footHtml = (
         return cache.get(key);
     }
 
-    function calculate() {
-        const snapshot =
-            calculatePlayerStatSnapshot({
-                player:
-                    state.detail,
+function calculate() {
 
-                grade:
-                    state.grade,
-
-                adaptation:
-                    state.adaptation,
-
-                teamColorBonus:
-                    state.teamColor,
-            });
+    const activeTeamColors =
+        Array.isArray(
+            state.currentTeamColors
+        )
+            ? state.currentTeamColors
+            : [];
 
 
-        return {
-            bonus:
-                snapshot.ability_bonus,
+    const snapshot =
+        calculatePlayerStatSnapshot({
+            player:
+                state.detail,
 
-            ovr:
-                snapshot.final_ovr,
+            grade:
+                state.grade,
 
-            stats:
-                snapshot.final_stats,
+            adaptation:
+                state.adaptation,
 
-            enhancementBonus:
-                snapshot.enhancement_bonus,
+            // 수동 +0 ~ +9 제거
+            teamColorBonus:
+                0,
 
-            adaptationBonus:
-                snapshot.adaptation_bonus,
-        };
+            // 현재 Quick Squad에서
+            // 이 선수에게 실제 적용 중인 팀컬러
+            activeTeamColors,
+
+            // 포지션 가중 OVR 계산
+            position:
+                state.summary.slot_position
+                ??
+                state.detail.position,
+        });
+
+
+    return {
+
+        bonus:
+            snapshot.ability_bonus,
+
+        ovr:
+            snapshot.final_ovr,
+
+        stats:
+            snapshot.final_stats,
+
+        enhancementBonus:
+            snapshot.enhancement_bonus,
+
+        adaptationBonus:
+            snapshot.adaptation_bonus,
+
+        teamColorOvrBonus:
+            Number(
+                snapshot.team_color_ovr_bonus
+                ??
+                state.summary.team_color_ovr_bonus
+                ??
+                0
+            ),
+
+        teamColorStatBonus:
+            snapshot.team_color_stat_bonus
+            ??
+            state.summary.team_color_stat_bonus
+            ??
+            {},
+    };
+}
+
+function renderCurrentTeamColors() {
+
+    const holder =
+        $(
+            "[data-qs-current-team-colors]"
+        );
+
+
+    if (!holder) {
+        return;
     }
+
+
+    const teamColors =
+        Array.isArray(
+            state?.currentTeamColors
+        )
+            ? state.currentTeamColors
+            : [];
+
+
+    if (
+        teamColors.length
+        === 0
+    ) {
+
+        holder.innerHTML = `
+            <span
+                class="qsd-current-team-color-empty"
+            >
+                현재 적용 중인 팀컬러 없음
+            </span>
+        `;
+
+        return;
+    }
+
+
+    holder.innerHTML =
+        teamColors
+            .map(
+                teamColor => {
+
+                    const icon =
+                        imageUrl(
+                            teamColor.icon_url
+                        );
+
+
+                    const name =
+                        escape(
+                            teamColor.team_name
+                            ??
+                            "팀컬러"
+                        );
+
+
+                    const stage =
+                        Number(
+                            teamColor.stage
+                            ??
+                            teamColor.active_stage
+                            ??
+                            0
+                        );
+
+
+                    const effects =
+                        Array.isArray(
+                            teamColor.effects
+                        )
+                            ? teamColor.effects
+                            : [];
+
+
+                    const effectText =
+                        effects
+                            .map(
+                                effect => {
+
+                                    const statName =
+                                        escape(
+                                            effect.stat_name
+                                            ??
+                                            effect.stat_key
+                                            ??
+                                            ""
+                                        );
+
+
+                                    const bonus =
+                                        Number(
+                                            effect.bonus
+                                            ??
+                                            0
+                                        );
+
+
+                                    if (
+                                        !statName
+                                        ||
+                                        !bonus
+                                    ) {
+                                        return "";
+                                    }
+
+
+                                    return (
+                                        `${statName} +${bonus}`
+                                    );
+                                }
+                            )
+                            .filter(
+                                Boolean
+                            )
+                            .join(
+                                " · "
+                            );
+
+
+                    return `
+                        <div
+                            class="qsd-current-team-color-item"
+                        >
+
+                            <div
+                                class="qsd-current-team-color-main"
+                            >
+
+                                ${
+                                    icon
+                                        ? `
+                                            <img
+                                                src="${escape(icon)}"
+                                                alt=""
+                                                loading="lazy"
+                                            >
+                                        `
+                                        : ""
+                                }
+
+                                <div>
+                                    <strong>
+                                        ${name}
+                                    </strong>
+
+                                    ${
+                                        stage > 0
+                                            ? `
+                                                <small>
+                                                    ${stage}단계
+                                                </small>
+                                            `
+                                            : ""
+                                    }
+                                </div>
+
+                            </div>
+
+
+                            ${
+                                effectText
+                                    ? `
+                                        <p>
+                                            ${effectText}
+                                        </p>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+                    `;
+                }
+            )
+            .join("");
+}
+
 
     function selectedPrice() {
         const item = state?.prices?.find(
@@ -287,6 +502,7 @@ const footHtml = (
             stats,
             enhancementBonus,
             adaptationBonus,
+            teamColorOvrBonus,
         } = calculate();
         const ovrElement = $('[data-qs-ovr]');
         if (ovrElement) ovrElement.textContent = ovr;
@@ -299,9 +515,15 @@ const footHtml = (
                 +
                 ` · 적응도 +${adaptationBonus}`
                 +
-                ` · 팀컬러 +${state.teamColor}`
-                +
-                ` = 총 +${bonus}`;
+                (
+                    teamColorOvrBonus
+                        ? (
+                            ` · 현재 팀컬러 OVR +${teamColorOvrBonus}`
+                        )
+                        : (
+                            " · 현재 팀컬러 OVR +0"
+                        )
+                );
         }
         all('[data-qs-stat]').forEach((element) => {
             const value = stats[element.dataset.qsStat];
@@ -318,8 +540,7 @@ const footHtml = (
             button.classList.toggle("is-active", selected);
             button.setAttribute("aria-pressed", String(selected));
         });
-        const select = $('[data-qs-team-bonus]');
-        if (select) select.value = String(state.teamColor);
+        renderCurrentTeamColors();
         renderPrice();
     }
 
@@ -456,11 +677,49 @@ const seasonId = [
                                     data-qs-adaptation="${value}">${value}</button>`).join("")}
                             </div>
                         </div>
-                        <div class="qsd-setting-panel qsd-team-panel">
-                            <label class="qsd-setting-label" for="quick-squad-detail-team-bonus">팀컬러</label>
-                            <select id="quick-squad-detail-team-bonus" class="qsd-team-select" data-qs-team-bonus>
-                                ${Array.from({length:10},(_,value)=>`<option value="${value}">+${value} (전체 능력치 +${value})</option>`).join("")}
+                        <div
+                            class="
+                                qsd-setting-panel
+                                qsd-team-panel
+                            "
+                        >
+
+                            <label
+                                class="qsd-setting-label"
+                                for="quick-squad-detail-team-mode"
+                            >
+                                팀컬러
+                            </label>
+
+
+                            <select
+                                id="quick-squad-detail-team-mode"
+                                class="qsd-team-select"
+                                data-qs-team-mode
+                            >
+                                <option
+                                    value="current"
+                                    selected
+                                >
+                                    현재 팀컬러
+                                </option>
                             </select>
+
+
+                            <div
+                                class="qsd-current-team-colors"
+                                data-qs-current-team-colors
+                            ></div>
+
+
+                            <small
+                                class="qsd-current-team-color-note"
+                            >
+                                현재 스쿼드에서 실제 발동 중인
+                                팀컬러 효과가 능력치와 OVR에
+                                자동 적용됩니다.
+                            </small>
+
                         </div>
                         <div class="qsd-market-section">
                             <div class="qsd-section-heading"><span>이적시장 시세</span><small>선택 강화 기준</small></div>
@@ -509,13 +768,12 @@ const seasonId = [
                     DEFAULT_ADAPTATION_LEVEL
                 ),
 
-            teamColor: Math.max(
-                0,
-                Math.min(
-                    9,
-                    number(summary.team_color_bonus, 0)
+            currentTeamColors:
+                Array.isArray(
+                    summary.official_team_colors
                 )
-            ),
+                    ? summary.official_team_colors
+                    : [],
 
             prices: null,
             priceStatus: "loading",
@@ -618,12 +876,6 @@ const seasonId = [
         }
     });
 
-    body.addEventListener("change", (event) => {
-        if (!event.target.matches("[data-qs-team-bonus]") || !state?.detail) return;
-        state.teamColor = Math.max(0, Math.min(9, number(event.target.value)));
-        refreshValues();
-    });
-
     modal.addEventListener("keydown", (event) => {
         if (event.key !== "Tab" || modal.classList.contains("hidden")) return;
         const focusable = [...modal.querySelectorAll(
@@ -667,9 +919,14 @@ const seasonId = [
             const summary = { ...state.summary };
 
             const selection = {
-                grade: state.grade,
-                adaptation: state.adaptation,
-                team_color_bonus: state.teamColor,
+                grade:
+                    state.grade,
+
+                adaptation:
+                    state.adaptation,
+
+                team_color_bonus:
+                    0,
                 ability_bonus: bonus,
                 base_ovr: number(state.detail.base_ovr),
                 ovr,

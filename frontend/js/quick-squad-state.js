@@ -3,7 +3,8 @@ import {
     calculatePlayerStatSnapshot,
     normalizeAdaptationLevel,
     normalizeTeamColorBonus,
-} from "./player-stat-engine.js?v=1";
+    getPlayerActiveTeamColors,
+} from "./player-stat-engine.js?v=2";
 
 const STORAGE_KEY = "fcl.quick-squad.saved.v1";
 
@@ -31,23 +32,57 @@ const positionName = slot =>
         ? slot
         : slot?.position || "";
 
-function normalizePlayer(player, index, position) {
-    const spId = Number(player.sp_id);
-    const grade = Number(player.grade);
-    const price = Number(player.price);
+
+function normalizePlayer(
+    player,
+    index,
+    slotPosition,
+    activeTeamColors = []
+) {
+
+    const spId =
+        Number(
+            player.sp_id
+        );
+
+
+    const grade =
+        Number(
+            player.grade
+        );
+
+
+    const price =
+        Number(
+            player.price
+        );
+
 
     if (
-        !positiveId(spId)
-        || !Number.isInteger(grade)
-        || grade < 1
-        || grade > 13
-        || !Number.isSafeInteger(price)
-        || price <= 0
+        !positiveId(
+            spId
+        )
+        ||
+        !Number.isInteger(
+            grade
+        )
+        ||
+        grade < 1
+        ||
+        grade > 13
+        ||
+        !Number.isSafeInteger(
+            price
+        )
+        ||
+        price <= 0
     ) {
+
         throw new Error(
             "저장할 선수 ID, 강화등급 또는 시세가 올바르지 않습니다."
         );
     }
+
 
     const adaptation =
         normalizeAdaptationLevel(
@@ -55,12 +90,32 @@ function normalizePlayer(player, index, position) {
             DEFAULT_ADAPTATION_LEVEL
         );
 
-    const teamColor =
+
+    const legacyTeamColor =
         normalizeTeamColorBonus(
             player.team_color_bonus
             ??
             0
         );
+
+
+    // =====================================
+    // 이 선수에게 실제 적용되는 공식 팀컬러만
+    // =====================================
+
+    const officialTeamColors =
+        getPlayerActiveTeamColors(
+            activeTeamColors,
+            spId
+        );
+
+
+    // 공식 자동 팀컬러가 있으면
+    // 과거 수동 +N 팀컬러는 중복 적용하지 않는다.
+    const effectiveLegacyTeamColor =
+        officialTeamColors.length > 0
+            ? 0
+            : legacyTeamColor;
 
 
     const sourceAbilityBonus =
@@ -79,13 +134,34 @@ function normalizePlayer(player, index, position) {
             : null;
 
 
+    const statPosition =
+        (
+            player.position
+            ||
+            slotPosition
+            ||
+            ""
+        );
+
+
     const snapshot =
         calculatePlayerStatSnapshot({
+
             player,
+
             grade,
+
             adaptation,
+
             teamColorBonus:
-                teamColor,
+                effectiveLegacyTeamColor,
+
+            activeTeamColors:
+                officialTeamColors,
+
+            position:
+                statPosition,
+
             sourceAbilityBonus,
         });
 
@@ -93,48 +169,148 @@ function normalizePlayer(player, index, position) {
     const bonus =
         snapshot.ability_bonus;
 
+
     const base =
         snapshot.base_ovr;
 
-    if (!Number.isFinite(base) || base <= 0) {
+
+    if (
+        !Number.isFinite(
+            base
+        )
+        ||
+        base <= 0
+    ) {
+
         throw new Error(
             "선수의 기본 OVR을 확인할 수 없습니다."
         );
     }
 
-    const season = positiveId(player.season_id)
-        ? Number(player.season_id)
-        : Math.floor(spId / 1_000_000);
 
-    const lockedGrade = player.locked
-        ? integer(
-            player.locked_grade
-            ?? player.recommended_grade
-            ?? grade,
-            grade
+    const season =
+        positiveId(
+            player.season_id
         )
-        : null;
+            ? Number(
+                player.season_id
+            )
+            : Math.floor(
+                spId
+                /
+                1_000_000
+            );
+
+
+    const lockedGrade =
+        player.locked
+            ? integer(
+                (
+                    player.locked_grade
+                    ??
+                    player.recommended_grade
+                    ??
+                    grade
+                ),
+                grade
+            )
+            : null;
+
 
     return {
+
         ...player,
-        sp_id: spId,
-        season_id: positiveId(season) ? season : null,
-        slot_index: index,
-        slot_position: position,
+
+
+        sp_id:
+            spId,
+
+        season_id:
+            positiveId(
+                season
+            )
+                ? season
+                : null,
+
+
+        slot_index:
+            index,
+
+        slot_position:
+            slotPosition,
+
+
         grade,
+
         adaptation,
-        team_color_bonus: teamColor,
-        ability_bonus: bonus,
-        base_ovr: base,
+
+
+        // 기존 저장 데이터 호환용
+        team_color_bonus:
+            legacyTeamColor,
+
+
+        official_team_colors:
+            officialTeamColors,
+
+        official_team_color_count:
+            officialTeamColors.length,
+
+
+        team_color_stat_bonus:
+            snapshot
+                .team_color_stat_bonus,
+
+
+        team_color_ovr_bonus:
+            snapshot
+                .team_color_ovr_bonus,
+
+
+        ovr_calculation_source:
+            snapshot
+                .ovr_calculation_source,
+
+
+        ability_bonus:
+            bonus,
+
+
+        base_ovr:
+            base,
+
+
         ovr:
             snapshot.final_ovr,
+
+
+        base_stats:
+            snapshot.base_stats,
+
+
+        stats:
+            snapshot.final_stats,
+
+
         price,
-        locked_grade: lockedGrade,
+
+
+        locked_grade:
+            lockedGrade,
     };
 }
 
+
+
 export function normalizeQuickSquadResult(data, slots) {
     const positions = (slots || []).map(positionName);
+
+    const activeTeamColors =
+        Array.isArray(
+            data?.active_team_colors
+        )
+            ? data.active_team_colors
+            : [];
 
     if (
         !data
@@ -165,7 +341,8 @@ export function normalizeQuickSquadResult(data, slots) {
         const next = normalizePlayer(
             player,
             index,
-            positions[index]
+            positions[index],
+            activeTeamColors
         );
 
         if (ids.has(next.sp_id)) {
@@ -417,8 +594,15 @@ export function applyQuickSquadPlayerSettings(
         team_color_bonus: teamColor,
         base_ovr: base,
         price,
-        base_stats: selection.base_stats,
-        stats: selection.stats,
+        base_stats:
+            selection.base_stats
+            ??
+            original.base_stats,
+
+        stats:
+            selection.stats
+            ??
+            original.stats,
         price_checked_at: selection.price_checked_at,
         manual_saved: true,
     };

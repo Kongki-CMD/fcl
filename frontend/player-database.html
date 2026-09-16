@@ -276,6 +276,92 @@
 
     </div>
 
+    <!-- =====================================
+        공식 팀컬러
+    ====================================== -->
+
+    <div
+        class="
+            player-database-filter
+            player-database-multi-filter
+            player-database-hierarchy-filter
+        "
+    >
+
+        <span class="player-database-label">
+            팀컬러
+        </span>
+
+
+        <button
+            type="button"
+            id="player-database-official-team-color-toggle"
+            class="player-database-multi-toggle"
+            aria-expanded="false"
+            aria-controls="player-database-official-team-color-panel"
+        >
+
+            <span
+                id="player-database-official-team-color-summary"
+            >
+                전체 팀컬러
+            </span>
+
+            <span aria-hidden="true">
+                ▼
+            </span>
+
+        </button>
+
+
+        <div
+            id="player-database-official-team-color-panel"
+            class="
+                player-database-multi-panel
+                player-database-official-team-color-panel
+            "
+            hidden
+        >
+
+            <div
+                class="player-database-hierarchy-header"
+            >
+
+                <input
+                    type="search"
+                    id="player-database-official-team-color-search"
+                    class="player-database-hierarchy-search"
+                    placeholder="팀컬러 검색"
+                    autocomplete="off"
+                >
+
+
+                <button
+                    type="button"
+                    id="player-database-official-team-color-clear"
+                    class="player-database-hierarchy-clear"
+                >
+                    전체 팀컬러
+                </button>
+
+            </div>
+
+
+            <div
+                id="player-database-official-team-color-categories"
+                class="player-database-official-team-color-categories"
+            ></div>
+
+
+            <div
+                id="player-database-official-team-color-options"
+                class="player-database-official-team-color-options"
+            ></div>
+
+        </div>
+
+    </div>
+
 
     <!-- =====================================
         소속팀

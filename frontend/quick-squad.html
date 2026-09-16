@@ -574,30 +574,54 @@
 
                 <div class="quick-squad-field-header">
 
-                    <div>
+                    <!-- 왼쪽: 포메이션 / 추천 상태 -->
+                    <div class="quick-squad-field-heading-main">
 
-                        <span>
-                            FORMATION
-                        </span>
+                        <div class="quick-squad-field-formation-row">
 
-                        <strong
-                            id="quick-squad-formation-title"
+                            <span>
+                                FORMATION
+                            </span>
+
+                            <strong
+                                id="quick-squad-formation-title"
+                            >
+                                4-3-3
+                            </strong>
+
+                        </div>
+
+
+                        <span
+                            id="quick-squad-result-status"
+                            class="quick-squad-result-status"
                         >
-                            4-3-3
-                        </strong>
+                            조건을 설정하고
+                            스쿼드를 추천해보세요.
+                        </span>
 
                     </div>
 
 
-                    <span
-                        id="quick-squad-result-status"
-                        class="quick-squad-result-status"
-                    >
-                        조건을 설정하고
-                        스쿼드를 추천해보세요.
-                    </span>
+                    <!-- 오른쪽: 활성 팀컬러 -->
+                    <div class="quick-squad-team-color-panel">
+
+                        <span class="quick-squad-team-color-panel-title">
+                            팀컬러 적용
+                        </span>
+
+                        <div
+                            id="quick-squad-active-team-colors"
+                            class="quick-squad-active-team-colors"
+                            aria-label="현재 적용 중인 팀컬러"
+                            hidden
+                        ></div>
+
+                    </div>
 
                 </div>
+
+            </div>
 
 
                 <div
