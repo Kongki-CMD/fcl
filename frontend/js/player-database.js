@@ -9,7 +9,7 @@ import {
 import {
     DEFAULT_ADAPTATION_LEVEL,
     calculatePlayerStatSnapshot,
-} from "./player-stat-engine.js?v=1";
+} from "./player-stat-engine.js?v=20260917-01";
 
 const playerCompareModalElement =
     document.querySelector(

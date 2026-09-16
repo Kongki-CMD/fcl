@@ -2,7 +2,7 @@ import {
     DEFAULT_ADAPTATION_LEVEL,
     calculatePlayerStatSnapshot,
     normalizeAdaptationLevel,
-} from "./player-stat-engine.js?v=2";
+} from "./player-stat-engine.js?v=20260917-01";
 
 // Quick Squad player detail controller
 export function createQuickSquadDetailModal({

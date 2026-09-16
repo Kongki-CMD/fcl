@@ -4,11 +4,11 @@ import {
 
 import {
     DEFAULT_ADAPTATION_LEVEL,
-} from "./player-stat-engine.js?v=2";
+} from "./player-stat-engine.js?v=20260917-01";
 
 import {
     createQuickSquadDetailModal,
-} from "./quick-squad-detail.js?v=7";
+} from "./quick-squad-detail.js?v=20260917-01";
 
 import {
     createQuickSquadLockController,
@@ -30,7 +30,7 @@ import {
     readSavedQuickSquad,
     writeSavedQuickSquad,
     mergeQuickSquadLockSettings,
-} from "./quick-squad-state.js?v=3";
+} from "./quick-squad-state.js?v=20260917-01";
 
 // =========================================
 // DOM
