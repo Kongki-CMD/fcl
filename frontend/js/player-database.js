@@ -10876,6 +10876,20 @@ playerResultListElement.addEventListener(
                 preferred_team_color_id: selectedTeamColorId,
             });
 
+            // =========================================
+            // 고정 선수 추가로 퀵스쿼드에 진입한다는
+            // 1회용 예외 플래그
+            // =========================================
+
+            sessionStorage.setItem(
+                "fcl.quick-squad.preserve-on-entry.v1",
+                "1"
+            );
+
+            window.location.assign(
+                "./quick-squad.html"
+            );
+
             window.location.assign(
                 "./quick-squad.html"
             );

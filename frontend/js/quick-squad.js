@@ -156,6 +156,52 @@ let currentQuickSquadActiveTeamColors = [];
 
 let quickSquadTeamColorTooltipTarget = null;
 
+let quickSquadTeamColorTooltipHideTimer =
+    null;
+
+
+function clearQuickSquadTeamColorTooltipHideTimer() {
+
+    if (
+        quickSquadTeamColorTooltipHideTimer
+        === null
+    ) {
+        return;
+    }
+
+
+    clearTimeout(
+        quickSquadTeamColorTooltipHideTimer
+    );
+
+
+    quickSquadTeamColorTooltipHideTimer =
+        null;
+}
+
+
+function scheduleQuickSquadTeamColorTooltipHide(
+    delay = 180
+) {
+
+    clearQuickSquadTeamColorTooltipHideTimer();
+
+
+    quickSquadTeamColorTooltipHideTimer =
+        window.setTimeout(
+            () => {
+
+                quickSquadTeamColorTooltipHideTimer =
+                    null;
+
+
+                hideQuickSquadTeamColorTooltip();
+
+            },
+            delay
+        );
+}
+
 
 const QUICK_SQUAD_CONDITION_STORAGE_KEY =
     "fcl.quick-squad.conditions.v1";
@@ -2299,6 +2345,56 @@ function getQuickSquadTeamColorTooltipElement() {
         "tooltip"
     );
 
+    tooltipElement.addEventListener(
+        "mouseenter",
+        () => {
+
+            clearQuickSquadTeamColorTooltipHideTimer();
+
+        }
+    );
+
+
+    tooltipElement.addEventListener(
+        "mouseleave",
+        event => {
+
+            if (
+                !isQuickSquadHoverDevice()
+            ) {
+                return;
+            }
+
+
+            if (
+                quickSquadTeamColorTooltipTarget
+                &&
+                event.relatedTarget
+                &&
+                quickSquadTeamColorTooltipTarget.contains(
+                    event.relatedTarget
+                )
+            ) {
+                clearQuickSquadTeamColorTooltipHideTimer();
+
+                return;
+            }
+
+
+            scheduleQuickSquadTeamColorTooltipHide();
+        }
+    );
+
+
+    tooltipElement.addEventListener(
+        "click",
+        event => {
+
+            event.stopPropagation();
+
+        }
+    );
+
 
     document.body.appendChild(
         tooltipElement
@@ -2926,6 +3022,8 @@ function showQuickSquadTeamColorTooltip(
     targetElement
 ) {
 
+    clearQuickSquadTeamColorTooltipHideTimer();
+
     const index =
         Number(
             targetElement.dataset
@@ -2996,6 +3094,8 @@ function showQuickSquadTeamColorTooltip(
 
 
 function hideQuickSquadTeamColorTooltip() {
+
+    clearQuickSquadTeamColorTooltipHideTimer();
 
     const tooltipElement =
         document.getElementById(
@@ -4788,7 +4888,26 @@ quickSquadActiveTeamColorsElement
             }
 
 
-            hideQuickSquadTeamColorTooltip();
+        const tooltipElement =
+            document.getElementById(
+                "quick-squad-team-color-tooltip"
+            );
+
+
+        if (
+            tooltipElement
+            &&
+            event.relatedTarget
+            &&
+            tooltipElement.contains(
+                event.relatedTarget
+            )
+        ) {
+            return;
+        }
+
+
+        scheduleQuickSquadTeamColorTooltipHide();
         }
     );
 
@@ -4861,6 +4980,22 @@ document.addEventListener(
             return;
         }
 
+        const tooltipElement =
+            document.getElementById(
+                "quick-squad-team-color-tooltip"
+            );
+
+
+        if (
+            tooltipElement
+            &&
+            tooltipElement.contains(
+                event.target
+            )
+        ) {
+            return;
+        }
+
 
         hideQuickSquadTeamColorTooltip();
     }
@@ -4875,7 +5010,35 @@ window.addEventListener(
 
 window.addEventListener(
     "scroll",
-    hideQuickSquadTeamColorTooltip,
+    event => {
+
+        const tooltipElement =
+            document.getElementById(
+                "quick-squad-team-color-tooltip"
+            );
+
+
+        // 팀컬러 팝업 내부를 스크롤하는 경우
+        // 팝업을 닫지 않는다.
+        if (
+            tooltipElement
+            &&
+            (
+                event.target === tooltipElement
+                ||
+                tooltipElement.contains(
+                    event.target
+                )
+            )
+        ) {
+            return;
+        }
+
+
+        // 실제 페이지가 움직일 때만 닫는다.
+        hideQuickSquadTeamColorTooltip();
+
+    },
     true
 );
 
@@ -4989,29 +5152,26 @@ document.addEventListener(
 async function initializeQuickSquad() {
 
     // =========================================
-    // 실제 브라우저 새로고침일 때만 초기화
+    // 고정 선수 추가를 통한 진입인지 확인
     // =========================================
 
-    const navigationEntry =
-        performance
-            .getEntriesByType(
-                "navigation"
-            )
-            ?.[0];
+    const preserveOnEntry =
+        sessionStorage.getItem(
+            "fcl.quick-squad.preserve-on-entry.v1"
+        ) === "1";
 
 
-    const isPageReload =
-        (
-            navigationEntry
-                ?.type
-            ===
-            "reload"
-        );
+    // 1회용이므로 진입 즉시 제거
+    sessionStorage.removeItem(
+        "fcl.quick-squad.preserve-on-entry.v1"
+    );
 
 
-    if (
-        isPageReload
-    ) {
+    // =========================================
+    // 일반적인 퀵스쿼드 진입은 항상 초기화
+    // =========================================
+
+    if (!preserveOnEntry) {
 
         try {
 
@@ -5043,7 +5203,6 @@ async function initializeQuickSquad() {
         if (
             quickSquadTeamColorElement
         ) {
-
             quickSquadTeamColorElement.value =
                 "";
         }
@@ -5052,7 +5211,6 @@ async function initializeQuickSquad() {
         if (
             quickSquadBudgetElement
         ) {
-
             quickSquadBudgetElement.value =
                 "";
         }
@@ -5061,7 +5219,6 @@ async function initializeQuickSquad() {
         if (
             quickSquadEnhancementGradeElement
         ) {
-
             quickSquadEnhancementGradeElement.value =
                 "auto";
         }

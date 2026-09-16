@@ -20853,7 +20853,11 @@ button.quick-squad-active-team-color {
             0.55
         );
 
-    pointer-events: none;
+    pointer-events: auto;
+
+    overscroll-behavior: contain;
+
+    touch-action: pan-y;
 }
 
 
