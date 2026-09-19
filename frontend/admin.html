@@ -18,7 +18,7 @@
 
     <link
         rel="stylesheet"
-        href="./css/admin.css"
+        href="./css/admin.css?v=playoffs-1"
     >
 </head>
 
@@ -386,8 +386,19 @@
                         플레이오프 관리
                     </h1>
 
-                    <div class="admin-placeholder">
-                        추후 구현
+                    <p>
+                        플레이오프 경기 일정과 경기 방식을 관리합니다.
+                    </p>
+
+                    <p>
+                        경기가 시작되기 전까지만
+                        날짜 및 경기 방식을 변경할 수 있습니다.
+                    </p>
+
+                    <div
+                        id="admin-playoff-list"
+                        class="admin-schedule-list"
+                    >
                     </div>
 
                 </section>
@@ -812,13 +823,96 @@
 
     </div>
 
+    <!-- ========================= -->
+    <!-- 플레이오프 설정 수정 팝업 -->
+    <!-- ========================= -->
+
+    <div
+        id="admin-playoff-edit-modal"
+        class="admin-result-edit-modal hidden"
+    >
+
+        <div class="admin-result-edit-panel">
+
+            <h2>
+                플레이오프 설정 변경
+            </h2>
+
+            <p
+                id="admin-playoff-edit-title"
+                class="admin-result-edit-title"
+            ></p>
+
+
+            <label>
+                경기 날짜
+
+                <input
+                    type="date"
+                    id="admin-playoff-edit-date"
+                >
+            </label>
+
+
+            <label>
+                경기 방식
+
+                <select
+                    id="admin-playoff-edit-best-of"
+                >
+
+                    <option value="3">
+                        3판 2선승
+                    </option>
+
+                    <option value="5">
+                        5판 3선승
+                    </option>
+
+                    <option value="7">
+                        7판 4선승
+                    </option>
+
+                </select>
+
+            </label>
+
+
+            <p
+                id="admin-playoff-edit-message"
+                class="admin-result-edit-message"
+            ></p>
+
+
+            <div class="admin-result-edit-actions">
+
+                <button
+                    type="button"
+                    id="admin-playoff-edit-cancel"
+                >
+                    취소
+                </button>
+
+                <button
+                    type="button"
+                    id="admin-playoff-edit-save"
+                >
+                    저장
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
 
     </main>
 
 
     <script
         type="module"
-        src="./js/admin.js?v=point-shop-1"
+        src="./js/admin.js?v=playoffs-2"
     ></script>
 
 </body>

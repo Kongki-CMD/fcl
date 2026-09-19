@@ -2972,6 +2972,79 @@ def initialize_database():
                 """
             )
 
+            # =========================
+            # PLAYOFF 경기 방식 확장
+            #
+            # 3판 2선승
+            # 5판 3선승
+            # 7판 4선승
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                DROP CONSTRAINT IF EXISTS
+                    chk_series_playoff_config
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ADD CONSTRAINT
+                    chk_series_playoff_config
+
+                CHECK (
+                    (
+                        series_type IN (
+                            '프리시즌',
+                            '정규리그'
+                        )
+
+                        AND playoff_stage IS NULL
+                        AND best_of IS NULL
+                        AND wins_required IS NULL
+                    )
+
+                    OR
+
+                    (
+                        series_type = '플레이오프'
+
+                        AND playoff_stage IN (
+                            '준플레이오프',
+                            '플레이오프',
+                            '결승시리즈'
+                        )
+
+                        AND (
+                            (
+                                best_of = 3
+                                AND wins_required = 2
+                            )
+
+                            OR
+
+                            (
+                                best_of = 5
+                                AND wins_required = 3
+                            )
+
+                            OR
+
+                            (
+                                best_of = 7
+                                AND wins_required = 4
+                            )
+                        )
+                    )
+                )
+                """
+            )
+
             cursor.execute(
                 """
                 ALTER TABLE series
@@ -3050,6 +3123,114 @@ def initialize_database():
 
                 WHERE
                     series_type = '정규리그'
+                """
+            )
+
+            # =========================
+            # PLAYOFF SETTINGS
+            #
+            # SERIES 생성 전에도
+            # 플레이오프 날짜 / 경기 방식
+            # 관리 가능
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    playoff_settings (
+                        playoff_stage VARCHAR(20)
+                            PRIMARY KEY,
+
+                        scheduled_date DATE
+                            NOT NULL,
+
+                        best_of INTEGER
+                            NOT NULL,
+
+                        wins_required INTEGER
+                            NOT NULL,
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        CONSTRAINT
+                            chk_playoff_settings_stage
+
+                        CHECK (
+                            playoff_stage IN (
+                                '준플레이오프',
+                                '플레이오프',
+                                '결승시리즈'
+                            )
+                        ),
+
+                        CONSTRAINT
+                            chk_playoff_settings_format
+
+                        CHECK (
+                            (
+                                best_of = 3
+                                AND
+                                wins_required = 2
+                            )
+
+                            OR
+
+                            (
+                                best_of = 5
+                                AND
+                                wins_required = 3
+                            )
+
+                            OR
+
+                            (
+                                best_of = 7
+                                AND
+                                wins_required = 4
+                            )
+                        )
+                    )
+                """
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO playoff_settings (
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required
+                )
+
+                VALUES
+                    (
+                        '준플레이오프',
+                        DATE '2026-10-03',
+                        5,
+                        3
+                    ),
+
+                    (
+                        '플레이오프',
+                        DATE '2026-10-06',
+                        5,
+                        3
+                    ),
+
+                    (
+                        '결승시리즈',
+                        DATE '2026-10-10',
+                        7,
+                        4
+                    )
+
+                ON CONFLICT (
+                    playoff_stage
+                )
+
+                DO NOTHING
                 """
             )
 
@@ -6143,6 +6324,17 @@ class PlayoffAdvanceRequest(
     BaseModel
 ):
     scheduled_date: str
+
+class AdminPlayoffUpdateRequest(
+    BaseModel
+):
+    scheduled_date: str
+
+    best_of: Literal[
+        3,
+        5,
+        7,
+    ]
 
 class AdminRegularScheduleUpdateRequest(
     BaseModel
@@ -15422,6 +15614,12 @@ def get_matches():
                     s.status,
                     s.target_set_count,
 
+                    s.team_a_snapshot_name,
+                    s.team_a_snapshot_logo_path,
+
+                    s.team_b_snapshot_name,
+                    s.team_b_snapshot_logo_path,
+
                     team_a.fcl_name
                         AS team_a,
 
@@ -15539,6 +15737,26 @@ def get_matches():
                 "status":
                     series_row[
                         "status"
+                    ],
+
+                "team_a_snapshot_name":
+                    series_row[
+                        "team_a_snapshot_name"
+                    ],
+
+                "team_a_snapshot_logo_path":
+                    series_row[
+                        "team_a_snapshot_logo_path"
+                    ],
+
+                "team_b_snapshot_name":
+                    series_row[
+                        "team_b_snapshot_name"
+                    ],
+
+                "team_b_snapshot_logo_path":
+                    series_row[
+                        "team_b_snapshot_logo_path"
                     ],
 
                 "target_set_count":
@@ -15678,12 +15896,13 @@ def get_matches():
     workbook.close()
 
     # =========================================
-    # 참가자 현재 팀 정보 연결
+    # 일정 표시용 팀 정보
     #
-    # 일정 화면은 항상 participants의
-    # 현재 팀 정보를 사용
+    # 예정 / 진행 중:
+    # participants의 현재 팀 정보 사용
     #
-    # 과거 경기 결과 Snapshot과는 별개
+    # 완료 경기:
+    # 경기 완료 당시 Snapshot 사용
     # =========================================
 
     with get_db_connection() as connection:
@@ -15714,6 +15933,20 @@ def get_matches():
 
     for match in matches:
 
+        use_snapshot = (
+            match.get(
+                "source"
+            )
+            ==
+            "database"
+            and
+            match.get(
+                "status"
+            )
+            ==
+            "completed"
+        )
+
         team_a_current = (
             participant_team_map.get(
                 match["team_a"]
@@ -15732,6 +15965,17 @@ def get_matches():
             match[
                 "team_a_current_team_name"
             ] = (
+                match.get(
+                    "team_a_snapshot_name"
+                )
+                if (
+                    use_snapshot
+                    and
+                    match.get(
+                        "team_a_snapshot_name"
+                    )
+                )
+                else
                 team_a_current[
                     "current_team_name"
                 ]
@@ -15740,6 +15984,17 @@ def get_matches():
             match[
                 "team_a_current_team_logo_path"
             ] = (
+                match.get(
+                    "team_a_snapshot_logo_path"
+                )
+                if (
+                    use_snapshot
+                    and
+                    match.get(
+                        "team_a_snapshot_logo_path"
+                    )
+                )
+                else
                 team_a_current[
                     "current_team_logo_path"
                 ]
@@ -15761,6 +16016,17 @@ def get_matches():
             match[
                 "team_b_current_team_name"
             ] = (
+                match.get(
+                    "team_b_snapshot_name"
+                )
+                if (
+                    use_snapshot
+                    and
+                    match.get(
+                        "team_b_snapshot_name"
+                    )
+                )
+                else
                 team_b_current[
                     "current_team_name"
                 ]
@@ -15769,6 +16035,17 @@ def get_matches():
             match[
                 "team_b_current_team_logo_path"
             ] = (
+                match.get(
+                    "team_b_snapshot_logo_path"
+                )
+                if (
+                    use_snapshot
+                    and
+                    match.get(
+                        "team_b_snapshot_logo_path"
+                    )
+                )
+                else
                 team_b_current[
                     "current_team_logo_path"
                 ]
@@ -16834,6 +17111,637 @@ def get_standings():
     return sorted_standings
 
 # =========================
+# ADMIN PLAYOFF UPDATE
+# 날짜 / 경기 방식 변경
+# =========================
+
+@app.put(
+    "/api/admin/playoffs/{series_id}"
+)
+def admin_update_playoff(
+    series_id: int,
+
+    request:
+        AdminPlayoffUpdateRequest,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 날짜 검증
+    # =========================
+
+    try:
+
+        scheduled_date = (
+            datetime.strptime(
+                request.scheduled_date,
+                "%Y-%m-%d",
+            ).date()
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "경기 날짜 형식은 "
+                "YYYY-MM-DD여야 합니다."
+            ),
+        )
+
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    if scheduled_date < today:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지난 날짜로는 "
+                "일정을 변경할 수 없습니다."
+            ),
+        )
+
+
+    # =========================
+    # 경기 방식
+    # =========================
+
+    wins_required_map = {
+        3: 2,
+        5: 3,
+        7: 4,
+    }
+
+
+    best_of = int(
+        request.best_of
+    )
+
+
+    wins_required = (
+        wins_required_map[
+            best_of
+        ]
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # SERIES 조회 + 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.series_type,
+                    s.playoff_stage,
+                    s.scheduled_date,
+                    s.best_of,
+                    s.wins_required,
+                    s.status,
+
+                    (
+                        SELECT COUNT(*)
+
+                        FROM series_sets AS ss
+
+                        WHERE
+                            ss.series_id = s.id
+                    ) AS set_count
+
+                FROM series AS s
+
+                WHERE s.id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            series = (
+                cursor.fetchone()
+            )
+
+
+            if not series:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "플레이오프 경기를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 플레이오프만 허용
+            # =========================
+
+            if (
+                series["series_type"]
+                != "플레이오프"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "플레이오프 경기만 "
+                        "변경할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 예정 경기만 수정
+            # =========================
+
+            if (
+                series["status"]
+                != "scheduled"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "아직 시작하지 않은 "
+                        "플레이오프 경기만 "
+                        "변경할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 세트 결과 존재 여부
+            # =========================
+
+            if (
+                int(
+                    series["set_count"]
+                    or 0
+                )
+                > 0
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "이미 세트 결과가 있는 "
+                        "경기는 변경할 수 없습니다."
+                    ),
+                )
+
+
+            previous_date = (
+                series[
+                    "scheduled_date"
+                ]
+            )
+
+            previous_best_of = int(
+                series[
+                    "best_of"
+                ]
+            )
+
+            previous_wins_required = int(
+                series[
+                    "wins_required"
+                ]
+            )
+
+
+            # =========================
+            # 실제 변경
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE series
+
+                SET
+                    scheduled_date = %s,
+                    best_of = %s,
+                    wins_required = %s
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required,
+                    status
+                """,
+                (
+                    scheduled_date,
+                    best_of,
+                    wins_required,
+                    series_id,
+                ),
+            )
+
+
+            updated_series = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "series_id":
+            updated_series["id"],
+
+        "playoff_stage":
+            updated_series[
+                "playoff_stage"
+            ],
+
+        "previous_date":
+            (
+                previous_date.isoformat()
+                if previous_date
+                else None
+            ),
+
+        "scheduled_date":
+            updated_series[
+                "scheduled_date"
+            ].isoformat(),
+
+        "previous_best_of":
+            previous_best_of,
+
+        "previous_wins_required":
+            previous_wins_required,
+
+        "best_of":
+            updated_series[
+                "best_of"
+            ],
+
+        "wins_required":
+            updated_series[
+                "wins_required"
+            ],
+
+        "status":
+            updated_series[
+                "status"
+            ],
+
+        "message":
+            (
+                "플레이오프 설정이 "
+                "변경되었습니다."
+            ),
+    }
+
+# =========================
+# ADMIN PLAYOFF SETTING UPDATE
+#
+# SERIES 생성 전:
+# playoff_settings만 변경
+#
+# SERIES 생성 후 scheduled:
+# settings + SERIES 같이 변경
+# =========================
+
+@app.put(
+    "/api/admin/playoffs/settings/{playoff_stage}"
+)
+def admin_update_playoff_setting(
+    playoff_stage: str,
+
+    request:
+        AdminPlayoffUpdateRequest,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    allowed_stages = (
+        "준플레이오프",
+        "플레이오프",
+        "결승시리즈",
+    )
+
+
+    if (
+        playoff_stage
+        not in allowed_stages
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바르지 않은 "
+                "플레이오프 단계입니다."
+            ),
+        )
+
+
+    # =========================
+    # 날짜 검증
+    # =========================
+
+    try:
+
+        scheduled_date = (
+            datetime.strptime(
+                request.scheduled_date,
+                "%Y-%m-%d",
+            ).date()
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "경기 날짜 형식은 "
+                "YYYY-MM-DD여야 합니다."
+            ),
+        )
+
+
+    today = datetime.now(
+        ZoneInfo("Asia/Seoul")
+    ).date()
+
+
+    if scheduled_date < today:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지난 날짜로는 "
+                "일정을 변경할 수 없습니다."
+            ),
+        )
+
+
+    wins_required_map = {
+        3: 2,
+        5: 3,
+        7: 4,
+    }
+
+
+    best_of = int(
+        request.best_of
+    )
+
+
+    wins_required = (
+        wins_required_map[
+            best_of
+        ]
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 이미 실제 SERIES가
+            # 생성되어 있는지 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.status,
+
+                    (
+                        SELECT COUNT(*)
+
+                        FROM series_sets AS ss
+
+                        WHERE
+                            ss.series_id = s.id
+                    ) AS set_count
+
+                FROM series AS s
+
+                WHERE
+                    s.series_type =
+                        '플레이오프'
+
+                    AND
+                    s.playoff_stage = %s
+
+                    AND
+                    s.status <>
+                        'cancelled'
+
+                ORDER BY
+                    s.id DESC
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    playoff_stage,
+                ),
+            )
+
+
+            series = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # 생성된 SERIES가 있다면
+            # 예정 상태에서만 변경
+            # =========================
+
+            if series:
+
+                if (
+                    series["status"]
+                    != "scheduled"
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "이미 시작되었거나 완료된 "
+                            "플레이오프 경기는 "
+                            "설정을 변경할 수 없습니다."
+                        ),
+                    )
+
+
+                if (
+                    int(
+                        series["set_count"]
+                        or 0
+                    )
+                    > 0
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "이미 세트 결과가 있는 "
+                            "경기는 변경할 수 없습니다."
+                        ),
+                    )
+
+
+            # =========================
+            # 기본 설정 저장
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO playoff_settings (
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required,
+                    updated_at
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+                    %s,
+                    NOW()
+                )
+
+                ON CONFLICT (
+                    playoff_stage
+                )
+
+                DO UPDATE SET
+                    scheduled_date =
+                        EXCLUDED.scheduled_date,
+
+                    best_of =
+                        EXCLUDED.best_of,
+
+                    wins_required =
+                        EXCLUDED.wins_required,
+
+                    updated_at =
+                        NOW()
+
+                RETURNING
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required
+                """,
+                (
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required,
+                ),
+            )
+
+
+            setting = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # 실제 SERIES가 이미 있으면
+            # 같이 변경
+            # =========================
+
+            if series:
+
+                cursor.execute(
+                    """
+                    UPDATE series
+
+                    SET
+                        scheduled_date = %s,
+                        best_of = %s,
+                        wins_required = %s
+
+                    WHERE id = %s
+                    """,
+                    (
+                        scheduled_date,
+                        best_of,
+                        wins_required,
+                        series["id"],
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "playoff_stage":
+            setting[
+                "playoff_stage"
+            ],
+
+        "scheduled_date":
+            setting[
+                "scheduled_date"
+            ].isoformat(),
+
+        "best_of":
+            setting[
+                "best_of"
+            ],
+
+        "wins_required":
+            setting[
+                "wins_required"
+            ],
+
+        "series_id":
+            (
+                series["id"]
+                if series
+                else None
+            ),
+
+        "series_updated":
+            bool(series),
+
+        "message":
+            (
+                "플레이오프 설정이 "
+                "변경되었습니다."
+            ),
+    }
+
+# =========================
 # PLAYOFF PREVIEW
 # 현재 정규리그 순위 기준
 # =========================
@@ -17840,9 +18748,6 @@ def advance_playoff_series(
 
                 seeded_rank = 2
 
-                next_best_of = 5
-                next_wins_required = 3
-
 
             elif (
                 series["playoff_stage"]
@@ -17855,9 +18760,6 @@ def advance_playoff_series(
 
                 seeded_rank = 1
 
-                next_best_of = 7
-                next_wins_required = 4
-
 
             else:
 
@@ -17868,6 +18770,37 @@ def advance_playoff_series(
                         "플레이오프 단계입니다."
                     ),
                 )
+
+            next_playoff_setting = (
+                get_playoff_setting(
+                    next_stage
+                )
+            )
+
+
+            if not next_playoff_setting:
+
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        f"{next_stage} 설정을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            next_best_of = int(
+                next_playoff_setting[
+                    "best_of"
+                ]
+            )
+
+
+            next_wins_required = int(
+                next_playoff_setting[
+                    "wins_required"
+                ]
+            )
 
 
             # =========================
@@ -18790,94 +19723,338 @@ def get_player_rankings():
 
     return players
 
+# =========================
+# 정규리그 확정 순위
+#
+# 남은 경기 최대 승점을 계산해서
+# 승점만으로도 순위가 뒤집힐 수 없는
+# 참가자만 확정 처리
+#
+# 동률 가능성이 있으면
+# 득실차 / 득점과 관계없이
+# 아직 확정하지 않음
+# =========================
+
+def get_locked_regular_seeds():
+
+    standings = (
+        get_standings()
+    )
+
+
+    if not standings:
+
+        return {}
+
+
+    current_points = {
+        standing["name"]:
+            int(
+                standing["points"]
+            )
+
+        for standing
+        in standings
+    }
+
+
+    remaining_max_points = {
+        standing["name"]: 0
+
+        for standing
+        in standings
+    }
+
+
+    # =========================
+    # 남은 정규리그 경기
+    #
+    # 세트 승 = 3점
+    # 따라서 경기당 최대:
+    # target_set_count * 3
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.target_set_count,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_b.fcl_name
+                        AS team_b
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type =
+                        '정규리그'
+
+                    AND
+                    s.status IN (
+                        'scheduled',
+                        'active'
+                    )
+                """
+            )
+
+
+            remaining_series = (
+                cursor.fetchall()
+            )
+
+
+    for series in remaining_series:
+
+        max_series_points = (
+            int(
+                series[
+                    "target_set_count"
+                ]
+                or 3
+            )
+            *
+            3
+        )
+
+
+        team_a = (
+            series[
+                "team_a"
+            ]
+        )
+
+        team_b = (
+            series[
+                "team_b"
+            ]
+        )
+
+
+        if (
+            team_a
+            in remaining_max_points
+        ):
+
+            remaining_max_points[
+                team_a
+            ] += max_series_points
+
+
+        if (
+            team_b
+            in remaining_max_points
+        ):
+
+            remaining_max_points[
+                team_b
+            ] += max_series_points
+
+
+    # =========================
+    # 최종 최대 가능 승점
+    # =========================
+
+    maximum_final_points = {
+        name:
+            (
+                current_points[name]
+                +
+                remaining_max_points[name]
+            )
+
+        for name
+        in current_points
+    }
+
+
+    locked_seeds = {}
+
+
+    # =========================
+    # 참가자별 정확한 최종 순위가
+    # 승점만으로 확정됐는지 확인
+    # =========================
+
+    for participant in standings:
+
+        name = (
+            participant[
+                "name"
+            ]
+        )
+
+        participant_min = (
+            current_points[
+                name
+            ]
+        )
+
+        participant_max = (
+            maximum_final_points[
+                name
+            ]
+        )
+
+
+        guaranteed_above_count = 0
+
+        rank_is_locked = True
+
+
+        for other in standings:
+
+            other_name = (
+                other[
+                    "name"
+                ]
+            )
+
+
+            if (
+                other_name
+                == name
+            ):
+                continue
+
+
+            other_min = (
+                current_points[
+                    other_name
+                ]
+            )
+
+            other_max = (
+                maximum_final_points[
+                    other_name
+                ]
+            )
+
+
+            # 상대가 어떤 경우에도
+            # 이 참가자보다 위
+            if (
+                other_min
+                >
+                participant_max
+            ):
+
+                guaranteed_above_count += 1
+
+                continue
+
+
+            # 이 참가자가 어떤 경우에도
+            # 상대보다 위
+            if (
+                participant_min
+                >
+                other_max
+            ):
+
+                continue
+
+
+            # 승점 동률 또는 역전 가능
+            # → 아직 정확한 순위 미확정
+            rank_is_locked = False
+
+            break
+
+
+        if not rank_is_locked:
+            continue
+
+
+        locked_rank = (
+            guaranteed_above_count
+            + 1
+        )
+
+
+        if locked_rank in (
+            1,
+            2,
+            3,
+            4,
+            5,
+        ):
+
+            locked_seeds[
+                locked_rank
+            ] = name
+
+
+    return locked_seeds
+
+def get_playoff_setting(
+    playoff_stage: str,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required
+
+                FROM playoff_settings
+
+                WHERE playoff_stage = %s
+
+                LIMIT 1
+                """,
+                (
+                    playoff_stage,
+                ),
+            )
+
+
+            setting = (
+                cursor.fetchone()
+            )
+
+
+    return setting
+
 
 def get_playoff_schedule_date(
     playoff_stage: str,
 ):
 
-    workbook = load_workbook(
-        PLAYOFFS_PATH,
-        data_only=True,
+    setting = (
+        get_playoff_setting(
+            playoff_stage
+        )
     )
 
-    worksheet = workbook[
-        "플레이오프"
+
+    if not setting:
+        return None
+
+
+    return setting[
+        "scheduled_date"
     ]
 
-
-    try:
-
-        for row in worksheet.iter_rows(
-            min_row=2,
-            max_col=4,
-            values_only=True,
-        ):
-
-            (
-                match_date,
-                stage,
-                _,
-                _,
-            ) = row
-
-
-            if (
-                match_date is None
-                or
-                stage is None
-            ):
-                continue
-
-
-            stage_text = (
-                str(stage).strip()
-            )
-
-
-            if (
-                stage_text
-                == "결승 시리즈"
-            ):
-                stage_text = (
-                    "결승시리즈"
-                )
-
-
-            if (
-                stage_text
-                != playoff_stage
-            ):
-                continue
-
-
-            if isinstance(
-                match_date,
-                datetime,
-            ):
-                return (
-                    match_date.date()
-                )
-
-
-            if hasattr(
-                match_date,
-                "year",
-            ):
-                return match_date
-
-
-            return datetime.strptime(
-                str(match_date).strip(),
-                "%Y-%m-%d",
-            ).date()
-
-
-    finally:
-
-        workbook.close()
-
-
-    return None
 
 def create_initial_playoff_if_ready():
 
@@ -19005,6 +20182,33 @@ def create_initial_playoff_if_ready():
     # 기존 플레이오프 일정에서
     # 준PO 날짜 가져오기
     # =========================
+
+    playoff_setting = (
+        get_playoff_setting(
+            "준플레이오프"
+        )
+    )
+
+
+    if not playoff_setting:
+
+        raise RuntimeError(
+            "준플레이오프 설정을 "
+            "찾을 수 없습니다."
+        )
+
+
+    best_of = int(
+        playoff_setting[
+            "best_of"
+        ]
+    )
+
+    wins_required = int(
+        playoff_setting[
+            "wins_required"
+        ]
+    )
 
     scheduled_date = (
         get_playoff_schedule_date(
@@ -19181,6 +20385,8 @@ def create_initial_playoff_if_ready():
                     team_a["id"],
                     team_b["id"],
                     scheduled_date,
+                    best_of,
+                    wins_required,
                 ),
             )
 
@@ -19551,6 +20757,50 @@ def get_playoffs():
 
     workbook.close()
 
+    # =========================
+    # PLAYOFF 관리자 설정
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required
+
+                FROM playoff_settings
+                """
+            )
+
+
+            setting_rows = (
+                cursor.fetchall()
+            )
+
+
+    playoff_setting_map = {
+        row[
+            "playoff_stage"
+        ]:
+            row
+
+        for row
+        in setting_rows
+    }
+
+    # =========================
+    # 정규리그 조기 확정 시드
+    # =========================
+
+    locked_seeds = (
+        get_locked_regular_seeds()
+    )
+
 
     # =========================
     # 2. 실제 플레이오프 SERIES
@@ -19708,26 +20958,122 @@ def get_playoffs():
         )
 
 
-        if database_stage in (
-            "준플레이오프",
-            "플레이오프",
+        playoff_setting = (
+            playoff_setting_map.get(
+                database_stage
+            )
+        )
+
+
+        if playoff_setting:
+
+            setting_date = (
+                playoff_setting[
+                    "scheduled_date"
+                ].isoformat()
+            )
+
+            default_best_of = int(
+                playoff_setting[
+                    "best_of"
+                ]
+            )
+
+            default_wins_required = int(
+                playoff_setting[
+                    "wins_required"
+                ]
+            )
+
+        else:
+
+            setting_date = (
+                schedule_row[
+                    "date"
+                ]
+            )
+
+            default_best_of = None
+            default_wins_required = None
+
+        # =========================
+        # SERIES 생성 전
+        # 조기 확정 참가자 표시
+        # =========================
+
+        waiting_team_a = (
+            schedule_row[
+                "default_team_a"
+            ]
+            or
+            "TBD"
+        )
+
+        waiting_team_b = (
+            schedule_row[
+                "default_team_b"
+            ]
+            or
+            "TBD"
+        )
+
+
+        if (
+            database_stage
+            == "준플레이오프"
         ):
 
-            default_best_of = 5
-            default_wins_required = 3
+            waiting_team_a = (
+                locked_seeds.get(
+                    3
+                )
+                or
+                "TBD"
+            )
+
+            waiting_team_b = (
+                locked_seeds.get(
+                    4
+                )
+                or
+                "TBD"
+            )
+
+
+        elif (
+            database_stage
+            == "플레이오프"
+        ):
+
+            waiting_team_a = (
+                locked_seeds.get(
+                    2
+                )
+                or
+                "TBD"
+            )
+
+            waiting_team_b = (
+                "준플레이오프 승자"
+            )
+
 
         elif (
             database_stage
             == "결승시리즈"
         ):
 
-            default_best_of = 7
-            default_wins_required = 4
+            waiting_team_a = (
+                locked_seeds.get(
+                    1
+                )
+                or
+                "TBD"
+            )
 
-        else:
-
-            default_best_of = None
-            default_wins_required = None
+            waiting_team_b = (
+                "플레이오프 승자"
+            )
 
 
         # =====================
@@ -19739,9 +21085,7 @@ def get_playoffs():
             playoffs.append(
                 {
                     "date":
-                        schedule_row[
-                            "date"
-                        ],
+                        setting_date,
 
                     "stage":
                         schedule_row[
@@ -19764,22 +21108,10 @@ def get_playoffs():
                         default_wins_required,
 
                     "team_a":
-                        (
-                            schedule_row[
-                                "default_team_a"
-                            ]
-                            or
-                            "TBD"
-                        ),
+                        waiting_team_a,
 
                     "team_b":
-                        (
-                            schedule_row[
-                                "default_team_b"
-                            ]
-                            or
-                            "TBD"
-                        ),
+                        waiting_team_b,
 
                     "team_a_logo_path":
                         None,
@@ -19861,12 +21193,22 @@ def get_playoffs():
 
         playoffs.append(
             {
-                # 플레이오프 날짜는
-                # 기존 일정표를 기준으로 사용
+                # 실제 SERIES가 생성된 뒤에는
+                # DB의 변경된 일정을 우선 사용
                 "date":
-                    schedule_row[
-                        "date"
-                    ],
+                    (
+                        series_row[
+                            "scheduled_date"
+                        ].isoformat()
+
+                        if series_row[
+                            "scheduled_date"
+                        ]
+
+                        else schedule_row[
+                            "date"
+                        ]
+                    ),
 
                 "stage":
                     schedule_row[

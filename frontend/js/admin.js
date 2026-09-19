@@ -132,6 +132,11 @@ const adminScheduleListElement =
         "#admin-schedule-list"
     );
 
+const adminPlayoffListElement =
+    document.querySelector(
+        "#admin-playoff-list"
+    );
+
 const adminRegularReformButtonElement =
     document.querySelector(
         "#admin-regular-reform-button"
@@ -180,6 +185,44 @@ const adminScheduleEditSaveButtonElement =
 
 
 let editingAdminSchedule = null;
+
+const adminPlayoffEditModalElement =
+    document.querySelector(
+        "#admin-playoff-edit-modal"
+    );
+
+const adminPlayoffEditTitleElement =
+    document.querySelector(
+        "#admin-playoff-edit-title"
+    );
+
+const adminPlayoffEditDateElement =
+    document.querySelector(
+        "#admin-playoff-edit-date"
+    );
+
+const adminPlayoffEditBestOfElement =
+    document.querySelector(
+        "#admin-playoff-edit-best-of"
+    );
+
+const adminPlayoffEditMessageElement =
+    document.querySelector(
+        "#admin-playoff-edit-message"
+    );
+
+const adminPlayoffEditCancelButtonElement =
+    document.querySelector(
+        "#admin-playoff-edit-cancel"
+    );
+
+const adminPlayoffEditSaveButtonElement =
+    document.querySelector(
+        "#admin-playoff-edit-save"
+    );
+
+
+let editingAdminPlayoff = null;
 
 const adminResultEditModalElement =
     document.querySelector(
@@ -556,6 +599,14 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminRegularSchedule();
+                }
+
+                if (
+                    targetPage
+                    === "playoffs"
+                ) {
+
+                    loadAdminPlayoffs();
                 }
 
                 if (
@@ -2354,6 +2405,533 @@ adminScheduleEditSaveButtonElement
     );
 
 // =========================================
+// 플레이오프 관리
+// =========================================
+
+async function loadAdminPlayoffs() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminPlayoffListElement
+        .textContent =
+            "플레이오프 일정을 불러오는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/playoffs`
+            );
+
+
+        const playoffs =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                playoffs.detail
+                ?? "플레이오프 일정 조회 실패"
+            );
+        }
+
+
+        renderAdminPlayoffs(
+            playoffs
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminPlayoffListElement
+            .textContent =
+                "플레이오프 일정을 불러오지 못했습니다.";
+    }
+}
+
+function renderAdminPlayoffs(
+    playoffs
+) {
+
+    adminPlayoffListElement
+        .innerHTML = "";
+
+
+    if (
+        !Array.isArray(playoffs)
+        ||
+        playoffs.length === 0
+    ) {
+
+        adminPlayoffListElement
+            .textContent =
+                "등록된 플레이오프 일정이 없습니다.";
+
+        return;
+    }
+
+
+    playoffs.forEach(
+        playoff => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.classList.add(
+                "admin-schedule-card",
+                "admin-playoff-card"
+            );
+
+
+            cardElement.dataset.stage =
+                playoff.playoff_stage
+                ?? "";
+
+
+            cardElement.dataset.status =
+                playoff.status
+                ?? "";
+
+
+            let statusText =
+                playoff.status;
+
+
+            if (
+                playoff.status
+                === "waiting"
+            ) {
+
+                statusText =
+                    "대진 대기";
+
+            } else if (
+                playoff.status
+                === "scheduled"
+            ) {
+
+                statusText =
+                    "예정";
+
+            } else if (
+                playoff.status
+                === "active"
+            ) {
+
+                statusText =
+                    "진행 중";
+
+            } else if (
+                playoff.status
+                === "completed"
+            ) {
+
+                statusText =
+                    "완료";
+            }
+
+
+            const formatText =
+                (
+                    playoff.best_of
+                    &&
+                    playoff.wins_required
+                )
+                    ? (
+                        `${playoff.best_of}판 `
+                        + `${playoff.wins_required}선승`
+                    )
+                    : "-";
+
+
+            let actionHtml = "";
+
+
+            if (
+                playoff.status
+                === "waiting"
+                ||
+                playoff.status
+                === "scheduled"
+            ) {
+
+                actionHtml = `
+                    <button
+                        type="button"
+                        class="admin-playoff-edit-button"
+                    >
+                        설정 변경
+                    </button>
+                `;
+
+            } else {
+
+                actionHtml = `
+                    <span>
+                        변경 불가
+                    </span>
+                `;
+            }
+
+
+            cardElement.innerHTML = `
+
+                <div class="admin-schedule-meta">
+
+                    <strong
+                        class="admin-playoff-stage"
+                    >
+                        ${
+                            playoff.stage
+                            ?? playoff.playoff_stage
+                            ?? "플레이오프"
+                        }
+                    </strong>
+
+                    <span
+                        class="admin-playoff-format"
+                    >
+                        ${formatText}
+                    </span>
+
+                    <span
+                        class="admin-playoff-status"
+                    >
+                        ${statusText}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        admin-schedule-date
+                        admin-playoff-date
+                    "
+                >
+                    ${playoff.date ?? "-"}
+                </div>
+
+
+                <div
+                    class="
+                        admin-schedule-match
+                        admin-playoff-match
+                    "
+                >
+
+                    <span>
+                        ${playoff.team_a ?? "TBD"}
+                    </span>
+
+                    <strong>
+                        VS
+                    </strong>
+
+                    <span>
+                        ${playoff.team_b ?? "TBD"}
+                    </span>
+
+                </div>
+
+
+                <div class="admin-schedule-actions">
+                    ${actionHtml}
+                </div>
+            `;
+
+
+            const editButtonElement =
+                cardElement.querySelector(
+                    ".admin-playoff-edit-button"
+                );
+
+
+            if (editButtonElement) {
+
+                editButtonElement
+                    .addEventListener(
+                        "click",
+                        () => {
+
+                            openAdminPlayoffEdit(
+                                playoff
+                            );
+                        }
+                    );
+            }
+
+
+            adminPlayoffListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+}
+
+function openAdminPlayoffEdit(
+    playoff
+) {
+
+    editingAdminPlayoff =
+        playoff;
+
+
+    adminPlayoffEditTitleElement
+        .textContent =
+            `${
+                playoff.stage
+                ?? playoff.playoff_stage
+                ?? "플레이오프"
+            }`
+            + " / "
+            + `${playoff.team_a ?? "TBD"}`
+            + " VS "
+            + `${playoff.team_b ?? "TBD"}`;
+
+
+    adminPlayoffEditDateElement
+        .value =
+            playoff.date ?? "";
+
+
+    adminPlayoffEditBestOfElement
+        .value =
+            String(
+                playoff.best_of
+                ?? 5
+            );
+
+
+    adminPlayoffEditMessageElement
+        .textContent = "";
+
+
+    adminPlayoffEditModalElement
+        .classList.remove(
+            "hidden"
+        );
+}
+
+function closeAdminPlayoffEdit() {
+
+    editingAdminPlayoff =
+        null;
+
+
+    adminPlayoffEditMessageElement
+        .textContent = "";
+
+
+    adminPlayoffEditModalElement
+        .classList.add(
+            "hidden"
+        );
+}
+
+adminPlayoffEditSaveButtonElement
+    .addEventListener(
+        "click",
+        async () => {
+
+            if (!editingAdminPlayoff) {
+                return;
+            }
+
+
+            const scheduledDate =
+                adminPlayoffEditDateElement
+                    .value;
+
+
+            const bestOf =
+                Number(
+                    adminPlayoffEditBestOfElement
+                        .value
+                );
+
+
+            if (!scheduledDate) {
+
+                adminPlayoffEditMessageElement
+                    .textContent =
+                        "경기 날짜를 선택해주세요.";
+
+                return;
+            }
+
+
+            const winsRequiredMap = {
+                3: 2,
+                5: 3,
+                7: 4,
+            };
+
+
+            const winsRequired =
+                winsRequiredMap[
+                    bestOf
+                ];
+
+
+            const isConfirmed =
+                confirm(
+                    `${
+                        editingAdminPlayoff
+                            .stage
+                        ??
+                        editingAdminPlayoff
+                            .playoff_stage
+                    }\n\n`
+                    + `날짜: ${
+                        editingAdminPlayoff.date
+                    } → ${scheduledDate}\n`
+                    + `경기 방식: ${
+                        editingAdminPlayoff.best_of
+                    }판 ${
+                        editingAdminPlayoff.wins_required
+                    }선승`
+                    + ` → ${bestOf}판 `
+                    + `${winsRequired}선승\n\n`
+                    + "변경하시겠습니까?"
+                );
+
+
+            if (!isConfirmed) {
+                return;
+            }
+
+
+            const adminToken =
+                getAdminToken();
+
+
+            adminPlayoffEditSaveButtonElement
+                .disabled = true;
+
+
+            adminPlayoffEditMessageElement
+                .textContent =
+                    "저장 중...";
+
+
+            try {
+
+                const response =
+                    await fetch(
+                        `${apiBaseUrl}`
+                        + "/api/admin/playoffs/settings/"
+                        + encodeURIComponent(
+                            editingAdminPlayoff
+                                .playoff_stage
+                        ),
+                        {
+                            method:
+                                "PUT",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json",
+
+                                "X-Admin-Token":
+                                    adminToken,
+                            },
+
+                            body:
+                                JSON.stringify({
+                                    scheduled_date:
+                                        scheduledDate,
+
+                                    best_of:
+                                        bestOf,
+                                }),
+                        }
+                    );
+
+
+                const responseData =
+                    await response.json();
+
+
+                if (
+                    response.status
+                    === 401
+                ) {
+
+                    sessionStorage
+                        .removeItem(
+                            adminTokenStorageKey
+                        );
+
+
+                    closeAdminPlayoffEdit();
+
+                    showAdminLogin();
+
+                    return;
+                }
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        responseData.detail
+                        ?? "플레이오프 설정 변경 실패"
+                    );
+                }
+
+
+                closeAdminPlayoffEdit();
+
+
+                await loadAdminPlayoffs();
+
+
+                alert(
+                    responseData.message
+                    ?? "플레이오프 설정이 변경되었습니다."
+                );
+
+
+            } catch (error) {
+
+                console.error(
+                    error
+                );
+
+
+                adminPlayoffEditMessageElement
+                    .textContent =
+                        error.message;
+
+
+            } finally {
+
+                adminPlayoffEditSaveButtonElement
+                    .disabled = false;
+            }
+        }
+    );
+
+// =========================================
 // 경기 결과 삭제
 // =========================================
 
@@ -3405,6 +3983,12 @@ adminScheduleEditCancelButtonElement
     .addEventListener(
         "click",
         closeAdminScheduleEdit
+    );
+
+adminPlayoffEditCancelButtonElement
+    .addEventListener(
+        "click",
+        closeAdminPlayoffEdit
     );
 
 // =========================================

@@ -729,6 +729,174 @@
     background: #f2f3f5;
 }
 
+/* ========================================
+   플레이오프 관리
+======================================== */
+
+.admin-playoff-card {
+    position: relative;
+
+    overflow: hidden;
+
+    border-color: #dfe2e7;
+
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+.admin-playoff-card::before {
+    content: "";
+
+    position: absolute;
+
+    top: 0;
+    left: 0;
+    bottom: 0;
+
+    width: 4px;
+
+    background: #aeb4bd;
+}
+
+
+.admin-playoff-card[
+    data-stage="플레이오프"
+]::before {
+    background: #4f6fa8;
+}
+
+
+.admin-playoff-card[
+    data-stage="결승시리즈"
+]::before {
+    background: #c49b45;
+}
+
+
+.admin-playoff-card:hover {
+    border-color: #c9cdd4;
+
+    box-shadow:
+        0 5px 18px
+        rgba(0, 0, 0, 0.06);
+
+    transform:
+        translateY(-1px);
+}
+
+
+.admin-playoff-stage {
+    color: #17191d;
+
+    font-size: 15px;
+    font-weight: 700;
+}
+
+
+.admin-playoff-format {
+    width: fit-content;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    background: #f0f2f5;
+
+    color: #555;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.admin-playoff-status {
+    width: fit-content;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    background: #f3f4f6;
+
+    color: #777;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.admin-playoff-card[
+    data-status="scheduled"
+]
+.admin-playoff-status {
+    background: #eef4ff;
+    color: #4265a3;
+}
+
+
+.admin-playoff-card[
+    data-status="active"
+]
+.admin-playoff-status {
+    background: #fff1e8;
+    color: #a15d2f;
+}
+
+
+.admin-playoff-card[
+    data-status="completed"
+]
+.admin-playoff-status {
+    background: #edf7f0;
+    color: #477454;
+}
+
+
+.admin-playoff-date {
+    color: #333;
+
+    font-size: 15px;
+}
+
+
+.admin-playoff-match {
+    font-weight: 600;
+}
+
+
+.admin-playoff-edit-button {
+    padding: 9px 15px;
+
+    border: 1px solid #4f5968;
+    border-radius: 6px;
+
+    background: #17191d;
+    color: white;
+
+    font-family: inherit;
+    font-size: 13px;
+
+    cursor: pointer;
+
+    transition:
+        opacity 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+.admin-playoff-edit-button:hover {
+    opacity: 0.88;
+}
+
+
+.admin-playoff-edit-button:active {
+    transform:
+        translateY(1px);
+}
+
 
 /* ========================================
    일정 수정 팝업
@@ -768,6 +936,77 @@
 
     background: #17191d;
     color: white;
+}
+
+/* ========================================
+   플레이오프 설정 수정 팝업
+======================================== */
+
+#admin-playoff-edit-modal
+.admin-result-edit-panel {
+    max-width: 440px;
+}
+
+
+#admin-playoff-edit-modal
+.admin-result-edit-panel label {
+    display: flex;
+    flex-direction: column;
+
+    gap: 8px;
+
+    margin-top: 16px;
+
+    color: #666;
+
+    font-size: 13px;
+}
+
+
+#admin-playoff-edit-date,
+#admin-playoff-edit-best-of {
+    width: 100%;
+    height: 42px;
+
+    padding: 0 12px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    background: white;
+    color: #222;
+
+    font-family: inherit;
+    font-size: 14px;
+
+    outline: none;
+}
+
+
+#admin-playoff-edit-date:focus,
+#admin-playoff-edit-best-of:focus {
+    border-color: #606a78;
+
+    box-shadow:
+        0 0 0 3px
+        rgba(50, 60, 75, 0.08);
+}
+
+
+#admin-playoff-edit-save {
+    border-color: #17191d;
+
+    background: #17191d;
+    color: white;
+}
+
+
+#admin-playoff-edit-save:disabled {
+    opacity: 0.5;
+
+    cursor: default;
 }
 
 /* ========================================
@@ -1076,6 +1315,34 @@
         flex: 1;
 
         min-height: 40px;
+    }
+
+    .admin-playoff-card {
+        gap: 12px;
+    }
+
+
+    .admin-playoff-stage {
+        font-size: 14px;
+    }
+
+
+    .admin-playoff-format,
+    .admin-playoff-status {
+        font-size: 11px;
+    }
+
+
+    .admin-playoff-edit-button {
+        width: 100%;
+
+        min-height: 42px;
+    }
+
+
+    #admin-playoff-edit-date,
+    #admin-playoff-edit-best-of {
+        min-height: 44px;
     }
 
 
