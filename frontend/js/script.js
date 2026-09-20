@@ -805,7 +805,7 @@ todayMatchListElement.addEventListener(
 
 
                 window.location.href =
-                    "./preseason.html";
+                    "./preseason.html?mode=result";
 
             } catch (error) {
 

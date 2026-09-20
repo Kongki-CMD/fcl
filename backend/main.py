@@ -29119,27 +29119,79 @@ def sync_fcl_series_status(
         reject_reason = None
 
 
-        if match_date < started_at:
+        # =====================================
+        # 시간 범위 확인
+        #
+        # ACTIVE 상태:
+        # START 이후 경기만 인정
+        #
+        # 수동 결과 입력 후 사후 동기화:
+        # 실제 경기를 먼저 진행하고
+        # 사이트 START를 나중에 누른 경우도
+        # 있으므로 scheduled_date 당일의
+        # 경기까지 허용
+        # =====================================
 
-            reject_reason = (
-                "before_started_at"
-            )
+        if is_pending_result_sync:
+
+            if (
+                match_date.date()
+                !=
+                series[
+                    "scheduled_date"
+                ]
+            ):
+
+                reject_reason = (
+                    "scheduled_date_mismatch"
+                )
 
 
-        elif (
-            finished_at is not None
+            elif (
+                finished_at is not None
+                and
+                match_date
+                >
+                finished_at
+            ):
+
+                reject_reason = (
+                    "after_finished_at"
+                )
+
+
+        else:
+
+            if (
+                match_date
+                <
+                started_at
+            ):
+
+                reject_reason = (
+                    "before_started_at"
+                )
+
+
+            elif (
+                finished_at is not None
+                and
+                match_date
+                >
+                finished_at
+            ):
+
+                reject_reason = (
+                    "after_finished_at"
+                )
+
+
+        if (
+            reject_reason is None
             and
-            match_date > finished_at
-        ):
-
-            reject_reason = (
-                "after_finished_at"
-            )
-
-
-        elif (
             match_data["matchType"]
-            != series["match_type"]
+            !=
+            series["match_type"]
         ):
 
             reject_reason = (
@@ -29147,13 +29199,23 @@ def sync_fcl_series_status(
             )
 
 
-        elif match_nicknames != {
-            nickname_a,
-            nickname_b,
-        }:
+        elif (
+            reject_reason is None
+            and
+            match_nicknames
+            !=
+            {
+                nickname_a,
+                nickname_b,
+            }
+        ):
 
             reject_reason = (
                 "nickname_mismatch"
+            )
+
+            reject_reason = (
+                "match_type_mismatch"
             )
 
 
@@ -29325,11 +29387,13 @@ def sync_fcl_series_status(
         # 목표 세트 수만 감지
         # =========================
 
-        detected_matches = (
-            detected_matches[
-                :required_set_count
-            ]
-        )
+        if not is_pending_result_sync:
+
+            detected_matches = (
+                detected_matches[
+                    :required_set_count
+                ]
+            )
 
         # =========================
         # NEXON 경기 데이터 정합성 검증
@@ -29626,10 +29690,171 @@ def sync_fcl_series_status(
                     ),
                 )
 
+        # =========================
+        # 사후 동기화 후보 중
+        # 수동 입력 점수와 정확히 일치하는
+        # 연속 SERIES 찾기
+        #
+        # 같은 날 같은 참가자끼리
+        # 다른 경기를 추가로 했더라도
+        # 잘못 연결되는 것을 방지
+        # =========================
+
+        if (
+            len(detected_matches)
+            >=
+            required_sync_set_count
+        ):
+
+            manual_score_pairs = [
+                (
+                    int(
+                        manual_set[
+                            "team_a_score"
+                        ]
+                    ),
+                    int(
+                        manual_set[
+                            "team_b_score"
+                        ]
+                    ),
+                )
+
+                for manual_set
+                in manual_sets
+            ]
+
+
+            matching_windows = []
+
+
+            max_start_index = (
+                len(
+                    detected_matches
+                )
+                -
+                required_sync_set_count
+                +
+                1
+            )
+
+
+            for start_index in range(
+                max_start_index
+            ):
+
+                candidate_matches = (
+                    detected_matches[
+                        start_index:
+                        start_index
+                        +
+                        required_sync_set_count
+                    ]
+                )
+
+
+                candidate_score_pairs = []
+
+                candidate_valid = True
+
+
+                for candidate_match in (
+                    candidate_matches
+                ):
+
+                    score_pair = (
+                        get_match_score_pair(
+                            candidate_match[
+                                "data"
+                            ],
+                            nickname_a,
+                            nickname_b,
+                            include_extra_time_result=
+                                (
+                                    series[
+                                        "series_type"
+                                    ]
+                                    ==
+                                    "플레이오프"
+
+                                    or
+
+                                    bool(
+                                        series[
+                                            "include_extra_time_result"
+                                        ]
+                                    )
+                                ),
+                        )
+                    )
+
+
+                    if score_pair is None:
+
+                        candidate_valid = (
+                            False
+                        )
+
+                        break
+
+
+                    candidate_score_pairs.append(
+                        (
+                            int(
+                                score_pair[0]
+                            ),
+                            int(
+                                score_pair[1]
+                            ),
+                        )
+                    )
+
+
+                if (
+                    candidate_valid
+                    and
+                    candidate_score_pairs
+                    ==
+                    manual_score_pairs
+                ):
+
+                    matching_windows.append(
+                        candidate_matches
+                    )
+
+
+            # 같은 점수 조합이 여러 번 있다면
+            # 완료 시각에 가장 가까운
+            # 마지막 SERIES를 선택
+            if matching_windows:
+
+                detected_matches = (
+                    matching_windows[-1]
+                )
+
+
+            # 정확한 점수 조합은 없지만
+            # 후보가 충분하다면
+            # 가장 최근 경기들로 비교
+            # 이후 기존 conflict 검사가
+            # 점수 불일치를 잡아줌
+            elif (
+                len(detected_matches)
+                >
+                required_sync_set_count
+            ):
+
+                detected_matches = (
+                    detected_matches[
+                        -
+                        required_sync_set_count:
+                    ]
+                )
+
 
         # =========================
         # Nexon 데이터가 아직
-        # 3경기 전부 올라오지 않음
+        # 필요한 경기 수만큼 올라오지 않음
         # =========================
 
         if (
