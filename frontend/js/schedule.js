@@ -129,6 +129,264 @@ scheduleListElement.addEventListener(
 );
 
 
+function renderAiPredictionBar(match) {
+
+    const prediction =
+        match.ai_prediction;
+
+
+    if (
+        !prediction
+        ||
+        match.match_type
+        !== "정규리그"
+    ) {
+
+        return "";
+    }
+
+
+    const teamAWin = Math.max(
+        0,
+        Number(
+            prediction.team_a_win
+        )
+        || 0
+    );
+
+    const draw = Math.max(
+        0,
+        Number(
+            prediction.draw
+        )
+        || 0
+    );
+
+    const teamBWin = Math.max(
+        0,
+        Number(
+            prediction.team_b_win
+        )
+        || 0
+    );
+
+
+    const total =
+        teamAWin
+        +
+        draw
+        +
+        teamBWin;
+
+
+    if (total <= 0) {
+
+        return "";
+    }
+
+
+    const teamAWidth =
+        (
+            teamAWin
+            /
+            total
+        )
+        * 100;
+
+    const drawWidth =
+        (
+            draw
+            /
+            total
+        )
+        * 100;
+
+    const teamBWidth =
+        (
+            teamBWin
+            /
+            total
+        )
+        * 100;
+
+
+    // =====================================
+    // 상태별 제목
+    // =====================================
+
+    let predictionTitle =
+        "AI 추천 승률";
+
+
+    if (
+        match.status
+        === "active"
+    ) {
+
+        predictionTitle =
+            "경기 시작 AI 예측";
+    }
+
+
+    if (
+        match.status
+        === "completed"
+    ) {
+
+        predictionTitle =
+            "당시 AI 예측";
+    }
+
+
+    // =====================================
+    // 데이터 신뢰도
+    //
+    // 승리 확신도가 아니라
+    // 과거 표본량 기준
+    // =====================================
+
+    const confidenceMap = {
+        low: "낮음",
+        medium: "보통",
+        high: "높음",
+    };
+
+
+    const confidenceText =
+        confidenceMap[
+            prediction.confidence
+        ]
+        ?? null;
+
+
+    const confidenceHtml =
+        confidenceText
+            ? `
+                <span
+                    class="
+                        schedule-ai-confidence
+                        confidence-${
+                            prediction.confidence
+                        }
+                    "
+                    title="
+                        과거 경기 표본량을 기준으로 한
+                        데이터 신뢰도입니다.
+                    "
+                >
+                    데이터 신뢰도
+                    ${confidenceText}
+                </span>
+            `
+            : "";
+
+
+    return `
+        <div class="schedule-ai-prediction">
+
+            <div
+                class="
+                    schedule-ai-prediction-header
+                "
+            >
+
+                <span
+                    class="
+                        schedule-ai-prediction-title
+                    "
+                >
+                    ${predictionTitle}
+                </span>
+
+
+                ${confidenceHtml}
+
+            </div>
+
+
+            <div
+                class="
+                    schedule-ai-prediction-bar
+                "
+                aria-label="
+                    ${match.team_a} 승리
+                    ${Math.round(teamAWin)}%,
+                    무승부
+                    ${Math.round(draw)}%,
+                    ${match.team_b} 승리
+                    ${Math.round(teamBWin)}%
+                "
+            >
+
+                <div
+                    class="
+                        schedule-ai-prediction-segment
+                        team-a
+                    "
+                    style="
+                        width:
+                        ${teamAWidth}%;
+                    "
+                    title="
+                        ${match.team_a} 승리
+                        ${Math.round(teamAWin)}%
+                    "
+                >
+                    <span>
+                        ${match.team_a}
+                        ${Math.round(teamAWin)}%
+                    </span>
+                </div>
+
+
+                <div
+                    class="
+                        schedule-ai-prediction-segment
+                        draw
+                    "
+                    style="
+                        width:
+                        ${drawWidth}%;
+                    "
+                    title="
+                        무승부
+                        ${Math.round(draw)}%
+                    "
+                >
+                    <span>
+                        무승부
+                        ${Math.round(draw)}%
+                    </span>
+                </div>
+
+
+                <div
+                    class="
+                        schedule-ai-prediction-segment
+                        team-b
+                    "
+                    style="
+                        width:
+                        ${teamBWidth}%;
+                    "
+                    title="
+                        ${match.team_b} 승리
+                        ${Math.round(teamBWin)}%
+                    "
+                >
+                    <span>
+                        ${match.team_b}
+                        ${Math.round(teamBWin)}%
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
 async function loadSchedule() {
     try {
         const response = await fetch(
@@ -1087,6 +1345,11 @@ function renderSchedule(matches) {
             );
         }
 
+        const aiPredictionHtml =
+            renderAiPredictionBar(
+                match
+            );
+
 
         // =====================================
         // HTML
@@ -1157,6 +1420,8 @@ function renderSchedule(matches) {
                 </div>
 
             </div>
+
+            ${aiPredictionHtml}
 
 
             ${seriesStartHtml}

@@ -1143,6 +1143,259 @@ footer p {
     text-align: center;
 }
 
+/* ========================================
+   AI 경기 예측
+======================================== */
+
+.schedule-ai-prediction {
+    margin-top: 18px;
+}
+
+
+.schedule-ai-prediction-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-wrap: wrap;
+
+    gap: 7px;
+
+    margin-bottom: 7px;
+}
+
+
+.schedule-ai-prediction-title {
+    color: #888;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    letter-spacing: 0.04em;
+}
+
+.schedule-ai-confidence {
+    display: inline-flex;
+    align-items: center;
+
+    min-height: 20px;
+
+    padding:
+        2px
+        7px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #444;
+    border-radius: 999px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.035
+        );
+
+    color: #999;
+
+    font-size: 9px;
+    font-weight: 600;
+
+    white-space: nowrap;
+}
+
+
+.schedule-ai-confidence.confidence-high {
+    border-color:
+        rgba(
+            83,
+            145,
+            105,
+            0.55
+        );
+
+    color: #84bd98;
+}
+
+
+.schedule-ai-confidence.confidence-medium {
+    border-color:
+        rgba(
+            174,
+            145,
+            76,
+            0.55
+        );
+
+    color: #c6aa6b;
+}
+
+
+.schedule-ai-confidence.confidence-low {
+    border-color:
+        rgba(
+            150,
+            100,
+            100,
+            0.5
+        );
+
+    color: #ba8585;
+}
+
+
+.schedule-ai-prediction-bar {
+    display: flex;
+
+    width: 100%;
+    height: 38px;
+
+    overflow: hidden;
+
+    box-sizing: border-box;
+
+    border: 1px solid #444;
+    border-radius: 7px;
+
+    background: #202226;
+}
+
+
+.schedule-ai-prediction-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 0;
+    height: 100%;
+
+    box-sizing: border-box;
+
+    font-size: 12px;
+    font-weight: 700;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    transition:
+        width 0.25s ease;
+}
+
+
+.schedule-ai-prediction-segment
++ .schedule-ai-prediction-segment {
+    border-left:
+        1px solid
+        rgba(
+            255,
+            255,
+            255,
+            0.16
+        );
+}
+
+
+.schedule-ai-prediction-segment span {
+    display: block;
+
+    max-width: 100%;
+
+    padding: 0 7px;
+
+    box-sizing: border-box;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.schedule-ai-prediction-segment.team-a {
+    background:
+        rgba(
+            72,
+            105,
+            165,
+            0.72
+        );
+
+    color: #f1f5ff;
+}
+
+
+.schedule-ai-prediction-segment.draw {
+    background:
+        rgba(
+            100,
+            103,
+            110,
+            0.72
+        );
+
+    color: #f1f1f1;
+}
+
+
+.schedule-ai-prediction-segment.team-b {
+    background:
+        rgba(
+            170,
+            125,
+            61,
+            0.72
+        );
+
+    color: #fff5e6;
+}
+
+@media (max-width: 768px) {
+
+    .schedule-ai-prediction {
+        margin-top: 15px;
+    }
+
+
+    .schedule-ai-prediction-bar {
+        height: 34px;
+    }
+
+
+    .schedule-ai-prediction-segment {
+        font-size: 10px;
+    }
+
+
+    .schedule-ai-prediction-segment span {
+        padding: 0 4px;
+    }
+
+    .schedule-ai-prediction-header {
+        gap: 5px;
+        margin-bottom: 6px;
+    }
+
+
+    .schedule-ai-prediction-title {
+        font-size: 10px;
+    }
+
+
+    .schedule-ai-confidence {
+        min-height: 18px;
+
+        padding:
+            1px
+            6px;
+
+        font-size: 8px;
+    }
+
+}
+
 /* 라운드 표시 */
 
 .match-round {
@@ -21842,6 +22095,615 @@ button {
         justify-content: flex-end;
 
         flex-wrap: wrap;
+    }
+
+}
+
+/* =========================================
+   AI PREDICTION HISTORY
+========================================= */
+
+.ai-history-page {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 50px 40px;
+}
+
+
+.ai-history-section {
+    width: 100%;
+}
+
+
+.ai-history-header {
+    margin-bottom: 30px;
+}
+
+
+.ai-history-header h1 {
+    margin-bottom: 10px;
+
+    font-size: 32px;
+}
+
+
+.ai-history-header p {
+    color: #888;
+
+    font-size: 16px;
+}
+
+
+/* SUMMARY */
+
+.ai-history-summary {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            4,
+            minmax(0, 1fr)
+        );
+
+    gap: 14px;
+
+    margin-bottom: 30px;
+}
+
+
+.ai-summary-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 125px;
+
+    padding: 20px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.025
+        );
+
+    text-align: center;
+}
+
+
+.ai-summary-label {
+    margin-bottom: 10px;
+
+    color: #888;
+
+    font-size: 12px;
+    font-weight: 600;
+}
+
+
+.ai-summary-value {
+    margin-bottom: 7px;
+
+    color: #eee;
+
+    font-size: 27px;
+    font-weight: 800;
+}
+
+
+.ai-summary-detail {
+    color: #777;
+
+    font-size: 11px;
+}
+
+
+/* EMPTY */
+
+.ai-history-empty {
+    padding: 55px 25px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    text-align: center;
+
+    color: #888;
+}
+
+
+.ai-history-empty strong {
+    display: block;
+
+    margin-bottom: 8px;
+
+    color: #ccc;
+
+    font-size: 16px;
+}
+
+
+.ai-history-empty p {
+    font-size: 13px;
+}
+
+
+/* LIST */
+
+.ai-history-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 20px;
+}
+
+
+.ai-history-card {
+    padding: 24px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    background:
+        rgba(
+            0,
+            0,
+            0,
+            0.12
+        );
+}
+
+
+.ai-history-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    padding-bottom: 18px;
+    margin-bottom: 20px;
+
+    border-bottom: 1px solid #2d2d2d;
+}
+
+
+.ai-history-card-date {
+    margin-bottom: 7px;
+
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.ai-history-card-header h2 {
+    font-size: 20px;
+}
+
+
+.ai-history-card-header h2 span {
+    padding: 0 8px;
+
+    color: #666;
+
+    font-size: 11px;
+}
+
+
+.ai-history-card-meta {
+    padding: 5px 9px;
+
+    border: 1px solid #3a3a3a;
+    border-radius: 999px;
+
+    color: #888;
+
+    font-size: 10px;
+
+    white-space: nowrap;
+}
+
+
+/* PREDICTION */
+
+.ai-history-prediction-section {
+    margin-top: 17px;
+}
+
+
+.ai-history-section-title {
+    margin-bottom: 8px;
+
+    color: #999;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    letter-spacing: 0.03em;
+}
+
+
+.ai-history-probability-bar {
+    display: flex;
+
+    width: 100%;
+    height: 38px;
+
+    overflow: hidden;
+
+    border: 1px solid #333;
+    border-radius: 7px;
+
+    background: #151515;
+}
+
+
+.ai-history-probability-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 0;
+
+    overflow: hidden;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    white-space: nowrap;
+}
+
+
+.ai-history-probability-segment span {
+    overflow: hidden;
+
+    padding: 0 5px;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.ai-history-probability-segment.team-a {
+    background:
+        rgba(
+            65,
+            105,
+            170,
+            0.5
+        );
+}
+
+
+.ai-history-probability-segment.draw {
+    background:
+        rgba(
+            110,
+            110,
+            110,
+            0.4
+        );
+
+    color: #ccc;
+}
+
+
+.ai-history-probability-segment.team-b {
+    background:
+        rgba(
+            170,
+            135,
+            65,
+            0.5
+        );
+}
+
+
+/* OUTCOME */
+
+.ai-history-outcome-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            5,
+            minmax(0, 1fr)
+        );
+
+    gap: 10px;
+
+    margin-top: 22px;
+}
+
+
+.ai-history-outcome-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    min-height: 75px;
+
+    padding: 10px;
+
+    border: 1px solid #2e2e2e;
+    border-radius: 8px;
+
+    background:
+        rgba(
+            255,
+            255,
+            255,
+            0.02
+        );
+
+    text-align: center;
+}
+
+
+.ai-history-outcome-item
+> span:first-child {
+    margin-bottom: 7px;
+
+    color: #777;
+
+    font-size: 10px;
+}
+
+
+.ai-history-outcome-item strong {
+    color: #ddd;
+
+    font-size: 13px;
+}
+
+
+/* RESULT BADGE */
+
+.ai-history-result-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 48px;
+
+    padding: 4px 8px;
+
+    border-radius: 999px;
+
+    font-size: 10px;
+    font-weight: 700;
+}
+
+
+.ai-history-result-badge.is-correct {
+    border: 1px solid
+        rgba(
+            70,
+            155,
+            105,
+            0.6
+        );
+
+    background:
+        rgba(
+            70,
+            155,
+            105,
+            0.1
+        );
+
+    color: #74c694;
+}
+
+
+.ai-history-result-badge.is-wrong {
+    border: 1px solid
+        rgba(
+            170,
+            80,
+            80,
+            0.55
+        );
+
+    background:
+        rgba(
+            170,
+            80,
+            80,
+            0.08
+        );
+
+    color: #ca8585;
+}
+
+
+.ai-history-result-badge.is-neutral {
+    border: 1px solid #444;
+
+    color: #888;
+}
+
+
+/* SET RESULT */
+
+.ai-history-set-section {
+    margin-top: 22px;
+
+    padding-top: 18px;
+
+    border-top: 1px solid #2d2d2d;
+}
+
+
+.ai-history-set-list {
+    display: flex;
+    flex-direction: column;
+
+    gap: 7px;
+}
+
+
+.ai-history-set-row {
+    display: grid;
+
+    grid-template-columns:
+        55px
+        70px
+        1fr
+        auto;
+
+    align-items: center;
+
+    gap: 12px;
+
+    padding: 9px 12px;
+
+    border: 1px solid #2a2a2a;
+    border-radius: 6px;
+}
+
+
+.ai-history-set-number {
+    color: #888;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+.ai-history-set-score {
+    color: #ddd;
+
+    font-size: 13px;
+    font-weight: 700;
+
+    text-align: center;
+}
+
+
+.ai-history-set-result {
+    color: #aaa;
+
+    font-size: 12px;
+}
+
+
+.ai-history-no-set {
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+/* MOBILE */
+
+@media (
+    max-width: 768px
+) {
+
+    .ai-history-page {
+        padding:
+            35px
+            16px;
+    }
+
+
+    .ai-history-header h1 {
+        font-size: 27px;
+    }
+
+
+    .ai-history-header p {
+        font-size: 13px;
+    }
+
+
+    .ai-history-summary {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+
+        gap: 9px;
+    }
+
+
+    .ai-summary-card {
+        min-height: 105px;
+
+        padding: 14px 8px;
+    }
+
+
+    .ai-summary-value {
+        font-size: 22px;
+    }
+
+
+    .ai-history-card {
+        padding: 17px 14px;
+    }
+
+
+    .ai-history-card-header {
+        gap: 10px;
+    }
+
+
+    .ai-history-card-header h2 {
+        font-size: 17px;
+    }
+
+
+    .ai-history-card-meta {
+        font-size: 8px;
+    }
+
+
+    .ai-history-probability-bar {
+        height: 34px;
+    }
+
+
+    .ai-history-probability-segment {
+        font-size: 9px;
+    }
+
+
+    .ai-history-outcome-grid {
+        grid-template-columns:
+            repeat(
+                2,
+                minmax(0, 1fr)
+            );
+    }
+
+
+    .ai-history-set-row {
+        grid-template-columns:
+            42px
+            50px
+            1fr
+            auto;
+
+        gap: 7px;
+
+        padding: 8px;
+    }
+
+
+    .ai-history-set-result {
+        font-size: 10px;
     }
 
 }

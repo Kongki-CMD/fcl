@@ -72,6 +72,14 @@ if (siteMainMenuElement) {
                     href:
                         "./players.html",
                 },
+
+                {
+                    label:
+                        "AI 예측 기록",
+
+                    href:
+                        "./ai-predictions.html",
+                },
             ],
         },
 

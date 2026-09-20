@@ -63,6 +63,7 @@ import httpx
 import psycopg
 
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from fastapi import (
     FastAPI,
@@ -3110,6 +3111,26 @@ def initialize_database():
                 """
             )
 
+
+            # =========================
+            # AI 경기 예측 Snapshot
+            #
+            # 경기 시작 순간의 예측값을
+            # 이후에도 역사 데이터로 보존
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ADD COLUMN IF NOT EXISTS
+                    ai_prediction_snapshot JSONB,
+
+                ADD COLUMN IF NOT EXISTS
+                    ai_prediction_snapshot_at
+                    TIMESTAMPTZ
+                """
+            )
 
 
             cursor.execute(
@@ -15580,6 +15601,4117 @@ def test_prediction_settlement(
             prediction_results,
     }
 
+# =========================
+# AI MATCH PREDICTION V1
+#
+# 기준
+# 전체 전적      20%
+# 최근 폼        20%
+# 상대 전적      15%
+# 득실           15%
+# Elo            20%
+# Home / Away    10%
+#
+# team_a = Home
+# team_b = Away
+# =========================
+
+AI_PREDICTION_MODEL = (
+    "fcl-stat-v1.1"
+)
+
+AI_PREDICTION_WEIGHTS = {
+    "overall": 0.23,
+    "recent_form": 0.12,
+    "head_to_head": 0.05,
+    "goals": 0.23,
+    "elo": 0.24,
+    "home_away": 0.13,
+}
+
+
+AI_RECENT_FORM_WEIGHTS = [
+    1.00,
+    0.92,
+    0.85,
+    0.78,
+    0.71,
+    0.64,
+    0.58,
+    0.52,
+    0.46,
+    0.40,
+]
+
+
+def clamp_ai_value(
+    value,
+    minimum,
+    maximum,
+):
+
+    return max(
+        minimum,
+        min(
+            maximum,
+            value,
+        ),
+    )
+
+
+def create_ai_record_bucket():
+
+    return {
+        "sets": 0,
+        "wins": 0,
+        "draws": 0,
+        "losses": 0,
+        "goals_for": 0,
+        "goals_against": 0,
+    }
+
+
+def update_ai_record_bucket(
+    bucket,
+    result,
+    goals_for,
+    goals_against,
+):
+
+    bucket["sets"] += 1
+
+    bucket["goals_for"] += int(
+        goals_for
+    )
+
+    bucket["goals_against"] += int(
+        goals_against
+    )
+
+
+    if result == 1.0:
+
+        bucket["wins"] += 1
+
+    elif result == 0.5:
+
+        bucket["draws"] += 1
+
+    else:
+
+        bucket["losses"] += 1
+
+
+def get_ai_record_rate(
+    bucket,
+):
+
+    set_count = int(
+        bucket["sets"]
+    )
+
+
+    if set_count <= 0:
+
+        return 0.5
+
+
+    return (
+        (
+            bucket["wins"]
+            +
+            (
+                bucket["draws"]
+                * 0.5
+            )
+        )
+        /
+        set_count
+    )
+
+
+def get_ai_draw_rate(
+    bucket,
+    default=0.22,
+):
+
+    set_count = int(
+        bucket["sets"]
+    )
+
+
+    if set_count <= 0:
+
+        return default
+
+
+    return (
+        bucket["draws"]
+        /
+        set_count
+    )
+
+
+def get_ai_average_goals_for(
+    bucket,
+):
+
+    set_count = int(
+        bucket["sets"]
+    )
+
+
+    if set_count <= 0:
+
+        return 0.0
+
+
+    return (
+        bucket["goals_for"]
+        /
+        set_count
+    )
+
+
+def get_ai_average_goals_against(
+    bucket,
+):
+
+    set_count = int(
+        bucket["sets"]
+    )
+
+
+    if set_count <= 0:
+
+        return 0.0
+
+
+    return (
+        bucket["goals_against"]
+        /
+        set_count
+    )
+
+def build_ai_prediction_context_from_history(
+    source_history,
+):
+
+    history = list(
+        source_history
+    )
+
+
+    history.sort(
+        key=lambda record:
+            record["order_key"]
+    )
+
+
+    # =========================
+    # 참가자별 통계
+    # =========================
+
+    stats = {}
+
+    recent_results = {}
+
+    elo_ratings = {}
+
+
+    def ensure_participant(
+        name,
+    ):
+
+        if name in stats:
+            return
+
+
+        stats[name] = {
+            "overall":
+                create_ai_record_bucket(),
+
+            "home":
+                create_ai_record_bucket(),
+
+            "away":
+                create_ai_record_bucket(),
+        }
+
+
+        recent_results[name] = []
+
+        elo_ratings[name] = 1500.0
+
+
+    for participant in PARTICIPANTS:
+
+        ensure_participant(
+            participant
+        )
+
+
+    global_record = (
+        create_ai_record_bucket()
+    )
+
+
+    # =========================
+    # 시간순 통계 + Elo
+    # =========================
+
+    for record in history:
+
+        team_a = (
+            record[
+                "team_a"
+            ]
+        )
+
+        team_b = (
+            record[
+                "team_b"
+            ]
+        )
+
+
+        ensure_participant(
+            team_a
+        )
+
+        ensure_participant(
+            team_b
+        )
+
+
+        team_a_score = int(
+            record[
+                "team_a_score"
+            ]
+        )
+
+        team_b_score = int(
+            record[
+                "team_b_score"
+            ]
+        )
+
+
+        winner_side = (
+            record[
+                "winner_side"
+            ]
+        )
+
+
+        if (
+            winner_side
+            == "team_a"
+        ):
+
+            result_a = 1.0
+            result_b = 0.0
+
+
+        elif (
+            winner_side
+            == "team_b"
+        ):
+
+            result_a = 0.0
+            result_b = 1.0
+
+
+        else:
+
+            result_a = 0.5
+            result_b = 0.5
+
+
+        # =====================
+        # 전체 기록
+        # =====================
+
+        update_ai_record_bucket(
+            stats[
+                team_a
+            ][
+                "overall"
+            ],
+            result_a,
+            team_a_score,
+            team_b_score,
+        )
+
+        update_ai_record_bucket(
+            stats[
+                team_b
+            ][
+                "overall"
+            ],
+            result_b,
+            team_b_score,
+            team_a_score,
+        )
+
+
+        # =====================
+        # Home / Away
+        # =====================
+
+        update_ai_record_bucket(
+            stats[
+                team_a
+            ][
+                "home"
+            ],
+            result_a,
+            team_a_score,
+            team_b_score,
+        )
+
+        update_ai_record_bucket(
+            stats[
+                team_b
+            ][
+                "away"
+            ],
+            result_b,
+            team_b_score,
+            team_a_score,
+        )
+
+
+        # =====================
+        # 최근 폼
+        # =====================
+
+        recent_results[
+            team_a
+        ].append(
+            result_a
+        )
+
+        recent_results[
+            team_b
+        ].append(
+            result_b
+        )
+
+
+        # =====================
+        # 전체 무승부율
+        # =====================
+
+        update_ai_record_bucket(
+            global_record,
+
+            (
+                0.5
+                if
+                winner_side
+                == "draw"
+
+                else
+                (
+                    1.0
+                    if
+                    winner_side
+                    == "team_a"
+
+                    else
+                    0.0
+                )
+            ),
+
+            team_a_score,
+            team_b_score,
+        )
+
+
+        # =====================
+        # Elo
+        # =====================
+
+        elo_a = float(
+            elo_ratings[
+                team_a
+            ]
+        )
+
+        elo_b = float(
+            elo_ratings[
+                team_b
+            ]
+        )
+
+
+        expected_a = (
+            1.0
+            /
+            (
+                1.0
+                +
+                (
+                    10
+                    **
+                    (
+                        (
+                            elo_b
+                            -
+                            elo_a
+                        )
+                        /
+                        400.0
+                    )
+                )
+            )
+        )
+
+
+        expected_b = (
+            1.0
+            -
+            expected_a
+        )
+
+
+        elo_k = 24.0
+
+
+        elo_ratings[
+            team_a
+        ] = (
+            elo_a
+            +
+            elo_k
+            *
+            (
+                result_a
+                -
+                expected_a
+            )
+        )
+
+
+        elo_ratings[
+            team_b
+        ] = (
+            elo_b
+            +
+            elo_k
+            *
+            (
+                result_b
+                -
+                expected_b
+            )
+        )
+
+
+    return {
+        "history":
+            history,
+
+        "stats":
+            stats,
+
+        "recent_results":
+            recent_results,
+
+        "elo_ratings":
+            elo_ratings,
+
+        "global_record":
+            global_record,
+    }
+
+
+def build_ai_prediction_context():
+
+    history = []
+
+    regular_database_match_keys = set()
+
+
+    # =========================
+    # 1. DB 완료 경기
+    #
+    # 정규리그
+    # +
+    # 정규시간 결과를 사용한 프리시즌
+    #
+    # 플레이오프는 제외
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id AS series_id,
+                    s.series_type,
+                    s.scheduled_date,
+                    s.include_extra_time_result,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_b.fcl_name
+                        AS team_b,
+
+                    ss.set_number,
+                    ss.played_at,
+                    ss.team_a_score,
+                    ss.team_b_score,
+                    ss.winner_side
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                JOIN series_sets AS ss
+                    ON ss.series_id =
+                        s.id
+
+                WHERE
+                    s.status =
+                        'completed'
+
+                    AND (
+                        s.series_type =
+                            '정규리그'
+
+                        OR
+
+                        (
+                            s.series_type =
+                                '프리시즌'
+
+                            AND
+                            s.include_extra_time_result
+                                = FALSE
+                        )
+                    )
+
+                ORDER BY
+                    s.scheduled_date,
+                    ss.played_at,
+                    s.id,
+                    ss.set_number
+                """
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    for row in rows:
+
+        team_a_score = int(
+            row["team_a_score"]
+        )
+
+        team_b_score = int(
+            row["team_b_score"]
+        )
+
+
+        winner_side = (
+            row["winner_side"]
+        )
+
+
+        if winner_side not in (
+            "team_a",
+            "team_b",
+            "draw",
+        ):
+
+            if (
+                team_a_score
+                >
+                team_b_score
+            ):
+
+                winner_side = "team_a"
+
+            elif (
+                team_b_score
+                >
+                team_a_score
+            ):
+
+                winner_side = "team_b"
+
+            else:
+
+                winner_side = "draw"
+
+
+        scheduled_date = (
+            row["scheduled_date"]
+        )
+
+
+        date_text = (
+            scheduled_date.isoformat()
+            if scheduled_date
+            else ""
+        )
+
+
+        played_at_text = (
+            row["played_at"].isoformat()
+            if row["played_at"]
+            else ""
+        )
+
+
+        history.append(
+            {
+                "series_id":
+                    row["series_id"],
+
+                "series_type":
+                    row["series_type"],
+
+                "date":
+                    date_text,
+
+                "order_key": (
+                    date_text,
+                    played_at_text,
+                    int(
+                        row["series_id"]
+                    ),
+                    int(
+                        row["set_number"]
+                    ),
+                ),
+
+                "team_a":
+                    row["team_a"],
+
+                "team_b":
+                    row["team_b"],
+
+                "team_a_score":
+                    team_a_score,
+
+                "team_b_score":
+                    team_b_score,
+
+                "winner_side":
+                    winner_side,
+            }
+        )
+
+
+        if (
+            row["series_type"]
+            == "정규리그"
+            and
+            scheduled_date
+        ):
+
+            teams = sorted(
+                [
+                    row["team_a"],
+                    row["team_b"],
+                ]
+            )
+
+
+            regular_database_match_keys.add(
+                (
+                    scheduled_date
+                        .isoformat(),
+
+                    teams[0],
+                    teams[1],
+                )
+            )
+
+
+    # =========================
+    # 2. 기존 Excel 정규리그
+    #
+    # DB에 같은 경기가 없을 때만
+    # 과거 데이터 보완
+    # =========================
+
+    workbook = load_workbook(
+        RESULTS_PATH,
+        data_only=True,
+    )
+
+    worksheet = workbook[
+        "경기결과"
+    ]
+
+
+    excel_order = 0
+
+
+    for row in worksheet.iter_rows(
+        min_row=2,
+        max_col=10,
+        values_only=True,
+    ):
+
+        (
+            match_date,
+
+            team_a,
+
+            set1_team_a,
+            set1_team_b,
+
+            set2_team_a,
+            set2_team_b,
+
+            set3_team_a,
+            set3_team_b,
+
+            team_b,
+
+            match_type,
+        ) = row
+
+
+        if match_date is None:
+
+            continue
+
+
+        if match_type is None:
+
+            match_type = (
+                "정규리그"
+            )
+
+
+        if (
+            match_type
+            != "정규리그"
+        ):
+
+            continue
+
+
+        if hasattr(
+            match_date,
+            "date",
+        ):
+
+            match_date = (
+                match_date.date()
+            )
+
+
+        elif isinstance(
+            match_date,
+            str,
+        ):
+
+            try:
+
+                match_date = (
+                    datetime.strptime(
+                        match_date,
+                        "%Y-%m-%d",
+                    ).date()
+                )
+
+            except ValueError:
+
+                continue
+
+
+        scores = [
+            set1_team_a,
+            set1_team_b,
+            set2_team_a,
+            set2_team_b,
+            set3_team_a,
+            set3_team_b,
+        ]
+
+
+        if any(
+            score is None
+            for score in scores
+        ):
+
+            continue
+
+
+        teams = sorted(
+            [
+                team_a,
+                team_b,
+            ]
+        )
+
+
+        match_key = (
+            match_date.isoformat(),
+            teams[0],
+            teams[1],
+        )
+
+
+        if (
+            match_key
+            in regular_database_match_keys
+        ):
+
+            continue
+
+
+        excel_sets = [
+            (
+                set1_team_a,
+                set1_team_b,
+            ),
+            (
+                set2_team_a,
+                set2_team_b,
+            ),
+            (
+                set3_team_a,
+                set3_team_b,
+            ),
+        ]
+
+
+        for (
+            set_index,
+            (
+                team_a_score,
+                team_b_score,
+            ),
+        ) in enumerate(
+            excel_sets,
+            start=1,
+        ):
+
+            team_a_score = int(
+                team_a_score
+            )
+
+            team_b_score = int(
+                team_b_score
+            )
+
+
+            if (
+                team_a_score
+                >
+                team_b_score
+            ):
+
+                winner_side = (
+                    "team_a"
+                )
+
+            elif (
+                team_b_score
+                >
+                team_a_score
+            ):
+
+                winner_side = (
+                    "team_b"
+                )
+
+            else:
+
+                winner_side = (
+                    "draw"
+                )
+
+
+            history.append(
+                {
+                    "series_id":
+                        None,
+
+                    "series_type":
+                        "정규리그",
+
+                    "date":
+                        match_date
+                            .isoformat(),
+
+                    "order_key": (
+                        match_date
+                            .isoformat(),
+
+                        "",
+
+                        excel_order,
+
+                        set_index,
+                    ),
+
+                    "team_a":
+                        team_a,
+
+                    "team_b":
+                        team_b,
+
+                    "team_a_score":
+                        team_a_score,
+
+                    "team_b_score":
+                        team_b_score,
+
+                    "winner_side":
+                        winner_side,
+                }
+            )
+
+
+        excel_order += 1
+
+
+    workbook.close()
+
+    history.sort(
+        key=lambda record:
+            record["order_key"]
+    )
+
+    return (
+        build_ai_prediction_context_from_history(
+            history
+        )
+    )
+
+
+def calculate_ai_match_prediction(
+    context,
+    team_a,
+    team_b,
+    weights=None,
+):
+
+    stats = context[
+        "stats"
+    ]
+
+    recent_results = context[
+        "recent_results"
+    ]
+
+    elo_ratings = context[
+        "elo_ratings"
+    ]
+
+    history = context[
+        "history"
+    ]
+
+
+    if (
+        team_a not in stats
+        or
+        team_b not in stats
+    ):
+
+        return {
+            "team_a_win": 39,
+            "draw": 22,
+            "team_b_win": 39,
+            "sample_size": 0,
+            "confidence": "low",
+            "model":
+                AI_PREDICTION_MODEL,
+        }
+
+
+    stats_a = stats[
+        team_a
+    ]
+
+    stats_b = stats[
+        team_b
+    ]
+
+
+    overall_a = (
+        get_ai_record_rate(
+            stats_a[
+                "overall"
+            ]
+        )
+    )
+
+    overall_b = (
+        get_ai_record_rate(
+            stats_b[
+                "overall"
+            ]
+        )
+    )
+
+
+    # =========================
+    # 1. 전체 전적
+    # =========================
+
+    overall_factor = (
+        0.5
+        +
+        (
+            overall_a
+            -
+            overall_b
+        )
+        *
+        0.5
+    )
+
+
+    overall_factor = (
+        clamp_ai_value(
+            overall_factor,
+            0.10,
+            0.90,
+        )
+    )
+
+
+    # =========================
+    # 2. 최근 폼
+    # 최근 10세트
+    # =========================
+
+    def recent_form_rate(
+        name,
+    ):
+
+        values = (
+            recent_results.get(
+                name,
+                [],
+            )
+        )
+
+
+        values = list(
+            reversed(
+                values[-10:]
+            )
+        )
+
+
+        if not values:
+
+            return 0.5
+
+
+        weighted_total = 0.0
+        weight_total = 0.0
+
+
+        for (
+            index,
+            result,
+        ) in enumerate(
+            values
+        ):
+
+            weight = (
+                AI_RECENT_FORM_WEIGHTS[
+                    index
+                ]
+            )
+
+
+            weighted_total += (
+                float(result)
+                *
+                weight
+            )
+
+            weight_total += (
+                weight
+            )
+
+
+        if weight_total <= 0:
+
+            return 0.5
+
+
+        return (
+            weighted_total
+            /
+            weight_total
+        )
+
+
+    recent_a = (
+        recent_form_rate(
+            team_a
+        )
+    )
+
+    recent_b = (
+        recent_form_rate(
+            team_b
+        )
+    )
+
+
+    recent_factor = (
+        0.5
+        +
+        (
+            recent_a
+            -
+            recent_b
+        )
+        *
+        0.5
+    )
+
+
+    recent_factor = (
+        clamp_ai_value(
+            recent_factor,
+            0.10,
+            0.90,
+        )
+    )
+
+
+    # =========================
+    # 3. 상대전적
+    # =========================
+
+    head_to_head_results = []
+
+    head_to_head_draws = 0
+
+
+    for record in history:
+
+        is_same_matchup = (
+            {
+                record[
+                    "team_a"
+                ],
+                record[
+                    "team_b"
+                ],
+            }
+            ==
+            {
+                team_a,
+                team_b,
+            }
+        )
+
+
+        if not is_same_matchup:
+
+            continue
+
+
+        if (
+            record[
+                "winner_side"
+            ]
+            == "draw"
+        ):
+
+            result = 0.5
+
+            head_to_head_draws += 1
+
+
+        elif (
+            (
+                record[
+                    "team_a"
+                ]
+                ==
+                team_a
+                and
+                record[
+                    "winner_side"
+                ]
+                ==
+                "team_a"
+            )
+            or
+            (
+                record[
+                    "team_b"
+                ]
+                ==
+                team_a
+                and
+                record[
+                    "winner_side"
+                ]
+                ==
+                "team_b"
+            )
+        ):
+
+            result = 1.0
+
+
+        else:
+
+            result = 0.0
+
+
+        head_to_head_results.append(
+            result
+        )
+
+
+    head_to_head_count = len(
+        head_to_head_results
+    )
+
+
+    if head_to_head_count:
+
+        raw_head_to_head = (
+            sum(
+                head_to_head_results
+            )
+            /
+            head_to_head_count
+        )
+
+
+        head_to_head_reliability = min(
+            1.0,
+            (
+                head_to_head_count
+                /
+                6.0
+            ),
+        )
+
+
+        head_to_head_factor = (
+            0.5
+            +
+            (
+                raw_head_to_head
+                -
+                0.5
+            )
+            *
+            head_to_head_reliability
+        )
+
+
+    else:
+
+        head_to_head_factor = 0.5
+
+        head_to_head_reliability = 0.0
+
+
+    # =========================
+    # 4. 득실
+    #
+    # 공격력 차이
+    # +
+    # 수비력 차이
+    # =========================
+
+    average_for_a = (
+        get_ai_average_goals_for(
+            stats_a[
+                "overall"
+            ]
+        )
+    )
+
+    average_against_a = (
+        get_ai_average_goals_against(
+            stats_a[
+                "overall"
+            ]
+        )
+    )
+
+
+    average_for_b = (
+        get_ai_average_goals_for(
+            stats_b[
+                "overall"
+            ]
+        )
+    )
+
+    average_against_b = (
+        get_ai_average_goals_against(
+            stats_b[
+                "overall"
+            ]
+        )
+    )
+
+
+    attack_edge = (
+        average_for_a
+        -
+        average_for_b
+    )
+
+
+    defense_edge = (
+        average_against_b
+        -
+        average_against_a
+    )
+
+
+    goal_edge = (
+        (
+            attack_edge
+            +
+            defense_edge
+        )
+        /
+        2.0
+    )
+
+
+    goals_factor = (
+        0.5
+        +
+        clamp_ai_value(
+            (
+                goal_edge
+                /
+                6.0
+            ),
+            -0.35,
+            0.35,
+        )
+    )
+
+
+    # =========================
+    # 5. Elo
+    # =========================
+
+    elo_a = float(
+        elo_ratings.get(
+            team_a,
+            1500.0,
+        )
+    )
+
+    elo_b = float(
+        elo_ratings.get(
+            team_b,
+            1500.0,
+        )
+    )
+
+
+    elo_factor = (
+        1.0
+        /
+        (
+            1.0
+            +
+            (
+                10
+                **
+                (
+                    (
+                        elo_b
+                        -
+                        elo_a
+                    )
+                    /
+                    400.0
+                )
+            )
+        )
+    )
+
+
+    # =========================
+    # 6. Home / Away
+    #
+    # A의 Home 기록
+    # B의 Away 기록
+    # =========================
+
+    home_a = (
+        stats_a[
+            "home"
+        ]
+    )
+
+    away_b = (
+        stats_b[
+            "away"
+        ]
+    )
+
+
+    home_a_rate = (
+        get_ai_record_rate(
+            home_a
+        )
+    )
+
+    away_b_rate = (
+        get_ai_record_rate(
+            away_b
+        )
+    )
+
+
+    # 표본이 적으면
+    # 전체 기록 쪽으로 보정
+    home_reliability = min(
+        1.0,
+        home_a["sets"]
+        /
+        6.0,
+    )
+
+    away_reliability = min(
+        1.0,
+        away_b["sets"]
+        /
+        6.0,
+    )
+
+
+    adjusted_home_a = (
+        overall_a
+        +
+        (
+            home_a_rate
+            -
+            overall_a
+        )
+        *
+        home_reliability
+    )
+
+
+    adjusted_away_b = (
+        overall_b
+        +
+        (
+            away_b_rate
+            -
+            overall_b
+        )
+        *
+        away_reliability
+    )
+
+
+    home_away_factor = (
+        0.5
+        +
+        (
+            adjusted_home_a
+            -
+            adjusted_away_b
+        )
+        *
+        0.5
+    )
+
+
+    home_away_factor = (
+        clamp_ai_value(
+            home_away_factor,
+            0.10,
+            0.90,
+        )
+    )
+
+
+    # =========================
+    # 종합 A 우세도
+    # =========================
+
+    factors = {
+        "overall":
+            overall_factor,
+
+        "recent_form":
+            recent_factor,
+
+        "head_to_head":
+            head_to_head_factor,
+
+        "goals":
+            goals_factor,
+
+        "elo":
+            elo_factor,
+
+        "home_away":
+            home_away_factor,
+    }
+
+
+    active_weights = (
+        weights
+        if weights is not None
+        else AI_PREDICTION_WEIGHTS
+    )
+
+
+    total_weight = sum(
+        active_weights.values()
+    )
+
+
+    if total_weight <= 0:
+
+        active_weights = (
+            AI_PREDICTION_WEIGHTS
+        )
+
+        total_weight = sum(
+            active_weights.values()
+        )
+
+
+    team_a_strength = 0.0
+
+
+    for (
+        factor_name,
+        weight,
+    ) in active_weights.items():
+
+        if (
+            factor_name
+            not in factors
+        ):
+
+            continue
+
+
+        normalized_weight = (
+            weight
+            /
+            total_weight
+        )
+
+
+        team_a_strength += (
+            factors[
+                factor_name
+            ]
+            *
+            normalized_weight
+        )
+    #
+    # 두 참가자 중
+    # 기록이 적은 참가자를 기준
+    # =========================
+
+    sample_size = min(
+        int(
+            stats_a[
+                "overall"
+            ][
+                "sets"
+            ]
+        ),
+        int(
+            stats_b[
+                "overall"
+            ][
+                "sets"
+            ]
+        ),
+    )
+
+
+    sample_reliability = min(
+        1.0,
+        sample_size
+        /
+        16.0,
+    )
+
+
+    team_a_strength = (
+        0.5
+        +
+        (
+            team_a_strength
+            -
+            0.5
+        )
+        *
+        (
+            0.25
+            +
+            (
+                0.75
+                *
+                sample_reliability
+            )
+        )
+    )
+
+
+    team_a_strength = (
+        clamp_ai_value(
+            team_a_strength,
+            0.12,
+            0.88,
+        )
+    )
+
+
+    # =========================
+    # 무승부 확률
+    # =========================
+
+    global_draw_rate = (
+        get_ai_draw_rate(
+            context[
+                "global_record"
+            ]
+        )
+    )
+
+
+    draw_rate_a = (
+        get_ai_draw_rate(
+            stats_a[
+                "overall"
+            ]
+        )
+    )
+
+    draw_rate_b = (
+        get_ai_draw_rate(
+            stats_b[
+                "overall"
+            ]
+        )
+    )
+
+
+    if head_to_head_count:
+
+        raw_h2h_draw_rate = (
+            head_to_head_draws
+            /
+            head_to_head_count
+        )
+
+
+        h2h_draw_rate = (
+            global_draw_rate
+            +
+            (
+                raw_h2h_draw_rate
+                -
+                global_draw_rate
+            )
+            *
+            head_to_head_reliability
+        )
+
+    else:
+
+        h2h_draw_rate = (
+            global_draw_rate
+        )
+
+
+    base_draw_probability = (
+        global_draw_rate
+        *
+        0.40
+
+        +
+        draw_rate_a
+        *
+        0.20
+
+        +
+        draw_rate_b
+        *
+        0.20
+
+        +
+        h2h_draw_rate
+        *
+        0.20
+    )
+
+
+    # 실력이 비슷할수록
+    # 무승부 확률 상승
+    closeness = (
+        1.0
+        -
+        min(
+            1.0,
+            abs(
+                team_a_strength
+                -
+                0.5
+            )
+            *
+            2.0,
+        )
+    )
+
+
+    draw_probability = (
+        base_draw_probability
+        *
+        (
+            0.75
+            +
+            (
+                0.35
+                *
+                closeness
+            )
+        )
+    )
+
+
+    # 시즌 초반에는
+    # 22% Prior 쪽으로 보정
+    draw_probability = (
+        0.22
+        *
+        (
+            1.0
+            -
+            sample_reliability
+        )
+
+        +
+
+        draw_probability
+        *
+        sample_reliability
+    )
+
+
+    draw_probability = (
+        clamp_ai_value(
+            draw_probability,
+            0.12,
+            0.38,
+        )
+    )
+
+
+    # =========================
+    # 최종 A승 / 무 / B승
+    # =========================
+
+    decisive_probability = (
+        1.0
+        -
+        draw_probability
+    )
+
+
+    team_a_probability = (
+        decisive_probability
+        *
+        team_a_strength
+    )
+
+
+    team_b_probability = (
+        decisive_probability
+        *
+        (
+            1.0
+            -
+            team_a_strength
+        )
+    )
+
+
+    team_a_percent = int(
+        round(
+            team_a_probability
+            *
+            100
+        )
+    )
+
+    draw_percent = int(
+        round(
+            draw_probability
+            *
+            100
+        )
+    )
+
+
+    # 합계 무조건 100
+    team_b_percent = (
+        100
+        -
+        team_a_percent
+        -
+        draw_percent
+    )
+
+
+    team_b_percent = max(
+        0,
+        team_b_percent,
+    )
+
+
+    # =========================
+    # 신뢰도
+    # =========================
+
+    if sample_size >= 20:
+
+        confidence = "high"
+
+    elif sample_size >= 8:
+
+        confidence = "medium"
+
+    else:
+
+        confidence = "low"
+
+
+    return {
+        "team_a_win":
+            team_a_percent,
+
+        "draw":
+            draw_percent,
+
+        "team_b_win":
+            team_b_percent,
+
+        "sample_size":
+            sample_size,
+
+        "head_to_head_sample":
+            head_to_head_count,
+
+        "confidence":
+            confidence,
+
+        "model":
+            AI_PREDICTION_MODEL,
+
+        "elo": {
+            "team_a":
+                round(
+                    elo_a,
+                    1,
+                ),
+
+            "team_b":
+                round(
+                    elo_b,
+                    1,
+                ),
+        },
+
+        "factors": {
+            factor_name:
+                round(
+                    value,
+                    3,
+                )
+
+            for (
+                factor_name,
+                value,
+            )
+            in factors.items()
+        },
+    }
+
+
+def calculate_ai_series_prediction(
+    prediction,
+    target_set_count,
+):
+
+    if not isinstance(
+        prediction,
+        dict,
+    ):
+        return None
+
+
+    try:
+
+        team_a_win = float(
+            prediction.get(
+                "team_a_win",
+                0,
+            )
+        )
+
+        draw = float(
+            prediction.get(
+                "draw",
+                0,
+            )
+        )
+
+        team_b_win = float(
+            prediction.get(
+                "team_b_win",
+                0,
+            )
+        )
+
+        set_count = int(
+            target_set_count
+            or 0
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return None
+
+
+    total = (
+        team_a_win
+        +
+        draw
+        +
+        team_b_win
+    )
+
+
+    if (
+        total <= 0
+        or
+        set_count <= 0
+    ):
+
+        return None
+
+
+    # =====================================
+    # 1SET 확률 정규화
+    # =====================================
+
+    probability_a = (
+        team_a_win
+        /
+        total
+    )
+
+    probability_draw = (
+        draw
+        /
+        total
+    )
+
+    probability_b = (
+        team_b_win
+        /
+        total
+    )
+
+
+    # =====================================
+    # SERIES 확률 계산
+    #
+    # key:
+    # A 승 세트 수 - B 승 세트 수
+    #
+    # A 승 = +1
+    # 무승부 = 0
+    # B 승 = -1
+    #
+    # 현재 2SET뿐 아니라
+    # 향후 1~3SET에도 그대로 사용 가능
+    # =====================================
+
+    distribution = {
+        0: 1.0,
+    }
+
+
+    for _ in range(
+        set_count
+    ):
+
+        next_distribution = {}
+
+
+        for (
+            score_difference,
+            probability,
+        ) in distribution.items():
+
+            # A 승
+            next_distribution[
+                score_difference + 1
+            ] = (
+                next_distribution.get(
+                    score_difference + 1,
+                    0.0,
+                )
+                +
+                probability
+                *
+                probability_a
+            )
+
+
+            # 무승부
+            next_distribution[
+                score_difference
+            ] = (
+                next_distribution.get(
+                    score_difference,
+                    0.0,
+                )
+                +
+                probability
+                *
+                probability_draw
+            )
+
+
+            # B 승
+            next_distribution[
+                score_difference - 1
+            ] = (
+                next_distribution.get(
+                    score_difference - 1,
+                    0.0,
+                )
+                +
+                probability
+                *
+                probability_b
+            )
+
+
+        distribution = (
+            next_distribution
+        )
+
+
+    series_a = sum(
+        probability
+
+        for (
+            score_difference,
+            probability,
+        ) in distribution.items()
+
+        if score_difference > 0
+    )
+
+
+    series_draw = (
+        distribution.get(
+            0,
+            0.0,
+        )
+    )
+
+
+    series_b = sum(
+        probability
+
+        for (
+            score_difference,
+            probability,
+        ) in distribution.items()
+
+        if score_difference < 0
+    )
+
+
+    team_a_percent = round(
+        series_a * 100,
+        1,
+    )
+
+    draw_percent = round(
+        series_draw * 100,
+        1,
+    )
+
+    # 반올림해도 합계 100 유지
+    team_b_percent = round(
+        100.0
+        -
+        team_a_percent
+        -
+        draw_percent,
+        1,
+    )
+
+
+    return {
+        "team_a_win":
+            team_a_percent,
+
+        "draw":
+            draw_percent,
+
+        "team_b_win":
+            team_b_percent,
+
+        "target_set_count":
+            set_count,
+    }
+
+def get_ai_prediction_top_result(
+    prediction,
+):
+
+    if not isinstance(
+        prediction,
+        dict,
+    ):
+
+        return None
+
+
+    probabilities = {
+        "team_a":
+            float(
+                prediction.get(
+                    "team_a_win",
+                    0,
+                )
+            ),
+
+        "draw":
+            float(
+                prediction.get(
+                    "draw",
+                    0,
+                )
+            ),
+
+        "team_b":
+            float(
+                prediction.get(
+                    "team_b_win",
+                    0,
+                )
+            ),
+    }
+
+
+    highest_probability = max(
+        probabilities.values()
+    )
+
+
+    leaders = [
+        result
+
+        for (
+            result,
+            probability,
+        ) in probabilities.items()
+
+        if abs(
+            probability
+            -
+            highest_probability
+        ) < 0.000001
+    ]
+
+
+    # 정확히 같은 최고 확률이 2개 이상이면
+    # 억지로 A/B 한쪽을 적중 후보로 잡지 않음
+    if len(leaders) != 1:
+
+        return None
+
+
+    return leaders[0]
+
+def calculate_ai_brier_score(
+    prediction,
+    actual_result,
+):
+
+    if (
+        not isinstance(
+            prediction,
+            dict,
+        )
+        or
+        actual_result
+        not in (
+            "team_a",
+            "draw",
+            "team_b",
+        )
+    ):
+
+        return None
+
+
+    try:
+
+        team_a = float(
+            prediction.get(
+                "team_a_win",
+                0,
+            )
+        )
+
+        draw = float(
+            prediction.get(
+                "draw",
+                0,
+            )
+        )
+
+        team_b = float(
+            prediction.get(
+                "team_b_win",
+                0,
+            )
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+
+        return None
+
+
+    total = (
+        team_a
+        +
+        draw
+        +
+        team_b
+    )
+
+
+    if total <= 0:
+
+        return None
+
+
+    probabilities = {
+        "team_a":
+            team_a / total,
+
+        "draw":
+            draw / total,
+
+        "team_b":
+            team_b / total,
+    }
+
+
+    brier_score = 0.0
+
+
+    for (
+        result,
+        probability,
+    ) in probabilities.items():
+
+        actual_value = (
+            1.0
+
+            if result
+            ==
+            actual_result
+
+            else 0.0
+        )
+
+
+        brier_score += (
+            probability
+            -
+            actual_value
+        ) ** 2
+
+
+    return brier_score
+
+@app.get(
+    "/api/ai-predictions/history"
+)
+def get_ai_prediction_history():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id
+                        AS series_id,
+
+                    s.fixture_number,
+
+                    s.scheduled_date,
+
+                    s.round_number,
+
+                    s.target_set_count,
+
+                    s.status,
+
+                    s.ai_prediction_snapshot,
+
+                    s.ai_prediction_snapshot_at,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_b.fcl_name
+                        AS team_b,
+
+                    ss.set_number,
+
+                    ss.team_a_score,
+
+                    ss.team_b_score,
+
+                    ss.winner_side
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                LEFT JOIN series_sets AS ss
+                    ON ss.series_id =
+                        s.id
+
+                WHERE
+                    s.series_type =
+                        '정규리그'
+
+                    AND
+                    s.status =
+                        'completed'
+
+                    AND
+                    s.ai_prediction_snapshot
+                        IS NOT NULL
+
+                ORDER BY
+                    s.scheduled_date DESC,
+                    s.fixture_number DESC,
+                    s.id DESC,
+                    ss.set_number ASC
+                """
+            )
+
+
+            rows = cursor.fetchall()
+
+
+    # =====================================
+    # SERIES 단위 묶기
+    # =====================================
+
+    series_map = {}
+
+
+    for row in rows:
+
+        series_id = (
+            row[
+                "series_id"
+            ]
+        )
+
+
+        if (
+            series_id
+            not in series_map
+        ):
+
+            snapshot = (
+                row[
+                    "ai_prediction_snapshot"
+                ]
+            )
+
+
+            series_map[
+                series_id
+            ] = {
+                "series_id":
+                    series_id,
+
+                "fixture_number":
+                    row[
+                        "fixture_number"
+                    ],
+
+                "date":
+                    (
+                        row[
+                            "scheduled_date"
+                        ].isoformat()
+
+                        if row[
+                            "scheduled_date"
+                        ]
+
+                        else None
+                    ),
+
+                "round":
+                    row[
+                        "round_number"
+                    ],
+
+                "team_a":
+                    row[
+                        "team_a"
+                    ],
+
+                "team_b":
+                    row[
+                        "team_b"
+                    ],
+
+                "target_set_count":
+                    int(
+                        row[
+                            "target_set_count"
+                        ]
+                        or 0
+                    ),
+
+                "model":
+                    (
+                        snapshot.get(
+                            "model"
+                        )
+
+                        if isinstance(
+                            snapshot,
+                            dict,
+                        )
+
+                        else None
+                    ),
+
+                "snapshot_at":
+                    (
+                        row[
+                            "ai_prediction_snapshot_at"
+                        ].isoformat()
+
+                        if row[
+                            "ai_prediction_snapshot_at"
+                        ]
+
+                        else None
+                    ),
+
+                "set_prediction":
+                    snapshot,
+
+                "sets": [],
+            }
+
+
+        if (
+            row[
+                "set_number"
+            ]
+            is not None
+        ):
+
+            series_map[
+                series_id
+            ][
+                "sets"
+            ].append(
+                {
+                    "set_number":
+                        row[
+                            "set_number"
+                        ],
+
+                    "team_a_score":
+                        row[
+                            "team_a_score"
+                        ],
+
+                    "team_b_score":
+                        row[
+                            "team_b_score"
+                        ],
+
+                    "actual_result":
+                        row[
+                            "winner_side"
+                        ],
+                }
+            )
+
+
+    # =====================================
+    # 실전 성적 집계
+    # =====================================
+
+    predictions = []
+
+
+    series_prediction_count = 0
+    series_decisive_count = 0
+    series_correct_count = 0
+
+    series_brier_total = 0.0
+    series_brier_count = 0
+
+
+    set_prediction_count = 0
+    set_decisive_count = 0
+    set_correct_count = 0
+
+    set_brier_total = 0.0
+    set_brier_count = 0
+
+
+    for series in series_map.values():
+
+        set_prediction = (
+            series[
+                "set_prediction"
+            ]
+        )
+
+
+        if not isinstance(
+            set_prediction,
+            dict,
+        ):
+
+            continue
+
+
+        # =================================
+        # 1SET 예측 1순위
+        # =================================
+
+        set_top_result = (
+            get_ai_prediction_top_result(
+                set_prediction
+            )
+        )
+
+
+        # =================================
+        # 실제 SET 성적
+        # =================================
+
+        team_a_points = 0
+        team_b_points = 0
+
+        valid_set_count = 0
+
+
+        for set_result in series[
+            "sets"
+        ]:
+
+            actual_result = (
+                set_result[
+                    "actual_result"
+                ]
+            )
+
+
+            if actual_result not in (
+                "team_a",
+                "draw",
+                "team_b",
+            ):
+
+                set_result[
+                    "is_correct"
+                ] = None
+
+                continue
+
+
+            valid_set_count += 1
+            set_prediction_count += 1
+
+
+            if (
+                actual_result
+                ==
+                "team_a"
+            ):
+
+                team_a_points += 3
+
+
+            elif (
+                actual_result
+                ==
+                "team_b"
+            ):
+
+                team_b_points += 3
+
+
+            else:
+
+                team_a_points += 1
+                team_b_points += 1
+
+
+            # SET 적중 여부
+            if (
+                set_top_result
+                is not None
+            ):
+
+                set_decisive_count += 1
+
+                set_is_correct = (
+                    set_top_result
+                    ==
+                    actual_result
+                )
+
+                set_result[
+                    "is_correct"
+                ] = (
+                    set_is_correct
+                )
+
+
+                if set_is_correct:
+
+                    set_correct_count += 1
+
+
+            else:
+
+                set_result[
+                    "is_correct"
+                ] = None
+
+
+            # SET Brier
+            set_brier = (
+                calculate_ai_brier_score(
+                    set_prediction,
+                    actual_result,
+                )
+            )
+
+
+            if (
+                set_brier
+                is not None
+            ):
+
+                set_brier_total += (
+                    set_brier
+                )
+
+                set_brier_count += 1
+
+
+        # =================================
+        # 실제 SERIES 결과
+        #
+        # 승 3 / 무 1 / 패 0
+        # =================================
+
+        actual_series_result = None
+
+
+        if (
+            valid_set_count
+            >=
+            series[
+                "target_set_count"
+            ]
+            and
+            valid_set_count > 0
+        ):
+
+            if (
+                team_a_points
+                >
+                team_b_points
+            ):
+
+                actual_series_result = (
+                    "team_a"
+                )
+
+
+            elif (
+                team_a_points
+                <
+                team_b_points
+            ):
+
+                actual_series_result = (
+                    "team_b"
+                )
+
+
+            else:
+
+                actual_series_result = (
+                    "draw"
+                )
+
+
+        # =================================
+        # SET → SERIES AI 확률 변환
+        # =================================
+
+        series_prediction = (
+            calculate_ai_series_prediction(
+                set_prediction,
+                series[
+                    "target_set_count"
+                ],
+            )
+        )
+
+
+        series_top_result = (
+            get_ai_prediction_top_result(
+                series_prediction
+            )
+
+            if series_prediction
+
+            else None
+        )
+
+
+        series_is_correct = None
+        series_brier = None
+
+
+        if (
+            actual_series_result
+            is not None
+            and
+            series_prediction
+            is not None
+        ):
+
+            series_prediction_count += 1
+
+
+            if (
+                series_top_result
+                is not None
+            ):
+
+                series_decisive_count += 1
+
+                series_is_correct = (
+                    series_top_result
+                    ==
+                    actual_series_result
+                )
+
+
+                if series_is_correct:
+
+                    series_correct_count += 1
+
+
+            series_brier = (
+                calculate_ai_brier_score(
+                    series_prediction,
+                    actual_series_result,
+                )
+            )
+
+
+            if (
+                series_brier
+                is not None
+            ):
+
+                series_brier_total += (
+                    series_brier
+                )
+
+                series_brier_count += 1
+
+
+        series[
+            "series_prediction"
+        ] = (
+            series_prediction
+        )
+
+        series[
+            "predicted_result"
+        ] = (
+            series_top_result
+        )
+
+        series[
+            "actual_result"
+        ] = (
+            actual_series_result
+        )
+
+        series[
+            "team_a_points"
+        ] = (
+            team_a_points
+        )
+
+        series[
+            "team_b_points"
+        ] = (
+            team_b_points
+        )
+
+        series[
+            "is_correct"
+        ] = (
+            series_is_correct
+        )
+
+        series[
+            "brier_score"
+        ] = (
+            round(
+                series_brier,
+                4,
+            )
+
+            if series_brier
+            is not None
+
+            else None
+        )
+
+
+        predictions.append(
+            series
+        )
+
+
+    # =====================================
+    # Summary
+    # =====================================
+
+    series_accuracy = (
+        round(
+            (
+                series_correct_count
+                /
+                series_decisive_count
+            )
+            * 100,
+            1,
+        )
+
+        if series_decisive_count
+
+        else None
+    )
+
+
+    set_accuracy = (
+        round(
+            (
+                set_correct_count
+                /
+                set_decisive_count
+            )
+            * 100,
+            1,
+        )
+
+        if set_decisive_count
+
+        else None
+    )
+
+
+    average_series_brier = (
+        round(
+            series_brier_total
+            /
+            series_brier_count,
+            4,
+        )
+
+        if series_brier_count
+
+        else None
+    )
+
+
+    average_set_brier = (
+        round(
+            set_brier_total
+            /
+            set_brier_count,
+            4,
+        )
+
+        if set_brier_count
+
+        else None
+    )
+
+
+    return {
+        "series_summary": {
+            "prediction_count":
+                series_prediction_count,
+
+            "decisive_prediction_count":
+                series_decisive_count,
+
+            "correct_count":
+                series_correct_count,
+
+            "accuracy":
+                series_accuracy,
+
+            "brier_score":
+                average_series_brier,
+
+            "normalized_brier_score":
+                (
+                    round(
+                        average_series_brier
+                        /
+                        2.0,
+                        4,
+                    )
+
+                    if average_series_brier
+                    is not None
+
+                    else None
+                ),
+        },
+
+        "set_summary": {
+            "prediction_count":
+                set_prediction_count,
+
+            "decisive_prediction_count":
+                set_decisive_count,
+
+            "correct_count":
+                set_correct_count,
+
+            "accuracy":
+                set_accuracy,
+
+            "brier_score":
+                average_set_brier,
+
+            "normalized_brier_score":
+                (
+                    round(
+                        average_set_brier
+                        /
+                        2.0,
+                        4,
+                    )
+
+                    if average_set_brier
+                    is not None
+
+                    else None
+                ),
+        },
+
+        "predictions":
+            predictions,
+    }
+
+# =========================
+# AI PREDICTION BACKTEST
+#
+# 각 SERIES 시작 이전 데이터만
+# 사용해서 예측한다.
+#
+# 동일 SERIES 안의 다른 SET 결과는
+# 학습 데이터에 포함하지 않는다.
+# =========================
+
+def run_ai_prediction_backtest(
+    weights=None,
+    include_evaluations=True,
+):
+
+    full_context = (
+        build_ai_prediction_context()
+    )
+
+
+    history = list(
+        full_context[
+            "history"
+        ]
+    )
+
+
+    # =========================
+    # 정규리그만 검증
+    # =========================
+
+    regular_history = [
+        record
+
+        for record
+        in history
+
+        if (
+            record[
+                "series_type"
+            ]
+            ==
+            "정규리그"
+        )
+    ]
+
+
+    # =========================
+    # SERIES 단위로 묶기
+    #
+    # DB SERIES:
+    # series_id 기준
+    #
+    # Excel 과거경기:
+    # 날짜 + 참가자 기준
+    # =========================
+
+    series_groups = {}
+
+
+    for record in regular_history:
+
+        if (
+            record[
+                "series_id"
+            ]
+            is not None
+        ):
+
+            group_key = (
+                "database",
+                int(
+                    record[
+                        "series_id"
+                    ]
+                ),
+            )
+
+
+        else:
+
+            group_key = (
+                "excel",
+                record[
+                    "date"
+                ],
+                record[
+                    "team_a"
+                ],
+                record[
+                    "team_b"
+                ],
+            )
+
+
+        series_groups.setdefault(
+            group_key,
+            []
+        ).append(
+            record
+        )
+
+
+    # =========================
+    # SERIES 시간순
+    # =========================
+
+    grouped_series = list(
+        series_groups.values()
+    )
+
+
+    for group in grouped_series:
+
+        group.sort(
+            key=lambda record:
+                record[
+                    "order_key"
+                ]
+        )
+
+
+    grouped_series.sort(
+        key=lambda group:
+            group[0][
+                "order_key"
+            ]
+    )
+
+
+    evaluations = []
+
+
+    # =========================
+    # SERIES 하나씩 과거로 이동
+    # =========================
+
+    for group in grouped_series:
+
+        if not group:
+            continue
+
+
+        first_record = (
+            group[0]
+        )
+
+
+        team_a = (
+            first_record[
+                "team_a"
+            ]
+        )
+
+        team_b = (
+            first_record[
+                "team_b"
+            ]
+        )
+
+
+        cutoff_key = (
+            first_record[
+                "order_key"
+            ]
+        )
+
+
+        # =====================
+        # 현재 SERIES보다
+        # 과거 데이터만 사용
+        # =====================
+
+        training_history = [
+            record
+
+            for record
+            in history
+
+            if (
+                record[
+                    "order_key"
+                ]
+                <
+                cutoff_key
+            )
+        ]
+
+
+        training_context = (
+            build_ai_prediction_context_from_history(
+                training_history
+            )
+        )
+
+
+        prediction = (
+            calculate_ai_match_prediction(
+                training_context,
+                team_a,
+                team_b,
+                weights=weights,
+            )
+        )
+
+
+        probability_map = {
+            "team_a":
+                (
+                    prediction[
+                        "team_a_win"
+                    ]
+                    /
+                    100.0
+                ),
+
+            "draw":
+                (
+                    prediction[
+                        "draw"
+                    ]
+                    /
+                    100.0
+                ),
+
+            "team_b":
+                (
+                    prediction[
+                        "team_b_win"
+                    ]
+                    /
+                    100.0
+                ),
+        }
+
+
+        # =====================
+        # 1순위 예측
+        # =====================
+
+        predicted_side = max(
+            probability_map,
+            key=
+                probability_map.get,
+        )
+
+
+        # =====================
+        # 동일 SERIES의 모든 SET을
+        # 같은 사전 예측값으로 평가
+        # =====================
+
+        for record in group:
+
+            actual_side = (
+                record[
+                    "winner_side"
+                ]
+            )
+
+
+            if actual_side not in (
+                "team_a",
+                "draw",
+                "team_b",
+            ):
+
+                continue
+
+
+            actual_probability = (
+                probability_map[
+                    actual_side
+                ]
+            )
+
+
+            # =================
+            # Multi-class
+            # Brier Score
+            #
+            # 0이 완벽
+            # 최대 2
+            # =================
+
+            brier_score = 0.0
+
+
+            for side in (
+                "team_a",
+                "draw",
+                "team_b",
+            ):
+
+                expected_value = (
+                    1.0
+                    if
+                    side == actual_side
+
+                    else
+                    0.0
+                )
+
+
+                brier_score += (
+                    (
+                        probability_map[
+                            side
+                        ]
+                        -
+                        expected_value
+                    )
+                    **
+                    2
+                )
+
+
+            evaluations.append(
+                {
+                    "date":
+                        record[
+                            "date"
+                        ],
+
+                    "series_id":
+                        record[
+                            "series_id"
+                        ],
+
+                    "team_a":
+                        team_a,
+
+                    "team_b":
+                        team_b,
+
+                    "actual":
+                        actual_side,
+
+                    "predicted":
+                        predicted_side,
+
+                    "correct":
+                        (
+                            predicted_side
+                            ==
+                            actual_side
+                        ),
+
+                    "actual_probability":
+                        actual_probability,
+
+                    "brier_score":
+                        brier_score,
+
+                    "prediction":
+                        prediction,
+                }
+            )
+
+
+    sample_count = len(
+        evaluations
+    )
+
+
+    if sample_count == 0:
+
+        return {
+            "model":
+                AI_PREDICTION_MODEL,
+
+            "sample_count":
+                0,
+
+            "message":
+                (
+                    "백테스트 가능한 "
+                    "정규리그 기록이 없습니다."
+                ),
+        }
+
+
+    # =========================
+    # 적중률
+    # =========================
+
+    correct_count = sum(
+        1
+
+        for evaluation
+        in evaluations
+
+        if evaluation[
+            "correct"
+        ]
+    )
+
+
+    accuracy = (
+        correct_count
+        /
+        sample_count
+    )
+
+
+    # =========================
+    # 실제 결과에 부여한
+    # 평균 확률
+    # =========================
+
+    average_actual_probability = (
+        sum(
+            evaluation[
+                "actual_probability"
+            ]
+
+            for evaluation
+            in evaluations
+        )
+        /
+        sample_count
+    )
+
+
+    # =========================
+    # Brier Score
+    # =========================
+
+    average_brier_score = (
+        sum(
+            evaluation[
+                "brier_score"
+            ]
+
+            for evaluation
+            in evaluations
+        )
+        /
+        sample_count
+    )
+
+
+    normalized_brier_score = (
+        average_brier_score
+        /
+        2.0
+    )
+
+
+    # =========================
+    # 실제 결과 분포
+    # =========================
+
+    actual_counts = {
+        "team_a": 0,
+        "draw": 0,
+        "team_b": 0,
+    }
+
+
+    predicted_probability_sum = {
+        "team_a": 0.0,
+        "draw": 0.0,
+        "team_b": 0.0,
+    }
+
+
+    for evaluation in evaluations:
+
+        actual_counts[
+            evaluation[
+                "actual"
+            ]
+        ] += 1
+
+
+        prediction = (
+            evaluation[
+                "prediction"
+            ]
+        )
+
+
+        predicted_probability_sum[
+            "team_a"
+        ] += (
+            prediction[
+                "team_a_win"
+            ]
+            /
+            100.0
+        )
+
+
+        predicted_probability_sum[
+            "draw"
+        ] += (
+            prediction[
+                "draw"
+            ]
+            /
+            100.0
+        )
+
+
+        predicted_probability_sum[
+            "team_b"
+        ] += (
+            prediction[
+                "team_b_win"
+            ]
+            /
+            100.0
+        )
+
+
+    actual_distribution = {
+        side:
+            round(
+                (
+                    actual_counts[
+                        side
+                    ]
+                    /
+                    sample_count
+                )
+                *
+                100,
+                1,
+            )
+
+        for side in (
+            "team_a",
+            "draw",
+            "team_b",
+        )
+    }
+
+
+    average_prediction = {
+        side:
+            round(
+                (
+                    predicted_probability_sum[
+                        side
+                    ]
+                    /
+                    sample_count
+                )
+                *
+                100,
+                1,
+            )
+
+        for side in (
+            "team_a",
+            "draw",
+            "team_b",
+        )
+    }
+
+
+    # =========================
+    # 신뢰도별 성능
+    # =========================
+
+    confidence_summary = {}
+
+
+    for confidence in (
+        "low",
+        "medium",
+        "high",
+    ):
+
+        confidence_rows = [
+            evaluation
+
+            for evaluation
+            in evaluations
+
+            if (
+                evaluation[
+                    "prediction"
+                ][
+                    "confidence"
+                ]
+                ==
+                confidence
+            )
+        ]
+
+
+        confidence_count = len(
+            confidence_rows
+        )
+
+
+        if confidence_count == 0:
+
+            confidence_summary[
+                confidence
+            ] = {
+                "count": 0,
+                "accuracy": None,
+            }
+
+            continue
+
+
+        confidence_correct = sum(
+            1
+
+            for evaluation
+            in confidence_rows
+
+            if evaluation[
+                "correct"
+            ]
+        )
+
+
+        confidence_summary[
+            confidence
+        ] = {
+            "count":
+                confidence_count,
+
+            "accuracy":
+                round(
+                    (
+                        confidence_correct
+                        /
+                        confidence_count
+                    )
+                    *
+                    100,
+                    1,
+                ),
+        }
+
+    result = {
+        "model":
+            AI_PREDICTION_MODEL,
+
+        "method":
+            (
+                "series-pre-match-"
+                "walk-forward"
+            ),
+
+        "sample_count":
+            sample_count,
+
+        "correct_count":
+            correct_count,
+
+        "accuracy":
+            round(
+                accuracy
+                *
+                100,
+                1,
+            ),
+
+        "average_actual_probability":
+            round(
+                average_actual_probability
+                *
+                100,
+                1,
+            ),
+
+        "brier_score":
+            round(
+                average_brier_score,
+                4,
+            ),
+
+        "normalized_brier_score":
+            round(
+                normalized_brier_score,
+                4,
+            ),
+
+        "actual_distribution":
+            actual_distribution,
+
+        "average_prediction":
+            average_prediction,
+
+        "confidence":
+            confidence_summary,
+    }
+
+
+    if include_evaluations:
+
+        result[
+            "evaluations"
+        ] = evaluations
+
+
+    return result
+
+# =========================
+# AI PREDICTION
+# ABLATION BACKTEST
+#
+# 각 요소를 하나씩 제거해서
+# FULL 모델과 성능 비교
+# =========================
+
+def run_ai_prediction_ablation_backtest():
+
+    variants = {
+        "full":
+            dict(
+                AI_PREDICTION_WEIGHTS
+            )
+    }
+
+
+    for factor_name in (
+        AI_PREDICTION_WEIGHTS
+        .keys()
+    ):
+
+        variant_name = (
+            f"without_{factor_name}"
+        )
+
+
+        variants[
+            variant_name
+        ] = {
+            name:
+                weight
+
+            for (
+                name,
+                weight,
+            )
+            in (
+                AI_PREDICTION_WEIGHTS
+                .items()
+            )
+
+            if (
+                name
+                !=
+                factor_name
+            )
+        }
+
+
+    results = {}
+
+
+    for (
+        variant_name,
+        weights,
+    ) in variants.items():
+
+        backtest = (
+            run_ai_prediction_backtest(
+                weights=weights,
+                include_evaluations=False,
+            )
+        )
+
+
+        results[
+            variant_name
+        ] = {
+            "weights":
+                weights,
+
+            "sample_count":
+                backtest.get(
+                    "sample_count",
+                    0,
+                ),
+
+            "accuracy":
+                backtest.get(
+                    "accuracy"
+                ),
+
+            "average_actual_probability":
+                backtest.get(
+                    "average_actual_probability"
+                ),
+
+            "brier_score":
+                backtest.get(
+                    "brier_score"
+                ),
+
+            "normalized_brier_score":
+                backtest.get(
+                    "normalized_brier_score"
+                ),
+
+            "average_prediction":
+                backtest.get(
+                    "average_prediction"
+                ),
+        }
+
+
+    full_result = (
+        results[
+            "full"
+        ]
+    )
+
+
+    full_accuracy = (
+        full_result[
+            "accuracy"
+        ]
+    )
+
+    full_brier = (
+        full_result[
+            "brier_score"
+        ]
+    )
+
+
+    for (
+        variant_name,
+        result,
+    ) in results.items():
+
+        if (
+            variant_name
+            ==
+            "full"
+        ):
+
+            result[
+                "accuracy_change"
+            ] = 0.0
+
+            result[
+                "brier_change"
+            ] = 0.0
+
+            continue
+
+
+        result[
+            "accuracy_change"
+        ] = round(
+            (
+                result[
+                    "accuracy"
+                ]
+                -
+                full_accuracy
+            ),
+            1,
+        )
+
+
+        result[
+            "brier_change"
+        ] = round(
+            (
+                result[
+                    "brier_score"
+                ]
+                -
+                full_brier
+            ),
+            4,
+        )
+
+
+    return results
+
+def run_ai_prediction_candidate_backtest():
+
+    candidates = {
+        "v1":
+            {
+                "overall": 0.20,
+                "recent_form": 0.20,
+                "head_to_head": 0.15,
+                "goals": 0.15,
+                "elo": 0.20,
+                "home_away": 0.10,
+            },
+
+        "v1_1_a":
+            {
+                "overall": 0.22,
+                "recent_form": 0.15,
+                "head_to_head": 0.08,
+                "goals": 0.20,
+                "elo": 0.23,
+                "home_away": 0.12,
+            },
+
+        "v1_1_b":
+            {
+                "overall": 0.23,
+                "recent_form": 0.12,
+                "head_to_head": 0.05,
+                "goals": 0.23,
+                "elo": 0.24,
+                "home_away": 0.13,
+            },
+
+        "v1_1_c":
+            {
+                "overall": 0.24,
+                "recent_form": 0.12,
+                "head_to_head": 0.00,
+                "goals": 0.25,
+                "elo": 0.26,
+                "home_away": 0.13,
+            },
+
+        "v1_1_d":
+            {
+                "overall": 0.25,
+                "recent_form": 0.08,
+                "head_to_head": 0.04,
+                "goals": 0.25,
+                "elo": 0.27,
+                "home_away": 0.11,
+            },
+    }
+
+
+    results = {}
+
+
+    for (
+        candidate_name,
+        weights,
+    ) in candidates.items():
+
+        backtest = (
+            run_ai_prediction_backtest(
+                weights=weights,
+                include_evaluations=False,
+            )
+        )
+
+
+        results[
+            candidate_name
+        ] = {
+            "weights":
+                weights,
+
+            "accuracy":
+                backtest[
+                    "accuracy"
+                ],
+
+            "average_actual_probability":
+                backtest[
+                    "average_actual_probability"
+                ],
+
+            "brier_score":
+                backtest[
+                    "brier_score"
+                ],
+
+            "normalized_brier_score":
+                backtest[
+                    "normalized_brier_score"
+                ],
+
+            "average_prediction":
+                backtest[
+                    "average_prediction"
+                ],
+        }
+
+
+    return results
+
+
+# =========================
+# ADMIN
+# AI 승률 백테스트
+# =========================
+
+@app.get(
+    "/api/admin/ai-predictions/backtest"
+)
+def get_ai_prediction_backtest(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    result = (
+        run_ai_prediction_backtest()
+    )
+
+
+    result[
+        "ablation"
+    ] = (
+        run_ai_prediction_ablation_backtest()
+    )
+
+    result[
+        "candidates"
+    ] = (
+        run_ai_prediction_candidate_backtest()
+    )
+
+
+    return result
 
 # =========================
 # 전체 경기 일정
@@ -15619,6 +19751,9 @@ def get_matches():
 
                     s.team_b_snapshot_name,
                     s.team_b_snapshot_logo_path,
+
+                    s.ai_prediction_snapshot,
+                    s.ai_prediction_snapshot_at,
 
                     team_a.fcl_name
                         AS team_a,
@@ -15758,6 +19893,24 @@ def get_matches():
                     series_row[
                         "team_b_snapshot_logo_path"
                     ],
+
+                "ai_prediction_snapshot":
+                    series_row[
+                        "ai_prediction_snapshot"
+                    ],
+
+                "ai_prediction_snapshot_at":
+                    (
+                        series_row[
+                            "ai_prediction_snapshot_at"
+                        ].isoformat()
+
+                        if series_row[
+                            "ai_prediction_snapshot_at"
+                        ]
+
+                        else None
+                    ),
 
                 "target_set_count":
                     int(
@@ -15930,6 +20083,16 @@ def get_matches():
         for row in participant_team_rows
     }
 
+    # =========================================
+    # AI 예측용 과거 경기 데이터
+    #
+    # API 요청 1회당 한 번만 계산
+    # =========================================
+
+    ai_prediction_context = (
+        build_ai_prediction_context()
+    )
+
 
     for match in matches:
 
@@ -15946,6 +20109,94 @@ def get_matches():
             ==
             "completed"
         )
+
+        # =====================================
+        # AI 추천 승률
+        #
+        # 예정 경기:
+        # 현재까지의 기록으로 실시간 계산
+        #
+        # 시작 / 완료 경기:
+        # 경기 시작 순간 Snapshot 사용
+        # =====================================
+
+        if (
+            match.get(
+                "match_type"
+            )
+            ==
+            "정규리그"
+
+            and
+
+            match.get(
+                "status"
+            )
+            ==
+            "scheduled"
+
+            and
+
+            match.get(
+                "source"
+            )
+            ==
+            "database"
+        ):
+
+            match[
+                "ai_prediction"
+            ] = (
+                calculate_ai_match_prediction(
+                    ai_prediction_context,
+
+                    match[
+                        "team_a"
+                    ],
+
+                    match[
+                        "team_b"
+                    ],
+                )
+            )
+
+
+        elif (
+            match.get(
+                "match_type"
+            )
+            ==
+            "정규리그"
+
+            and
+
+            match.get(
+                "source"
+            )
+            ==
+            "database"
+
+            and
+
+            match.get(
+                "ai_prediction_snapshot"
+            )
+        ):
+
+            match[
+                "ai_prediction"
+            ] = (
+                match[
+                    "ai_prediction_snapshot"
+                ]
+            )
+
+
+        else:
+
+            match[
+                "ai_prediction"
+            ] = None
 
         team_a_current = (
             participant_team_map.get(
@@ -23108,6 +27359,46 @@ def activate_fcl_series(
                     ),
                 )
 
+            # =========================
+            # AI 경기 예측 Snapshot
+            #
+            # 정규리그만 저장
+            #
+            # 아직 status가 scheduled이므로
+            # 현재 SERIES 결과가 학습 데이터에
+            # 들어갈 일도 없음
+            # =========================
+
+            ai_prediction_snapshot = None
+
+
+            if (
+                series[
+                    "series_type"
+                ]
+                ==
+                "정규리그"
+            ):
+
+                ai_prediction_context = (
+                    build_ai_prediction_context()
+                )
+
+
+                ai_prediction_snapshot = (
+                    calculate_ai_match_prediction(
+                        ai_prediction_context,
+
+                        series[
+                            "team_a"
+                        ],
+
+                        series[
+                            "team_b"
+                        ],
+                    )
+                )
+
 
             # =========================
             # SERIES 시작
@@ -23132,7 +27423,10 @@ def activate_fcl_series(
                     team_a_snapshot_logo_path = %s,
 
                     team_b_snapshot_name = %s,
-                    team_b_snapshot_logo_path = %s
+                    team_b_snapshot_logo_path = %s,
+
+                    ai_prediction_snapshot = %s,
+                    ai_prediction_snapshot_at = %s
 
                 WHERE id = %s
                 """,
@@ -23154,6 +27448,30 @@ def activate_fcl_series(
                     series[
                         "team_b_current_team_logo_path"
                     ],
+
+                    (
+                        Jsonb(
+                            ai_prediction_snapshot
+                        )
+
+                        if
+                        ai_prediction_snapshot
+                        is not None
+
+                        else
+                        None
+                    ),
+
+                    (
+                        now
+
+                        if
+                        ai_prediction_snapshot
+                        is not None
+
+                        else
+                        None
+                    ),
 
                     series_id,
                 ),
@@ -23195,6 +27513,9 @@ def activate_fcl_series(
 
         "status":
             "active",
+
+        "ai_prediction_snapshot":
+            ai_prediction_snapshot,
     }
 
 
