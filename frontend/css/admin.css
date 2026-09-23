@@ -2936,3 +2936,365 @@
     font-weight: 700;
     line-height: 1.6;
 }
+
+/* =========================================
+   ONE DAY TOURNAMENT ADMIN
+========================================= */
+
+.admin-tournament-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 24px;
+}
+
+
+.admin-tournament-card {
+    padding: 18px;
+
+    border: 1px solid #333;
+    border-radius: 10px;
+
+    background: #151515;
+}
+
+
+.admin-tournament-card-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+
+.admin-tournament-title-field {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 7px;
+}
+
+
+.admin-tournament-title-field > span {
+    color: #888;
+    font-size: 11px;
+}
+
+
+.admin-tournament-title-input {
+    width: 100%;
+    height: 40px;
+
+    padding: 0 12px;
+
+    border: 1px solid #3b3b3b;
+    border-radius: 7px;
+
+    outline: none;
+
+    background: #1b1b1b;
+    color: #fff;
+
+    font-size: 14px;
+}
+
+
+.admin-tournament-title-input:focus {
+    border-color: #a98b4b;
+}
+
+
+.admin-tournament-status {
+    padding: 6px 10px;
+
+    border: 1px solid #444;
+    border-radius: 999px;
+
+    color: #aaa;
+
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+
+.admin-tournament-status.active {
+    border-color: #8f7747;
+    color: #d5b55c;
+}
+
+
+.admin-tournament-status.completed {
+    border-color: #39765a;
+    color: #65c58e;
+}
+
+
+.admin-tournament-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+
+    margin-top: 12px;
+
+    color: #888;
+
+    font-size: 12px;
+}
+
+
+.admin-tournament-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+
+    margin-top: 16px;
+}
+
+
+.admin-tournament-message {
+    flex: 1;
+
+    color: #aaa;
+    font-size: 12px;
+}
+
+
+.admin-tournament-matches-button,
+.admin-tournament-save-button,
+.admin-tournament-delete-button {
+    min-height: 34px;
+    padding: 7px 13px;
+
+    border-radius: 6px;
+
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+.admin-tournament-matches-button {
+    border: 1px solid #4a4a4a;
+
+    background: #1a1a1a;
+    color: #dddddd;
+}
+
+
+.admin-tournament-matches-button:hover {
+    border-color: #8f7747;
+
+    background: rgba(
+        143,
+        119,
+        71,
+        0.12
+    );
+
+    color: #d5b55c;
+}
+
+
+.admin-tournament-save-button {
+    border: 1px solid #8f7747;
+
+    background: rgba(
+        143,
+        119,
+        71,
+        0.1
+    );
+
+    color: #d5b55c;
+}
+
+
+.admin-tournament-delete-button {
+    border: 1px solid #743f3f;
+
+    background: rgba(
+        116,
+        63,
+        63,
+        0.12
+    );
+
+    color: #d67b7b;
+}
+
+
+.admin-tournament-delete-button:hover {
+    background: rgba(
+        116,
+        63,
+        63,
+        0.25
+    );
+}
+
+
+@media (max-width: 700px) {
+
+    .admin-tournament-card-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+
+    .admin-tournament-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+
+    .admin-tournament-message {
+        min-height: 18px;
+    }
+
+
+    .admin-tournament-matches-button,
+    .admin-tournament-save-button,
+    .admin-tournament-delete-button {
+        width: 100%;
+    }
+}
+
+/* =========================================
+   TOURNAMENT MATCH ADMIN
+========================================= */
+
+.admin-tournament-match-manager {
+    margin-top: 18px;
+    padding-top: 18px;
+
+    border-top: 1px solid #303030;
+}
+
+
+.admin-tournament-round {
+    margin-bottom: 18px;
+}
+
+
+.admin-tournament-round h3 {
+    margin: 0 0 10px;
+
+    color: #c1a05b;
+
+    font-size: 13px;
+}
+
+
+.admin-tournament-match-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 14px;
+
+    margin-bottom: 8px;
+    padding: 12px;
+
+    border: 1px solid #303030;
+    border-radius: 8px;
+
+    background: #111;
+}
+
+
+.admin-tournament-match-info {
+    display: grid;
+
+    grid-template-columns:
+        70px
+        minmax(120px, 1fr)
+        minmax(120px, 1fr);
+
+    align-items: center;
+
+    gap: 12px;
+
+    flex: 1;
+}
+
+
+.admin-tournament-match-info > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 10px;
+}
+
+
+.admin-tournament-match-number {
+    color: #777;
+
+    font-size: 10px;
+    font-weight: 800;
+}
+
+
+.admin-tournament-match-reset-button {
+    padding: 7px 11px;
+
+    border: 1px solid #815050;
+    border-radius: 6px;
+
+    background: rgba(
+        129,
+        80,
+        80,
+        0.13
+    );
+
+    color: #df8989;
+
+    font-size: 11px;
+    font-weight: 700;
+
+    cursor: pointer;
+
+    white-space: nowrap;
+}
+
+
+.admin-tournament-match-reset-button:hover {
+    background: rgba(
+        129,
+        80,
+        80,
+        0.25
+    );
+}
+
+
+.admin-tournament-match-state {
+    color: #777;
+
+    font-size: 11px;
+
+    white-space: nowrap;
+}
+
+
+@media (max-width: 700px) {
+
+    .admin-tournament-match-card {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+
+    .admin-tournament-match-info {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .admin-tournament-match-reset-button {
+        width: 100%;
+    }
+}

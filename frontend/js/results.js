@@ -1646,7 +1646,7 @@ function renderResultDetailSet(
 }
 
 
-async function openResultDetail(
+export async function openResultDetail(
     seriesId,
     competitionLabel = ""
 ) {
@@ -2541,102 +2541,112 @@ if (canSyncNexon) {
 // NEXON 기록 확인 버튼
 // =========================================
 
-resultsListElement.addEventListener(
-    "click",
-    (event) => {
+if (resultsListElement) {
 
-        const syncButtonElement =
-            event.target.closest(
-                "[data-series-sync-button]"
-            );
+    resultsListElement.addEventListener(
+        "click",
+        (event) => {
 
-
-        if (!syncButtonElement) {
-            return;
-        }
-
-
-        const seriesId =
-            Number(
-                syncButtonElement.dataset
-                    .seriesId
-            );
-
-
-        const resultCardElement =
-            syncButtonElement.closest(
-                ".result-card"
-            );
-
-
-        const syncMessageElement =
-            resultCardElement
-                ?.querySelector(
-                    "[data-series-sync-message]"
+            const syncButtonElement =
+                event.target.closest(
+                    "[data-series-sync-button]"
                 );
 
 
-        syncCompletedSeries(
-            seriesId,
-            syncButtonElement,
-            syncMessageElement
-        );
-    }
-);
+            if (!syncButtonElement) {
+                return;
+            }
+
+
+            const seriesId =
+                Number(
+                    syncButtonElement.dataset
+                        .seriesId
+                );
+
+
+            const resultCardElement =
+                syncButtonElement.closest(
+                    ".result-card"
+                );
+
+
+            const syncMessageElement =
+                resultCardElement
+                    ?.querySelector(
+                        "[data-series-sync-message]"
+                    );
+
+
+            syncCompletedSeries(
+                seriesId,
+                syncButtonElement,
+                syncMessageElement
+            );
+        }
+    );
+}
+
+
 
 // =========================================
 // 경기 상세 열기
 // =========================================
 
-resultsListElement.addEventListener(
-    "click",
-    (event) => {
+if (resultsListElement) {
 
-        // NEXON 동기화 버튼은 제외
-        if (
-            event.target.closest(
-                "[data-series-sync-button]"
-            )
-        ) {
+    resultsListElement.addEventListener(
+        "click",
+        (event) => {
 
-            return;
-        }
+            // NEXON 동기화 버튼은 제외
+            if (
+                event.target.closest(
+                    "[data-series-sync-button]"
+                )
+            ) {
 
-
-        const detailCardElement =
-            event.target.closest(
-                "[data-series-detail-id]"
-            );
+                return;
+            }
 
 
-        if (!detailCardElement) {
-            return;
-        }
+            const detailCardElement =
+                event.target.closest(
+                    "[data-series-detail-id]"
+                );
 
 
-        const seriesId =
-            Number(
+            if (!detailCardElement) {
+                return;
+            }
+
+
+            const seriesId =
+                Number(
+                    detailCardElement.dataset
+                        .seriesDetailId
+                );
+
+
+            if (!seriesId) {
+                return;
+            }
+
+            const competitionLabel =
                 detailCardElement.dataset
-                    .seriesDetailId
+                    .seriesDetailCompetition
+                ?? "";
+
+
+            openResultDetail(
+                seriesId,
+                competitionLabel
             );
-
-
-        if (!seriesId) {
-            return;
         }
-
-        const competitionLabel =
-            detailCardElement.dataset
-                .seriesDetailCompetition
-            ?? "";
+    );
+}
 
 
-        openResultDetail(
-            seriesId,
-            competitionLabel
-        );
-    }
-);
 
 
 // =========================================
@@ -2781,6 +2791,10 @@ async function autoSyncPendingResults() {
         return;
     }
 
+    if (!resultsListElement) {
+        return;
+    }
+
 
     resultAutoSyncRunning =
         true;
@@ -2854,7 +2868,10 @@ async function autoSyncPendingResults() {
 
     }
 
+
 }
+
+
 
 
 // 30분마다 pending 경기만 자동 확인
@@ -2871,5 +2888,8 @@ setInterval(
 
 
 
-loadResults();
+if (resultsListElement) {
+
+    loadResults();
+}
 

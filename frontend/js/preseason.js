@@ -1256,8 +1256,12 @@ function renderManualResultInputs() {
         // =========================
 
         if (
-            currentSeriesType
-            === "플레이오프"
+            [
+                "플레이오프",
+                "토너먼트",
+            ].includes(
+                currentSeriesType
+            )
         ) {
 
             const winnerChoiceElement =
@@ -1525,6 +1529,18 @@ function openManualResultPanel() {
 
 function closeManualResultPanel() {
 
+    if (
+        currentSeriesType
+        === "토너먼트"
+    ) {
+
+        window.location.href =
+            "./tournament.html";
+
+        return;
+    }
+
+
     window.location.href =
         "./schedule.html";
 }
@@ -1676,8 +1692,12 @@ async function completeManualResult() {
          * 실제 승자 선택
          */
         if (
-            currentSeriesType
-            === "플레이오프"
+            [
+                "플레이오프",
+                "토너먼트",
+            ].includes(
+                currentSeriesType
+            )
             &&
             teamAScore === teamBScore
         ) {
@@ -1805,6 +1825,10 @@ async function completeManualResult() {
         const data =
             await response.json();
 
+        const isTournamentSeries =
+            currentSeriesType
+            === "토너먼트";
+
 
         if (!response.ok) {
 
@@ -1834,7 +1858,9 @@ async function completeManualResult() {
 
 
         window.location.href =
-            "./results.html";
+            isTournamentSeries
+                ? "./tournament.html"
+                : "./results.html";
 
 
     } catch (error) {

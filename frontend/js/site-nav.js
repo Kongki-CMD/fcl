@@ -49,6 +49,14 @@ if (siteMainMenuElement) {
                     href:
                         "./rules.html",
                 },
+
+                {
+                    label:
+                        "원데이 토너먼트",
+
+                    href:
+                        "./tournament.html",
+                },
             ],
         },
 
@@ -79,6 +87,13 @@ if (siteMainMenuElement) {
 
                     href:
                         "./ai-predictions.html",
+                },
+                {
+                    label:
+                        "토너먼트 기록",
+
+                    href:
+                        "./tournament-history.html",
                 },
             ],
         },

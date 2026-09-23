@@ -137,6 +137,11 @@ const adminPlayoffListElement =
         "#admin-playoff-list"
     );
 
+const adminTournamentListElement =
+    document.querySelector(
+        "#admin-tournament-list"
+    );
+
 const adminRegularReformButtonElement =
     document.querySelector(
         "#admin-regular-reform-button"
@@ -607,6 +612,14 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminPlayoffs();
+                }
+
+                if (
+                    targetPage
+                    === "tournaments"
+                ) {
+
+                    loadAdminTournaments();
                 }
 
                 if (
@@ -6775,6 +6788,997 @@ async function completeAdminPointShopExchange(
 
     }
 
+}
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 목록
+// =========================================
+
+async function loadAdminTournaments() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminTournamentListElement.innerHTML =
+        `
+            <p>
+                토너먼트를 불러오는 중...
+            </p>
+        `;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/tournaments",
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "토너먼트 조회 실패"
+            );
+        }
+
+
+        renderAdminTournaments(
+            data
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminTournamentListElement
+            .innerHTML = `
+                <p>
+                    ${escapeAdminHtml(
+                        error.message
+                    )}
+                </p>
+            `;
+    }
+}
+
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 출력
+// =========================================
+
+function renderAdminTournaments(
+    tournaments
+) {
+
+    adminTournamentListElement.innerHTML =
+        "";
+
+
+    if (
+        tournaments.length === 0
+    ) {
+
+        adminTournamentListElement
+            .innerHTML = `
+                <p>
+                    생성된 토너먼트가 없습니다.
+                </p>
+            `;
+
+        return;
+    }
+
+
+    tournaments.forEach(
+        tournament => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.className =
+                "admin-tournament-card";
+
+
+            cardElement.dataset
+                .tournamentId =
+                    tournament
+                        .tournament_id;
+
+
+            const statusText =
+                tournament.status
+                === "completed"
+                    ? "완료"
+                    : "진행 중";
+
+
+            const championText =
+                tournament.champion
+                    ?.name
+                ??
+                "-";
+
+
+            cardElement.innerHTML = `
+                <div
+                    class="
+                        admin-tournament-card-header
+                    "
+                >
+
+                    <div
+                        class="
+                            admin-tournament-title-field
+                        "
+                    >
+
+                        <span>
+                            대회명
+                        </span>
+
+                        <input
+                            type="text"
+                            maxlength="100"
+                            class="
+                                admin-tournament-title-input
+                            "
+                            value="${
+                                escapeAdminHtml(
+                                    tournament.title
+                                )
+                            }"
+                        >
+
+                    </div>
+
+
+                    <span
+                        class="
+                            admin-tournament-status
+                            ${tournament.status}
+                        "
+                    >
+                        ${statusText}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        admin-tournament-meta
+                    "
+                >
+
+                    <span>
+                        ID
+                        #${tournament.tournament_id}
+                    </span>
+
+                    <span>
+                        ${
+                            escapeAdminHtml(
+                                tournament.date
+                            )
+                        }
+                    </span>
+
+                    <span>
+                        ${tournament.participant_count}명 참가
+                    </span>
+
+                    <span>
+                        우승
+                        ${
+                            escapeAdminHtml(
+                                championText
+                            )
+                        }
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="
+                        admin-tournament-actions
+                    "
+                >
+
+                    <p
+                        class="
+                            admin-tournament-message
+                        "
+                    ></p>
+
+                    <button
+                        type="button"
+                        class="
+                            admin-tournament-matches-button
+                        "
+                    >
+                        경기 관리
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            admin-tournament-save-button
+                        "
+                    >
+                        대회명 저장
+                    </button>
+
+
+                    <button
+                        type="button"
+                        class="
+                            admin-tournament-delete-button
+                        "
+                    >
+                        대회 삭제
+                    </button>
+
+                </div>
+
+                <div
+                    class="
+                        admin-tournament-match-manager
+                        hidden
+                    "
+                >
+                </div>
+            `;
+
+
+            cardElement
+                .querySelector(
+                    ".admin-tournament-save-button"
+                )
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        saveAdminTournamentTitle(
+                            tournament,
+                            cardElement
+                        );
+                    }
+                );
+
+
+            cardElement
+                .querySelector(
+                    ".admin-tournament-delete-button"
+                )
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        deleteAdminTournament(
+                            tournament
+                        );
+                    }
+                );
+
+            cardElement
+                .querySelector(
+                    ".admin-tournament-matches-button"
+                )
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        toggleAdminTournamentMatches(
+                            tournament,
+                            cardElement
+                        );
+                    }
+                );
+
+
+            adminTournamentListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+}
+
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 이름 수정
+// =========================================
+
+async function saveAdminTournamentTitle(
+    tournament,
+    cardElement
+) {
+
+    const inputElement =
+        cardElement.querySelector(
+            ".admin-tournament-title-input"
+        );
+
+
+    const buttonElement =
+        cardElement.querySelector(
+            ".admin-tournament-save-button"
+        );
+
+
+    const messageElement =
+        cardElement.querySelector(
+            ".admin-tournament-message"
+        );
+
+
+    const title =
+        inputElement.value.trim();
+
+
+    if (!title) {
+
+        messageElement.textContent =
+            "대회명을 입력해주세요.";
+
+        return;
+    }
+
+
+    buttonElement.disabled =
+        true;
+
+
+    messageElement.textContent =
+        "저장 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                    + `/api/admin/tournaments/`
+                    + `${tournament.tournament_id}`,
+                {
+                    method:
+                        "PATCH",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            getAdminToken(),
+                    },
+
+                    body:
+                        JSON.stringify({
+                            title,
+                        }),
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "대회명 수정 실패"
+            );
+        }
+
+
+        await loadAdminTournaments();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+        buttonElement.disabled =
+            false;
+    }
+}
+
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 완전 삭제
+// =========================================
+
+async function deleteAdminTournament(
+    tournament
+) {
+
+    const confirmed =
+        confirm(
+            `"${tournament.title}" 토너먼트를 삭제하시겠습니까?\n\n`
+            +
+            "대진, 경기 결과, 팀 스냅샷, "
+            +
+            "NEXON 상세 기록까지 모두 삭제됩니다.\n\n"
+            +
+            "이 작업은 되돌릴 수 없습니다."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                    + `/api/admin/tournaments/`
+                    + `${tournament.tournament_id}`,
+                {
+                    method:
+                        "DELETE",
+
+                    headers: {
+                        "X-Admin-Token":
+                            getAdminToken(),
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "토너먼트 삭제 실패"
+            );
+        }
+
+
+        await loadAdminTournaments();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        alert(
+            error.message
+        );
+    }
+}
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 경기 관리
+// =========================================
+
+async function toggleAdminTournamentMatches(
+    tournament,
+    cardElement
+) {
+
+    const managerElement =
+        cardElement.querySelector(
+            ".admin-tournament-match-manager"
+        );
+
+
+    const isHidden =
+        managerElement.classList
+            .contains(
+                "hidden"
+            );
+
+
+    if (!isHidden) {
+
+        managerElement.classList.add(
+            "hidden"
+        );
+
+        return;
+    }
+
+
+    managerElement.classList.remove(
+        "hidden"
+    );
+
+
+    managerElement.innerHTML = `
+        <p>
+            경기 정보를 불러오는 중...
+        </p>
+    `;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/tournaments/`
+                + `${tournament.tournament_id}`
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "경기 정보를 불러오지 못했습니다."
+            );
+        }
+
+
+        renderAdminTournamentMatches(
+            tournament,
+            data,
+            managerElement
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        managerElement.innerHTML = `
+            <p>
+                ${escapeAdminHtml(
+                    error.message
+                )}
+            </p>
+        `;
+    }
+}
+
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 경기 목록 출력
+// =========================================
+
+function renderAdminTournamentMatches(
+    tournament,
+    detail,
+    managerElement
+) {
+
+    const html = [];
+
+
+    detail.rounds.forEach(
+        round => {
+
+            const matches =
+                round.matches.filter(
+                    match =>
+                        !match.is_bye
+                );
+
+
+            if (
+                matches.length === 0
+            ) {
+                return;
+            }
+
+
+            html.push(`
+                <div
+                    class="
+                        admin-tournament-round
+                    "
+                >
+
+                    <h3>
+                        ${escapeAdminHtml(
+                            round.round_name
+                        )}
+                    </h3>
+            `);
+
+
+            matches.forEach(
+                match => {
+
+                    const teamA =
+                        match.participant_a
+                            ?.name
+                        ?? "대기";
+
+
+                    const teamB =
+                        match.participant_b
+                            ?.name
+                        ?? "대기";
+
+
+                    const scoreA =
+                        match.team_a_score
+                        ??
+                        "-";
+
+
+                    const scoreB =
+                        match.team_b_score
+                        ??
+                        "-";
+
+
+                    const completed =
+                        match.status
+                        === "completed";
+
+
+                    html.push(`
+                        <article
+                            class="
+                                admin-tournament-match-card
+                            "
+                        >
+
+                            <div
+                                class="
+                                    admin-tournament-match-info
+                                "
+                            >
+
+                                <span
+                                    class="
+                                        admin-tournament-match-number
+                                    "
+                                >
+                                    MATCH
+                                    ${match.match_number}
+                                </span>
+
+
+                                <div>
+                                    <strong>
+                                        ${escapeAdminHtml(
+                                            teamA
+                                        )}
+                                    </strong>
+
+                                    <span>
+                                        ${scoreA}
+                                    </span>
+                                </div>
+
+
+                                <div>
+                                    <strong>
+                                        ${escapeAdminHtml(
+                                            teamB
+                                        )}
+                                    </strong>
+
+                                    <span>
+                                        ${scoreB}
+                                    </span>
+                                </div>
+
+                            </div>
+
+
+                            ${
+                                completed
+                                    ? `
+                                        <button
+                                            type="button"
+
+                                            class="
+                                                admin-tournament-match-reset-button
+                                            "
+
+                                            data-tournament-id="${
+                                                tournament.tournament_id
+                                            }"
+
+                                            data-match-id="${
+                                                match.match_id
+                                            }"
+                                        >
+                                            결과 초기화
+                                        </button>
+                                    `
+                                    : `
+                                        <span
+                                            class="
+                                                admin-tournament-match-state
+                                            "
+                                        >
+                                            ${
+                                                match.series_status
+                                                === "active"
+                                                    ? "진행 중"
+                                                    :
+                                                match.status
+                                                === "ready"
+                                                    ? "경기 대기"
+                                                    : "대진 대기"
+                                            }
+                                        </span>
+                                    `
+                            }
+
+                        </article>
+                    `);
+                }
+            );
+
+
+            html.push(
+                "</div>"
+            );
+        }
+    );
+
+
+    managerElement.innerHTML =
+        html.join("");
+
+
+    managerElement
+        .querySelectorAll(
+            ".admin-tournament-match-reset-button"
+        )
+        .forEach(
+            buttonElement => {
+
+                buttonElement
+                    .addEventListener(
+                        "click",
+                        () => {
+
+                            resetAdminTournamentMatch(
+                                tournament,
+                                buttonElement
+                            );
+                        }
+                    );
+            }
+        );
+}
+
+
+// =========================================
+// ONE DAY TOURNAMENT ADMIN
+// 경기 결과 초기화
+// =========================================
+
+async function resetAdminTournamentMatch(
+    tournament,
+    buttonElement
+) {
+
+    const tournamentId =
+        Number(
+            buttonElement.dataset
+                .tournamentId
+        );
+
+
+    const matchId =
+        Number(
+            buttonElement.dataset
+                .matchId
+        );
+
+
+    const confirmed =
+        confirm(
+            "이 경기 결과를 초기화하시겠습니까?\n\n"
+            +
+            "이 경기의 승자로 만들어진 "
+            +
+            "이후 라운드 대진과 결과도 "
+            +
+            "함께 초기화됩니다.\n\n"
+            +
+            "NEXON 상세 기록이 있다면 "
+            +
+            "함께 삭제됩니다."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    buttonElement.disabled =
+        true;
+
+
+    buttonElement.textContent =
+        "초기화 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                    + `/api/admin/tournaments/`
+                    + `${tournamentId}`
+                    + `/matches/`
+                    + `${matchId}`
+                    + `/result`,
+                {
+                    method:
+                        "DELETE",
+
+                    headers: {
+                        "X-Admin-Token":
+                            getAdminToken(),
+                    },
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail
+                ??
+                "경기 결과 초기화 실패"
+            );
+        }
+
+
+        alert(
+            data.message
+        );
+
+
+        await loadAdminTournaments();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        alert(
+            error.message
+        );
+
+
+        buttonElement.disabled =
+            false;
+
+
+        buttonElement.textContent =
+            "결과 초기화";
+    }
 }
 
 

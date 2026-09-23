@@ -18,7 +18,7 @@
 
     <link
         rel="stylesheet"
-        href="./css/admin.css?v=playoffs-1"
+        href="./css/admin.css?v=tournament-admin-1"
     >
 </head>
 
@@ -186,6 +186,14 @@
                         data-admin-page="playoffs"
                     >
                         플레이오프
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
+                        data-admin-page="tournaments"
+                    >
+                        원데이 토너먼트
                     </button>
 
                     <button
@@ -398,6 +406,30 @@
                     <div
                         id="admin-playoff-list"
                         class="admin-schedule-list"
+                    >
+                    </div>
+
+                </section>
+
+                <!-- 원데이 토너먼트 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="tournaments"
+                >
+
+                    <h1>
+                        원데이 토너먼트 관리
+                    </h1>
+
+                    <p>
+                        생성된 토너먼트의
+                        대회명 수정 및 대회 삭제를 관리합니다.
+                    </p>
+
+                    <div
+                        id="admin-tournament-list"
+                        class="admin-tournament-list"
                     >
                     </div>
 
@@ -912,7 +944,7 @@
 
     <script
         type="module"
-        src="./js/admin.js?v=playoffs-2"
+        src="./js/admin.js?v=tournament-admin-1"
     ></script>
 
 </body>
