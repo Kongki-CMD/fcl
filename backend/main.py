@@ -24785,7 +24785,30 @@ def get_ai_prediction_backtest(
 # =========================
 
 @app.get("/api/matches")
-def get_matches():
+def get_matches(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
 
     matches = []
 
@@ -24850,11 +24873,17 @@ def get_matches():
                     s.status <>
                         'cancelled'
 
+                    AND
+                    s.season_id = %s
+
                 ORDER BY
                     s.scheduled_date,
                     s.fixture_number,
                     s.id
-                """
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
 
@@ -24910,6 +24939,10 @@ def get_matches():
 
         matches.append(
             {
+
+                "season_number":
+                    selected_season_number,
+
                 "series_id":
                     series_row[
                         "series_id"
@@ -25024,6 +25057,14 @@ def get_matches():
             match_type,
         ) = row
 
+        # 기존 Excel 일정은
+        # Season 1 레거시 데이터
+        if (
+            selected_season_number
+            != 1
+        ):
+            continue
+
 
         if match_date is None:
             continue
@@ -25087,6 +25128,10 @@ def get_matches():
 
         matches.append(
             {
+
+                "season_number":
+                    1,
+
                 "series_id":
                     None,
 
@@ -38469,6 +38514,113 @@ def get_database_participants():
 # FCL SEASONS
 # 공개 시즌 조회 API
 # =========================
+
+def resolve_fcl_season_record(
+    season_number: int | None = None,
+):
+
+    if (
+        season_number is not None
+        and
+        season_number <= 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 시즌 번호가 아닙니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 시즌 번호가 명시된 경우
+            # =========================
+
+            if season_number is not None:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        season_number,
+                        title,
+                        status
+
+                    FROM
+                        seasons
+
+                    WHERE
+                        season_number = %s
+
+                    LIMIT 1
+                    """,
+                    (
+                        season_number,
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 번호가 없으면
+            # 현재 ACTIVE 시즌
+            # =========================
+
+            else:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        season_number,
+                        title,
+                        status
+
+                    FROM
+                        seasons
+
+                    WHERE
+                        status = 'active'
+
+                    ORDER BY
+                        season_number DESC
+
+                    LIMIT 1
+                    """
+                )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+    if season is None:
+
+        if season_number is None:
+
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "현재 진행 중인 시즌이 없습니다."
+                ),
+            )
+
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Season {season_number}을 "
+                "찾을 수 없습니다."
+            ),
+        )
+
+
+    return season
 
 @app.get("/api/seasons")
 def get_fcl_seasons():
