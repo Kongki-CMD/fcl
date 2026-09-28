@@ -5369,6 +5369,31 @@ def initialize_database():
             )
 
 
+            # =========================
+            # SEASON PARTICIPANTS
+            # 시즌 종료 시 팀 Snapshot
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    season_participants
+
+                ADD COLUMN IF NOT EXISTS
+                    team_name_snapshot
+                        VARCHAR(100),
+
+                ADD COLUMN IF NOT EXISTS
+                    team_logo_path_snapshot
+                        VARCHAR(500),
+
+                ADD COLUMN IF NOT EXISTS
+                    snapshot_at
+                        TIMESTAMPTZ
+                """
+            )
+
+
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS
@@ -11134,6 +11159,49 @@ def admin_update_fcl_season_participants(
     }
 
 
+def snapshot_fcl_season_participant_teams(
+    cursor,
+    season_id: int,
+):
+
+    cursor.execute(
+        """
+        UPDATE
+            season_participants
+                AS sp
+
+        SET
+            team_name_snapshot =
+                p.current_team_name,
+
+            team_logo_path_snapshot =
+                p.current_team_logo_path,
+
+            snapshot_at =
+                COALESCE(
+                    sp.snapshot_at,
+                    NOW()
+                )
+
+        FROM
+            participants AS p
+
+        WHERE
+            sp.season_id = %s
+
+            AND
+            p.id =
+                sp.participant_id
+
+            AND
+            sp.snapshot_at
+                IS NULL
+        """,
+        (
+            season_id,
+        ),
+    )
+
 @app.post(
     "/api/admin/seasons/"
     "{season_number}/activate"
@@ -11257,6 +11325,53 @@ def admin_activate_fcl_season(
                         "시즌 활성화 전 "
                         "참가자를 2명 이상 "
                         "등록해주세요."
+                    ),
+                )
+
+            # =========================
+            # 기존 ACTIVE 시즌
+            # 종료 전 팀 Snapshot 저장
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM
+                    seasons
+
+                WHERE
+                    status = 'active'
+
+                    AND
+                    id <> %s
+
+                FOR UPDATE
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            previous_active_seasons = (
+                cursor.fetchall()
+            )
+
+
+            for previous_season in (
+                previous_active_seasons
+            ):
+
+                snapshot_fcl_season_participant_teams(
+                    cursor,
+                    int(
+                        previous_season[
+                            "id"
+                        ]
                     ),
                 )
 
@@ -11448,6 +11563,21 @@ def admin_complete_fcl_season(
                     "message":
                         "이미 종료된 시즌입니다.",
                 }
+                
+
+            # =========================
+            # 시즌 종료 전
+            # 참가자 팀 Snapshot 저장
+            # =========================
+
+            snapshot_fcl_season_participant_teams(
+                cursor,
+                int(
+                    season[
+                        "id"
+                    ]
+                ),
+            )
 
 
             cursor.execute(
@@ -26554,12 +26684,60 @@ def get_standings(
             cursor.execute(
                 """
                 SELECT
-                    fcl_name,
-                    current_team_name,
-                    current_team_logo_path
+                    p.fcl_name,
 
-                FROM participants
-                """
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_name_snapshot,
+                                p.current_team_name
+                            )
+
+                        ELSE
+                            p.current_team_name
+                    END
+                        AS current_team_name,
+
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_logo_path_snapshot,
+                                p.current_team_logo_path
+                            )
+
+                        ELSE
+                            p.current_team_logo_path
+                    END
+                        AS current_team_logo_path
+
+                FROM
+                    season_participants
+                        AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        sp.season_id
+
+                WHERE
+                    sp.season_id = %s
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
             participant_team_rows = (
