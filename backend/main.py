@@ -64,6 +64,7 @@ import psycopg
 
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from psycopg_pool import ConnectionPool
 
 from fastapi import (
     FastAPI,
@@ -81,6 +82,7 @@ from fastapi.security import (
     HTTPBearer,
 )
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from openpyxl import load_workbook
@@ -119,6 +121,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# =========================
+# GZIP
+# 정적 파일 / JSON 압축
+# =========================
+
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1024,
+    compresslevel=1,
+)
+
 
 # =========================
 # 파일 경로
@@ -148,6 +161,35 @@ DATABASE_URL = os.getenv(
 
 ADMIN_PASSWORD = os.getenv(
     "ADMIN_PASSWORD"
+)
+
+# =========================
+# DATABASE CONNECTION POOL
+# =========================
+
+DATABASE_POOL = (
+    ConnectionPool(
+        conninfo=DATABASE_URL,
+
+        min_size=1,
+        max_size=4,
+
+        kwargs={
+            "row_factory":
+                dict_row,
+        },
+
+        timeout=10.0,
+
+        max_idle=300.0,
+        max_lifetime=1800.0,
+
+        open=True,
+    )
+
+    if DATABASE_URL
+
+    else None
 )
 
 
@@ -633,16 +675,23 @@ def get_participant_ouid(
 
 def get_db_connection():
 
-    if not DATABASE_URL:
+    if (
+        not DATABASE_URL
+        or
+        DATABASE_POOL is None
+    ):
 
         raise HTTPException(
             status_code=500,
-            detail="DATABASE_URL이 설정되지 않았습니다.",
+            detail=(
+                "DATABASE_URL이 "
+                "설정되지 않았습니다."
+            ),
         )
 
-    return psycopg.connect(
-        DATABASE_URL,
-        row_factory=dict_row,
+
+    return (
+        DATABASE_POOL.connection()
     )
 
 
