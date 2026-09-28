@@ -5217,6 +5217,170 @@ def initialize_database():
             )
 
             # =========================
+            # FCL SEASONS
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS seasons (
+                    id BIGSERIAL PRIMARY KEY,
+
+                    season_number SMALLINT
+                        NOT NULL
+                        UNIQUE,
+
+                    title VARCHAR(100)
+                        NOT NULL,
+
+                    status VARCHAR(20)
+                        NOT NULL
+                        DEFAULT 'upcoming',
+
+                    start_date DATE,
+
+                    end_date DATE,
+
+                    activated_at TIMESTAMPTZ,
+
+                    completed_at TIMESTAMPTZ,
+
+                    created_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    updated_at TIMESTAMPTZ
+                        NOT NULL
+                        DEFAULT NOW(),
+
+                    CONSTRAINT
+                        chk_seasons_number
+
+                    CHECK (
+                        season_number > 0
+                    ),
+
+                    CONSTRAINT
+                        chk_seasons_status
+
+                    CHECK (
+                        status IN (
+                            'upcoming',
+                            'active',
+                            'completed'
+                        )
+                    ),
+
+                    CONSTRAINT
+                        chk_seasons_date_range
+
+                    CHECK (
+                        start_date IS NULL
+                        OR
+                        end_date IS NULL
+                        OR
+                        end_date >= start_date
+                    )
+                )
+                """
+            )
+
+
+            # 동시에 active인 시즌은
+            # 최대 1개만 허용
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    ux_seasons_single_active
+
+                ON seasons (
+                    status
+                )
+
+                WHERE
+                    status = 'active'
+                """
+            )
+
+
+            # 현재 운영 데이터를
+            # FCL SEASON 1로 등록
+            #
+            # 이미 존재할 경우 title만 보정하고,
+            # status는 덮어쓰지 않는다.
+            cursor.execute(
+                """
+                INSERT INTO seasons (
+                    season_number,
+                    title,
+                    status
+                )
+
+                VALUES (
+                    1,
+                    'FCL SEASON 1',
+                    'active'
+                )
+
+                ON CONFLICT (
+                    season_number
+                )
+
+                DO UPDATE SET
+                    title =
+                        EXCLUDED.title,
+
+                    updated_at =
+                        NOW()
+                """
+            )
+
+
+            # =========================
+            # SEASON PARTICIPANTS
+            # 시즌별 참가자 구성
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    season_participants (
+                        season_id BIGINT
+                            NOT NULL
+                            REFERENCES seasons(id)
+                            ON DELETE CASCADE,
+
+                        participant_id BIGINT
+                            NOT NULL
+                            REFERENCES participants(id)
+                            ON DELETE CASCADE,
+
+                        display_order SMALLINT,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        PRIMARY KEY (
+                            season_id,
+                            participant_id
+                        )
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_season_participants_participant
+
+                ON season_participants (
+                    participant_id
+                )
+                """
+            )
+
+            # =========================
             # ONE DAY TOURNAMENT
             # 하루 완결형 자유 토너먼트
             # =========================
@@ -5683,6 +5847,315 @@ def initialize_database():
             )
 
             # =========================
+            # SERIES SEASON
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE series
+
+                ADD COLUMN IF NOT EXISTS
+                    season_id BIGINT
+                """
+            )
+
+
+            # 기존 DB에서도 여러 번 실행 가능하도록
+            # FK가 없을 때만 추가
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+
+                    IF NOT EXISTS (
+                        SELECT
+                            1
+
+                        FROM
+                            pg_constraint
+
+                        WHERE
+                            conname =
+                                'fk_series_season'
+                    ) THEN
+
+                        ALTER TABLE series
+
+                        ADD CONSTRAINT
+                            fk_series_season
+
+                        FOREIGN KEY (
+                            season_id
+                        )
+
+                        REFERENCES
+                            seasons(id);
+
+                    END IF;
+
+                END
+                $$;
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_series_season_id
+
+                ON series (
+                    season_id
+                )
+                """
+            )
+
+            # =========================
+            # SERIES ACTIVE SEASON 자동 귀속
+            #
+            # 기존 Render 코드처럼
+            # season_id를 보내지 않는 INSERT도
+            # 현재 active 시즌에 자동 귀속
+            #
+            # 원데이 토너먼트는 항상
+            # 정규 시즌과 분리
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE OR REPLACE FUNCTION
+                    assign_active_season_to_series()
+
+                RETURNS TRIGGER
+
+                LANGUAGE plpgsql
+
+                AS $$
+                BEGIN
+
+                    IF
+                        NEW.series_type = '토너먼트'
+                    THEN
+
+                        NEW.season_id := NULL;
+
+                        RETURN NEW;
+
+                    END IF;
+
+
+                    IF
+                        NEW.season_id IS NULL
+                    THEN
+
+                        SELECT
+                            id
+
+                        INTO
+                            NEW.season_id
+
+                        FROM
+                            seasons
+
+                        WHERE
+                            status = 'active'
+
+                        ORDER BY
+                            season_number DESC
+
+                        LIMIT 1;
+
+                    END IF;
+
+
+                    RETURN NEW;
+
+                END;
+                $$;
+                """
+            )
+
+
+            cursor.execute(
+                """
+                DROP TRIGGER IF EXISTS
+                    trg_series_assign_active_season
+
+                ON series
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE TRIGGER
+                    trg_series_assign_active_season
+
+                BEFORE INSERT
+                    OR UPDATE OF
+                        series_type,
+                        season_id
+
+                ON series
+
+                FOR EACH ROW
+
+                EXECUTE FUNCTION
+                    assign_active_season_to_series()
+                """
+            )
+
+
+            # =========================
+            # 기존 SERIES → SEASON 1
+            #
+            # 시즌2가 아직 생성되지 않은
+            # 최초 마이그레이션에서만 실행
+            #
+            # 원데이 토너먼트는
+            # 정규 시즌에 귀속하지 않는다.
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE series
+
+                SET
+                    season_id = (
+                        SELECT
+                            id
+
+                        FROM
+                            seasons
+
+                        WHERE
+                            season_number = 1
+                    )
+
+                WHERE
+                    season_id IS NULL
+
+                    AND
+                    series_type <> '토너먼트'
+
+                    AND
+                    NOT EXISTS (
+                        SELECT
+                            1
+
+                        FROM
+                            seasons
+
+                        WHERE
+                            season_number > 1
+                    )
+                """
+            )
+
+
+            # 기존 원데이 토너먼트 SERIES는
+            # 시즌과 분리
+            cursor.execute(
+                """
+                UPDATE series
+
+                SET
+                    season_id = NULL
+
+                WHERE
+                    series_type = '토너먼트'
+                """
+            )
+
+
+            # =========================
+            # 기존 시즌1 참가자 자동 등록
+            #
+            # Season 1 SERIES에 실제 등장한
+            # 참가자만 Season 1에 등록
+            #
+            # 이후 Season 2 데이터가 생겨도
+            # Season 1에 섞이지 않는다.
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    season_participants (
+                        season_id,
+                        participant_id
+                    )
+
+                SELECT
+                    season_id,
+                    participant_id
+
+                FROM (
+                    SELECT DISTINCT
+                        season_id,
+                        team_a_id
+                            AS participant_id
+
+                    FROM
+                        series
+
+                    WHERE
+                        season_id = (
+                            SELECT
+                                id
+
+                            FROM
+                                seasons
+
+                            WHERE
+                                season_number = 1
+                        )
+
+                        AND
+                        series_type <> '토너먼트'
+
+
+                    UNION
+
+
+                    SELECT DISTINCT
+                        season_id,
+                        team_b_id
+                            AS participant_id
+
+                    FROM
+                        series
+
+                    WHERE
+                        season_id = (
+                            SELECT
+                                id
+
+                            FROM
+                                seasons
+
+                            WHERE
+                                season_number = 1
+                        )
+
+                        AND
+                        series_type <> '토너먼트'
+                ) AS
+                    season_one_participants
+
+                WHERE
+                    season_id IS NOT NULL
+
+                ON CONFLICT (
+                    season_id,
+                    participant_id
+                )
+
+                DO NOTHING
+                """
+            )
+
+            # =========================
             # SERIES 목표 세트 수
             #
             # 프리시즌 / 정규리그
@@ -5804,15 +6277,27 @@ def initialize_database():
 
             cursor.execute(
                 """
+                DROP INDEX IF EXISTS
+                    ux_series_regular_fixture_number
+                """
+            )
+
+
+            cursor.execute(
+                """
                 CREATE UNIQUE INDEX IF NOT EXISTS
                     ux_series_regular_fixture_number
 
                 ON series (
+                    season_id,
                     fixture_number
                 )
 
                 WHERE
                     series_type = '정규리그'
+
+                    AND
+                    season_id IS NOT NULL
                 """
             )
 
