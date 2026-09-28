@@ -37422,6 +37422,293 @@ def get_database_participants():
 
     return participants
 
+# =========================
+# FCL SEASONS
+# 공개 시즌 조회 API
+# =========================
+
+@app.get("/api/seasons")
+def get_fcl_seasons():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.season_number,
+                    s.title,
+                    s.status,
+                    s.start_date,
+                    s.end_date,
+                    s.activated_at,
+                    s.completed_at,
+                    s.created_at,
+                    s.updated_at,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            season_participants
+                                AS sp
+
+                        WHERE
+                            sp.season_id = s.id
+                    ) AS participant_count,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            series
+                                AS sr
+
+                        WHERE
+                            sr.season_id = s.id
+                    ) AS series_count
+
+                FROM
+                    seasons AS s
+
+                ORDER BY
+                    s.season_number
+                """
+            )
+
+
+            seasons = (
+                cursor.fetchall()
+            )
+
+
+    return {
+        "seasons":
+            seasons
+    }
+
+
+@app.get("/api/seasons/current")
+def get_current_fcl_season():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.season_number,
+                    s.title,
+                    s.status,
+                    s.start_date,
+                    s.end_date,
+                    s.activated_at,
+                    s.completed_at,
+                    s.created_at,
+                    s.updated_at,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            season_participants
+                                AS sp
+
+                        WHERE
+                            sp.season_id = s.id
+                    ) AS participant_count,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            series
+                                AS sr
+
+                        WHERE
+                            sr.season_id = s.id
+                    ) AS series_count
+
+                FROM
+                    seasons AS s
+
+                WHERE
+                    s.status = 'active'
+
+                ORDER BY
+                    s.season_number DESC
+
+                LIMIT 1
+                """
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+    if season is None:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "현재 진행 중인 시즌이 없습니다."
+            ),
+        )
+
+
+    return {
+        "season":
+            season
+    }
+
+
+@app.get("/api/seasons/{season_number}")
+def get_fcl_season(
+    season_number: int,
+):
+
+    if season_number <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 시즌 번호가 아닙니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.season_number,
+                    s.title,
+                    s.status,
+                    s.start_date,
+                    s.end_date,
+                    s.activated_at,
+                    s.completed_at,
+                    s.created_at,
+                    s.updated_at,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            season_participants
+                                AS sp
+
+                        WHERE
+                            sp.season_id = s.id
+                    ) AS participant_count,
+
+                    (
+                        SELECT
+                            COUNT(*)
+
+                        FROM
+                            series
+                                AS sr
+
+                        WHERE
+                            sr.season_id = s.id
+                    ) AS series_count
+
+                FROM
+                    seasons AS s
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS participant_id,
+                    p.fcl_name,
+                    p.fc_nickname,
+                    p.ouid,
+                    sp.display_order
+
+                FROM
+                    season_participants
+                        AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order
+                        NULLS LAST,
+
+                    p.id
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            participants = (
+                cursor.fetchall()
+            )
+
+
+    return {
+        "season":
+            season,
+
+        "participants":
+            participants,
+    }
+
 # 메타데이터 API
 @app.get(
     "/api/fconline/metadata/seasons"
