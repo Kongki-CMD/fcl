@@ -21,6 +21,23 @@ const resultDetailCustomPlayerImages = {
 const resultsListElement =
     document.querySelector(".results-list");
 
+const resultsSeasonTabsElement =
+    document.querySelector(
+        "#results-season-tabs"
+    );
+
+const resultsDescriptionElement =
+    document.querySelector(
+        ".results-header p"
+    );
+
+
+let selectedResultSeasonNumber =
+    null;
+
+let availableResultSeasons =
+    [];
+
 const resultDetailModalElement =
     document.querySelector(
         "#result-detail-modal"
@@ -358,12 +375,298 @@ function createResultKey(result) {
 
 
 // =========================================
+// FCL 시즌 선택
+// =========================================
+
+function getRequestedResultSeasonNumber() {
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+
+    const seasonValue =
+        Number(
+            params.get(
+                "season"
+            )
+        );
+
+
+    if (
+        Number.isInteger(
+            seasonValue
+        )
+        &&
+        seasonValue > 0
+    ) {
+
+        return seasonValue;
+    }
+
+
+    return null;
+}
+
+
+function updateResultsDescription() {
+
+    if (!resultsDescriptionElement) {
+        return;
+    }
+
+
+    if (!selectedResultSeasonNumber) {
+
+        resultsDescriptionElement.textContent =
+            "FC Online Champions League 경기 결과";
+
+        return;
+    }
+
+
+    resultsDescriptionElement.textContent =
+        (
+            `SEASON ${selectedResultSeasonNumber} `
+            + "경기 결과"
+        );
+}
+
+
+function renderResultSeasonTabs() {
+
+    if (!resultsSeasonTabsElement) {
+        return;
+    }
+
+
+    resultsSeasonTabsElement.innerHTML =
+        "";
+
+
+    availableResultSeasons.forEach(
+        season => {
+
+            const seasonButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            seasonButtonElement.type =
+                "button";
+
+
+            seasonButtonElement.className =
+                "season-tab-button";
+
+
+            seasonButtonElement.textContent =
+                `SEASON ${season.season_number}`;
+
+
+            if (
+                Number(
+                    season.season_number
+                )
+                ===
+                selectedResultSeasonNumber
+            ) {
+
+                seasonButtonElement
+                    .classList.add(
+                        "active"
+                    );
+            }
+
+
+            seasonButtonElement.addEventListener(
+                "click",
+                async () => {
+
+                    const nextSeasonNumber =
+                        Number(
+                            season.season_number
+                        );
+
+
+                    if (
+                        nextSeasonNumber
+                        ===
+                        selectedResultSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedResultSeasonNumber =
+                        nextSeasonNumber;
+
+
+                    const url =
+                        new URL(
+                            window.location.href
+                        );
+
+
+                    url.searchParams.set(
+                        "season",
+                        String(
+                            selectedResultSeasonNumber
+                        )
+                    );
+
+
+                    window.history.replaceState(
+                        {},
+                        "",
+                        url
+                    );
+
+
+                    renderResultSeasonTabs();
+
+                    updateResultsDescription();
+
+
+                    await loadResults();
+                }
+            );
+
+
+            resultsSeasonTabsElement
+                .appendChild(
+                    seasonButtonElement
+                );
+        }
+    );
+}
+
+
+async function loadResultSeasonTabs() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/seasons`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "시즌 정보를 불러오지 못했습니다."
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        availableResultSeasons =
+            data.seasons
+            ?? [];
+
+
+        if (
+            availableResultSeasons.length
+            === 0
+        ) {
+
+            throw new Error(
+                "등록된 시즌이 없습니다."
+            );
+        }
+
+
+        const requestedSeasonNumber =
+            getRequestedResultSeasonNumber();
+
+
+        const requestedSeason =
+            availableResultSeasons.find(
+                season =>
+                    Number(
+                        season.season_number
+                    )
+                    ===
+                    requestedSeasonNumber
+            );
+
+
+        const activeSeason =
+            availableResultSeasons.find(
+                season =>
+                    season.status
+                    ===
+                    "active"
+            );
+
+
+        const fallbackSeason =
+            availableResultSeasons[
+                availableResultSeasons.length - 1
+            ];
+
+
+        const selectedSeason =
+            requestedSeason
+            ??
+            activeSeason
+            ??
+            fallbackSeason;
+
+
+        selectedResultSeasonNumber =
+            Number(
+                selectedSeason
+                    .season_number
+            );
+
+
+        renderResultSeasonTabs();
+
+        updateResultsDescription();
+
+
+        await loadResults();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        if (resultsSeasonTabsElement) {
+
+            resultsSeasonTabsElement.innerHTML = `
+                <p>
+                    시즌 정보를 불러오는 중
+                    오류가 발생했습니다.
+                </p>
+            `;
+        }
+    }
+}
+
+
+// =========================================
 // 경기 결과 불러오기
 // =========================================
 
 async function loadResults() {
 
     try {
+
+        if (!selectedResultSeasonNumber) {
+            return;
+        }
+
 
         await loadResultDetailSeasonMetadata();
 
@@ -377,10 +680,13 @@ async function loadResults() {
         ] = await Promise.all([
             fetch(
                 `${apiBaseUrl}/api/results`
+                + `?season=${selectedResultSeasonNumber}`
             ),
 
             fetch(
-                `${apiBaseUrl}/api/fconline/series/completed-results`
+                `${apiBaseUrl}`
+                + `/api/fconline/series/completed-results`
+                + `?season=${selectedResultSeasonNumber}`
             ),
         ]);
 
@@ -2890,6 +3196,6 @@ setInterval(
 
 if (resultsListElement) {
 
-    loadResults();
+    loadResultSeasonTabs();
 }
 
