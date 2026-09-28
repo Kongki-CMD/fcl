@@ -18,33 +18,74 @@ const scheduleDescriptionElement = document.querySelector(
     ".schedule-description"
 );
 
+const seasonTabsElement = document.querySelector(
+    "#schedule-season-tabs"
+);
+
 
 let isPlayoffView = false;
 
+let selectedSeasonNumber = null;
 
-scheduleViewButtonElement.addEventListener("click", () => {
-    isPlayoffView = !isPlayoffView;
+let availableSeasons = [];
+
+
+function updateScheduleView() {
+
+    const seasonLabel =
+        selectedSeasonNumber
+            ? `SEASON ${selectedSeasonNumber}`
+            : "FCL";
+
 
     if (isPlayoffView) {
-        scheduleListElement.style.display = "none";
-        playoffMatchListElement.style.display = "block";
+
+        scheduleListElement.style.display =
+            "none";
+
+        playoffMatchListElement.style.display =
+            "block";
+
 
         scheduleDescriptionElement.textContent =
-            "FC Online Champions League 플레이오프 일정";
+            `${seasonLabel} 플레이오프 일정`;
+
 
         scheduleViewButtonElement.textContent =
             "전체 경기 일정";
+
+
     } else {
-        scheduleListElement.style.display = "block";
-        playoffMatchListElement.style.display = "none";
+
+        scheduleListElement.style.display =
+            "flex";
+
+        playoffMatchListElement.style.display =
+            "none";
+
 
         scheduleDescriptionElement.textContent =
-            "FC Online Champions League 전체 경기 일정";
+            `${seasonLabel} 전체 경기 일정`;
+
 
         scheduleViewButtonElement.textContent =
             "플레이오프 일정";
     }
-});
+}
+
+
+scheduleViewButtonElement.addEventListener(
+    "click",
+    () => {
+
+        isPlayoffView =
+            !isPlayoffView;
+
+
+        updateScheduleView();
+    }
+);
+
 
 scheduleListElement.addEventListener(
     "click",
@@ -386,11 +427,297 @@ function renderAiPredictionBar(match) {
     `;
 }
 
+function getRequestedSeasonNumber() {
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+
+    const seasonValue =
+        Number(
+            params.get(
+                "season"
+            )
+        );
+
+
+    if (
+        Number.isInteger(
+            seasonValue
+        )
+        &&
+        seasonValue > 0
+    ) {
+
+        return seasonValue;
+    }
+
+
+    return null;
+}
+
+
+function renderSeasonTabs() {
+
+    seasonTabsElement.innerHTML =
+        "";
+
+
+    availableSeasons.forEach(
+        season => {
+
+            const seasonButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            seasonButtonElement.type =
+                "button";
+
+
+            seasonButtonElement.className =
+                "season-tab-button";
+
+
+            seasonButtonElement.textContent =
+                `SEASON ${season.season_number}`;
+
+
+            if (
+                Number(
+                    season.season_number
+                )
+                ===
+                selectedSeasonNumber
+            ) {
+
+                seasonButtonElement
+                    .classList.add(
+                        "active"
+                    );
+            }
+
+
+            seasonButtonElement.addEventListener(
+                "click",
+                async () => {
+
+                    const nextSeasonNumber =
+                        Number(
+                            season.season_number
+                        );
+
+
+                    if (
+                        nextSeasonNumber
+                        ===
+                        selectedSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedSeasonNumber =
+                        nextSeasonNumber;
+
+
+                    const url =
+                        new URL(
+                            window.location.href
+                        );
+
+
+                    url.searchParams.set(
+                        "season",
+                        String(
+                            selectedSeasonNumber
+                        )
+                    );
+
+
+                    window.history.replaceState(
+                        {},
+                        "",
+                        url
+                    );
+
+
+                    isPlayoffView =
+                        false;
+
+
+                    renderSeasonTabs();
+
+                    updateScheduleView();
+
+
+                    await loadSchedule();
+
+                    await loadSelectedSeasonPlayoffs();
+                }
+            );
+
+
+            seasonTabsElement.appendChild(
+                seasonButtonElement
+            );
+        }
+    );
+}
+
+
+async function loadSeasonTabs() {
+
+    try {
+
+        const response = await fetch(
+            `${apiBaseUrl}/api/seasons`
+        );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "시즌 정보를 불러오지 못했습니다."
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        availableSeasons =
+            data.seasons
+            ?? [];
+
+
+        if (
+            availableSeasons.length
+            === 0
+        ) {
+
+            throw new Error(
+                "등록된 시즌이 없습니다."
+            );
+        }
+
+
+        const requestedSeasonNumber =
+            getRequestedSeasonNumber();
+
+
+        const requestedSeason =
+            availableSeasons.find(
+                season =>
+                    Number(
+                        season.season_number
+                    )
+                    ===
+                    requestedSeasonNumber
+            );
+
+
+        const activeSeason =
+            availableSeasons.find(
+                season =>
+                    season.status
+                    ===
+                    "active"
+            );
+
+
+        const fallbackSeason =
+            availableSeasons[
+                availableSeasons.length - 1
+            ];
+
+
+        const selectedSeason =
+            requestedSeason
+            ??
+            activeSeason
+            ??
+            fallbackSeason;
+
+
+        selectedSeasonNumber =
+            Number(
+                selectedSeason
+                    .season_number
+            );
+
+
+        renderSeasonTabs();
+
+        updateScheduleView();
+
+
+        await loadSchedule();
+
+        await loadSelectedSeasonPlayoffs();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        seasonTabsElement.innerHTML = `
+            <p>
+                시즌 정보를 불러오는 중
+                오류가 발생했습니다.
+            </p>
+        `;
+    }
+}
+
+
+async function loadSelectedSeasonPlayoffs() {
+
+    /*
+     * 현재 플레이오프 설정 구조는
+     * Season 1 전용이다.
+     *
+     * Season 2 플레이오프 구조를
+     * 시즌별로 분리하기 전까지는
+     * Season 1 데이터가 섞이지 않도록
+     * Season 2에서는 빈 목록 처리한다.
+     */
+
+    if (
+        selectedSeasonNumber
+        !== 1
+    ) {
+
+        renderPlayoffSchedule(
+            []
+        );
+
+        return;
+    }
+
+
+    await loadPlayoffSchedule();
+}
+
 
 async function loadSchedule() {
     try {
+        if (!selectedSeasonNumber) {
+            return;
+        }
+
+
         const response = await fetch(
             `${apiBaseUrl}/api/matches`
+            + `?season=${selectedSeasonNumber}`
         );
 
         if (!response.ok) {
@@ -1435,5 +1762,4 @@ function renderSchedule(matches) {
 }
 
 
-loadSchedule();
-loadPlayoffSchedule();
+loadSeasonTabs();
