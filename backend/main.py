@@ -25764,11 +25764,90 @@ def get_results(
 # =========================
 
 @app.get("/api/standings")
-def get_standings():
+def get_standings(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
 
     today = datetime.now(
         ZoneInfo("Asia/Seoul")
     ).date()
+
+
+    # =========================
+    # 선택 시즌 참가자
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS participant_id,
+                    p.fcl_name,
+                    sp.display_order
+
+                FROM
+                    season_participants
+                        AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order
+                        NULLS LAST,
+
+                    p.id
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            season_participant_rows = (
+                cursor.fetchall()
+            )
+
+
+    season_participants = [
+        row[
+            "fcl_name"
+        ]
+
+        for row
+        in season_participant_rows
+    ]
 
 
     # =========================
@@ -25778,9 +25857,13 @@ def get_standings():
     standings = {}
 
 
-    for participant in PARTICIPANTS:
+    for participant in season_participants:
 
         standings[participant] = {
+
+            "season_number":
+                selected_season_number,
+
             "name": participant,
 
             # SERIES 수
@@ -26026,10 +26109,16 @@ def get_standings():
                     AND
                     s.series_type = '정규리그'
 
+                    AND
+                    s.season_id = %s
+
                 ORDER BY
                     s.id,
                     ss.set_number
-                """
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
 
@@ -26233,6 +26322,13 @@ def get_standings():
             match_type,
         ) = row
 
+        # 기존 Excel 경기 결과는
+        # Season 1 레거시 데이터
+        if (
+            selected_season_number
+            != 1
+        ):
+            continue
 
         # 빈 행
         if match_date is None:
@@ -26395,7 +26491,7 @@ def get_standings():
 
         for index, participant
         in enumerate(
-            PARTICIPANTS
+            season_participants
         )
     }
 
