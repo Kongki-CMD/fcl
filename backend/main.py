@@ -28818,7 +28818,30 @@ def advance_playoff_series(
 # =========================
 
 @app.get("/api/player-rankings/sync-status")
-def get_player_rankings_sync_status():
+def get_player_rankings_sync_status(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
 
     with get_db_connection() as connection:
 
@@ -28845,9 +28868,16 @@ def get_player_rankings_sync_status():
 
                 WHERE
                     status = 'completed'
+
                     AND
                     series_type = '정규리그'
-                """
+
+                    AND
+                    season_id = %s
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
             row = cursor.fetchone()
@@ -28865,6 +28895,9 @@ def get_player_rankings_sync_status():
 
 
     return {
+        "season_number":
+            selected_season_number,
+
         "is_syncing":
             pending_count > 0,
 
@@ -28882,7 +28915,30 @@ def get_player_rankings_sync_status():
 # =========================
 
 @app.get("/api/player-rankings")
-def get_player_rankings():
+def get_player_rankings(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
 
     with get_db_connection() as connection:
 
@@ -28915,6 +28971,9 @@ def get_player_rankings():
                         AND
                         s.status =
                             'completed'
+
+                        AND
+                        s.season_id = %s
 
                         AND
                         sssp.sp_position
@@ -28981,6 +29040,9 @@ def get_player_rankings():
                         AND
                         s.status =
                             'completed'
+
+                        AND
+                        s.season_id = %s
 
                         AND
                         sssp.sp_position
@@ -29189,6 +29251,9 @@ def get_player_rankings():
                         s.series_type =
                             '정규리그'
 
+                        AND
+                        s.season_id = %s
+
                     GROUP BY
                         sps.participant_id,
                         TRIM(
@@ -29223,6 +29288,9 @@ def get_player_rankings():
                         AND
                         s.series_type =
                             '정규리그'
+
+                        AND
+                        s.season_id = %s
 
                     GROUP BY
                         sm.participant_id,
@@ -29319,7 +29387,13 @@ def get_player_rankings():
                     csp.player_name ASC,
 
                     p.id ASC
-                """
+                """,
+                (
+                    selected_season_id,
+                    selected_season_id,
+                    selected_season_id,
+                    selected_season_id,
+                ),
             )
 
             rows = cursor.fetchall()
@@ -29369,6 +29443,9 @@ def get_player_rankings():
 
         players.append(
             {
+                "season_number":
+                    selected_season_number,
+
                 "fcl_name":
                     row["fcl_name"],
 
