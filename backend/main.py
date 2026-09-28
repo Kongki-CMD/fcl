@@ -148,6 +148,91 @@ PLAYER_RANKINGS_PATH = BASE_DIR / "data" / "player_rankings.xlsx"
 PLAYOFFS_PATH = BASE_DIR / "data" / "playoffs.xlsx"
 
 # =========================
+# LEGACY RESULTS EXCEL CACHE
+#
+# Season 1 레거시 Excel은
+# 배포 중 변경되지 않으므로
+# 프로세스 메모리에 1회만 로드
+# =========================
+
+RESULTS_EXCEL_ROWS_CACHE = {}
+
+RESULTS_EXCEL_ROWS_CACHE_LOCK = (
+    threading.Lock()
+)
+
+
+def get_results_excel_rows(
+    data_only: bool = False,
+):
+
+    cache_key = bool(
+        data_only
+    )
+
+
+    cached_rows = (
+        RESULTS_EXCEL_ROWS_CACHE.get(
+            cache_key
+        )
+    )
+
+
+    if cached_rows is not None:
+
+        return cached_rows
+
+
+    with RESULTS_EXCEL_ROWS_CACHE_LOCK:
+
+        cached_rows = (
+            RESULTS_EXCEL_ROWS_CACHE.get(
+                cache_key
+            )
+        )
+
+
+        if cached_rows is not None:
+
+            return cached_rows
+
+
+        workbook = load_workbook(
+            RESULTS_PATH,
+            data_only=data_only,
+            read_only=True,
+        )
+
+
+        try:
+
+            worksheet = workbook[
+                "경기결과"
+            ]
+
+
+            cached_rows = tuple(
+                worksheet.iter_rows(
+                    min_row=2,
+                    max_col=10,
+                    values_only=True,
+                )
+            )
+
+
+        finally:
+
+            workbook.close()
+
+
+        RESULTS_EXCEL_ROWS_CACHE[
+            cache_key
+        ] = cached_rows
+
+
+        return cached_rows
+
+# =========================
 # NEXON Open API
 # =========================
 
@@ -21587,31 +21672,11 @@ def build_ai_prediction_context():
                 )
             )
 
-
-    # =========================
-    # 2. 기존 Excel 정규리그
-    #
-    # DB에 같은 경기가 없을 때만
-    # 과거 데이터 보완
-    # =========================
-
-    workbook = load_workbook(
-        RESULTS_PATH,
-        data_only=True,
-    )
-
-    worksheet = workbook[
-        "경기결과"
-    ]
-
-
     excel_order = 0
 
 
-    for row in worksheet.iter_rows(
-        min_row=2,
-        max_col=10,
-        values_only=True,
+    for row in get_results_excel_rows(
+        data_only=True
     ):
 
         (
@@ -25798,11 +25863,6 @@ def get_results(
         return []
 
 
-    workbook = load_workbook(
-        RESULTS_PATH
-    )
-    worksheet = workbook["경기결과"]
-
     today = datetime.now(
         ZoneInfo("Asia/Seoul")
     ).date()
@@ -25811,11 +25871,8 @@ def get_results(
 
     regular_match_index = 0
 
-    for row in worksheet.iter_rows(
-        min_row=2,
-        max_col=10,
-        values_only=True,
-    ):
+
+    for row in get_results_excel_rows():
         (
             match_date,
             team_a,
@@ -25932,9 +25989,6 @@ def get_results(
             }
         )
 
-
-    workbook.close()
-
     return results
 
 # =========================
@@ -25986,7 +26040,35 @@ def get_standings(
                 SELECT
                     p.id AS participant_id,
                     p.fcl_name,
-                    sp.display_order
+                    sp.display_order,
+
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_name_snapshot,
+                                p.current_team_name
+                            )
+
+                        ELSE
+                            p.current_team_name
+                    END
+                        AS current_team_name,
+
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_logo_path_snapshot,
+                                p.current_team_logo_path
+                            )
+
+                        ELSE
+                            p.current_team_logo_path
+                    END
+                        AS current_team_logo_path
 
                 FROM
                     season_participants
@@ -25998,6 +26080,13 @@ def get_standings(
                     ON
                         p.id =
                         sp.participant_id
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        sp.season_id
 
                 WHERE
                     sp.season_id = %s
@@ -26027,6 +26116,14 @@ def get_standings(
         for row
         in season_participant_rows
     ]
+
+
+    participant_team_map = {
+        row["fcl_name"]: row
+
+        for row
+        in season_participant_rows
+    }
 
 
     # =========================
@@ -26467,20 +26564,7 @@ def get_standings(
     # 2. 기존 Excel 결과
     # =========================================
 
-    workbook = load_workbook(
-        RESULTS_PATH
-    )
-
-    worksheet = workbook[
-        "경기결과"
-    ]
-
-
-    for row in worksheet.iter_rows(
-        min_row=2,
-        max_col=10,
-        values_only=True,
-    ):
+    for row in get_results_excel_rows():
 
         (
             match_date,
@@ -26639,8 +26723,6 @@ def get_standings(
         )
 
 
-    workbook.close()
-
 
     # =========================
     # 득실차
@@ -26714,91 +26796,6 @@ def get_standings(
     ):
 
         record["rank"] = index
-
-
-    # =========================
-    # 참가자 현재 팀 정보
-    #
-    # 현재 화면에서 사용하는 팀 정보는
-    # participants 테이블을 기준으로 함
-    #
-    # 과거 SERIES Snapshot은
-    # 절대 수정하지 않음
-    # =========================
-
-    with get_db_connection() as connection:
-
-        with connection.cursor() as cursor:
-
-            cursor.execute(
-                """
-                SELECT
-                    p.fcl_name,
-
-                    CASE
-                        WHEN
-                            s.status = 'completed'
-                        THEN
-                            COALESCE(
-                                sp.team_name_snapshot,
-                                p.current_team_name
-                            )
-
-                        ELSE
-                            p.current_team_name
-                    END
-                        AS current_team_name,
-
-                    CASE
-                        WHEN
-                            s.status = 'completed'
-                        THEN
-                            COALESCE(
-                                sp.team_logo_path_snapshot,
-                                p.current_team_logo_path
-                            )
-
-                        ELSE
-                            p.current_team_logo_path
-                    END
-                        AS current_team_logo_path
-
-                FROM
-                    season_participants
-                        AS sp
-
-                JOIN
-                    participants AS p
-
-                    ON
-                        p.id =
-                        sp.participant_id
-
-                JOIN
-                    seasons AS s
-
-                    ON
-                        s.id =
-                        sp.season_id
-
-                WHERE
-                    sp.season_id = %s
-                """,
-                (
-                    selected_season_id,
-                ),
-            )
-
-            participant_team_rows = (
-                cursor.fetchall()
-            )
-
-
-    participant_team_map = {
-        row["fcl_name"]: row
-        for row in participant_team_rows
-    }
-
 
     for record in sorted_standings:
 
