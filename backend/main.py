@@ -25588,8 +25588,40 @@ def get_today_matches():
 # =========================
 
 @app.get("/api/results")
-def get_results():
-    workbook = load_workbook(RESULTS_PATH)
+def get_results(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    # =========================================
+    # 기존 Excel 경기 결과는
+    # Season 1 레거시 데이터
+    # =========================================
+
+    if (
+        selected_season_number
+        != 1
+    ):
+
+        return []
+
+
+    workbook = load_workbook(
+        RESULTS_PATH
+    )
     worksheet = workbook["경기결과"]
 
     today = datetime.now(
@@ -25685,6 +25717,9 @@ def get_results():
                 "date": match_date.strftime(
                     "%Y-%m-%d"
                 ),
+
+                "season_number":
+                    1,
 
                 "round": round_number,
 
@@ -37136,7 +37171,30 @@ def get_season_champion():
 @app.get(
     "/api/fconline/series/completed-results"
 )
-def get_completed_series_results():
+def get_completed_series_results(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
 
     results = []
 
@@ -37233,8 +37291,15 @@ def get_completed_series_results():
                     s.series_type <>
                         '토너먼트'
 
-                ORDER BY s.completed_at DESC
-                """
+                    AND
+                    s.season_id = %s
+
+                ORDER BY
+                    s.completed_at DESC
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
 
@@ -37475,6 +37540,10 @@ def get_completed_series_results():
 
                 results.append(
                     {
+
+                        "season_number":
+                            selected_season_number,
+
                         "series_id":
                             series_row[
                                 "series_id"
