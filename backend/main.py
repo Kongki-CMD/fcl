@@ -9391,6 +9391,89 @@ class CommunityCommentUpdateRequest(
 ):
     content: str
 
+# =========================
+# ADMIN SEASON REQUEST
+# =========================
+
+class AdminSeasonCreateRequest(
+    BaseModel
+):
+    season_number: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+    title: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    start_date: str | None = None
+
+    end_date: str | None = None
+
+
+class AdminSeasonUpdateRequest(
+    BaseModel
+):
+    title: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    start_date: str | None = None
+
+    end_date: str | None = None
+
+
+class AdminSeasonParticipantsUpdateRequest(
+    BaseModel
+):
+    participant_ids: list[int] = Field(
+        default_factory=list,
+        max_length=100,
+    )
+
+
+def parse_fcl_season_date(
+    value: str | None,
+    field_name: str,
+):
+
+    if value is None:
+        return None
+
+
+    normalized = (
+        str(
+            value
+        )
+        .strip()
+    )
+
+
+    if not normalized:
+        return None
+
+
+    try:
+
+        return datetime.strptime(
+            normalized,
+            "%Y-%m-%d",
+        ).date()
+
+
+    except ValueError as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"{field_name}은 "
+                "YYYY-MM-DD 형식이어야 합니다."
+            ),
+        ) from error
+
 class AdminLoginRequest(BaseModel):
     password: str
 
@@ -10468,6 +10551,966 @@ def admin_login(
         "token": token,
         "expires_in":
             ADMIN_SESSION_SECONDS,
+    }
+
+# =========================
+# ADMIN FCL SEASONS
+# =========================
+
+@app.post("/api/admin/seasons")
+def admin_create_fcl_season(
+    request_data: AdminSeasonCreateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    season_number = int(
+        request_data.season_number
+    )
+
+
+    title = (
+        str(
+            request_data.title
+        )
+        .strip()
+    )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 이름을 입력해주세요."
+            ),
+        )
+
+
+    start_date = (
+        parse_fcl_season_date(
+            request_data.start_date,
+            "시작일",
+        )
+    )
+
+
+    end_date = (
+        parse_fcl_season_date(
+            request_data.end_date,
+            "종료일",
+        )
+    )
+
+
+    if (
+        start_date is not None
+        and
+        end_date is not None
+        and
+        end_date < start_date
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 종료일은 "
+                "시작일보다 빠를 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM
+                    seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            existing = (
+                cursor.fetchone()
+            )
+
+
+            if existing:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Season {season_number}이 "
+                        "이미 존재합니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                INSERT INTO seasons (
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    'upcoming',
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date,
+                    activated_at,
+                    completed_at,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    season_number,
+                    title,
+                    start_date,
+                    end_date,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season":
+            season
+    }
+
+
+@app.put(
+    "/api/admin/seasons/{season_number}"
+)
+def admin_update_fcl_season(
+    season_number: int,
+
+    request_data:
+        AdminSeasonUpdateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    if season_number <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 시즌 번호가 아닙니다."
+            ),
+        )
+
+
+    title = (
+        str(
+            request_data.title
+        )
+        .strip()
+    )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 이름을 입력해주세요."
+            ),
+        )
+
+
+    start_date = (
+        parse_fcl_season_date(
+            request_data.start_date,
+            "시작일",
+        )
+    )
+
+
+    end_date = (
+        parse_fcl_season_date(
+            request_data.end_date,
+            "종료일",
+        )
+    )
+
+
+    if (
+        start_date is not None
+        and
+        end_date is not None
+        and
+        end_date < start_date
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 종료일은 "
+                "시작일보다 빠를 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    title = %s,
+                    start_date = %s,
+                    end_date = %s,
+                    updated_at = NOW()
+
+                WHERE
+                    season_number = %s
+
+                RETURNING
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date,
+                    activated_at,
+                    completed_at,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    title,
+                    start_date,
+                    end_date,
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "season":
+            season
+    }
+
+
+@app.put(
+    "/api/admin/seasons/"
+    "{season_number}/participants"
+)
+def admin_update_fcl_season_participants(
+    season_number: int,
+
+    request_data:
+        AdminSeasonParticipantsUpdateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    participant_ids = [
+        int(
+            participant_id
+        )
+
+        for participant_id
+        in request_data.participant_ids
+    ]
+
+
+    if any(
+        participant_id <= 0
+
+        for participant_id
+        in participant_ids
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바르지 않은 참가자 ID가 "
+                "포함되어 있습니다."
+            ),
+        )
+
+
+    if (
+        len(
+            participant_ids
+        )
+        !=
+        len(
+            set(
+                participant_ids
+            )
+        )
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "같은 참가자를 "
+                "중복 등록할 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    status
+
+                FROM
+                    seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if participant_ids:
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id
+
+                    FROM
+                        participants
+
+                    WHERE
+                        id = ANY(%s)
+                    """,
+                    (
+                        participant_ids,
+                    ),
+                )
+
+
+                existing_ids = {
+                    int(
+                        row[
+                            "id"
+                        ]
+                    )
+
+                    for row
+                    in cursor.fetchall()
+                }
+
+
+                missing_ids = sorted(
+                    set(
+                        participant_ids
+                    )
+                    -
+                    existing_ids
+                )
+
+
+                if missing_ids:
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "존재하지 않는 참가자 ID: "
+                            +
+                            ", ".join(
+                                str(
+                                    participant_id
+                                )
+
+                                for participant_id
+                                in missing_ids
+                            )
+                        ),
+                    )
+
+
+            cursor.execute(
+                """
+                DELETE FROM
+                    season_participants
+
+                WHERE
+                    season_id = %s
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            for (
+                display_order,
+                participant_id,
+            ) in enumerate(
+                participant_ids,
+                start=1,
+            ):
+
+                cursor.execute(
+                    """
+                    INSERT INTO
+                        season_participants (
+                            season_id,
+                            participant_id,
+                            display_order
+                        )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s
+                    )
+                    """,
+                    (
+                        season[
+                            "id"
+                        ],
+
+                        participant_id,
+
+                        display_order,
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS participant_id,
+                    p.fcl_name,
+                    p.fc_nickname,
+                    sp.display_order
+
+                FROM
+                    season_participants
+                        AS sp
+
+                JOIN
+                    participants
+                        AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order,
+                    p.id
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            participants = (
+                cursor.fetchall()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season_number":
+            season_number,
+
+        "participants":
+            participants,
+    }
+
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/activate"
+)
+def admin_activate_fcl_season(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number,
+                    title,
+                    status
+
+                FROM
+                    seasons
+
+                WHERE
+                    season_number = %s
+
+                FOR UPDATE
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                season[
+                    "status"
+                ]
+                ==
+                "completed"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "종료된 시즌은 "
+                        "다시 활성화할 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                season[
+                    "status"
+                ]
+                ==
+                "active"
+            ):
+
+                return {
+                    "season":
+                        season,
+
+                    "message":
+                        "이미 활성화된 시즌입니다.",
+                }
+
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS participant_count
+
+                FROM
+                    season_participants
+
+                WHERE
+                    season_id = %s
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            participant_count = int(
+                cursor.fetchone()[
+                    "participant_count"
+                ]
+            )
+
+
+            if participant_count < 2:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "시즌 활성화 전 "
+                        "참가자를 2명 이상 "
+                        "등록해주세요."
+                    ),
+                )
+
+
+            # 기존 active 시즌 종료
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    status = 'completed',
+
+                    end_date =
+                        COALESCE(
+                            end_date,
+                            CURRENT_DATE
+                        ),
+
+                    completed_at =
+                        COALESCE(
+                            completed_at,
+                            NOW()
+                        ),
+
+                    updated_at = NOW()
+
+                WHERE
+                    status = 'active'
+
+                    AND
+                    id <> %s
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            # 대상 시즌 활성화
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    status = 'active',
+
+                    start_date =
+                        COALESCE(
+                            start_date,
+                            CURRENT_DATE
+                        ),
+
+                    activated_at =
+                        COALESCE(
+                            activated_at,
+                            NOW()
+                        ),
+
+                    completed_at = NULL,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date,
+                    activated_at,
+                    completed_at,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            activated_season = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season":
+            activated_season,
+
+        "message":
+            (
+                f"Season {season_number}이 "
+                "활성화되었습니다."
+            ),
+    }
+
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/complete"
+)
+def admin_complete_fcl_season(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    status
+
+                FROM
+                    seasons
+
+                WHERE
+                    season_number = %s
+
+                FOR UPDATE
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                season[
+                    "status"
+                ]
+                ==
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "아직 시작하지 않은 시즌은 "
+                        "종료할 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                season[
+                    "status"
+                ]
+                ==
+                "completed"
+            ):
+
+                return {
+                    "season_number":
+                        season_number,
+
+                    "message":
+                        "이미 종료된 시즌입니다.",
+                }
+
+
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    status = 'completed',
+
+                    end_date =
+                        COALESCE(
+                            end_date,
+                            CURRENT_DATE
+                        ),
+
+                    completed_at =
+                        COALESCE(
+                            completed_at,
+                            NOW()
+                        ),
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date,
+                    activated_at,
+                    completed_at,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            completed_season = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season":
+            completed_season,
+
+        "message":
+            (
+                f"Season {season_number}이 "
+                "종료되었습니다."
+            ),
     }
 
 # =========================
