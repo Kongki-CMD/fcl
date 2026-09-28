@@ -1,12 +1,34 @@
 import {
     apiBaseUrl,
-} from "./config.js";
+    loadFclSeasons,
+} from "./config.js?v=perf-2";
 
 
 const playersTableBodyElement =
     document.querySelector(
         ".players-table-body"
     );
+
+
+const playerSeasonTabsElement =
+    document.querySelector(
+        "#player-season-tabs"
+    );
+
+
+const playerDescriptionElement =
+    document.querySelector(
+        ".players-header p"
+    );
+
+
+let selectedPlayerSeasonNumber =
+    null;
+
+
+let availablePlayerSeasons =
+    [];
+
 
 let playerRankingData = [];
 
@@ -177,6 +199,278 @@ function getPlayerRecordImage(
 
 
 // =========================================
+// FCL 시즌 선택
+// =========================================
+
+function getRequestedPlayerSeasonNumber() {
+
+    const params =
+        new URLSearchParams(
+            window.location.search
+        );
+
+
+    const seasonValue =
+        Number(
+            params.get(
+                "season"
+            )
+        );
+
+
+    if (
+        Number.isInteger(
+            seasonValue
+        )
+        &&
+        seasonValue > 0
+    ) {
+
+        return seasonValue;
+    }
+
+
+    return null;
+}
+
+
+function updatePlayerDescription() {
+
+    if (!playerDescriptionElement) {
+        return;
+    }
+
+
+    if (!selectedPlayerSeasonNumber) {
+
+        playerDescriptionElement.textContent =
+            "FC Online Champions League 정규리그 선수 누적 기록";
+
+        return;
+    }
+
+
+    playerDescriptionElement.textContent =
+        (
+            `SEASON ${selectedPlayerSeasonNumber} `
+            + "정규리그 선수 누적 기록"
+        );
+}
+
+
+function renderPlayerSeasonTabs() {
+
+    if (!playerSeasonTabsElement) {
+        return;
+    }
+
+
+    playerSeasonTabsElement.innerHTML =
+        "";
+
+
+    availablePlayerSeasons.forEach(
+        season => {
+
+            const seasonButtonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            seasonButtonElement.type =
+                "button";
+
+
+            seasonButtonElement.className =
+                "season-tab-button";
+
+
+            seasonButtonElement.textContent =
+                `SEASON ${season.season_number}`;
+
+
+            if (
+                Number(
+                    season.season_number
+                )
+                ===
+                selectedPlayerSeasonNumber
+            ) {
+
+                seasonButtonElement
+                    .classList.add(
+                        "active"
+                    );
+            }
+
+
+            seasonButtonElement.addEventListener(
+                "click",
+                async () => {
+
+                    const nextSeasonNumber =
+                        Number(
+                            season.season_number
+                        );
+
+
+                    if (
+                        nextSeasonNumber
+                        ===
+                        selectedPlayerSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedPlayerSeasonNumber =
+                        nextSeasonNumber;
+
+
+                    const url =
+                        new URL(
+                            window.location.href
+                        );
+
+
+                    url.searchParams.set(
+                        "season",
+                        String(
+                            selectedPlayerSeasonNumber
+                        )
+                    );
+
+
+                    window.history.replaceState(
+                        {},
+                        "",
+                        url
+                    );
+
+
+                    renderPlayerSeasonTabs();
+
+                    updatePlayerDescription();
+
+
+                    await Promise.all([
+                        loadPlayerRankings(),
+                        checkPlayerRankingSyncStatus(
+                            false
+                        ),
+                    ]);
+                }
+            );
+
+
+            playerSeasonTabsElement.appendChild(
+                seasonButtonElement
+            );
+        }
+    );
+}
+
+
+async function loadPlayerSeasonTabs() {
+
+    try {
+
+        availablePlayerSeasons =
+            await loadFclSeasons();
+
+
+        if (
+            availablePlayerSeasons.length
+            === 0
+        ) {
+
+            throw new Error(
+                "등록된 시즌이 없습니다."
+            );
+        }
+
+
+        const requestedSeasonNumber =
+            getRequestedPlayerSeasonNumber();
+
+
+        const requestedSeason =
+            availablePlayerSeasons.find(
+                season =>
+                    Number(
+                        season.season_number
+                    )
+                    ===
+                    requestedSeasonNumber
+            );
+
+
+        const activeSeason =
+            availablePlayerSeasons.find(
+                season =>
+                    season.status
+                    ===
+                    "active"
+            );
+
+
+        const fallbackSeason =
+            availablePlayerSeasons[
+                availablePlayerSeasons.length - 1
+            ];
+
+
+        const selectedSeason =
+            requestedSeason
+            ??
+            activeSeason
+            ??
+            fallbackSeason;
+
+
+        selectedPlayerSeasonNumber =
+            Number(
+                selectedSeason
+                    .season_number
+            );
+
+
+        renderPlayerSeasonTabs();
+
+        updatePlayerDescription();
+
+
+        await Promise.all([
+            loadPlayerRankings(),
+            checkPlayerRankingSyncStatus(
+                false
+            ),
+        ]);
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        if (playerSeasonTabsElement) {
+
+            playerSeasonTabsElement.innerHTML = `
+                <p>
+                    시즌 정보를 불러오는 중
+                    오류가 발생했습니다.
+                </p>
+            `;
+        }
+    }
+}
+
+
+// =========================================
 // 선수 기록 불러오기
 // =========================================
 
@@ -184,8 +478,14 @@ async function loadPlayerRankings() {
 
     try {
 
+        if (!selectedPlayerSeasonNumber) {
+            return;
+        }
+
+
         const response = await fetch(
             `${apiBaseUrl}/api/player-rankings`
+            + `?season=${selectedPlayerSeasonNumber}`
         );
 
 
@@ -337,6 +637,7 @@ function renderPlayerRankings(
                     colspan="8"
                     class="players-empty"
                 >
+                    SEASON ${selectedPlayerSeasonNumber}에
                     아직 등록된 정규리그
                     선수 기록이 없습니다.
                 </td>
@@ -605,9 +906,15 @@ function updatePlayerSortHeaders() {
 
 }
 
-async function checkPlayerRankingSyncStatus() {
+async function checkPlayerRankingSyncStatus(
+    reloadRankingsWhenReady = true
+) {
 
     if (playerSyncCheckRunning) {
+        return;
+    }
+
+    if (!selectedPlayerSeasonNumber) {
         return;
     }
 
@@ -621,6 +928,7 @@ async function checkPlayerRankingSyncStatus() {
         const response =
             await fetch(
                 `${apiBaseUrl}/api/player-rankings/sync-status`
+                + `?season=${selectedPlayerSeasonNumber}`
             );
 
 
@@ -681,7 +989,12 @@ async function checkPlayerRankingSyncStatus() {
                 "";
 
 
-        await loadPlayerRankings();
+        if (
+            reloadRankingsWhenReady
+        ) {
+
+            await loadPlayerRankings();
+        }
 
     } catch (error) {
 
@@ -703,9 +1016,7 @@ async function initializePlayerRankings() {
 
     await loadPlayerSeasonMetadata();
 
-    await loadPlayerRankings();
-
-    await checkPlayerRankingSyncStatus();
+    await loadPlayerSeasonTabs();
 
 }
 
