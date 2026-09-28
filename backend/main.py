@@ -21896,8 +21896,6 @@ def build_ai_prediction_context():
         excel_order += 1
 
 
-    workbook.close()
-
     history.sort(
         key=lambda record:
             record["order_key"]
