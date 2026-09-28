@@ -580,11 +580,6 @@ async function loadSeasonTabs() {
             await loadFclSeasons();
 
 
-        availableSeasons =
-            data.seasons
-            ?? [];
-
-
         if (
             availableSeasons.length
             === 0
