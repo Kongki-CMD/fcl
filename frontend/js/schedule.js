@@ -1,7 +1,8 @@
 import {
     apiBaseUrl,
     getTeamImagePath,
-} from "./config.js";
+    loadFclSeasons,
+} from "./config.js?v=perf-2";
 
 
 const scheduleListElement = document.querySelector(".match-list");
@@ -555,9 +556,10 @@ function renderSeasonTabs() {
                     updateScheduleView();
 
 
-                    await loadSchedule();
-
-                    await loadSelectedSeasonPlayoffs();
+                    await Promise.all([
+                        loadSchedule(),
+                        loadSelectedSeasonPlayoffs(),
+                    ]);
                 }
             );
 
@@ -574,21 +576,8 @@ async function loadSeasonTabs() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/seasons`
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "시즌 정보를 불러오지 못했습니다."
-            );
-        }
-
-
-        const data =
-            await response.json();
+        availableSeasons =
+            await loadFclSeasons();
 
 
         availableSeasons =
@@ -657,9 +646,10 @@ async function loadSeasonTabs() {
         updateScheduleView();
 
 
-        await loadSchedule();
-
-        await loadSelectedSeasonPlayoffs();
+        await Promise.all([
+            loadSchedule(),
+            loadSelectedSeasonPlayoffs(),
+        ]);
 
 
     } catch (error) {

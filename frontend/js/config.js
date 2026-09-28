@@ -6,6 +6,118 @@ export const apiBaseUrl = isLiveServer
     ? "http://127.0.0.1:8000"
     : "";
 
+// =========================================
+// FCL 시즌 목록 캐시
+//
+// 페이지 이동마다 /api/seasons를
+// 다시 호출하지 않도록 짧게 캐시
+// =========================================
+
+const fclSeasonsCacheKey =
+    "fclSeasonsCacheV1";
+
+const fclSeasonsCacheTtlMs =
+    30 * 1000;
+
+
+export async function loadFclSeasons() {
+
+    const now =
+        Date.now();
+
+
+    try {
+
+        const cachedText =
+            sessionStorage.getItem(
+                fclSeasonsCacheKey
+            );
+
+
+        if (cachedText) {
+
+            const cached =
+                JSON.parse(
+                    cachedText
+                );
+
+
+            if (
+                Array.isArray(
+                    cached.seasons
+                )
+                &&
+                (
+                    now
+                    -
+                    Number(
+                        cached.savedAt
+                    )
+                )
+                <
+                fclSeasonsCacheTtlMs
+            ) {
+
+                return cached.seasons;
+            }
+        }
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+    }
+
+
+    const response = await fetch(
+        `${apiBaseUrl}/api/seasons`
+    );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "시즌 정보를 불러오지 못했습니다."
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    const seasons =
+        data.seasons
+        ?? [];
+
+
+    try {
+
+        sessionStorage.setItem(
+            fclSeasonsCacheKey,
+            JSON.stringify(
+                {
+                    savedAt:
+                        now,
+
+                    seasons:
+                        seasons,
+                }
+            )
+        );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+    }
+
+
+    return seasons;
+}
+
 export const teamImageMap = {
     "문권기": "./assets/images/teams/moon.png",
     "이준석": "./assets/images/teams/junseok.png",

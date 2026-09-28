@@ -1,7 +1,8 @@
 import {
     apiBaseUrl,
     getTeamImagePath,
-} from "./config.js";
+    loadFclSeasons,
+} from "./config.js?v=perf-2";
 
 
 const standingsTableBodyElement = document.querySelector(
@@ -196,26 +197,8 @@ async function loadStandingsSeasonTabs() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/seasons`
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "시즌 정보를 불러오지 못했습니다."
-            );
-        }
-
-
-        const data =
-            await response.json();
-
-
         availableStandingsSeasons =
-            data.seasons
-            ?? [];
+            await loadFclSeasons();
 
 
         if (

@@ -2,7 +2,8 @@ import {
     apiBaseUrl,
     getTeamImagePath,
     formatKstDateTime,
-} from "./config.js";
+    loadFclSeasons,
+} from "./config.js?v=perf-2";
 
 
 //선수 사진 추가
@@ -549,26 +550,8 @@ async function loadResultSeasonTabs() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/seasons`
-        );
-
-
-        if (!response.ok) {
-
-            throw new Error(
-                "시즌 정보를 불러오지 못했습니다."
-            );
-        }
-
-
-        const data =
-            await response.json();
-
-
         availableResultSeasons =
-            data.seasons
-            ?? [];
+            await loadFclSeasons();
 
 
         if (
@@ -668,16 +651,19 @@ async function loadResults() {
         }
 
 
-        await loadResultDetailSeasonMetadata();
-
         // ================================
-        // Excel 결과 + Neon 결과
+        // 선수 메타데이터 + 경기 결과
+        // 동시에 불러오기
         // ================================
 
         const [
+            ,
             excelResponse,
             databaseResponse,
         ] = await Promise.all([
+
+            loadResultDetailSeasonMetadata(),
+
             fetch(
                 `${apiBaseUrl}/api/results`
                 + `?season=${selectedResultSeasonNumber}`
