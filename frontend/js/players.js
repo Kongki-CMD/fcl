@@ -181,7 +181,7 @@ const playerRecordCustomImages = {
     "곤살루 게드스":
         "./assets/images/players/custom/goncalo_guedes.png",
 
-    "로빈 반 페르시":
+    "로빈 반페르시":
         "./assets/images/players/custom/van_persi.png"
         
 };
