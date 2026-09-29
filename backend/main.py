@@ -17576,10 +17576,21 @@ def build_regular_schedule_generation_preview(
 
 
     # =========================
-    # 10 경기일 생성
+    # 6 경기일 생성
     #
-    # 20 SERIES
-    # 하루 2 SERIES
+    # 2주 × 주 3일
+    #
+    # 1주차:
+    # - 3 SERIES
+    # - 3 SERIES
+    # - 4 SERIES
+    #
+    # 2주차:
+    # - 3 SERIES
+    # - 3 SERIES
+    # - 4 SERIES
+    #
+    # 총 20 SERIES
     # =========================
 
     match_dates = []
@@ -17589,7 +17600,7 @@ def build_regular_schedule_generation_preview(
     )
 
 
-    while len(match_dates) < 10:
+    while len(match_dates) < 6:
 
         if (
             current_date.weekday()
@@ -17647,17 +17658,27 @@ def build_regular_schedule_generation_preview(
     # =========================
     # 4 ROUND × 5 SERIES
     #
-    # 각 ROUND:
-    # - 5 SERIES
-    # - 참가자별 2회 출전
+    # ROUND 1 / 2:
+    # 모든 상대와 1회씩
     #
-    # 전체 시즌:
-    # - 상대 4명과 각각 2회
-    # - 홈/원정 1회씩
+    # ROUND 3 / 4:
+    # ROUND 1 / 2의 홈/원정 반전
     #
-    # 같은 경기일의 2경기는
-    # 참가자가 겹치지 않도록
-    # 순서를 고정
+    # 경기일별 배치:
+    #
+    # 1주차
+    # DAY 1 = Fixture 1 ~ 3
+    # DAY 2 = Fixture 4 ~ 6
+    # DAY 3 = Fixture 7 ~ 10
+    #
+    # 2주차
+    # DAY 4 = Fixture 11 ~ 13
+    # DAY 5 = Fixture 14 ~ 16
+    # DAY 6 = Fixture 17 ~ 20
+    #
+    # 모든 경기일에
+    # 참가자 5명 전원 최소 1회 출전
+    # 하루 최대 2회 출전
     # =========================
 
     round_pairings = [
@@ -17666,27 +17687,22 @@ def build_regular_schedule_generation_preview(
         # =========================
         [
             (p1, p2),
-            (p3, p4),
-
             (p2, p3),
             (p4, p5),
 
+            (p3, p4),
             (p5, p1),
         ],
 
         # =========================
         # ROUND 2
-        #
-        # ROUND 1에서 만나지 않은
-        # 나머지 대진
         # =========================
         [
-            (p2, p4),
+            (p2, p5),
 
             (p1, p3),
-            (p5, p2),
-
             (p1, p4),
+            (p2, p4),
             (p3, p5),
         ],
 
@@ -17697,12 +17713,11 @@ def build_regular_schedule_generation_preview(
         # =========================
         [
             (p2, p1),
-            (p4, p3),
-
-            (p1, p5),
             (p3, p2),
-
             (p5, p4),
+
+            (p4, p3),
+            (p1, p5),
         ],
 
         # =========================
@@ -17711,15 +17726,65 @@ def build_regular_schedule_generation_preview(
         # ROUND 2 홈/원정 반전
         # =========================
         [
-            (p3, p1),
+            (p5, p2),
 
+            (p3, p1),
+            (p4, p1),
             (p4, p2),
             (p5, p3),
-
-            (p2, p5),
-            (p4, p1),
         ],
     ]
+
+    # =========================
+    # 경기일별 SERIES 수
+    #
+    # 1주차: 3 / 3 / 4
+    # 2주차: 3 / 3 / 4
+    # =========================
+
+    match_day_series_counts = [
+        3,
+        3,
+        4,
+        3,
+        3,
+        4,
+    ]
+
+
+    fixture_match_day_map = {}
+
+
+    fixture_cursor = 1
+
+
+    for (
+        match_day_index,
+        series_count,
+    ) in enumerate(
+        match_day_series_counts
+    ):
+
+        for _ in range(
+            series_count
+        ):
+
+            fixture_match_day_map[
+                fixture_cursor
+            ] = (
+                match_day_index
+            )
+
+
+            fixture_cursor += 1
+
+
+    if fixture_cursor != 21:
+
+        raise RuntimeError(
+            "정규리그 경기일 배치가 "
+            "20경기와 일치하지 않습니다."
+        )
 
 
     schedule = []
@@ -17741,11 +17806,9 @@ def build_regular_schedule_generation_preview(
         ) in pairings:
 
             match_day_index = (
-                (
+                fixture_match_day_map[
                     fixture_number
-                    - 1
-                )
-                // 2
+                ]
             )
 
 
@@ -17866,67 +17929,208 @@ def build_regular_schedule_generation_preview(
             "중복 생성되었습니다."
         )
 
+    # =========================
+    # 경기일별 참가자 검증
+    #
+    # - 총 6경기일
+    # - 3 / 3 / 4 / 3 / 3 / 4 경기
+    # - 매 경기일 참가자 5명 전원 출전
+    # - 참가자별 하루 최소 1경기
+    # - 참가자별 하루 최대 2경기
+    # =========================
 
-    # 같은 날 두 경기의
-    # 참가자 중복 방지
-    for index in range(
-        0,
-        len(schedule),
-        2,
+    schedule_by_date = {}
+
+
+    for item in schedule:
+
+        scheduled_date = (
+            item[
+                "scheduled_date"
+            ]
+        )
+
+
+        schedule_by_date.setdefault(
+            scheduled_date,
+            [],
+        ).append(
+            item
+        )
+
+
+    if len(schedule_by_date) != 6:
+
+        raise RuntimeError(
+            "정규리그 경기일 수가 "
+            "6일이 아닙니다."
+        )
+
+
+    expected_match_day_counts = [
+        3,
+        3,
+        4,
+        3,
+        3,
+        4,
+    ]
+
+
+    for (
+        match_day_index,
+        match_date,
+    ) in enumerate(
+        match_dates
     ):
 
-        first_match = (
-            schedule[
-                index
-            ]
-        )
-
-        second_match = (
-            schedule[
-                index + 1
-            ]
+        match_date_text = (
+            match_date.isoformat()
         )
 
 
-        first_players = {
-            int(
-                first_match[
-                    "team_a_id"
-                ]
-            ),
-            int(
-                first_match[
-                    "team_b_id"
-                ]
-            ),
-        }
-
-        second_players = {
-            int(
-                second_match[
-                    "team_a_id"
-                ]
-            ),
-            int(
-                second_match[
-                    "team_b_id"
-                ]
-            ),
-        }
-
-
-        if not (
-            first_players
-            .isdisjoint(
-                second_players
+        day_series = (
+            schedule_by_date.get(
+                match_date_text,
+                [],
             )
+        )
+
+
+        expected_series_count = (
+            expected_match_day_counts[
+                match_day_index
+            ]
+        )
+
+
+        if (
+            len(
+                day_series
+            )
+            !=
+            expected_series_count
         ):
 
             raise RuntimeError(
-                "같은 경기일에 "
-                "같은 참가자가 중복됩니다."
+                f"{match_date_text}의 "
+                "경기 수가 올바르지 않습니다. "
+                f"예상: "
+                f"{expected_series_count}, "
+                f"현재: "
+                f"{len(day_series)}"
             )
 
+
+        participant_counts = {}
+
+
+        for item in day_series:
+
+            for participant_id in (
+                int(
+                    item[
+                        "team_a_id"
+                    ]
+                ),
+                int(
+                    item[
+                        "team_b_id"
+                    ]
+                ),
+            ):
+
+                participant_counts[
+                    participant_id
+                ] = (
+                    participant_counts.get(
+                        participant_id,
+                        0,
+                    )
+                    + 1
+                )
+
+
+        if len(participant_counts) != 5:
+
+            raise RuntimeError(
+                f"{match_date_text}에 "
+                "참가자 5명 전원이 "
+                "출전하지 않습니다."
+            )
+
+
+        if any(
+            count not in (
+                1,
+                2,
+            )
+
+            for count
+            in participant_counts.values()
+        ):
+
+            raise RuntimeError(
+                f"{match_date_text}에 "
+                "하루 1~2경기 출전 규칙을 "
+                "위반한 참가자가 있습니다. "
+                f"현재: "
+                f"{participant_counts}"
+            )
+
+
+    # =========================
+    # 시즌 전체 참가 경기 수
+    #
+    # 참가자 5명
+    # 각자 8 SERIES
+    # =========================
+
+    season_participant_counts = {
+        int(
+            participant[
+                "participant_id"
+            ]
+        ):
+            0
+
+        for participant
+        in participants
+    }
+
+
+    for item in schedule:
+
+        season_participant_counts[
+            int(
+                item[
+                    "team_a_id"
+                ]
+            )
+        ] += 1
+
+
+        season_participant_counts[
+            int(
+                item[
+                    "team_b_id"
+                ]
+            )
+        ] += 1
+
+
+    if any(
+        count != 8
+
+        for count
+        in season_participant_counts.values()
+    ):
+
+        raise RuntimeError(
+            "정규리그 참가자의 "
+            "시즌 전체 출전 수가 "
+            "8경기로 균등하지 않습니다."
+        )
 
     return {
         "season": {
@@ -17992,7 +18196,14 @@ def build_regular_schedule_generation_preview(
             "round_count": 4,
             "series_per_round": 5,
 
-            "series_per_day": 2,
+            "week_count": 2,
+            "match_day_count": 6,
+
+            "series_per_day_pattern": [
+                3,
+                3,
+                4,
+            ],
 
             "sets_per_series": 2,
 
@@ -18001,6 +18212,12 @@ def build_regular_schedule_generation_preview(
                 "수",
                 "토",
             ],
+
+            "all_participants_each_match_day":
+                True,
+
+            "max_series_per_participant_per_day":
+                2,
 
             "home_away":
                 True,
