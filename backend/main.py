@@ -37977,21 +37977,28 @@ def manual_complete_fcl_series(
             # =========================
 
             if (
-                not series[
-                    "team_a_current_team_name"
+                series[
+                    "series_type"
                 ]
-                or
-                not series[
-                    "team_a_current_team_logo_path"
-                ]
-                or
-                not series[
-                    "team_b_current_team_name"
-                ]
-                or
-                not series[
-                    "team_b_current_team_logo_path"
-                ]
+                != "토너먼트"
+                and
+                (
+                    not series[
+                        "team_a_current_team_name"
+                    ]
+                    or
+                    not series[
+                        "team_a_current_team_logo_path"
+                    ]
+                    or
+                    not series[
+                        "team_b_current_team_name"
+                    ]
+                    or
+                    not series[
+                        "team_b_current_team_logo_path"
+                    ]
+                )
             ):
                 raise HTTPException(
                     status_code=400,
@@ -38551,16 +38558,38 @@ def manual_complete_fcl_series(
                     finished_at,
                     finished_at,
 
-                    series[
-                        "team_a_current_team_name"
-                    ],
+                    (
+                        series[
+                            "team_a_current_team_name"
+                        ]
+                        or
+                        (
+                            series[
+                                "team_a"
+                            ]
+                            if is_tournament
+                            else None
+                        )
+                    ),
+
                     series[
                         "team_a_current_team_logo_path"
                     ],
 
-                    series[
-                        "team_b_current_team_name"
-                    ],
+                    (
+                        series[
+                            "team_b_current_team_name"
+                        ]
+                        or
+                        (
+                            series[
+                                "team_b"
+                            ]
+                            if is_tournament
+                            else None
+                        )
+                    ),
+
                     series[
                         "team_b_current_team_logo_path"
                     ],
