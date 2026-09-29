@@ -115,9 +115,10 @@ async def debug_unhandled_exception(
 ):
 
     if (
-        request.method == "POST"
-        and
-        request.url.path == "/api/tournaments"
+        request.url.path
+        .startswith(
+            "/api/tournaments"
+        )
     ):
 
         return JSONResponse(
