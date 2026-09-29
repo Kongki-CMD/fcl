@@ -42826,6 +42826,11 @@ def get_series_squads(
                         team_a.fcl_name
                     ) AS team_a_fcl_name,
 
+                    COALESCE(
+                        s.team_a_snapshot_name,
+                        team_a.current_team_name
+                    ) AS team_a_name,
+
                     CASE
 
                         WHEN
@@ -42855,11 +42860,6 @@ def get_series_squads(
                             )
 
                     END AS team_a_logo_path,
-
-                    COALESCE(
-                        s.team_a_snapshot_logo_path,
-                        team_a.current_team_logo_path
-                    ) AS team_a_logo_path,
 
                     team_b.id
                         AS team_b_id,
