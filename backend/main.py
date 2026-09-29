@@ -42826,10 +42826,35 @@ def get_series_squads(
                         team_a.fcl_name
                     ) AS team_a_fcl_name,
 
-                    COALESCE(
-                        s.team_a_snapshot_name,
-                        team_a.current_team_name
-                    ) AS team_a_name,
+                    CASE
+
+                        WHEN
+                            s.series_type = '토너먼트'
+                            AND
+                            tournament_entry_a.id
+                            IS NOT NULL
+                            AND
+                            (
+                                tournament_entry_a.display_name
+                                <>
+                                team_a.fcl_name
+
+                                OR
+
+                                team_a.current_team_logo_path
+                                IS NULL
+                            )
+
+                        THEN
+                            './assets/images/FCL_season2.png'
+
+                        ELSE
+                            COALESCE(
+                                s.team_a_snapshot_logo_path,
+                                team_a.current_team_logo_path
+                            )
+
+                    END AS team_a_logo_path,
 
                     COALESCE(
                         s.team_a_snapshot_logo_path,
@@ -42849,10 +42874,35 @@ def get_series_squads(
                         team_b.current_team_name
                     ) AS team_b_name,
 
-                    COALESCE(
-                        s.team_b_snapshot_logo_path,
-                        team_b.current_team_logo_path
-                    ) AS team_b_logo_path
+                CASE
+
+                    WHEN
+                        s.series_type = '토너먼트'
+                        AND
+                        tournament_entry_b.id
+                        IS NOT NULL
+                        AND
+                        (
+                            tournament_entry_b.display_name
+                            <>
+                            team_b.fcl_name
+
+                            OR
+
+                            team_b.current_team_logo_path
+                            IS NULL
+                        )
+
+                    THEN
+                        './assets/images/FCL_season2.png'
+
+                    ELSE
+                        COALESCE(
+                            s.team_b_snapshot_logo_path,
+                            team_b.current_team_logo_path
+                        )
+
+                END AS team_b_logo_path
 
                 FROM series AS s
 
