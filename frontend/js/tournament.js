@@ -1335,6 +1335,12 @@ function renderTournamentDetail(
 
 
             if (
+                (
+                    tournament.format_version
+                    ?? 1
+                )
+                < 2
+                &&
                 roundIndex === 0
                 &&
                 hasBye

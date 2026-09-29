@@ -3098,6 +3098,1164 @@ def get_one_day_tournament_round_name(
         f"ROUND {round_number}"
     )
 
+def get_one_day_tournament_v2_stage_name(
+    contender_count: int,
+):
+
+    if contender_count == 2:
+
+        return "결승"
+
+
+    if contender_count == 4:
+
+        return "4강"
+
+
+    if contender_count == 8:
+
+        return "8강"
+
+
+    if contender_count == 16:
+
+        return "16강"
+
+
+    return "진출전"
+
+
+def create_one_day_tournament_v2_match(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+    participant_a_entry_id: int,
+    participant_b_entry_id: int | None,
+    stage_name: str,
+    match_kind: str = "normal",
+    auto_winner_entry_id: int | None = None,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            COALESCE(
+                MAX(
+                    match_number
+                ),
+                0
+            )
+            + 1
+                AS next_match_number
+
+        FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number = %s
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    next_match_number = int(
+        cursor.fetchone()[
+            "next_match_number"
+        ]
+    )
+
+
+    match_status = (
+        "completed"
+
+        if
+        auto_winner_entry_id
+        is not None
+
+        else
+        "ready"
+    )
+
+
+    cursor.execute(
+        """
+        INSERT INTO
+            one_day_tournament_matches (
+                tournament_id,
+                round_number,
+                match_number,
+
+                participant_a_entry_id,
+                participant_b_entry_id,
+
+                winner_entry_id,
+
+                status,
+                completed_at,
+
+                stage_name,
+                match_kind
+            )
+
+        VALUES (
+            %s,
+            %s,
+            %s,
+
+            %s,
+            %s,
+
+            %s,
+
+            %s,
+
+            CASE
+                WHEN %s IS NOT NULL
+                THEN NOW()
+                ELSE NULL
+            END,
+
+            %s,
+            %s
+        )
+
+        RETURNING
+            id,
+            match_number
+        """,
+        (
+            tournament_id,
+            round_number,
+            next_match_number,
+
+            participant_a_entry_id,
+            participant_b_entry_id,
+
+            auto_winner_entry_id,
+
+            match_status,
+            auto_winner_entry_id,
+
+            stage_name,
+            match_kind,
+        ),
+    )
+
+
+    created_match = (
+        cursor.fetchone()
+    )
+
+
+    if (
+        participant_b_entry_id
+        is not None
+    ):
+
+        ensure_one_day_tournament_series(
+            cursor,
+            tournament_id,
+            round_number,
+            next_match_number,
+        )
+
+
+    return created_match
+
+
+def create_one_day_tournament_v2_round(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+    entry_ids: list[int],
+    stage_name: str,
+    randomize_pairings: bool,
+    bye_entry_id: int | None = None,
+    match_kind: str = "normal",
+):
+
+    pairing_entry_ids = [
+        int(
+            entry_id
+        )
+
+        for entry_id
+        in entry_ids
+
+        if (
+            bye_entry_id is None
+            or
+            int(
+                entry_id
+            )
+            != int(
+                bye_entry_id
+            )
+        )
+    ]
+
+
+    if (
+        len(
+            pairing_entry_ids
+        )
+        % 2
+        != 0
+    ):
+
+        raise RuntimeError(
+            (
+                "토너먼트 대진 인원이 "
+                "짝수가 아닙니다."
+            )
+        )
+
+
+    if randomize_pairings:
+
+        secrets.SystemRandom().shuffle(
+            pairing_entry_ids
+        )
+
+
+    created_matches = []
+
+
+    if bye_entry_id is not None:
+
+        bye_match = (
+            create_one_day_tournament_v2_match(
+                cursor,
+                tournament_id,
+                round_number,
+
+                int(
+                    bye_entry_id
+                ),
+
+                None,
+
+                stage_name,
+
+                match_kind=
+                    "bye",
+
+                auto_winner_entry_id=
+                    int(
+                        bye_entry_id
+                    ),
+            )
+        )
+
+
+        created_matches.append(
+            bye_match
+        )
+
+
+    for entry_index in range(
+        0,
+        len(
+            pairing_entry_ids
+        ),
+        2,
+    ):
+
+        participant_a_entry_id = (
+            pairing_entry_ids[
+                entry_index
+            ]
+        )
+
+
+        participant_b_entry_id = (
+            pairing_entry_ids[
+                entry_index + 1
+            ]
+        )
+
+
+        created_match = (
+            create_one_day_tournament_v2_match(
+                cursor,
+                tournament_id,
+                round_number,
+
+                participant_a_entry_id,
+                participant_b_entry_id,
+
+                stage_name,
+
+                match_kind=
+                    match_kind,
+            )
+        )
+
+
+        created_matches.append(
+            created_match
+        )
+
+
+    return created_matches
+
+
+def get_one_day_tournament_v2_round_losers(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            CASE
+                WHEN
+                    match.winner_entry_id =
+                    match.participant_a_entry_id
+
+                THEN
+                    match.participant_b_entry_id
+
+                ELSE
+                    match.participant_a_entry_id
+            END
+                AS loser_entry_id
+
+        FROM
+            one_day_tournament_matches
+                AS match
+
+        WHERE
+            match.tournament_id = %s
+
+            AND
+            match.round_number = %s
+
+            AND
+            match.match_kind = 'normal'
+
+            AND
+            match.status = 'completed'
+
+            AND
+            match.participant_a_entry_id
+                IS NOT NULL
+
+            AND
+            match.participant_b_entry_id
+                IS NOT NULL
+
+            AND
+            match.winner_entry_id
+                IS NOT NULL
+
+        ORDER BY
+            match.match_number
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    return [
+        int(
+            row[
+                "loser_entry_id"
+            ]
+        )
+
+        for row
+        in cursor.fetchall()
+
+        if row[
+            "loser_entry_id"
+        ]
+        is not None
+    ]
+
+
+def select_one_day_tournament_v2_revival_entry(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    # ================================
+    # 실제 경기를 치른 패자 수
+    # ================================
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*)
+                AS loser_count
+
+        FROM
+            one_day_tournament_matches
+                AS match
+
+        WHERE
+            match.tournament_id = %s
+
+            AND
+            match.round_number = %s
+
+            AND
+            match.match_kind = 'normal'
+
+            AND
+            match.status = 'completed'
+
+            AND
+            match.participant_a_entry_id
+                IS NOT NULL
+
+            AND
+            match.participant_b_entry_id
+                IS NOT NULL
+
+            AND
+            match.winner_entry_id
+                IS NOT NULL
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    loser_count = int(
+        cursor.fetchone()[
+            "loser_count"
+        ]
+    )
+
+
+    if loser_count <= 0:
+
+        return None
+
+
+    # ================================
+    # 패자부활 순위
+    #
+    # 1. 득실차
+    # 2. 득점
+    # 3. 최초 시드
+    # ================================
+
+    cursor.execute(
+        """
+        SELECT
+            loser.id
+                AS loser_entry_id,
+
+            loser.seed_number,
+
+            CASE
+                WHEN
+                    loser.id =
+                    match.participant_a_entry_id
+
+                THEN
+                    linked_set.team_a_score
+
+                ELSE
+                    linked_set.team_b_score
+            END
+                AS goals_for,
+
+            CASE
+                WHEN
+                    loser.id =
+                    match.participant_a_entry_id
+
+                THEN
+                    linked_set.team_b_score
+
+                ELSE
+                    linked_set.team_a_score
+            END
+                AS goals_against
+
+        FROM
+            one_day_tournament_matches
+                AS match
+
+        JOIN
+            series_sets
+                AS linked_set
+
+            ON
+                linked_set.series_id =
+                match.series_id
+
+            AND
+                linked_set.set_number = 1
+
+        JOIN
+            one_day_tournament_entries
+                AS loser
+
+            ON
+                loser.id =
+                CASE
+                    WHEN
+                        match.winner_entry_id =
+                        match.participant_a_entry_id
+
+                    THEN
+                        match.participant_b_entry_id
+
+                    ELSE
+                        match.participant_a_entry_id
+                END
+
+        WHERE
+            match.tournament_id = %s
+
+            AND
+            match.round_number = %s
+
+            AND
+            match.match_kind = 'normal'
+
+            AND
+            match.status = 'completed'
+
+            AND
+            match.participant_a_entry_id
+                IS NOT NULL
+
+            AND
+            match.participant_b_entry_id
+                IS NOT NULL
+
+            AND
+            match.winner_entry_id
+                IS NOT NULL
+
+        ORDER BY
+            (
+                CASE
+                    WHEN
+                        loser.id =
+                        match.participant_a_entry_id
+
+                    THEN
+                        linked_set.team_a_score
+                        -
+                        linked_set.team_b_score
+
+                    ELSE
+                        linked_set.team_b_score
+                        -
+                        linked_set.team_a_score
+                END
+            ) DESC,
+
+            goals_for DESC,
+
+            loser.seed_number ASC
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    revival_candidates = (
+        cursor.fetchall()
+    )
+
+
+    if (
+        len(
+            revival_candidates
+        )
+        != loser_count
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "패자부활 선정을 위해 "
+                "직전 라운드의 모든 경기 "
+                "스코어가 필요합니다."
+            ),
+        )
+
+
+    if not revival_candidates:
+
+        return None
+
+
+    return int(
+        revival_candidates[
+            0
+        ][
+            "loser_entry_id"
+        ]
+    )
+
+
+def get_one_day_tournament_v2_round_winners(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            winner_entry_id
+
+        FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number = %s
+
+            AND
+            status = 'completed'
+
+            AND
+            winner_entry_id IS NOT NULL
+
+        ORDER BY
+            match_number
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    return [
+        int(
+            row[
+                "winner_entry_id"
+            ]
+        )
+
+        for row
+        in cursor.fetchall()
+    ]
+
+
+def is_one_day_tournament_v2_round_completed(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            COUNT(*)
+                AS total_count,
+
+            COUNT(*) FILTER (
+                WHERE
+                    status = 'completed'
+            )
+                AS completed_count
+
+        FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number = %s
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    row = (
+        cursor.fetchone()
+    )
+
+
+    total_count = int(
+        row[
+            "total_count"
+        ]
+    )
+
+
+    completed_count = int(
+        row[
+            "completed_count"
+        ]
+    )
+
+
+    return (
+        total_count > 0
+        and
+        total_count
+        == completed_count
+    )
+
+
+def one_day_tournament_v2_round_exists(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    cursor.execute(
+        """
+        SELECT
+            1
+
+        FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number = %s
+
+        LIMIT 1
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    return (
+        cursor.fetchone()
+        is not None
+    )
+
+
+def complete_one_day_tournament_v2(
+    cursor,
+    tournament_id: int,
+    champion_entry_id: int,
+):
+
+    cursor.execute(
+        """
+        UPDATE
+            one_day_tournaments
+
+        SET
+            status = 'completed',
+
+            champion_entry_id = %s,
+
+            completed_at = NOW()
+
+        WHERE
+            id = %s
+        """,
+        (
+            champion_entry_id,
+            tournament_id,
+        ),
+    )
+
+
+def advance_one_day_tournament_v2(
+    cursor,
+    tournament_id: int,
+    participant_count: int,
+    round_number: int,
+    match_kind: str,
+    winner_entry_id: int,
+    randomize_pairings: bool,
+):
+
+
+    # =====================================
+    # 토너먼트 단위 진행 잠금
+    #
+    # 같은 라운드의 서로 다른 경기가
+    # 동시에 완료되더라도
+    # 다음 라운드를 한 번만 생성한다.
+    # =====================================
+
+    cursor.execute(
+        """
+        SELECT
+            id
+
+        FROM
+            one_day_tournaments
+
+        WHERE
+            id = %s
+
+        FOR UPDATE
+        """,
+        (
+            tournament_id,
+        ),
+    )
+
+
+    locked_tournament = (
+        cursor.fetchone()
+    )
+
+
+    if not locked_tournament:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "토너먼트를 찾을 수 없습니다."
+            ),
+        )
+
+    # =====================================
+    # 현재 라운드의 모든 경기가
+    # 끝날 때까지 기다린다.
+    # =====================================
+
+    if not (
+        is_one_day_tournament_v2_round_completed(
+            cursor,
+            tournament_id,
+            round_number,
+        )
+    ):
+
+        return
+
+
+    # =====================================
+    # 5명 전용 패자부활전 종료
+    #
+    # 1라운드:
+    # seed 1 BYE + 정상 경기 승자 2명
+    #
+    # 2라운드:
+    # 패자 2명의 패자부활전
+    #
+    # → 총 4명으로 4강 생성
+    # =====================================
+
+    if (
+        participant_count == 5
+        and
+        match_kind == "revival"
+    ):
+
+        first_round_winners = (
+            get_one_day_tournament_v2_round_winners(
+                cursor,
+                tournament_id,
+                1,
+            )
+        )
+
+
+        if (
+            len(
+                first_round_winners
+            )
+            != 3
+        ):
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "5인 토너먼트의 "
+                    "1라운드 진출자 수가 "
+                    "올바르지 않습니다."
+                ),
+            )
+
+
+        semifinal_entry_ids = [
+            *first_round_winners,
+            int(
+                winner_entry_id
+            ),
+        ]
+
+
+        next_round_number = (
+            round_number + 1
+        )
+
+
+        if (
+            one_day_tournament_v2_round_exists(
+                cursor,
+                tournament_id,
+                next_round_number,
+            )
+        ):
+
+            return
+
+
+        create_one_day_tournament_v2_round(
+            cursor,
+            tournament_id,
+            next_round_number,
+            semifinal_entry_ids,
+            "4강",
+            randomize_pairings,
+        )
+
+
+        return
+
+
+    # =====================================
+    # 현재 라운드 진출자
+    #
+    # 최초 BYE도 completed + winner로
+    # 저장되어 있으므로 자동 포함된다.
+    # =====================================
+
+    winner_entry_ids = (
+        get_one_day_tournament_v2_round_winners(
+            cursor,
+            tournament_id,
+            round_number,
+        )
+    )
+
+
+    if not winner_entry_ids:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "다음 라운드 진출자를 "
+                "확인할 수 없습니다."
+            ),
+        )
+
+
+    # =====================================
+    # 최종 1명
+    # → 우승 확정
+    # =====================================
+
+    if (
+        len(
+            winner_entry_ids
+        )
+        == 1
+    ):
+
+        complete_one_day_tournament_v2(
+            cursor,
+            tournament_id,
+            winner_entry_ids[
+                0
+            ],
+        )
+
+
+        return
+
+
+    # =====================================
+    # 5명 전용 규칙
+    #
+    # 최초 라운드가 끝나면
+    # 자동 순위 부활이 아니라
+    # 두 패자가 직접 패자부활전을 한다.
+    # =====================================
+
+    if (
+        participant_count == 5
+        and
+        round_number == 1
+    ):
+
+        loser_entry_ids = (
+            get_one_day_tournament_v2_round_losers(
+                cursor,
+                tournament_id,
+                round_number,
+            )
+        )
+
+
+        if (
+            len(
+                loser_entry_ids
+            )
+            != 2
+        ):
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "5인 토너먼트의 "
+                    "패자부활전 참가자가 "
+                    "올바르지 않습니다."
+                ),
+            )
+
+
+        revival_round_number = (
+            round_number + 1
+        )
+
+
+        if (
+            one_day_tournament_v2_round_exists(
+                cursor,
+                tournament_id,
+                revival_round_number,
+            )
+        ):
+
+            return
+
+
+        create_one_day_tournament_v2_round(
+            cursor,
+            tournament_id,
+            revival_round_number,
+            loser_entry_ids,
+            "패자부활전",
+            randomize_pairings,
+            match_kind=
+                "revival",
+        )
+
+
+        return
+
+
+    # =====================================
+    # 일반 패자부활
+    #
+    # 현재 승자 수가 홀수라면
+    # 직전 라운드 패자 중 1명을 부활시켜
+    # 다음 라운드를 짝수로 맞춘다.
+    #
+    # 기준:
+    # 1. 득실차
+    # 2. 득점
+    # 3. 최초 시드
+    # =====================================
+
+    next_entry_ids = [
+        *winner_entry_ids
+    ]
+
+
+    if (
+        len(
+            next_entry_ids
+        )
+        % 2
+        == 1
+    ):
+
+        revival_entry_id = (
+            select_one_day_tournament_v2_revival_entry(
+                cursor,
+                tournament_id,
+                round_number,
+            )
+        )
+
+
+        if revival_entry_id is None:
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "패자부활 대상자를 "
+                    "선정할 수 없습니다."
+                ),
+            )
+
+
+        if (
+            revival_entry_id
+            in next_entry_ids
+        ):
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "패자부활 대상자가 "
+                    "이미 진출자에 포함되어 있습니다."
+                ),
+            )
+
+
+        next_entry_ids.append(
+            revival_entry_id
+        )
+
+
+    # =====================================
+    # 다음 라운드 생성
+    # =====================================
+
+    next_round_number = (
+        round_number + 1
+    )
+
+
+    if (
+        one_day_tournament_v2_round_exists(
+            cursor,
+            tournament_id,
+            next_round_number,
+        )
+    ):
+
+        return
+
+
+    next_stage_name = (
+        get_one_day_tournament_v2_stage_name(
+            len(
+                next_entry_ids
+            )
+        )
+    )
+
+
+    create_one_day_tournament_v2_round(
+        cursor,
+        tournament_id,
+        next_round_number,
+        next_entry_ids,
+        next_stage_name,
+        randomize_pairings,
+    )
 
 def update_one_day_tournament_match_ready_status(
     cursor,
@@ -3488,15 +4646,6 @@ def create_one_day_tournament(
     )
 
 
-    # ================================
-    # 랜덤 대진
-    # ================================
-
-    if request.randomize:
-
-        secrets.SystemRandom().shuffle(
-            participants
-        )
 
 
     tournament_date = (
@@ -3524,7 +4673,9 @@ def create_one_day_tournament(
                         tournament_date,
                         participant_count,
                         bracket_size,
-                        status
+                        status,
+                        format_version,
+                        randomize_pairings
                     )
 
                 VALUES (
@@ -3532,7 +4683,9 @@ def create_one_day_tournament(
                     %s,
                     %s,
                     %s,
-                    'active'
+                    'active',
+                    2,
+                    %s
                 )
 
                 RETURNING
@@ -3541,10 +4694,16 @@ def create_one_day_tournament(
                 (
                     title,
                     tournament_date,
+
                     len(
                         participants
                     ),
+
                     bracket_size,
+
+                    bool(
+                        request.randomize
+                    ),
                 ),
             )
 
@@ -3641,245 +4800,73 @@ def create_one_day_tournament(
                     cursor.fetchone()
                 )
 
-
             # ================================
-            # 전체 라운드 경기 생성
-            # ================================
-
-            round_number = 1
-            round_match_count = (
-                bracket_size // 2
-            )
-
-
-            while (
-                round_match_count >= 1
-            ):
-
-                for match_number in range(
-                    1,
-                    round_match_count + 1,
-                ):
-
-                    cursor.execute(
-                        """
-                        INSERT INTO
-                            one_day_tournament_matches (
-                                tournament_id,
-                                round_number,
-                                match_number,
-                                status
-                            )
-
-                        VALUES (
-                            %s,
-                            %s,
-                            %s,
-                            'waiting'
-                        )
-                        """,
-                        (
-                            tournament_id,
-                            round_number,
-                            match_number,
-                        ),
-                    )
-
-
-                round_number += 1
-                round_match_count //= 2
-
-
-            # ================================
-            # 1라운드 배치
+            # V2 첫 라운드 생성
             #
-            # BYE끼리 붙는 상황을 막기 위해
-            # BYE 참가자를 먼저 배치
+            # 최초 입력 순서가
+            # seed_number 기준이다.
+            #
+            # 최초 참가자가 홀수이면
+            # seed 1만 최초 1회 BYE.
+            #
+            # 나머지 참가자들은
+            # randomize 옵션에 따라
+            # 실제 대진만 랜덤 구성한다.
             # ================================
 
-            bye_count = (
-                bracket_size
-                -
+            initial_entry_ids = [
+                int(
+                    entry[
+                        "id"
+                    ]
+                )
+
+                for entry
+                in entries
+            ]
+
+
+            initial_bye_entry_id = None
+
+
+            if (
                 len(
-                    entries
+                    initial_entry_ids
+                )
+                % 2
+                == 1
+            ):
+
+                initial_bye_entry_id = (
+                    initial_entry_ids[
+                        0
+                    ]
+                )
+
+
+            initial_stage_name = (
+                get_one_day_tournament_v2_stage_name(
+                    len(
+                        initial_entry_ids
+                    )
                 )
             )
 
 
-            first_round_pairs = []
+            create_one_day_tournament_v2_round(
+                cursor,
+                tournament_id,
+                1,
+                initial_entry_ids,
+                initial_stage_name,
 
-            entry_index = 0
-
-
-            # ================================
-            # BYE 참가자
-            # ================================
-
-            for _ in range(
-                bye_count
-            ):
-
-                first_round_pairs.append(
-                    (
-                        entries[
-                            entry_index
-                        ],
-                        None,
-                    )
-                )
-
-                entry_index += 1
-
-
-            # ================================
-            # 나머지 참가자는 1:1 경기
-            # ================================
-
-            while (
-                entry_index
-                <
-                len(
-                    entries
-                )
-            ):
-
-                participant_a = (
-                    entries[
-                        entry_index
-                    ]
-                )
-
-
-                participant_b = (
-                    entries[
-                        entry_index + 1
-                    ]
-                )
-
-
-                first_round_pairs.append(
-                    (
-                        participant_a,
-                        participant_b,
-                    )
-                )
-
-
-                entry_index += 2
-
-
-            # ================================
-            # 1라운드 DB 반영
-            # ================================
-
-            for (
-                match_index,
-                (
-                    participant_a,
-                    participant_b,
+                bool(
+                    request.randomize
                 ),
-            ) in enumerate(
-                first_round_pairs,
-                start=1,
-            ):
 
-                if (
-                    participant_b
-                    is None
-                ):
-
-                    # BYE 자동 진출
-                    cursor.execute(
-                        """
-                        UPDATE
-                            one_day_tournament_matches
-
-                        SET
-                            participant_a_entry_id = %s,
-
-                            participant_b_entry_id = NULL,
-
-                            winner_entry_id = %s,
-
-                            status = 'completed',
-
-                            completed_at = NOW()
-
-                        WHERE
-                            tournament_id = %s
-
-                            AND round_number = 1
-
-                            AND match_number = %s
-                        """,
-                        (
-                            participant_a[
-                                "id"
-                            ],
-
-                            participant_a[
-                                "id"
-                            ],
-
-                            tournament_id,
-                            match_index,
-                        ),
-                    )
-
-
-                    advance_one_day_tournament_entry(
-                        cursor,
-                        tournament_id,
-                        bracket_size,
-                        1,
-                        match_index,
-                        participant_a[
-                            "id"
-                        ],
-                    )
-
-
-                else:
-
-                    cursor.execute(
-                        """
-                        UPDATE
-                            one_day_tournament_matches
-
-                        SET
-                            participant_a_entry_id = %s,
-
-                            participant_b_entry_id = %s,
-
-                            status = 'ready'
-
-                        WHERE
-                            tournament_id = %s
-
-                            AND round_number = 1
-
-                            AND match_number = %s
-                        """,
-                        (
-                            participant_a[
-                                "id"
-                            ],
-
-                            participant_b[
-                                "id"
-                            ],
-
-                            tournament_id,
-                            match_index,
-                        ),
-                    )
-
-                    ensure_one_day_tournament_series(
-                        cursor,
-                        tournament_id,
-                        1,
-                        match_index,
-                    )
+                bye_entry_id=
+                    initial_bye_entry_id,
+            )
 
 
         connection.commit()
@@ -3928,6 +4915,7 @@ def get_one_day_tournaments():
                     tournament.tournament_date,
                     tournament.participant_count,
                     tournament.bracket_size,
+                    tournament.format_version,
                     tournament.status,
                     tournament.created_at,
                     tournament.completed_at,
@@ -4078,6 +5066,7 @@ def get_one_day_tournament(
                     tournament.tournament_date,
                     tournament.participant_count,
                     tournament.bracket_size,
+                    tournament.format_version,
                     tournament.status,
                     tournament.created_at,
                     tournament.completed_at,
@@ -4162,6 +5151,9 @@ def get_one_day_tournament(
                     match.id,
                     match.round_number,
                     match.match_number,
+
+                    match.stage_name,
+                    match.match_kind,
 
                     match.series_id,
 
@@ -4259,6 +5251,13 @@ def get_one_day_tournament(
                 cursor.fetchall()
             )
 
+    format_version = int(
+        tournament[
+            "format_version"
+        ]
+        or 1
+    )
+
 
     # =====================================
     # 참가자 응답
@@ -4314,13 +5313,27 @@ def get_one_day_tournament(
                     round_number,
 
                 "round_name":
-                    get_one_day_tournament_round_name(
-                        int(
-                            tournament[
-                                "bracket_size"
+                    (
+                        (
+                            row[
+                                "stage_name"
                             ]
-                        ),
-                        round_number,
+                            or
+                            f"ROUND {round_number}"
+                        )
+
+                        if
+                        format_version >= 2
+
+                        else
+                        get_one_day_tournament_round_name(
+                            int(
+                                tournament[
+                                    "bracket_size"
+                                ]
+                            ),
+                            round_number,
+                        )
                     ),
 
                 "matches": [],
@@ -4442,6 +5455,15 @@ def get_one_day_tournament(
                         "match_number"
                     ],
 
+                "match_kind":
+                    (
+                        row[
+                            "match_kind"
+                        ]
+                        or
+                        "normal"
+                    ),
+
                 "series_id":
                     row[
                         "series_id"
@@ -4538,6 +5560,9 @@ def get_one_day_tournament(
                 "bracket_size"
             ],
 
+        "format_version":
+            format_version,
+
         "status":
             tournament[
                 "status"
@@ -4605,11 +5630,18 @@ def set_one_day_tournament_match_winner(
                     match.match_number,
                     match.status,
 
+                    match.match_kind,
+
                     match.participant_a_entry_id,
                     match.participant_b_entry_id,
                     match.winner_entry_id,
 
                     tournament.bracket_size,
+
+                    tournament.participant_count,
+                    tournament.format_version,
+                    tournament.randomize_pairings,
+
                     tournament.status
                         AS tournament_status
 
@@ -4801,26 +5833,75 @@ def set_one_day_tournament_match_winner(
             # 결승이면 토너먼트 종료
             # =====================================
 
-            advance_one_day_tournament_entry(
-                cursor,
-                tournament_id,
+            if (
                 int(
                     match[
-                        "bracket_size"
+                        "format_version"
                     ]
-                ),
-                int(
-                    match[
-                        "round_number"
-                    ]
-                ),
-                int(
-                    match[
-                        "match_number"
-                    ]
-                ),
-                winner_entry_id,
-            )
+                )
+                >= 2
+            ):
+
+                advance_one_day_tournament_v2(
+                    cursor,
+                    tournament_id,
+
+                    int(
+                        match[
+                            "participant_count"
+                        ]
+                    ),
+
+                    int(
+                        match[
+                            "round_number"
+                        ]
+                    ),
+
+                    (
+                        match[
+                            "match_kind"
+                        ]
+                        or
+                        "normal"
+                    ),
+
+                    winner_entry_id,
+
+                    bool(
+                        match[
+                            "randomize_pairings"
+                        ]
+                    ),
+                )
+
+
+            else:
+
+                advance_one_day_tournament_entry(
+                    cursor,
+                    tournament_id,
+
+                    int(
+                        match[
+                            "bracket_size"
+                        ]
+                    ),
+
+                    int(
+                        match[
+                            "round_number"
+                        ]
+                    ),
+
+                    int(
+                        match[
+                            "match_number"
+                        ]
+                    ),
+
+                    winner_entry_id,
+                )
 
 
             # =====================================
@@ -6409,6 +7490,52 @@ def initialize_database():
 
                 WHERE
                     series_id IS NOT NULL
+                """
+            )
+
+            # =========================
+            # ONE DAY TOURNAMENT V2
+            #
+            # format_version
+            #   1 = 기존 고정 브래킷
+            #   2 = 동적 라운드 /
+            #       패자부활 방식
+            #
+            # randomize_pairings
+            #   다음 라운드 대진도
+            #   랜덤 구성할지 여부
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    one_day_tournaments
+
+                ADD COLUMN IF NOT EXISTS
+                    format_version SMALLINT
+                    NOT NULL
+                    DEFAULT 1,
+
+                ADD COLUMN IF NOT EXISTS
+                    randomize_pairings BOOLEAN
+                    NOT NULL
+                    DEFAULT TRUE
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    one_day_tournament_matches
+
+                ADD COLUMN IF NOT EXISTS
+                    stage_name VARCHAR(30),
+
+                ADD COLUMN IF NOT EXISTS
+                    match_kind VARCHAR(30)
+                    NOT NULL
+                    DEFAULT 'normal'
                 """
             )
 
@@ -14786,6 +15913,152 @@ def admin_delete_one_day_tournament(
             "토너먼트가 삭제되었습니다.",
     }
 
+def rollback_one_day_tournament_v2_downstream(
+    cursor,
+    tournament_id: int,
+    round_number: int,
+):
+
+    # =====================================
+    # V2는 다음 대진이 랜덤이며
+    # 패자부활 대상도 현재 라운드 결과에
+    # 따라 달라질 수 있다.
+    #
+    # 따라서 현재 라운드 이후의
+    # 모든 대진을 제거한 뒤,
+    # 현재 라운드를 다시 완료하면
+    # 다음 라운드를 새로 생성한다.
+    # =====================================
+
+    cursor.execute(
+        """
+        SELECT
+            id,
+            series_id,
+            round_number,
+            match_number
+
+        FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number > %s
+
+        ORDER BY
+            round_number DESC,
+            match_number DESC
+
+        FOR UPDATE
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    downstream_matches = (
+        cursor.fetchall()
+    )
+
+
+    series_ids = [
+        int(
+            row[
+                "series_id"
+            ]
+        )
+
+        for row
+        in downstream_matches
+
+        if row[
+            "series_id"
+        ]
+        is not None
+    ]
+
+
+    # =====================================
+    # 이후 라운드 SERIES 제거
+    #
+    # 세트 / 선수기록 / MVP /
+    # 스쿼드 Snapshot은 FK CASCADE
+    # =====================================
+
+    for series_id in series_ids:
+
+        cursor.execute(
+            """
+            DELETE FROM series
+
+            WHERE
+                id = %s
+
+                AND
+                series_type = '토너먼트'
+            """,
+            (
+                series_id,
+            ),
+        )
+
+
+    # =====================================
+    # 이후 동적 라운드 자체 제거
+    # =====================================
+
+    cursor.execute(
+        """
+        DELETE FROM
+            one_day_tournament_matches
+
+        WHERE
+            tournament_id = %s
+
+            AND
+            round_number > %s
+        """,
+        (
+            tournament_id,
+            round_number,
+        ),
+    )
+
+
+    return [
+        {
+            "match_id":
+                row[
+                    "id"
+                ],
+
+            "series_id":
+                row[
+                    "series_id"
+                ],
+
+            "round_number":
+                row[
+                    "round_number"
+                ],
+
+            "match_number":
+                row[
+                    "match_number"
+                ],
+        }
+
+        for row
+        in downstream_matches
+    ]
+
+
+
+
 def rollback_one_day_tournament_downstream(
     cursor,
     tournament_id: int,
@@ -15074,6 +16347,7 @@ def admin_reset_one_day_tournament_match_result(
                     tournament_match.status,
 
                     tournament.bracket_size,
+                    tournament.format_version,
 
                     tournament.status
                         AS tournament_status
@@ -15189,31 +16463,58 @@ def admin_reset_one_day_tournament_match_result(
             # 이후 라운드 자동 롤백
             # =====================================
 
-            removed_downstream_matches = (
-                rollback_one_day_tournament_downstream(
-                    cursor,
-
-                    tournament_id,
-
-                    int(
-                        tournament_match[
-                            "bracket_size"
-                        ]
-                    ),
-
-                    int(
-                        tournament_match[
-                            "round_number"
-                        ]
-                    ),
-
-                    int(
-                        tournament_match[
-                            "match_number"
-                        ]
-                    ),
+            if (
+                int(
+                    tournament_match[
+                        "format_version"
+                    ]
+                    or 1
                 )
-            )
+                >= 2
+            ):
+
+                removed_downstream_matches = (
+                    rollback_one_day_tournament_v2_downstream(
+                        cursor,
+
+                        tournament_id,
+
+                        int(
+                            tournament_match[
+                                "round_number"
+                            ]
+                        ),
+                    )
+                )
+
+
+            else:
+
+                removed_downstream_matches = (
+                    rollback_one_day_tournament_downstream(
+                        cursor,
+
+                        tournament_id,
+
+                        int(
+                            tournament_match[
+                                "bracket_size"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "round_number"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "match_number"
+                            ]
+                        ),
+                    )
+                )
 
 
             # =====================================
@@ -37005,10 +38306,16 @@ def manual_complete_fcl_series(
                         tournament_match.round_number,
                         tournament_match.match_number,
 
+                        tournament_match.match_kind,
+
                         tournament_match.participant_a_entry_id,
                         tournament_match.participant_b_entry_id,
 
                         tournament.bracket_size,
+
+                        tournament.participant_count,
+                        tournament.format_version,
+                        tournament.randomize_pairings,
 
                         participant_a.participant_id
                             AS participant_a_id,
@@ -37159,33 +38466,87 @@ def manual_complete_fcl_series(
                 )
 
 
-                advance_one_day_tournament_entry(
-                    cursor,
-
-                    tournament_match[
-                        "tournament_id"
-                    ],
-
+                if (
                     int(
                         tournament_match[
-                            "bracket_size"
+                            "format_version"
                         ]
-                    ),
+                    )
+                    >= 2
+                ):
 
-                    int(
-                        tournament_match[
-                            "round_number"
-                        ]
-                    ),
+                    advance_one_day_tournament_v2(
+                        cursor,
 
-                    int(
-                        tournament_match[
-                            "match_number"
-                        ]
-                    ),
+                        int(
+                            tournament_match[
+                                "tournament_id"
+                            ]
+                        ),
 
-                    winner_entry_id,
-                )
+                        int(
+                            tournament_match[
+                                "participant_count"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "round_number"
+                            ]
+                        ),
+
+                        (
+                            tournament_match[
+                                "match_kind"
+                            ]
+                            or
+                            "normal"
+                        ),
+
+                        int(
+                            winner_entry_id
+                        ),
+
+                        bool(
+                            tournament_match[
+                                "randomize_pairings"
+                            ]
+                        ),
+                    )
+
+
+                else:
+
+                    advance_one_day_tournament_entry(
+                        cursor,
+
+                        int(
+                            tournament_match[
+                                "tournament_id"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "bracket_size"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "round_number"
+                            ]
+                        ),
+
+                        int(
+                            tournament_match[
+                                "match_number"
+                            ]
+                        ),
+
+                        winner_entry_id,
+                    )
 
         connection.commit()
 
