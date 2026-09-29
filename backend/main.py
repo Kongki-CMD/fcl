@@ -40123,6 +40123,8 @@ def get_season_champion():
                     s.best_of,
                     s.wins_required,
 
+                    season.season_number,
+
                     s.team_a_id,
                     s.team_b_id,
 
@@ -40146,6 +40148,10 @@ def get_season_champion():
 
                 FROM series AS s
 
+                JOIN seasons AS season
+                    ON season.id =
+                        s.season_id
+
                 JOIN participants AS team_a
                     ON team_a.id =
                         s.team_a_id
@@ -40161,9 +40167,11 @@ def get_season_champion():
                     s.playoff_stage = '결승시리즈'
 
                     AND
-                    s.status <> 'cancelled'
+                    s.status = 'completed'
 
-                ORDER BY s.id DESC
+                ORDER BY
+                    season.season_number DESC,
+                    s.id DESC
 
                 LIMIT 1
                 """
@@ -40176,30 +40184,10 @@ def get_season_champion():
             # 결승 자체가 아직 없음
             if not final_series:
                 return {
-                    "season": 1,
+                    "season": None,
                     "completed": False,
                     "champion": None,
                     "final": None,
-                    "final_mvp": None,
-                }
-
-
-            # 결승이 아직 진행 중
-            if (
-                final_series["status"]
-                != "completed"
-            ):
-                return {
-                    "season": 1,
-                    "completed": False,
-                    "champion": None,
-                    "final": {
-                        "series_id":
-                            final_series["id"],
-
-                        "status":
-                            final_series["status"],
-                    },
                     "final_mvp": None,
                 }
 
@@ -40308,7 +40296,12 @@ def get_season_champion():
                 champion_side is None
             ):
                 return {
-                    "season": 1,
+                    "season":
+                        int(
+                            final_series[
+                                "season_number"
+                            ]
+                        ),
                     "completed": False,
                     "champion": None,
 
@@ -40493,7 +40486,12 @@ def get_season_champion():
 
 
     return {
-        "season": 1,
+        "season":
+            int(
+                final_series[
+                    "season_number"
+                ]
+            ),
 
         "completed": True,
 
