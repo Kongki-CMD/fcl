@@ -712,6 +712,29 @@ function renderTournamentList(
                     : "진행 중";
 
 
+            const championHtml =
+                (
+                    tournament.status
+                    === "completed"
+                    &&
+                    tournament.champion?.name
+                )
+                    ? `
+                        <span
+                            class="
+                                tournament-history-champion
+                            "
+                        >
+                            🏆 ${
+                                escapeTournamentHtml(
+                                    tournament.champion.name
+                                )
+                            }
+                        </span>
+                    `
+                    : "";
+
+
             buttonElement.innerHTML = `
                 <div
                     class="
@@ -751,16 +774,26 @@ function renderTournamentList(
                         }명
                     </span>
 
-                    <span
+                    <div
                         class="
-                            tournament-status-badge
-                            ${
-                                tournament.status
-                            }
+                            tournament-history-status-row
                         "
                     >
-                        ${statusText}
-                    </span>
+
+                        ${championHtml}
+
+                        <span
+                            class="
+                                tournament-status-badge
+                                ${
+                                    tournament.status
+                                }
+                            "
+                        >
+                            ${statusText}
+                        </span>
+
+                    </div>
 
                 </div>
             `;
@@ -789,11 +822,70 @@ historyListElement.addEventListener(
         }
 
 
-        currentTournamentId =
+        const selectedTournamentId =
             Number(
                 itemElement.dataset
                     .tournamentId
             );
+
+
+        if (
+            !Number.isInteger(
+                selectedTournamentId
+            )
+            ||
+            selectedTournamentId <= 0
+        ) {
+            return;
+        }
+
+
+        // =============================
+        // 현재 열려 있는 토너먼트를
+        // 다시 클릭하면 접기
+        // =============================
+
+        if (
+            currentTournamentId
+            ===
+            selectedTournamentId
+            &&
+            !bracketPanelElement
+                .classList
+                .contains(
+                    "hidden"
+                )
+        ) {
+
+            currentTournamentId =
+                null;
+
+
+            bracketPanelElement
+                .classList
+                .add(
+                    "hidden"
+                );
+
+
+            itemElement
+                .classList
+                .remove(
+                    "active"
+                );
+
+
+            return;
+        }
+
+
+        // =============================
+        // 다른 토너먼트 또는
+        // 접혀 있던 토너먼트 열기
+        // =============================
+
+        currentTournamentId =
+            selectedTournamentId;
 
 
         await loadTournamentDetail(

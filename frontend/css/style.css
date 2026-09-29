@@ -23043,6 +23043,21 @@ button {
     font-size: 13px;
 }
 
+.tournament-history-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tournament-history-champion {
+    display: inline-flex;
+    align-items: center;
+    color: #d0b474;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
 .tournament-status-badge {
     padding: 4px 8px;
     border-radius: 999px;
