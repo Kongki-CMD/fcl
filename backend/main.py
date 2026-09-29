@@ -9880,6 +9880,13 @@ class AdminRegularScheduleUpdateRequest(
 ):
     scheduled_date: str
 
+class AdminRegularScheduleGenerateRequest(
+    BaseModel
+):
+    expected_start_date: str
+
+    expected_participant_ids: list[int]
+
 # =========================
 # USER AUTH
 # =========================
@@ -14957,11 +14964,32 @@ def admin_backfill_series_squad(
     "/api/admin/regular-schedule"
 )
 def admin_get_regular_schedule(
+    season: int | None = None,
+
     admin_token: str =
         Depends(
             require_admin
-        )
+        ),
 ):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
 
     with get_db_connection() as connection:
 
@@ -14996,10 +15024,16 @@ def admin_get_regular_schedule(
                     s.series_type =
                         '정규리그'
 
+                    AND
+                    s.season_id = %s
+
                 ORDER BY
                     s.fixture_number,
                     s.id
-                """
+                """,
+                (
+                    selected_season_id,
+                ),
             )
 
 
@@ -15018,6 +15052,9 @@ def admin_get_regular_schedule(
 
         schedules.append(
             {
+                "season_number":
+                    selected_season_number,
+
                 "series_id":
                     schedule_row[
                         "series_id"
@@ -15059,6 +15096,1486 @@ def admin_get_regular_schedule(
 
 
     return schedules
+
+def build_regular_schedule_generation_preview(
+    season_number: int,
+):
+
+    if season_number <= 0:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 시즌 번호가 아닙니다."
+            ),
+        )
+
+
+    # Season 1은 기존 역사 데이터 보호
+    if season_number == 1:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Season 1 일정은 "
+                "자동 생성할 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 대상 시즌
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date
+
+                FROM seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 참가자
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id
+                        AS participant_id,
+
+                    p.fcl_name,
+
+                    p.fc_nickname,
+
+                    sp.display_order
+
+                FROM season_participants
+                    AS sp
+
+                JOIN participants
+                    AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order
+                        NULLS LAST,
+
+                    p.id
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            participants = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # 기존 정규리그 SERIES
+            #
+            # cancelled 포함:
+            # fixture UNIQUE 충돌까지
+            # 완전히 차단하기 위함
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS series_count
+
+                FROM series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    series_type =
+                        '정규리그'
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            existing_regular_count = int(
+                cursor.fetchone()[
+                    "series_count"
+                ]
+            )
+
+
+    # =========================
+    # 생성 가능 상태 검증
+    # =========================
+
+    if (
+        season[
+            "status"
+        ]
+        != "upcoming"
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "일정 자동 생성은 "
+                "upcoming 시즌에서만 "
+                "사용할 수 있습니다."
+            ),
+        )
+
+
+    if len(participants) != 5:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "현재 FCL 정규리그 일정은 "
+                "참가자 5명 기준입니다. "
+                f"현재 참가자 수: "
+                f"{len(participants)}명"
+            ),
+        )
+
+
+    start_date = (
+        season[
+            "start_date"
+        ]
+    )
+
+
+    if start_date is None:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 시작일이 없습니다. "
+                "먼저 시즌 시작일을 "
+                "설정해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 현재 정규리그 운영 요일
+    #
+    # 월 = 0
+    # 수 = 2
+    # 토 = 5
+    #
+    # 첫 경기일은 반드시
+    # season.start_date와 동일
+    # =========================
+
+    allowed_weekdays = {
+        0,
+        2,
+        5,
+    }
+
+
+    if (
+        start_date.weekday()
+        not in allowed_weekdays
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 시작일은 첫 경기일이므로 "
+                "월요일, 수요일, 토요일 중 "
+                "하나여야 합니다."
+            ),
+        )
+
+
+    # =========================
+    # 10 경기일 생성
+    #
+    # 20 SERIES
+    # 하루 2 SERIES
+    # =========================
+
+    match_dates = []
+
+    current_date = (
+        start_date
+    )
+
+
+    while len(match_dates) < 10:
+
+        if (
+            current_date.weekday()
+            in allowed_weekdays
+        ):
+
+            match_dates.append(
+                current_date
+            )
+
+
+        current_date += timedelta(
+            days=1
+        )
+
+
+    end_date = (
+        season[
+            "end_date"
+        ]
+    )
+
+
+    if (
+        end_date is not None
+        and
+        match_dates[-1]
+        > end_date
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "생성되는 정규리그 마지막 경기일이 "
+                "시즌 종료일보다 늦습니다. "
+                "시즌 종료일을 확인해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 참가자 슬롯
+    #
+    # season_participants의
+    # display_order 기준
+    # =========================
+
+    p1 = participants[0]
+    p2 = participants[1]
+    p3 = participants[2]
+    p4 = participants[3]
+    p5 = participants[4]
+
+
+    # =========================
+    # 4 ROUND × 5 SERIES
+    #
+    # 각 ROUND:
+    # - 5 SERIES
+    # - 참가자별 2회 출전
+    #
+    # 전체 시즌:
+    # - 상대 4명과 각각 2회
+    # - 홈/원정 1회씩
+    #
+    # 같은 경기일의 2경기는
+    # 참가자가 겹치지 않도록
+    # 순서를 고정
+    # =========================
+
+    round_pairings = [
+        # =========================
+        # ROUND 1
+        # =========================
+        [
+            (p1, p2),
+            (p3, p4),
+
+            (p2, p3),
+            (p4, p5),
+
+            (p5, p1),
+        ],
+
+        # =========================
+        # ROUND 2
+        #
+        # ROUND 1에서 만나지 않은
+        # 나머지 대진
+        # =========================
+        [
+            (p2, p4),
+
+            (p1, p3),
+            (p5, p2),
+
+            (p1, p4),
+            (p3, p5),
+        ],
+
+        # =========================
+        # ROUND 3
+        #
+        # ROUND 1 홈/원정 반전
+        # =========================
+        [
+            (p2, p1),
+            (p4, p3),
+
+            (p1, p5),
+            (p3, p2),
+
+            (p5, p4),
+        ],
+
+        # =========================
+        # ROUND 4
+        #
+        # ROUND 2 홈/원정 반전
+        # =========================
+        [
+            (p3, p1),
+
+            (p4, p2),
+            (p5, p3),
+
+            (p2, p5),
+            (p4, p1),
+        ],
+    ]
+
+
+    schedule = []
+
+    fixture_number = 1
+
+
+    for (
+        round_index,
+        pairings,
+    ) in enumerate(
+        round_pairings,
+        start=1,
+    ):
+
+        for (
+            team_a,
+            team_b,
+        ) in pairings:
+
+            match_day_index = (
+                (
+                    fixture_number
+                    - 1
+                )
+                // 2
+            )
+
+
+            scheduled_date = (
+                match_dates[
+                    match_day_index
+                ]
+            )
+
+
+            schedule.append(
+                {
+                    "fixture_number":
+                        fixture_number,
+
+                    "round":
+                        round_index,
+
+                    "scheduled_date":
+                        scheduled_date
+                            .isoformat(),
+
+                    "target_set_count":
+                        2,
+
+                    "team_a_id":
+                        int(
+                            team_a[
+                                "participant_id"
+                            ]
+                        ),
+
+                    "team_a":
+                        team_a[
+                            "fcl_name"
+                        ],
+
+                    "team_b_id":
+                        int(
+                            team_b[
+                                "participant_id"
+                            ]
+                        ),
+
+                    "team_b":
+                        team_b[
+                            "fcl_name"
+                        ],
+                }
+            )
+
+
+            fixture_number += 1
+
+
+    # =========================
+    # 내부 안전 검증
+    # =========================
+
+    if len(schedule) != 20:
+
+        raise RuntimeError(
+            "정규리그 생성 일정이 "
+            "20경기가 아닙니다."
+        )
+
+
+    fixture_numbers = {
+        int(
+            item[
+                "fixture_number"
+            ]
+        )
+
+        for item
+        in schedule
+    }
+
+
+    if fixture_numbers != set(
+        range(
+            1,
+            21,
+        )
+    ):
+
+        raise RuntimeError(
+            "Fixture 번호 생성에 "
+            "오류가 있습니다."
+        )
+
+
+    # 홈 → 원정 조합은
+    # 시즌 전체에서 정확히 1번씩
+    directed_pairs = {
+        (
+            int(
+                item[
+                    "team_a_id"
+                ]
+            ),
+            int(
+                item[
+                    "team_b_id"
+                ]
+            ),
+        )
+
+        for item
+        in schedule
+    }
+
+
+    if len(directed_pairs) != 20:
+
+        raise RuntimeError(
+            "정규리그 홈/원정 대진이 "
+            "중복 생성되었습니다."
+        )
+
+
+    # 같은 날 두 경기의
+    # 참가자 중복 방지
+    for index in range(
+        0,
+        len(schedule),
+        2,
+    ):
+
+        first_match = (
+            schedule[
+                index
+            ]
+        )
+
+        second_match = (
+            schedule[
+                index + 1
+            ]
+        )
+
+
+        first_players = {
+            int(
+                first_match[
+                    "team_a_id"
+                ]
+            ),
+            int(
+                first_match[
+                    "team_b_id"
+                ]
+            ),
+        }
+
+        second_players = {
+            int(
+                second_match[
+                    "team_a_id"
+                ]
+            ),
+            int(
+                second_match[
+                    "team_b_id"
+                ]
+            ),
+        }
+
+
+        if not (
+            first_players
+            .isdisjoint(
+                second_players
+            )
+        ):
+
+            raise RuntimeError(
+                "같은 경기일에 "
+                "같은 참가자가 중복됩니다."
+            )
+
+
+    return {
+        "season": {
+            "id":
+                season[
+                    "id"
+                ],
+
+            "season_number":
+                season[
+                    "season_number"
+                ],
+
+            "title":
+                season[
+                    "title"
+                ],
+
+            "status":
+                season[
+                    "status"
+                ],
+
+            "start_date":
+                start_date
+                    .isoformat(),
+
+            "end_date":
+                (
+                    end_date.isoformat()
+                    if end_date
+                    else None
+                ),
+        },
+
+        "participant_count":
+            len(
+                participants
+            ),
+
+        "participant_ids": [
+            int(
+                participant[
+                    "participant_id"
+                ]
+            )
+
+            for participant
+            in participants
+        ],
+
+        "existing_regular_series_count":
+            existing_regular_count,
+
+        "can_generate":
+            (
+                existing_regular_count
+                == 0
+            ),
+
+        "rule": {
+            "fixture_count": 20,
+            "round_count": 4,
+            "series_per_round": 5,
+
+            "series_per_day": 2,
+
+            "sets_per_series": 2,
+
+            "weekdays": [
+                "월",
+                "수",
+                "토",
+            ],
+
+            "home_away":
+                True,
+        },
+
+        "schedule":
+            schedule,
+    }
+
+@app.get(
+    "/api/admin/regular-schedule/"
+    "generate-preview"
+)
+def admin_preview_regular_schedule_generation(
+    season: int,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    return (
+        build_regular_schedule_generation_preview(
+            season
+        )
+    )
+
+@app.post(
+    "/api/admin/regular-schedule/generate"
+)
+def admin_generate_regular_schedule(
+    season: int,
+
+    request_data:
+        AdminRegularScheduleGenerateRequest,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # 먼저 동일한 생성 규칙으로
+    # Preview 생성
+    # =========================
+
+    preview = (
+        build_regular_schedule_generation_preview(
+            season
+        )
+    )
+
+
+    selected_season = (
+        preview[
+            "season"
+        ]
+    )
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    # Season 1 절대 보호
+    if selected_season_number == 1:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Season 1 일정은 "
+                "자동 생성할 수 없습니다."
+            ),
+        )
+
+
+    if not preview[
+        "can_generate"
+    ]:
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "선택한 시즌에 이미 "
+                "정규리그 SERIES가 존재합니다."
+            ),
+        )
+
+
+    preview_schedule = (
+        preview[
+            "schedule"
+        ]
+    )
+
+    expected_participant_ids = [
+        int(
+            participant_id
+        )
+
+        for participant_id
+        in request_data
+            .expected_participant_ids
+    ]
+
+
+    if (
+        len(
+            expected_participant_ids
+        )
+        != 5
+
+        or
+
+        len(
+            set(
+                expected_participant_ids
+            )
+        )
+        != 5
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "미리보기 참가자 정보가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    if (
+        preview[
+            "season"
+        ][
+            "start_date"
+        ]
+        !=
+        request_data
+            .expected_start_date
+    ):
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "미리보기 이후 시즌 시작일이 "
+                "변경되었습니다. "
+                "미리보기를 다시 확인해주세요."
+            ),
+        )
+
+
+    if (
+        preview[
+            "participant_ids"
+        ]
+        !=
+        expected_participant_ids
+    ):
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "미리보기 이후 참가자 또는 "
+                "참가자 순서가 변경되었습니다. "
+                "미리보기를 다시 확인해주세요."
+            ),
+        )
+
+
+    if len(preview_schedule) != 20:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "생성 예정 정규리그 경기가 "
+                "20경기가 아닙니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 같은 시즌에서
+            # 동시 생성 방지
+            # =========================
+
+            advisory_lock_key = (
+                202620000000
+                +
+                selected_season_id
+            )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    pg_advisory_xact_lock(
+                        %s
+                    )
+                """,
+                (
+                    advisory_lock_key,
+                ),
+            )
+
+
+            # =========================
+            # 시즌 행 잠금 + 재검증
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date
+
+                FROM seasons
+
+                WHERE
+                    id = %s
+
+                    AND
+                    season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    selected_season_id,
+                    selected_season_number,
+                ),
+            )
+
+
+            locked_season = (
+                cursor.fetchone()
+            )
+
+
+            if locked_season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "선택한 시즌을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                locked_season[
+                    "status"
+                ]
+                != "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "정규리그 일정 자동 생성은 "
+                        "upcoming 시즌에서만 "
+                        "사용할 수 있습니다."
+                    ),
+                )
+
+
+            # Preview 이후 시작일이
+            # 변경되었는지 확인
+            locked_start_date = (
+                locked_season[
+                    "start_date"
+                ]
+            )
+
+
+            preview_start_date = (
+                datetime.strptime(
+                    request_data
+                        .expected_start_date,
+                    "%Y-%m-%d",
+                ).date()
+            )
+
+
+            if (
+                locked_start_date
+                != preview_start_date
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "미리보기 이후 시즌 시작일이 "
+                        "변경되었습니다. "
+                        "미리보기를 다시 확인해주세요."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 참가자 잠금 + 재검증
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sp.participant_id
+
+                FROM
+                    season_participants AS sp
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order
+                        NULLS LAST,
+
+                    sp.participant_id
+
+                FOR SHARE
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            locked_participant_rows = (
+                cursor.fetchall()
+            )
+
+
+            locked_participant_ids = [
+                int(
+                    row[
+                        "participant_id"
+                    ]
+                )
+
+                for row
+                in locked_participant_rows
+            ]
+
+
+            if (
+                len(
+                    locked_participant_ids
+                )
+                != 5
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌 참가자 구성이 "
+                        "변경되었습니다. "
+                        "미리보기를 다시 확인해주세요."
+                    ),
+                )
+
+
+            if (
+                locked_participant_ids
+                !=
+                expected_participant_ids
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "미리보기 이후 시즌 참가자가 "
+                        "변경되었습니다. "
+                        "미리보기를 다시 확인해주세요."
+                    ),
+                )
+
+
+            # =========================
+            # 기존 정규리그 SERIES 재확인
+            #
+            # cancelled 포함
+            # 하나라도 존재하면 생성 금지
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    fixture_number,
+                    status
+
+                FROM series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    series_type =
+                        '정규리그'
+
+                ORDER BY
+                    id
+
+                FOR UPDATE
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            existing_regular_series = (
+                cursor.fetchall()
+            )
+
+
+            if existing_regular_series:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "선택한 시즌에 이미 "
+                        "정규리그 SERIES가 존재합니다. "
+                        "중복 생성할 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 최종 Preview 자체 재검증
+            # =========================
+
+            fixture_numbers = [
+                int(
+                    schedule[
+                        "fixture_number"
+                    ]
+                )
+
+                for schedule
+                in preview_schedule
+            ]
+
+
+            if (
+                fixture_numbers
+                != list(
+                    range(
+                        1,
+                        21,
+                    )
+                )
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Fixture 1~20 구성이 "
+                        "올바르지 않습니다."
+                    ),
+                )
+
+
+            round_counts = {}
+
+
+            for schedule in (
+                preview_schedule
+            ):
+
+                round_number = int(
+                    schedule[
+                        "round"
+                    ]
+                )
+
+
+                round_counts[
+                    round_number
+                ] = (
+                    round_counts.get(
+                        round_number,
+                        0,
+                    )
+                    + 1
+                )
+
+
+            if round_counts != {
+                1: 5,
+                2: 5,
+                3: 5,
+                4: 5,
+            }:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "정규리그 ROUND 구성이 "
+                        "올바르지 않습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 홈/원정 최종 검증
+            #
+            # 5명 기준 가능한 방향성 대진은
+            # 총 20개
+            # =========================
+
+            directed_pairs = {
+                (
+                    int(
+                        schedule[
+                            "team_a_id"
+                        ]
+                    ),
+                    int(
+                        schedule[
+                            "team_b_id"
+                        ]
+                    ),
+                )
+
+                for schedule
+                in preview_schedule
+            }
+
+
+            if len(directed_pairs) != 20:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "정규리그 홈/원정 대진에 "
+                        "중복이 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # SERIES 20개 생성
+            # =========================
+
+            created_schedule = []
+
+
+            for schedule in (
+                preview_schedule
+            ):
+
+                scheduled_date = (
+                    datetime.strptime(
+                        schedule[
+                            "scheduled_date"
+                        ],
+                        "%Y-%m-%d",
+                    ).date()
+                )
+
+
+                cursor.execute(
+                    """
+                    INSERT INTO series (
+                        series_type,
+                        season_id,
+
+                        team_a_id,
+                        team_b_id,
+
+                        match_type,
+                        include_extra_time_result,
+
+                        scheduled_date,
+                        round_number,
+                        fixture_number,
+
+                        target_set_count,
+
+                        stats_sync_status,
+                        status
+                    )
+
+                    VALUES (
+                        '정규리그',
+                        %s,
+
+                        %s,
+                        %s,
+
+                        40,
+                        FALSE,
+
+                        %s,
+                        %s,
+                        %s,
+
+                        2,
+
+                        'pending',
+                        'scheduled'
+                    )
+
+                    RETURNING
+                        id,
+                        season_id,
+                        fixture_number,
+                        round_number,
+                        scheduled_date,
+                        target_set_count,
+                        status
+                    """,
+                    (
+                        selected_season_id,
+
+                        int(
+                            schedule[
+                                "team_a_id"
+                            ]
+                        ),
+
+                        int(
+                            schedule[
+                                "team_b_id"
+                            ]
+                        ),
+
+                        scheduled_date,
+
+                        int(
+                            schedule[
+                                "round"
+                            ]
+                        ),
+
+                        int(
+                            schedule[
+                                "fixture_number"
+                            ]
+                        ),
+                    ),
+                )
+
+
+                created_series = (
+                    cursor.fetchone()
+                )
+
+
+                created_schedule.append(
+                    {
+                        "series_id":
+                            created_series[
+                                "id"
+                            ],
+
+                        "season_id":
+                            created_series[
+                                "season_id"
+                            ],
+
+                        "fixture_number":
+                            created_series[
+                                "fixture_number"
+                            ],
+
+                        "round":
+                            created_series[
+                                "round_number"
+                            ],
+
+                        "scheduled_date":
+                            created_series[
+                                "scheduled_date"
+                            ].isoformat(),
+
+                        "target_set_count":
+                            created_series[
+                                "target_set_count"
+                            ],
+
+                        "status":
+                            created_series[
+                                "status"
+                            ],
+
+                        "team_a":
+                            schedule[
+                                "team_a"
+                            ],
+
+                        "team_b":
+                            schedule[
+                                "team_b"
+                            ],
+                    }
+                )
+
+
+            # =========================
+            # 실제 생성 결과 최종 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS created_count,
+
+                    COUNT(
+                        DISTINCT fixture_number
+                    )
+                        AS fixture_count
+
+                FROM series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    series_type =
+                        '정규리그'
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            verification = (
+                cursor.fetchone()
+            )
+
+
+            if (
+                int(
+                    verification[
+                        "created_count"
+                    ]
+                )
+                != 20
+
+                or
+
+                int(
+                    verification[
+                        "fixture_count"
+                    ]
+                )
+                != 20
+            ):
+
+                raise RuntimeError(
+                    "정규리그 일정 생성 결과가 "
+                    "올바르지 않습니다."
+                )
+
+
+        # 여기까지 전부 성공한 경우에만
+        # 20경기 전체 COMMIT
+        connection.commit()
+
+
+    return {
+        "created":
+            True,
+
+        "season_number":
+            selected_season_number,
+
+        "created_count":
+            len(
+                created_schedule
+            ),
+
+        "message":
+            (
+                f"Season "
+                f"{selected_season_number} "
+                "정규리그 20경기가 "
+                "생성되었습니다."
+            ),
+
+        "schedule":
+            created_schedule,
+    }
 
 # =========================
 # ADMIN REGULAR SCHEDULE UPDATE
@@ -15301,6 +16818,18 @@ def admin_apply_regular_two_set_format(
 
     from itertools import permutations
 
+    season_one = (
+        resolve_fcl_season_record(
+            1
+        )
+    )
+
+
+    season_one_id = int(
+        season_one[
+            "id"
+        ]
+    )
 
     # =========================
     # 새 운영 시작일
@@ -15422,6 +16951,9 @@ def admin_apply_regular_two_set_format(
                         '정규리그'
 
                     AND
+                    s.season_id = %s
+
+                    AND
                     s.fixture_number
                         BETWEEN %s AND %s
 
@@ -15435,6 +16967,7 @@ def admin_apply_regular_two_set_format(
                 FOR UPDATE
                 """,
                 (
+                    season_one_id,
                     first_fixture,
                     last_fixture,
                 ),

@@ -331,7 +331,16 @@
                         정규리그 경기 일정을 관리합니다.
                     </p>
 
-                    <div class="admin-schedule-reform-card">
+                    <div
+                        id="admin-regular-season-tabs"
+                        class="season-tabs"
+                    >
+                    </div>
+
+                    <div
+                        id="admin-regular-reform-card"
+                        class="admin-schedule-reform-card"
+                    >
 
                         <div class="admin-schedule-reform-info">
 
@@ -371,6 +380,103 @@
                             id="admin-regular-reform-message"
                             class="admin-regular-reform-message"
                         ></p>
+
+                    </div>
+
+                    <div
+                        id="admin-regular-generation-card"
+                        class="admin-schedule-reform-card hidden"
+                    >
+
+                        <div class="admin-schedule-reform-info">
+
+                            <strong>
+                                정규리그 일정 자동 생성
+                            </strong>
+
+                            <span>
+                                선택한 시즌의 참가자 5명을 기준으로
+                                정규리그 20경기를 자동 생성합니다.
+                            </span>
+
+                            <span>
+                                4 ROUND × 5경기,
+                                홈 / 원정 각 1회,
+                                경기당 2세트로 구성됩니다.
+                            </span>
+
+                            <span>
+                                시즌 시작일부터
+                                월 / 수 / 토 기준으로
+                                하루 2경기씩 배치됩니다.
+                            </span>
+
+                        </div>
+
+
+                        <button
+                            type="button"
+                            id="admin-regular-preview-button"
+                            class="admin-regular-reform-button"
+                        >
+                            일정 미리보기
+                        </button>
+
+
+                        <p
+                            id="admin-regular-generation-message"
+                            class="admin-regular-reform-message"
+                        ></p>
+
+                    </div>
+
+
+                    <div
+                        id="admin-regular-generation-preview"
+                        class="admin-regular-generation-preview hidden"
+                    >
+
+                        <div class="admin-regular-generation-preview-header">
+
+                            <div>
+                                <strong>
+                                    생성 예정 일정
+                                </strong>
+
+                                <p
+                                    id="admin-regular-generation-preview-meta"
+                                ></p>
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            id="admin-regular-generation-preview-list"
+                            class="admin-schedule-list"
+                        >
+                        </div>
+
+
+                        <div class="admin-regular-generation-actions">
+
+                            <button
+                                type="button"
+                                id="admin-regular-generation-cancel"
+                                class="admin-regular-generation-cancel-button"
+                            >
+                                미리보기 닫기
+                            </button>
+
+                            <button
+                                type="button"
+                                id="admin-regular-generation-confirm"
+                                class="admin-regular-reform-button"
+                            >
+                                20경기 확정 생성
+                            </button>
+
+                        </div>
 
                     </div>
 

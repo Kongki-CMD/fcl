@@ -729,6 +729,90 @@
     background: #f2f3f5;
 }
 
+.admin-regular-generation-preview {
+    margin-top: 24px;
+    padding: 20px;
+
+    background: #f8f9fb;
+
+    border: 1px solid #dfe2e7;
+    border-radius: 10px;
+}
+
+
+.admin-regular-generation-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    margin-bottom: 18px;
+}
+
+
+.admin-regular-generation-preview-header strong {
+    color: #222;
+
+    font-size: 16px;
+}
+
+
+.admin-regular-generation-preview-header p {
+    margin: 6px 0 0;
+
+    color: #777;
+
+    font-size: 13px;
+}
+
+
+.admin-regular-generation-preview
+.admin-schedule-list {
+    margin-top: 0;
+}
+
+
+.admin-generation-preview-card
+.admin-schedule-actions {
+    color: #999;
+
+    font-size: 12px;
+}
+
+
+.admin-regular-generation-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+
+    margin-top: 20px;
+}
+
+
+.admin-regular-generation-cancel-button {
+    padding: 10px 18px;
+
+    border: 1px solid #bbb;
+    border-radius: 6px;
+
+    background: white;
+    color: #555;
+
+    cursor: pointer;
+}
+
+
+.admin-regular-generation-cancel-button:hover {
+    background: #f3f4f6;
+}
+
+
+#admin-regular-generation-confirm:disabled,
+#admin-regular-preview-button:disabled {
+    opacity: 0.5;
+
+    cursor: default;
+}
+
 /* ========================================
    플레이오프 관리
 ======================================== */
@@ -1014,6 +1098,17 @@
 ======================================== */
 
 @media (max-width: 768px) {
+
+    .admin-regular-generation-actions {
+        flex-direction: column;
+    }
+
+
+    .admin-regular-generation-actions button {
+        width: 100%;
+
+        min-height: 42px;
+    }
 
     /* ====================================
        관리자 헤더

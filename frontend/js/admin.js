@@ -128,6 +128,65 @@ const adminPointShopProductListElement =
         "#admin-point-shop-product-list"
     );
 
+const adminRegularSeasonTabsElement =
+    document.querySelector(
+        "#admin-regular-season-tabs"
+    );
+
+
+const adminRegularReformCardElement =
+    document.querySelector(
+        "#admin-regular-reform-card"
+    );
+
+
+const adminRegularGenerationCardElement =
+    document.querySelector(
+        "#admin-regular-generation-card"
+    );
+
+
+const adminRegularPreviewButtonElement =
+    document.querySelector(
+        "#admin-regular-preview-button"
+    );
+
+
+const adminRegularGenerationMessageElement =
+    document.querySelector(
+        "#admin-regular-generation-message"
+    );
+
+
+const adminRegularGenerationPreviewElement =
+    document.querySelector(
+        "#admin-regular-generation-preview"
+    );
+
+
+const adminRegularGenerationPreviewMetaElement =
+    document.querySelector(
+        "#admin-regular-generation-preview-meta"
+    );
+
+
+const adminRegularGenerationPreviewListElement =
+    document.querySelector(
+        "#admin-regular-generation-preview-list"
+    );
+
+
+const adminRegularGenerationCancelButtonElement =
+    document.querySelector(
+        "#admin-regular-generation-cancel"
+    );
+
+
+const adminRegularGenerationConfirmButtonElement =
+    document.querySelector(
+        "#admin-regular-generation-confirm"
+    );
+
 const adminScheduleListElement =
     document.querySelector(
         "#admin-schedule-list"
@@ -193,6 +252,12 @@ const adminScheduleEditSaveButtonElement =
     document.querySelector(
         "#admin-schedule-edit-save"
     );
+
+let adminRegularSeasons = [];
+
+let selectedAdminRegularSeasonNumber = null;
+
+let adminRegularGenerationPreviewData = null;
 
 
 let editingAdminSchedule = null;
@@ -1837,11 +1902,195 @@ function renderAdminResults(
     );
 }
 
+
+async function loadAdminRegularSeasonTabs() {
+
+    try {
+
+        adminRegularSeasons =
+            await loadFclSeasons();
+
+
+        if (
+            !Array.isArray(
+                adminRegularSeasons
+            )
+            ||
+            adminRegularSeasons.length === 0
+        ) {
+
+            adminRegularSeasonTabsElement
+                .innerHTML = "";
+
+            selectedAdminRegularSeasonNumber =
+                null;
+
+            return;
+        }
+
+
+        const activeSeason =
+            adminRegularSeasons.find(
+                season =>
+                    season.status
+                    === "active"
+            );
+
+
+        if (
+            !selectedAdminRegularSeasonNumber
+        ) {
+
+            selectedAdminRegularSeasonNumber =
+                Number(
+                    activeSeason
+                        ?.season_number
+                    ??
+                    adminRegularSeasons[
+                        adminRegularSeasons.length
+                        - 1
+                    ].season_number
+                );
+        }
+
+
+        renderAdminRegularSeasonTabs();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminRegularSeasonTabsElement
+            .innerHTML = "";
+    }
+}
+
+
+function renderAdminRegularSeasonTabs() {
+
+    adminRegularSeasonTabsElement
+        .innerHTML = "";
+
+
+    adminRegularSeasons.forEach(
+        season => {
+
+            const seasonNumber =
+                Number(
+                    season.season_number
+                );
+
+
+            const buttonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            buttonElement.type =
+                "button";
+
+
+            buttonElement.classList.add(
+                "season-tab-button"
+            );
+
+
+            if (
+                seasonNumber
+                ===
+                selectedAdminRegularSeasonNumber
+            ) {
+
+                buttonElement.classList.add(
+                    "active"
+                );
+            }
+
+
+            buttonElement.textContent =
+                `SEASON ${seasonNumber}`;
+
+
+            buttonElement.addEventListener(
+                "click",
+                async () => {
+
+                    if (
+                        seasonNumber
+                        ===
+                        selectedAdminRegularSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedAdminRegularSeasonNumber =
+                        seasonNumber;
+
+
+                    clearAdminRegularGenerationPreview();
+
+                    renderAdminRegularSeasonTabs();
+
+                    updateAdminRegularSeasonControls();
+
+
+                    await loadAdminRegularSchedule(
+                        false
+                    );
+                }
+            );
+
+
+            adminRegularSeasonTabsElement
+                .appendChild(
+                    buttonElement
+                );
+        }
+    );
+}
+
+
+function updateAdminRegularSeasonControls() {
+
+    const isSeasonOne =
+        selectedAdminRegularSeasonNumber
+        === 1;
+
+
+    adminRegularReformCardElement
+        ?.classList.toggle(
+            "hidden",
+            !isSeasonOne
+        );
+
+
+    adminRegularGenerationCardElement
+        ?.classList.toggle(
+            "hidden",
+            isSeasonOne
+        );
+
+
+    if (isSeasonOne) {
+
+        clearAdminRegularGenerationPreview();
+    }
+}
+
 // =========================================
 // 정규리그 일정 조회
 // =========================================
 
-async function loadAdminRegularSchedule() {
+async function loadAdminRegularSchedule(
+    loadSeasons = true
+) {
 
     const adminToken =
         getAdminToken();
@@ -1850,6 +2099,27 @@ async function loadAdminRegularSchedule() {
     if (!adminToken) {
         return;
     }
+
+
+    if (loadSeasons) {
+
+        await loadAdminRegularSeasonTabs();
+    }
+
+
+    if (
+        !selectedAdminRegularSeasonNumber
+    ) {
+
+        adminScheduleListElement
+            .textContent =
+                "시즌 정보를 불러올 수 없습니다.";
+
+        return;
+    }
+
+
+    updateAdminRegularSeasonControls();
 
 
     adminScheduleListElement
@@ -1861,7 +2131,10 @@ async function loadAdminRegularSchedule() {
 
         const response = await fetch(
             `${apiBaseUrl}`
-            + "/api/admin/regular-schedule",
+            + "/api/admin/regular-schedule"
+            + `?season=${
+                selectedAdminRegularSeasonNumber
+            }`,
             {
                 headers: {
                     "X-Admin-Token":
@@ -1902,6 +2175,41 @@ async function loadAdminRegularSchedule() {
         );
 
 
+        if (
+            selectedAdminRegularSeasonNumber
+            !== 1
+        ) {
+
+            if (
+                Array.isArray(schedules)
+                &&
+                schedules.length > 0
+            ) {
+
+                adminRegularPreviewButtonElement
+                    .disabled = true;
+
+
+                adminRegularGenerationMessageElement
+                    .textContent =
+                        `${schedules.length}경기의 `
+                        + "정규리그 일정이 이미 "
+                        + "생성되어 있습니다.";
+
+            } else {
+
+                adminRegularPreviewButtonElement
+                    .disabled = false;
+
+
+                adminRegularGenerationMessageElement
+                    .textContent =
+                        "일정 생성 전 미리보기를 "
+                        + "확인해주세요.";
+            }
+        }
+
+
     } catch (error) {
 
         console.error(
@@ -1914,6 +2222,468 @@ async function loadAdminRegularSchedule() {
                 "정규리그 일정을 불러오지 못했습니다.";
     }
 }
+
+function clearAdminRegularGenerationPreview() {
+
+    adminRegularGenerationPreviewData =
+        null;
+
+
+    adminRegularGenerationPreviewElement
+        ?.classList.add(
+            "hidden"
+        );
+
+
+    if (
+        adminRegularGenerationPreviewListElement
+    ) {
+
+        adminRegularGenerationPreviewListElement
+            .innerHTML = "";
+    }
+
+
+    if (
+        adminRegularGenerationPreviewMetaElement
+    ) {
+
+        adminRegularGenerationPreviewMetaElement
+            .textContent = "";
+    }
+
+    if (
+        adminRegularPreviewButtonElement
+    ) {
+
+        adminRegularPreviewButtonElement
+            .disabled = false;
+    }
+
+
+    if (
+        adminRegularGenerationConfirmButtonElement
+    ) {
+
+        adminRegularGenerationConfirmButtonElement
+            .disabled = false;
+    }
+
+}
+
+
+function renderAdminRegularGenerationPreview(
+    preview
+) {
+
+    adminRegularGenerationPreviewListElement
+        .innerHTML = "";
+
+
+    const season =
+        preview.season;
+
+
+    const schedule =
+        Array.isArray(
+            preview.schedule
+        )
+            ? preview.schedule
+            : [];
+
+
+    adminRegularGenerationPreviewMetaElement
+        .textContent =
+            `SEASON ${season.season_number}`
+            + ` · 시작일 ${season.start_date}`
+            + ` · 참가자 ${preview.participant_count}명`
+            + ` · ${schedule.length}경기`;
+
+
+    schedule.forEach(
+        item => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.classList.add(
+                "admin-schedule-card",
+                "admin-generation-preview-card"
+            );
+
+
+            cardElement.innerHTML = `
+                <div class="admin-schedule-meta">
+
+                    <strong>
+                        ROUND ${item.round}
+                    </strong>
+
+                    <span>
+                        경기 ${item.fixture_number}
+                    </span>
+
+                    <span>
+                        ${item.target_set_count} SET
+                    </span>
+
+                </div>
+
+
+                <div class="admin-schedule-date">
+                    ${item.scheduled_date}
+                </div>
+
+
+                <div class="admin-schedule-match">
+
+                    <span>
+                        ${item.team_a}
+                    </span>
+
+                    <strong>
+                        VS
+                    </strong>
+
+                    <span>
+                        ${item.team_b}
+                    </span>
+
+                </div>
+
+
+                <div class="admin-schedule-actions">
+                    미리보기
+                </div>
+            `;
+
+
+            adminRegularGenerationPreviewListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+
+
+    adminRegularGenerationConfirmButtonElement
+        .disabled =
+            !preview.can_generate;
+
+
+    adminRegularGenerationPreviewElement
+        .classList.remove(
+            "hidden"
+        );
+}
+
+
+async function previewAdminRegularScheduleGeneration() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (
+        !adminToken
+        ||
+        !selectedAdminRegularSeasonNumber
+    ) {
+
+        return;
+    }
+
+
+    adminRegularPreviewButtonElement
+        .disabled = true;
+
+
+    adminRegularGenerationMessageElement
+        .textContent =
+            "생성 예정 일정을 계산하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/regular-schedule/"
+                + "generate-preview"
+                + `?season=${
+                    selectedAdminRegularSeasonNumber
+                }`,
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const preview =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                preview.detail
+                ?? "일정 미리보기 생성 실패"
+            );
+        }
+
+
+        adminRegularGenerationPreviewData =
+            preview;
+
+
+        renderAdminRegularGenerationPreview(
+            preview
+        );
+
+
+        if (preview.can_generate) {
+
+            adminRegularGenerationMessageElement
+                .textContent =
+                    "미리보기를 확인한 뒤 "
+                    + "20경기 확정 생성을 눌러주세요.";
+
+        } else {
+
+            adminRegularGenerationMessageElement
+                .textContent =
+                    "이미 정규리그 일정이 "
+                    + "존재하여 생성할 수 없습니다.";
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        clearAdminRegularGenerationPreview();
+
+
+        adminRegularGenerationMessageElement
+            .textContent =
+                error.message;
+
+
+    } finally {
+
+        if (
+            !adminRegularGenerationPreviewData
+        ) {
+
+            adminRegularPreviewButtonElement
+                .disabled = false;
+        }
+    }
+}
+
+async function generateAdminRegularSchedule() {
+
+    const preview =
+        adminRegularGenerationPreviewData;
+
+
+    if (!preview) {
+        return;
+    }
+
+
+    if (!preview.can_generate) {
+        return;
+    }
+
+
+    const seasonNumber =
+        Number(
+            preview.season
+                .season_number
+        );
+
+
+    if (
+        seasonNumber
+        !==
+        selectedAdminRegularSeasonNumber
+    ) {
+
+        adminRegularGenerationMessageElement
+            .textContent =
+                "선택한 시즌이 변경되었습니다. "
+                + "미리보기를 다시 확인해주세요.";
+
+        clearAdminRegularGenerationPreview();
+
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            `SEASON ${seasonNumber} `
+            + "정규리그 일정을 생성하시겠습니까?\n\n"
+            + `시작일: ${
+                preview.season.start_date
+            }\n`
+            + `참가자: ${
+                preview.participant_count
+            }명\n`
+            + `경기 수: ${
+                preview.schedule.length
+            }경기\n`
+            + "경기당 2세트\n\n"
+            + "생성 후에는 같은 시즌에 "
+            + "다시 자동 생성할 수 없습니다."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+        return;
+    }
+
+
+    adminRegularGenerationConfirmButtonElement
+        .disabled = true;
+
+
+    adminRegularGenerationMessageElement
+        .textContent =
+            "정규리그 20경기를 생성하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/regular-schedule/generate"
+                + `?season=${seasonNumber}`,
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            expected_start_date:
+                                preview
+                                    .season
+                                    .start_date,
+
+                            expected_participant_ids:
+                                preview
+                                    .participant_ids,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "정규리그 일정 생성 실패"
+            );
+        }
+
+
+        clearAdminRegularGenerationPreview();
+
+
+        await loadAdminRegularSchedule(
+            false
+        );
+
+
+        alert(
+            responseData.message
+            ??
+            `SEASON ${seasonNumber} `
+            + "정규리그 일정 생성 완료"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminRegularGenerationMessageElement
+            .textContent =
+                error.message;
+
+
+        adminRegularGenerationConfirmButtonElement
+            .disabled = false;
+    }
+}
+
 
 // =========================================
 // 정규리그 일정 개편
@@ -7946,6 +8716,8 @@ function renderAdminTournamentMatches(
 }
 
 
+
+
 // =========================================
 // ONE DAY TOURNAMENT ADMIN
 // 경기 결과 초기화
@@ -8078,6 +8850,35 @@ async function resetAdminTournamentMatch(
             "결과 초기화";
     }
 }
+
+adminRegularPreviewButtonElement
+    ?.addEventListener(
+        "click",
+        previewAdminRegularScheduleGeneration
+    );
+
+
+adminRegularGenerationCancelButtonElement
+    ?.addEventListener(
+        "click",
+        () => {
+
+            clearAdminRegularGenerationPreview();
+
+
+            adminRegularGenerationMessageElement
+                .textContent =
+                    "일정 생성 전 미리보기를 "
+                    + "확인해주세요.";
+        }
+    );
+
+
+adminRegularGenerationConfirmButtonElement
+    ?.addEventListener(
+        "click",
+        generateAdminRegularSchedule
+    );
 
 
 // =========================================
