@@ -182,7 +182,7 @@ const playerRecordCustomImages = {
         "./assets/images/players/custom/goncalo_guedes.png",
 
     "로빈 반페르시":
-        "./assets/images/players/custom/van_persi.png"
+        "./assets/images/players/custom/van_persie.png"
         
 };
 
