@@ -3624,6 +3624,118 @@ function renderAdminRegularGenerationPreview(
         }
     );
 
+    // =========================================
+    // 플레이오프 일정 미리보기
+    // =========================================
+
+    const playoffMatchupMap = {
+        "준플레이오프": {
+            teamA:
+                "정규리그 3위",
+
+            teamB:
+                "정규리그 4위",
+        },
+
+        "플레이오프": {
+            teamA:
+                "정규리그 2위",
+
+            teamB:
+                "준플레이오프 승자",
+        },
+
+        "결승시리즈": {
+            teamA:
+                "정규리그 1위",
+
+            teamB:
+                "플레이오프 승자",
+        },
+    };
+
+
+    playoffSchedule.forEach(
+        item => {
+
+            const matchup =
+                playoffMatchupMap[
+                    item.playoff_stage
+                ]
+                ?? {
+                    teamA:
+                        "미정",
+
+                    teamB:
+                        "미정",
+                };
+
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.classList.add(
+                "admin-schedule-card",
+                "admin-generation-preview-card"
+            );
+
+
+            cardElement.innerHTML = `
+                <div class="admin-schedule-meta">
+
+                    <strong>
+                        ${item.playoff_stage}
+                    </strong>
+
+                    <span>
+                        BO${item.best_of}
+                    </span>
+
+                    <span>
+                        ${item.wins_required}선승
+                    </span>
+
+                </div>
+
+
+                <div class="admin-schedule-date">
+                    ${item.scheduled_date}
+                </div>
+
+
+                <div class="admin-schedule-match">
+
+                    <span>
+                        ${matchup.teamA}
+                    </span>
+
+                    <strong>
+                        VS
+                    </strong>
+
+                    <span>
+                        ${matchup.teamB}
+                    </span>
+
+                </div>
+
+
+                <div class="admin-schedule-actions">
+                    플레이오프
+                </div>
+            `;
+
+
+            adminRegularGenerationPreviewListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+
 
     adminRegularGenerationConfirmButtonElement
         .disabled =
