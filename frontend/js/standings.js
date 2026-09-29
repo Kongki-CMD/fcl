@@ -2,7 +2,8 @@ import {
     apiBaseUrl,
     getTeamImagePath,
     loadFclSeasons,
-} from "./config.js?v=perf-2";
+    resolvePublicDisplaySeason,
+} from "./config.js?v=season-default-1";
 
 
 const standingsTableBodyElement = document.querySelector(
@@ -216,38 +217,19 @@ async function loadStandingsSeasonTabs() {
             getRequestedStandingsSeasonNumber();
 
 
-        const requestedSeason =
-            availableStandingsSeasons.find(
-                season =>
-                    Number(
-                        season.season_number
-                    )
-                    ===
-                    requestedSeasonNumber
-            );
-
-
-        const activeSeason =
-            availableStandingsSeasons.find(
-                season =>
-                    season.status
-                    ===
-                    "active"
-            );
-
-
-        const fallbackSeason =
-            availableStandingsSeasons[
-                availableStandingsSeasons.length - 1
-            ];
-
-
         const selectedSeason =
-            requestedSeason
-            ??
-            activeSeason
-            ??
-            fallbackSeason;
+            resolvePublicDisplaySeason(
+                availableStandingsSeasons,
+                requestedSeasonNumber
+            );
+
+
+        if (!selectedSeason) {
+
+            throw new Error(
+                "표시할 시즌을 찾을 수 없습니다."
+            );
+        }
 
 
         selectedStandingsSeasonNumber =

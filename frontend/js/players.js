@@ -1,7 +1,8 @@
 import {
     apiBaseUrl,
     loadFclSeasons,
-} from "./config.js?v=perf-2";
+    resolvePublicDisplaySeason,
+} from "./config.js?v=season-default-1";
 
 
 const playersTableBodyElement =
@@ -396,38 +397,19 @@ async function loadPlayerSeasonTabs() {
             getRequestedPlayerSeasonNumber();
 
 
-        const requestedSeason =
-            availablePlayerSeasons.find(
-                season =>
-                    Number(
-                        season.season_number
-                    )
-                    ===
-                    requestedSeasonNumber
-            );
-
-
-        const activeSeason =
-            availablePlayerSeasons.find(
-                season =>
-                    season.status
-                    ===
-                    "active"
-            );
-
-
-        const fallbackSeason =
-            availablePlayerSeasons[
-                availablePlayerSeasons.length - 1
-            ];
-
-
         const selectedSeason =
-            requestedSeason
-            ??
-            activeSeason
-            ??
-            fallbackSeason;
+            resolvePublicDisplaySeason(
+                availablePlayerSeasons,
+                requestedSeasonNumber
+            );
+
+
+        if (!selectedSeason) {
+
+            throw new Error(
+                "표시할 시즌을 찾을 수 없습니다."
+            );
+        }
 
 
         selectedPlayerSeasonNumber =

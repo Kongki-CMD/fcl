@@ -3,7 +3,8 @@ import {
     getTeamImagePath,
     formatKstDateTime,
     loadFclSeasons,
-} from "./config.js?v=perf-2";
+    resolvePublicDisplaySeason,
+} from "./config.js?v=season-default-1";
 
 
 //선수 사진 추가
@@ -569,38 +570,19 @@ async function loadResultSeasonTabs() {
             getRequestedResultSeasonNumber();
 
 
-        const requestedSeason =
-            availableResultSeasons.find(
-                season =>
-                    Number(
-                        season.season_number
-                    )
-                    ===
-                    requestedSeasonNumber
-            );
-
-
-        const activeSeason =
-            availableResultSeasons.find(
-                season =>
-                    season.status
-                    ===
-                    "active"
-            );
-
-
-        const fallbackSeason =
-            availableResultSeasons[
-                availableResultSeasons.length - 1
-            ];
-
-
         const selectedSeason =
-            requestedSeason
-            ??
-            activeSeason
-            ??
-            fallbackSeason;
+            resolvePublicDisplaySeason(
+                availableResultSeasons,
+                requestedSeasonNumber
+            );
+
+
+        if (!selectedSeason) {
+
+            throw new Error(
+                "표시할 시즌을 찾을 수 없습니다."
+            );
+        }
 
 
         selectedResultSeasonNumber =
