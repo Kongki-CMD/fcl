@@ -3250,7 +3250,7 @@ def create_one_day_tournament_v2_match(
             %s,
 
             CASE
-                WHEN %s IS NOT NULL
+                WHEN %s::BIGINT IS NOT NULL
                 THEN NOW()
                 ELSE NULL
             END,
