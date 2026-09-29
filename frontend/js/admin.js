@@ -2087,8 +2087,6 @@ async function createAdminSeason(
         new Set(
             [
                 1,
-                3,
-                6,
             ]
         );
 
@@ -2102,9 +2100,8 @@ async function createAdminSeason(
         adminSeasonCreateMessageElement
             .textContent =
                 (
-                    "시즌 시작일은 월요일, "
-                    + "수요일, 토요일 중 "
-                    + "하나로 선택해주세요."
+                    "시즌 시작일은 "
+                    + "월요일로 선택해주세요."
                 );
 
         return;
@@ -3525,12 +3522,38 @@ function renderAdminRegularGenerationPreview(
             : [];
 
 
+    const playoffSchedule =
+        Array.isArray(
+            preview.playoff_schedule
+        )
+            ? preview.playoff_schedule
+            : [];
+
+
+    const playoffScheduleText =
+        playoffSchedule
+            .map(
+                item =>
+                    (
+                        `${item.playoff_stage} `
+                        + `${item.scheduled_date}`
+                    )
+            )
+            .join(
+                " · "
+            );
+
     adminRegularGenerationPreviewMetaElement
         .textContent =
             `SEASON ${season.season_number}`
             + ` · 시작일 ${season.start_date}`
             + ` · 참가자 ${preview.participant_count}명`
-            + ` · ${schedule.length}경기`;
+            + ` · 정규리그 ${schedule.length}경기`
+            + (
+                playoffScheduleText
+                    ? ` · ${playoffScheduleText}`
+                    : ""
+            );
 
 
     schedule.forEach(
@@ -3664,7 +3687,7 @@ async function saveAdminRegularSeasonStartDate() {
 
     // =========================
     // 첫 경기일은
-    // 월 / 수 / 토만 허용
+    // 월요일만 허용
     //
     // JS getDay:
     // 일 0
@@ -3682,8 +3705,6 @@ async function saveAdminRegularSeasonStartDate() {
     const allowedDays = new Set(
         [
             1,
-            3,
-            6,
         ]
     );
 
@@ -3696,8 +3717,8 @@ async function saveAdminRegularSeasonStartDate() {
 
         adminRegularSeasonStartMessageElement
             .textContent =
-                "첫 경기일은 월요일, 수요일, "
-                + "토요일 중 하나로 선택해주세요.";
+                "첫 경기일은 "
+                + "월요일로 선택해주세요.";
 
         return;
     }

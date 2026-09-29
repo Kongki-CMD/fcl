@@ -12473,19 +12473,15 @@ def admin_prepare_fcl_season(
 
     if (
         start_date.weekday()
-        not in (
-            0,
-            2,
-            5,
-        )
+        != 0
     ):
 
         raise HTTPException(
             status_code=400,
             detail=(
-                "시즌 시작일은 "
-                "월요일, 수요일, "
-                "토요일 중 하나여야 합니다."
+                "Season 2 이후 시즌 시작일은 "
+                "정규리그 2주 운영을 위해 "
+                "월요일이어야 합니다."
             ),
         )
 
@@ -12928,6 +12924,22 @@ def admin_update_fcl_season(
             "시작일",
         )
     )
+
+    if (
+        season_number != 1
+        and
+        start_date is not None
+        and
+        start_date.weekday() != 0
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Season 2 이후 시즌 시작일은 "
+                "월요일이어야 합니다."
+            ),
+        )
 
 
     end_date = (
@@ -17562,15 +17574,15 @@ def build_regular_schedule_generation_preview(
 
     if (
         start_date.weekday()
-        not in allowed_weekdays
+        != 0
     ):
 
         raise HTTPException(
             status_code=400,
             detail=(
-                "시즌 시작일은 첫 경기일이므로 "
-                "월요일, 수요일, 토요일 중 "
-                "하나여야 합니다."
+                "정규리그 자동 생성의 "
+                "시즌 시작일은 "
+                "월요일이어야 합니다."
             ),
         )
 
@@ -17616,6 +17628,91 @@ def build_regular_schedule_generation_preview(
             days=1
         )
 
+    # =========================
+    # 플레이오프 일정
+    #
+    # 정규리그 마지막 경기:
+    # 2주차 토요일
+    #
+    # 다음 주:
+    # 월 = 준플레이오프
+    # 수 = 플레이오프
+    # 토 = 결승시리즈
+    # =========================
+
+    regular_end_date = (
+        match_dates[
+            -1
+        ]
+    )
+
+
+    playoff_schedule = [
+        {
+            "playoff_stage":
+                "준플레이오프",
+
+            "scheduled_date":
+                (
+                    regular_end_date
+                    + timedelta(
+                        days=2
+                    )
+                ).isoformat(),
+
+            "best_of":
+                5,
+
+            "wins_required":
+                3,
+        },
+
+        {
+            "playoff_stage":
+                "플레이오프",
+
+            "scheduled_date":
+                (
+                    regular_end_date
+                    + timedelta(
+                        days=4
+                    )
+                ).isoformat(),
+
+            "best_of":
+                5,
+
+            "wins_required":
+                3,
+        },
+
+        {
+            "playoff_stage":
+                "결승시리즈",
+
+            "scheduled_date":
+                (
+                    regular_end_date
+                    + timedelta(
+                        days=7
+                    )
+                ).isoformat(),
+
+            "best_of":
+                7,
+
+            "wins_required":
+                4,
+        },
+    ]
+
+    season_schedule_end_date = (
+        regular_end_date
+        + timedelta(
+            days=7
+        )
+    )
+
 
     end_date = (
         season[
@@ -17627,14 +17724,14 @@ def build_regular_schedule_generation_preview(
     if (
         end_date is not None
         and
-        match_dates[-1]
+        season_schedule_end_date
         > end_date
     ):
 
         raise HTTPException(
             status_code=400,
             detail=(
-                "생성되는 정규리그 마지막 경기일이 "
+                "생성되는 플레이오프 결승 일정이 "
                 "시즌 종료일보다 늦습니다. "
                 "시즌 종료일을 확인해주세요."
             ),
@@ -18223,6 +18320,9 @@ def build_regular_schedule_generation_preview(
                 True,
         },
 
+        "playoff_schedule":
+            playoff_schedule,
+
         "schedule":
             schedule,
     }
@@ -18322,6 +18422,41 @@ def admin_generate_regular_schedule(
             "schedule"
         ]
     )
+
+    preview_playoff_schedule = (
+        preview[
+            "playoff_schedule"
+        ]
+    )
+
+
+    expected_playoff_stages = [
+        "준플레이오프",
+        "플레이오프",
+        "결승시리즈",
+    ]
+
+
+    if (
+        [
+            setting[
+                "playoff_stage"
+            ]
+
+            for setting
+            in preview_playoff_schedule
+        ]
+        !=
+        expected_playoff_stages
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "플레이오프 일정 구성이 "
+                "올바르지 않습니다."
+            ),
+        )
 
     expected_participant_ids = [
         int(
@@ -18997,9 +19132,95 @@ def admin_generate_regular_schedule(
                     "올바르지 않습니다."
                 )
 
+            # =========================
+            # 플레이오프 일정 자동 저장
+            #
+            # 정규리그:
+            # 2주차 토요일 종료
+            #
+            # 다음 주:
+            # 월 준PO / 수 PO / 토 결승
+            # =========================
+
+            for playoff_setting in (
+                preview_playoff_schedule
+            ):
+
+                playoff_date = (
+                    datetime.strptime(
+                        playoff_setting[
+                            "scheduled_date"
+                        ],
+                        "%Y-%m-%d",
+                    ).date()
+                )
+
+
+                cursor.execute(
+                    """
+                    INSERT INTO
+                        season_playoff_settings (
+                            season_id,
+                            playoff_stage,
+                            scheduled_date,
+                            best_of,
+                            wins_required,
+                            updated_at
+                        )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        %s,
+                        NOW()
+                    )
+
+                    ON CONFLICT (
+                        season_id,
+                        playoff_stage
+                    )
+
+                    DO UPDATE SET
+                        scheduled_date =
+                            EXCLUDED.scheduled_date,
+
+                        best_of =
+                            EXCLUDED.best_of,
+
+                        wins_required =
+                            EXCLUDED.wins_required,
+
+                        updated_at =
+                            NOW()
+                    """,
+                    (
+                        selected_season_id,
+
+                        playoff_setting[
+                            "playoff_stage"
+                        ],
+
+                        playoff_date,
+
+                        int(
+                            playoff_setting[
+                                "best_of"
+                            ]
+                        ),
+
+                        int(
+                            playoff_setting[
+                                "wins_required"
+                            ]
+                        ),
+                    ),
+                )
 
         # 여기까지 전부 성공한 경우에만
-        # 20경기 전체 COMMIT
+        # 정규리그 20경기 +
+        # 플레이오프 일정 전체 COMMIT
         connection.commit()
 
 
@@ -19022,6 +19243,9 @@ def admin_generate_regular_schedule(
                 "정규리그 20경기가 "
                 "생성되었습니다."
             ),
+
+        "playoff_schedule":
+            preview_playoff_schedule,
 
         "schedule":
             created_schedule,
