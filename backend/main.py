@@ -6568,6 +6568,128 @@ def initialize_database():
                 """
             )
 
+            # =========================
+            # SEASON PLAYOFF SETTINGS
+            #
+            # 기존 playoff_settings는
+            # Season 1 / Render 호환용으로 유지
+            #
+            # 신규 시즌부터는
+            # season_id 기준으로 설정 관리
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    season_playoff_settings (
+                        season_id BIGINT
+                            NOT NULL
+                            REFERENCES seasons(id)
+                            ON DELETE CASCADE,
+
+                        playoff_stage VARCHAR(20)
+                            NOT NULL,
+
+                        scheduled_date DATE
+                            NOT NULL,
+
+                        best_of INTEGER
+                            NOT NULL,
+
+                        wins_required INTEGER
+                            NOT NULL,
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        PRIMARY KEY (
+                            season_id,
+                            playoff_stage
+                        ),
+
+                        CONSTRAINT
+                            chk_season_playoff_stage
+
+                        CHECK (
+                            playoff_stage IN (
+                                '준플레이오프',
+                                '플레이오프',
+                                '결승시리즈'
+                            )
+                        ),
+
+                        CONSTRAINT
+                            chk_season_playoff_format
+
+                        CHECK (
+                            (
+                                best_of = 3
+                                AND
+                                wins_required = 2
+                            )
+
+                            OR
+
+                            (
+                                best_of = 5
+                                AND
+                                wins_required = 3
+                            )
+
+                            OR
+
+                            (
+                                best_of = 7
+                                AND
+                                wins_required = 4
+                            )
+                        )
+                    )
+                """
+            )
+
+
+            # =========================
+            # 기존 Season 1
+            # 플레이오프 설정 이관
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    season_playoff_settings (
+                        season_id,
+                        playoff_stage,
+                        scheduled_date,
+                        best_of,
+                        wins_required
+                    )
+
+                SELECT
+                    s.id,
+                    ps.playoff_stage,
+                    ps.scheduled_date,
+                    ps.best_of,
+                    ps.wins_required
+
+                FROM seasons AS s
+
+                CROSS JOIN
+                    playoff_settings AS ps
+
+                WHERE
+                    s.season_number = 1
+
+                ON CONFLICT (
+                    season_id,
+                    playoff_stage
+                )
+
+                DO NOTHING
+                """
+            )
+
 
             # =========================
             # SERIES 세트
