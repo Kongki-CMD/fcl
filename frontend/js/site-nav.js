@@ -13,6 +13,95 @@ const siteFooterElement =
 const siteVersion =
     "v1.6.0";
 
+// =========================================
+// 공통 헤더 시즌 표시
+//
+// 공개 페이지와 동일하게
+// 다음 시즌 첫 경기 2일 전부터
+// 헤더 시즌 번호도 자동 전환
+// =========================================
+
+async function initializeSiteSeasonLabel() {
+
+    const seasonElements =
+        document.querySelectorAll(
+            ".logo-season"
+        );
+
+
+    if (
+        seasonElements.length
+        === 0
+    ) {
+        return;
+    }
+
+
+    try {
+
+        const {
+            loadFclSeasons,
+            resolvePublicDisplaySeason,
+        } = await import(
+            "./config.js?v=season-default-1"
+        );
+
+
+        const seasons =
+            await loadFclSeasons();
+
+
+        const displaySeason =
+            resolvePublicDisplaySeason(
+                seasons
+            );
+
+
+        if (!displaySeason) {
+            return;
+        }
+
+
+        const seasonNumber =
+            Number(
+                displaySeason
+                    .season_number
+            );
+
+
+        if (
+            !Number.isInteger(
+                seasonNumber
+            )
+            ||
+            seasonNumber <= 0
+        ) {
+            return;
+        }
+
+
+        seasonElements.forEach(
+            seasonElement => {
+
+                seasonElement.textContent =
+                    `SEASON ${seasonNumber}`;
+
+            }
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "헤더 시즌 표시 실패:",
+            error
+        );
+    }
+}
+
+
+initializeSiteSeasonLabel();
+
 
 // =========================================
 // 공통 헤더 메뉴
