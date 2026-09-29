@@ -84,6 +84,7 @@ from fastapi.security import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
@@ -105,6 +106,39 @@ from backend.player_generation_notice import (
 # =========================
 
 app = FastAPI()
+
+
+@app.exception_handler(Exception)
+async def debug_unhandled_exception(
+    request: Request,
+    error: Exception,
+):
+
+    if (
+        request.method == "POST"
+        and
+        request.url.path == "/api/tournaments"
+    ):
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail":
+                    (
+                        f"{type(error).__name__}: "
+                        f"{error}"
+                    ),
+            },
+        )
+
+
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail":
+                "Internal Server Error",
+        },
+    )
 
 
 # =========================
