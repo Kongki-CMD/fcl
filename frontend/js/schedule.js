@@ -666,30 +666,14 @@ async function loadSeasonTabs() {
 
 async function loadSelectedSeasonPlayoffs() {
 
-    /*
-     * 현재 플레이오프 설정 구조는
-     * Season 1 전용이다.
-     *
-     * Season 2 플레이오프 구조를
-     * 시즌별로 분리하기 전까지는
-     * Season 1 데이터가 섞이지 않도록
-     * Season 2에서는 빈 목록 처리한다.
-     */
-
-    if (
-        selectedSeasonNumber
-        !== 1
-    ) {
-
-        renderPlayoffSchedule(
-            []
-        );
-
+    if (!selectedSeasonNumber) {
         return;
     }
 
 
-    await loadPlayoffSchedule();
+    await loadPlayoffSchedule(
+        selectedSeasonNumber
+    );
 }
 
 
@@ -721,10 +705,19 @@ async function loadSchedule() {
     }
 }
 
-async function loadPlayoffSchedule() {
+async function loadPlayoffSchedule(
+    seasonNumber = selectedSeasonNumber
+) {
     try {
+
+        if (!seasonNumber) {
+            return;
+        }
+
+
         const response = await fetch(
             `${apiBaseUrl}/api/playoffs`
+            + `?season=${seasonNumber}`
         );
 
         if (!response.ok) {

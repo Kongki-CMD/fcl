@@ -1,5 +1,6 @@
 import {
     apiBaseUrl,
+    loadFclSeasons,
 } from "./config.js";
 
 
@@ -132,6 +133,11 @@ const adminScheduleListElement =
         "#admin-schedule-list"
     );
 
+const adminPlayoffSeasonTabsElement =
+    document.querySelector(
+        "#admin-playoff-season-tabs"
+    );
+
 const adminPlayoffListElement =
     document.querySelector(
         "#admin-playoff-list"
@@ -225,6 +231,11 @@ const adminPlayoffEditSaveButtonElement =
     document.querySelector(
         "#admin-playoff-edit-save"
     );
+
+
+let adminPlayoffSeasons = [];
+
+let selectedAdminPlayoffSeasonNumber = null;
 
 
 let editingAdminPlayoff = null;
@@ -2421,7 +2432,267 @@ adminScheduleEditSaveButtonElement
 // 플레이오프 관리
 // =========================================
 
-async function loadAdminPlayoffs() {
+async function loadAdminPlayoffSeasonTabs() {
+
+    try {
+
+        adminPlayoffSeasons =
+            await loadFclSeasons();
+
+
+        if (
+            !Array.isArray(
+                adminPlayoffSeasons
+            )
+            ||
+            adminPlayoffSeasons.length === 0
+        ) {
+
+            adminPlayoffSeasonTabsElement
+                .innerHTML = "";
+
+            selectedAdminPlayoffSeasonNumber =
+                null;
+
+            return;
+        }
+
+
+        const activeSeason =
+            adminPlayoffSeasons.find(
+                season =>
+                    season.status
+                    === "active"
+            );
+
+
+        if (
+            !selectedAdminPlayoffSeasonNumber
+        ) {
+
+            selectedAdminPlayoffSeasonNumber =
+                Number(
+                    activeSeason
+                        ?.season_number
+                    ??
+                    adminPlayoffSeasons[
+                        adminPlayoffSeasons.length
+                        - 1
+                    ].season_number
+                );
+        }
+
+
+        renderAdminPlayoffSeasonTabs();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminPlayoffSeasonTabsElement
+            .innerHTML = "";
+    }
+}
+
+
+function renderAdminPlayoffSeasonTabs() {
+
+    adminPlayoffSeasonTabsElement
+        .innerHTML = "";
+
+
+    adminPlayoffSeasons.forEach(
+        season => {
+
+            const seasonNumber =
+                Number(
+                    season.season_number
+                );
+
+
+            const buttonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            buttonElement.type =
+                "button";
+
+
+            buttonElement.classList.add(
+                "season-tab-button"
+            );
+
+
+            if (
+                seasonNumber
+                ===
+                selectedAdminPlayoffSeasonNumber
+            ) {
+
+                buttonElement.classList.add(
+                    "active"
+                );
+            }
+
+
+            buttonElement.textContent =
+                `SEASON ${seasonNumber}`;
+
+
+            buttonElement.addEventListener(
+                "click",
+                async () => {
+
+                    if (
+                        seasonNumber
+                        ===
+                        selectedAdminPlayoffSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedAdminPlayoffSeasonNumber =
+                        seasonNumber;
+
+
+                    renderAdminPlayoffSeasonTabs();
+
+
+                    await loadAdminPlayoffs(
+                        false
+                    );
+                }
+            );
+
+
+            adminPlayoffSeasonTabsElement
+                .appendChild(
+                    buttonElement
+                );
+        }
+    );
+}
+
+function normalizeAdminPlayoffsForSeason(
+    playoffs
+) {
+
+    const playoffMap =
+        new Map(
+            (
+                Array.isArray(playoffs)
+                    ? playoffs
+                    : []
+            ).map(
+                playoff => [
+                    playoff.playoff_stage,
+                    playoff,
+                ]
+            )
+        );
+
+
+    const defaultPlayoffs = [
+        {
+            stage:
+                "준플레이오프",
+
+            playoff_stage:
+                "준플레이오프",
+
+            best_of: 5,
+            wins_required: 3,
+
+            team_a: "TBD",
+            team_b: "TBD",
+        },
+
+        {
+            stage:
+                "플레이오프",
+
+            playoff_stage:
+                "플레이오프",
+
+            best_of: 5,
+            wins_required: 3,
+
+            team_a: "TBD",
+            team_b:
+                "준플레이오프 승자",
+        },
+
+        {
+            stage:
+                "결승 시리즈",
+
+            playoff_stage:
+                "결승시리즈",
+
+            best_of: 7,
+            wins_required: 4,
+
+            team_a: "TBD",
+            team_b:
+                "플레이오프 승자",
+        },
+    ];
+
+
+    return defaultPlayoffs.map(
+        defaultPlayoff => {
+
+            const existingPlayoff =
+                playoffMap.get(
+                    defaultPlayoff
+                        .playoff_stage
+                );
+
+
+            if (existingPlayoff) {
+
+                return existingPlayoff;
+            }
+
+
+            return {
+                ...defaultPlayoff,
+
+                date: "",
+
+                series_id: null,
+
+                status:
+                    "waiting",
+
+                team_a_logo_path:
+                    null,
+
+                team_b_logo_path:
+                    null,
+
+                set_count: 0,
+
+                team_a_wins: 0,
+
+                team_b_wins: 0,
+            };
+        }
+    );
+}
+
+
+async function loadAdminPlayoffs(
+    loadSeasons = true
+) {
 
     const adminToken =
         getAdminToken();
@@ -2430,7 +2701,22 @@ async function loadAdminPlayoffs() {
     if (!adminToken) {
         return;
     }
+    if (loadSeasons) {
 
+        await loadAdminPlayoffSeasonTabs();
+    }
+
+
+    if (
+        !selectedAdminPlayoffSeasonNumber
+    ) {
+
+        adminPlayoffListElement
+            .textContent =
+                "시즌 정보를 불러올 수 없습니다.";
+
+        return;
+    }
 
     adminPlayoffListElement
         .textContent =
@@ -2442,6 +2728,9 @@ async function loadAdminPlayoffs() {
         const response =
             await fetch(
                 `${apiBaseUrl}/api/playoffs`
+                + `?season=${
+                    selectedAdminPlayoffSeasonNumber
+                }`
             );
 
 
@@ -2458,8 +2747,14 @@ async function loadAdminPlayoffs() {
         }
 
 
+        const normalizedPlayoffs =
+            normalizeAdminPlayoffsForSeason(
+                playoffs
+            );
+
+
         renderAdminPlayoffs(
-            playoffs
+            normalizedPlayoffs
         );
 
 
@@ -2639,7 +2934,7 @@ function renderAdminPlayoffs(
                         admin-playoff-date
                     "
                 >
-                    ${playoff.date ?? "-"}
+                    ${playoff.date || "-"}
                 </div>
 
 
@@ -2855,7 +3150,10 @@ adminPlayoffEditSaveButtonElement
                         + encodeURIComponent(
                             editingAdminPlayoff
                                 .playoff_stage
-                        ),
+                        )
+                        + `?season=${
+                            selectedAdminPlayoffSeasonNumber
+                        }`,
                         {
                             method:
                                 "PUT",
