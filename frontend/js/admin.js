@@ -145,6 +145,23 @@ const adminRegularGenerationCardElement =
         "#admin-regular-generation-card"
     );
 
+const adminRegularSeasonStartDateElement =
+    document.querySelector(
+        "#admin-regular-season-start-date"
+    );
+
+
+const adminRegularSeasonStartSaveButtonElement =
+    document.querySelector(
+        "#admin-regular-season-start-save"
+    );
+
+
+const adminRegularSeasonStartMessageElement =
+    document.querySelector(
+        "#admin-regular-season-start-message"
+    );
+
 
 const adminRegularPreviewButtonElement =
     document.querySelector(
@@ -258,6 +275,8 @@ let adminRegularSeasons = [];
 let selectedAdminRegularSeasonNumber = null;
 
 let adminRegularGenerationPreviewData = null;
+
+let adminRegularScheduleCount = 0;
 
 
 let editingAdminSchedule = null;
@@ -2033,6 +2052,8 @@ function renderAdminRegularSeasonTabs() {
                     selectedAdminRegularSeasonNumber =
                         seasonNumber;
 
+                    adminRegularScheduleCount = 0;
+
 
                     clearAdminRegularGenerationPreview();
 
@@ -2054,6 +2075,115 @@ function renderAdminRegularSeasonTabs() {
                 );
         }
     );
+}
+
+function getSelectedAdminRegularSeason() {
+
+    return (
+        adminRegularSeasons.find(
+            season =>
+                Number(
+                    season.season_number
+                )
+                ===
+                selectedAdminRegularSeasonNumber
+        )
+        ?? null
+    );
+}
+
+
+function updateAdminRegularSeasonStartControls() {
+
+    if (
+        !adminRegularSeasonStartDateElement
+        ||
+        !adminRegularSeasonStartSaveButtonElement
+    ) {
+
+        return;
+    }
+
+
+    const season =
+        getSelectedAdminRegularSeason();
+
+
+    if (
+        !season
+        ||
+        selectedAdminRegularSeasonNumber
+        === 1
+    ) {
+
+        adminRegularSeasonStartDateElement
+            .value = "";
+
+        return;
+    }
+
+
+    adminRegularSeasonStartDateElement
+        .value =
+            season.start_date
+            ?? "";
+
+
+    const canEdit =
+        season.status === "upcoming"
+        &&
+        adminRegularScheduleCount === 0;
+
+
+    adminRegularSeasonStartDateElement
+        .disabled =
+            !canEdit;
+
+
+    adminRegularSeasonStartSaveButtonElement
+        .disabled =
+            !canEdit;
+
+
+    if (
+        adminRegularScheduleCount > 0
+    ) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "정규리그 일정이 이미 생성되어 "
+                + "시작일을 변경할 수 없습니다.";
+
+        return;
+    }
+
+
+    if (
+        season.status
+        !== "upcoming"
+    ) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "upcoming 상태의 시즌만 "
+                + "시작일을 변경할 수 있습니다.";
+
+        return;
+    }
+
+
+    if (!season.start_date) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "첫 정규리그 경기일을 설정해주세요.";
+
+    } else {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                `현재 시작일: ${season.start_date}`;
+    }
 }
 
 
@@ -2081,6 +2211,10 @@ function updateAdminRegularSeasonControls() {
     if (isSeasonOne) {
 
         clearAdminRegularGenerationPreview();
+
+    } else {
+
+        updateAdminRegularSeasonStartControls();
     }
 }
 
@@ -2168,6 +2302,16 @@ async function loadAdminRegularSchedule(
                 ?? "정규리그 일정 조회 실패"
             );
         }
+
+        adminRegularScheduleCount =
+            Array.isArray(
+                schedules
+            )
+                ? schedules.length
+                : 0;
+
+
+        updateAdminRegularSeasonStartControls();
 
 
         renderAdminRegularSchedule(
@@ -2378,6 +2522,257 @@ function renderAdminRegularGenerationPreview(
         .classList.remove(
             "hidden"
         );
+}
+
+async function saveAdminRegularSeasonStartDate() {
+
+    const season =
+        getSelectedAdminRegularSeason();
+
+
+    if (!season) {
+
+        return;
+    }
+
+
+    if (
+        selectedAdminRegularSeasonNumber
+        === 1
+    ) {
+
+        return;
+    }
+
+
+    if (
+        adminRegularScheduleCount > 0
+    ) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "이미 정규리그 일정이 생성되어 "
+                + "시작일을 변경할 수 없습니다.";
+
+        return;
+    }
+
+
+    const startDate =
+        adminRegularSeasonStartDateElement
+            .value;
+
+
+    if (!startDate) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "시즌 시작일을 선택해주세요.";
+
+        return;
+    }
+
+
+    // =========================
+    // 첫 경기일은
+    // 월 / 수 / 토만 허용
+    //
+    // JS getDay:
+    // 일 0
+    // 월 1
+    // 수 3
+    // 토 6
+    // =========================
+
+    const startDateObject =
+        new Date(
+            `${startDate}T00:00:00`
+        );
+
+
+    const allowedDays = new Set(
+        [
+            1,
+            3,
+            6,
+        ]
+    );
+
+
+    if (
+        !allowedDays.has(
+            startDateObject.getDay()
+        )
+    ) {
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                "첫 경기일은 월요일, 수요일, "
+                + "토요일 중 하나로 선택해주세요.";
+
+        return;
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    adminRegularSeasonStartSaveButtonElement
+        .disabled = true;
+
+
+    adminRegularSeasonStartMessageElement
+        .textContent =
+            "시즌 시작일을 저장하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/seasons/"
+                + `${
+                    selectedAdminRegularSeasonNumber
+                }`,
+                {
+                    method:
+                        "PUT",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            title:
+                                season.title,
+
+                            start_date:
+                                startDate,
+
+                            end_date:
+                                season.end_date
+                                ?? null,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "시즌 시작일 저장 실패"
+            );
+        }
+
+
+        const updatedSeason =
+            responseData.season;
+
+
+        adminRegularSeasons =
+            adminRegularSeasons.map(
+                currentSeason => {
+
+                    if (
+                        Number(
+                            currentSeason
+                                .season_number
+                        )
+                        ===
+                        Number(
+                            updatedSeason
+                                .season_number
+                        )
+                    ) {
+
+                        return {
+                            ...currentSeason,
+                            ...updatedSeason,
+                        };
+                    }
+
+
+                    return currentSeason;
+                }
+            );
+
+
+        // loadFclSeasons()의
+        // 30초 캐시 제거
+        sessionStorage.removeItem(
+            "fclSeasonsCacheV1"
+        );
+
+
+        clearAdminRegularGenerationPreview();
+
+
+        updateAdminRegularSeasonStartControls();
+
+
+        adminRegularGenerationMessageElement
+            .textContent =
+                "시작일이 저장되었습니다. "
+                + "일정 미리보기를 확인해주세요.";
+
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                `시작일 저장 완료: ${startDate}`;
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminRegularSeasonStartMessageElement
+            .textContent =
+                error.message;
+
+
+    } finally {
+
+        updateAdminRegularSeasonStartControls();
+    }
 }
 
 
@@ -8878,6 +9273,12 @@ adminRegularGenerationConfirmButtonElement
     ?.addEventListener(
         "click",
         generateAdminRegularSchedule
+    );
+
+adminRegularSeasonStartSaveButtonElement
+    ?.addEventListener(
+        "click",
+        saveAdminRegularSeasonStartDate
     );
 
 

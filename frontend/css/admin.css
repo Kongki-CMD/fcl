@@ -575,6 +575,82 @@
    정규리그 일정 관리
 ======================================== */
 
+.admin-regular-season-start-setting {
+    grid-column: 1 / -1;
+
+    display: grid;
+    grid-template-columns:
+        auto
+        minmax(180px, 240px)
+        auto
+        1fr;
+
+    align-items: center;
+    gap: 10px 12px;
+
+    padding-top: 16px;
+
+    border-top: 1px solid #eceef1;
+}
+
+
+.admin-regular-season-start-setting label {
+    color: #555;
+
+    font-size: 13px;
+    font-weight: 700;
+}
+
+
+#admin-regular-season-start-date {
+    height: 40px;
+
+    padding: 0 10px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #cfd3d9;
+    border-radius: 6px;
+
+    background: white;
+
+    font-family: inherit;
+}
+
+
+.admin-regular-season-start-save-button {
+    height: 40px;
+
+    padding: 0 16px;
+
+    border: 1px solid #17191d;
+    border-radius: 6px;
+
+    background: white;
+    color: #17191d;
+
+    font-family: inherit;
+    font-weight: 600;
+
+    cursor: pointer;
+}
+
+
+.admin-regular-season-start-save-button:disabled {
+    opacity: 0.5;
+
+    cursor: default;
+}
+
+
+.admin-regular-season-start-message {
+    margin: 0;
+
+    color: #777;
+
+    font-size: 12px;
+}
+
 .admin-schedule-reform-card {
     margin-top: 24px;
     padding: 20px;
@@ -1444,6 +1520,21 @@
     /* ====================================
        정규리그 일정
     ==================================== */
+
+    .admin-regular-season-start-setting {
+        grid-template-columns: 1fr;
+    }
+
+
+    #admin-regular-season-start-date,
+    .admin-regular-season-start-save-button {
+        width: 100%;
+    }
+
+
+    .admin-regular-season-start-message {
+        min-height: 18px;
+    }
 
     .admin-schedule-list {
         gap: 12px;

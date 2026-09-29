@@ -11083,6 +11083,91 @@ def admin_update_fcl_season(
 
             cursor.execute(
                 """
+                SELECT
+                    id,
+                    start_date
+
+                FROM seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            current_season = (
+                cursor.fetchone()
+            )
+
+
+            if current_season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                current_season[
+                    "start_date"
+                ]
+                != start_date
+            ):
+
+                cursor.execute(
+                    """
+                    SELECT
+                        COUNT(*)
+                            AS regular_count
+
+                    FROM series
+
+                    WHERE
+                        season_id = %s
+
+                        AND
+                        series_type =
+                            '정규리그'
+                    """,
+                    (
+                        current_season[
+                            "id"
+                        ],
+                    ),
+                )
+
+
+                regular_count = int(
+                    cursor.fetchone()[
+                        "regular_count"
+                    ]
+                )
+
+
+                if regular_count > 0:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "정규리그 일정이 이미 "
+                            "생성된 시즌의 시작일은 "
+                            "변경할 수 없습니다."
+                        ),
+                    )
+
+            cursor.execute(
+                """
                 UPDATE seasons
 
                 SET
