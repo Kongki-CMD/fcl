@@ -27276,8 +27276,6 @@ def admin_update_playoff_setting(
     request:
         AdminPlayoffUpdateRequest,
 
-    season: int | None = None,
-
     admin_token: str =
         Depends(
             require_admin
@@ -27305,25 +27303,9 @@ def admin_update_playoff_setting(
         )
 
 
-    selected_season = (
-        resolve_fcl_season_record(
-            season
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+    # =========================
+    # 날짜 검증
+    # =========================
 
     try:
 
@@ -27384,6 +27366,11 @@ def admin_update_playoff_setting(
 
         with connection.cursor() as cursor:
 
+            # =========================
+            # 이미 실제 SERIES가
+            # 생성되어 있는지 확인
+            # =========================
+
             cursor.execute(
                 """
                 SELECT
@@ -27406,9 +27393,6 @@ def admin_update_playoff_setting(
                         '플레이오프'
 
                     AND
-                    s.season_id = %s
-
-                    AND
                     s.playoff_stage = %s
 
                     AND
@@ -27423,7 +27407,6 @@ def admin_update_playoff_setting(
                 FOR UPDATE
                 """,
                 (
-                    selected_season_id,
                     playoff_stage,
                 ),
             )
@@ -27433,6 +27416,11 @@ def admin_update_playoff_setting(
                 cursor.fetchone()
             )
 
+
+            # =========================
+            # 생성된 SERIES가 있다면
+            # 예정 상태에서만 변경
+            # =========================
 
             if series:
 
@@ -27468,20 +27456,21 @@ def admin_update_playoff_setting(
                     )
 
 
+            # =========================
+            # 기본 설정 저장
+            # =========================
+
             cursor.execute(
                 """
-                INSERT INTO
-                    season_playoff_settings (
-                        season_id,
-                        playoff_stage,
-                        scheduled_date,
-                        best_of,
-                        wins_required,
-                        updated_at
-                    )
+                INSERT INTO playoff_settings (
+                    playoff_stage,
+                    scheduled_date,
+                    best_of,
+                    wins_required,
+                    updated_at
+                )
 
                 VALUES (
-                    %s,
                     %s,
                     %s,
                     %s,
@@ -27490,7 +27479,6 @@ def admin_update_playoff_setting(
                 )
 
                 ON CONFLICT (
-                    season_id,
                     playoff_stage
                 )
 
@@ -27514,7 +27502,6 @@ def admin_update_playoff_setting(
                     wins_required
                 """,
                 (
-                    selected_season_id,
                     playoff_stage,
                     scheduled_date,
                     best_of,
@@ -27528,56 +27515,10 @@ def admin_update_playoff_setting(
             )
 
 
-            # Season 1은 기존 Render/관리자 코드
-            # 호환을 위해 레거시 설정도 동기화한다.
-            if (
-                selected_season_number
-                == 1
-            ):
-
-                cursor.execute(
-                    """
-                    INSERT INTO playoff_settings (
-                        playoff_stage,
-                        scheduled_date,
-                        best_of,
-                        wins_required,
-                        updated_at
-                    )
-
-                    VALUES (
-                        %s,
-                        %s,
-                        %s,
-                        %s,
-                        NOW()
-                    )
-
-                    ON CONFLICT (
-                        playoff_stage
-                    )
-
-                    DO UPDATE SET
-                        scheduled_date =
-                            EXCLUDED.scheduled_date,
-
-                        best_of =
-                            EXCLUDED.best_of,
-
-                        wins_required =
-                            EXCLUDED.wins_required,
-
-                        updated_at =
-                            NOW()
-                    """,
-                    (
-                        playoff_stage,
-                        scheduled_date,
-                        best_of,
-                        wins_required,
-                    ),
-                )
-
+            # =========================
+            # 실제 SERIES가 이미 있으면
+            # 같이 변경
+            # =========================
 
             if series:
 
@@ -27590,18 +27531,13 @@ def admin_update_playoff_setting(
                         best_of = %s,
                         wins_required = %s
 
-                    WHERE
-                        id = %s
-
-                        AND
-                        season_id = %s
+                    WHERE id = %s
                     """,
                     (
                         scheduled_date,
                         best_of,
                         wins_required,
                         series["id"],
-                        selected_season_id,
                     ),
                 )
 
@@ -27610,9 +27546,6 @@ def admin_update_playoff_setting(
 
 
     return {
-        "season_number":
-            selected_season_number,
-
         "playoff_stage":
             setting[
                 "playoff_stage"
@@ -27650,37 +27583,24 @@ def admin_update_playoff_setting(
             ),
     }
 
+# =========================
+# PLAYOFF PREVIEW
+# 현재 정규리그 순위 기준
+# =========================
+
 @app.get(
     "/api/admin/playoffs/preview"
 )
 def preview_playoffs(
-    season: int | None = None,
-
     admin_token: str =
         Depends(
             require_admin
         ),
 ):
 
-    selected_season = (
-        resolve_fcl_season_record(
-            season
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+    # =========================
+    # 정규리그 진행 상태
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -27699,16 +27619,8 @@ def preview_playoffs(
 
                 WHERE
                     series_type = '정규리그'
-
-                    AND
-                    season_id = %s
-
-                    AND
-                    status <> 'cancelled'
-                """,
-                (
-                    selected_season_id,
-                ),
+                    AND status <> 'cancelled'
+                """
             )
 
             regular_status = (
@@ -27725,10 +27637,11 @@ def preview_playoffs(
     )
 
 
-    standings = get_standings(
-        season=
-            selected_season_number
-    )
+    # =========================
+    # 현재 정규리그 순위
+    # =========================
+
+    standings = get_standings()
 
 
     if len(standings) < 5:
@@ -27749,92 +27662,11 @@ def preview_playoffs(
     fifth_place = standings[4]
 
 
-    playoff_settings = {}
-
-
-    for stage in (
-        "준플레이오프",
-        "플레이오프",
-        "결승시리즈",
-    ):
-
-        setting = get_playoff_setting(
-            stage,
-            season=
-                selected_season_number,
-        )
-
-        if setting:
-
-            playoff_settings[
-                stage
-            ] = setting
-
-
-    def get_format(
-        stage: str,
-        default_best_of: int,
-    ):
-
-        setting = (
-            playoff_settings.get(
-                stage
-            )
-        )
-
-
-        if setting:
-
-            return (
-                int(
-                    setting[
-                        "best_of"
-                    ]
-                ),
-                int(
-                    setting[
-                        "wins_required"
-                    ]
-                ),
-            )
-
-
-        return (
-            default_best_of,
-            (
-                default_best_of
-                // 2
-                + 1
-            ),
-        )
-
-
-    quarter_best_of, quarter_wins = (
-        get_format(
-            "준플레이오프",
-            5,
-        )
-    )
-
-    playoff_best_of, playoff_wins = (
-        get_format(
-            "플레이오프",
-            5,
-        )
-    )
-
-    final_best_of, final_wins = (
-        get_format(
-            "결승시리즈",
-            7,
-        )
-    )
-
+    # =========================
+    # 미리보기 반환
+    # =========================
 
     return {
-        "season_number":
-            selected_season_number,
-
         "regular_league": {
             "total": total_count,
             "completed": completed_count,
@@ -27864,11 +27696,8 @@ def preview_playoffs(
 
         "playoff_bracket": {
             "준플레이오프": {
-                "best_of":
-                    quarter_best_of,
-
-                "wins_required":
-                    quarter_wins,
+                "best_of": 5,
+                "wins_required": 3,
 
                 "team_a": {
                     "rank": 3,
@@ -27884,11 +27713,8 @@ def preview_playoffs(
             },
 
             "플레이오프": {
-                "best_of":
-                    playoff_best_of,
-
-                "wins_required":
-                    playoff_wins,
+                "best_of": 5,
+                "wins_required": 3,
 
                 "team_a": {
                     "rank": 2,
@@ -27903,11 +27729,8 @@ def preview_playoffs(
             },
 
             "결승시리즈": {
-                "best_of":
-                    final_best_of,
-
-                "wins_required":
-                    final_wins,
+                "best_of": 7,
+                "wins_required": 4,
 
                 "team_a": {
                     "rank": 1,
@@ -27929,13 +27752,17 @@ def preview_playoffs(
         },
     }
 
+
+# =========================
+# PLAYOFF INITIALIZE
+# 정규리그 3위 VS 4위
+# =========================
+
 @app.post(
     "/api/admin/playoffs/initialize"
 )
 def initialize_playoffs(
     request: PlayoffInitializeRequest,
-
-    season: int | None = None,
 
     admin_token: str =
         Depends(
@@ -27943,25 +27770,9 @@ def initialize_playoffs(
         ),
 ):
 
-    selected_season = (
-        resolve_fcl_season_record(
-            season
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+    # =========================
+    # 경기 날짜 검증
+    # =========================
 
     try:
 
@@ -27999,6 +27810,10 @@ def initialize_playoffs(
         )
 
 
+    # =========================
+    # 정규리그 완료 확인
+    # =========================
+
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
@@ -28016,16 +27831,8 @@ def initialize_playoffs(
 
                 WHERE
                     series_type = '정규리그'
-
-                    AND
-                    season_id = %s
-
-                    AND
-                    status <> 'cancelled'
-                """,
-                (
-                    selected_season_id,
-                ),
+                    AND status <> 'cancelled'
+                """
             )
 
 
@@ -28056,12 +27863,16 @@ def initialize_playoffs(
         raise HTTPException(
             status_code=400,
             detail=(
-                "선택한 시즌의 정규리그 "
-                "20경기가 모두 완료된 후 "
+                "정규리그 20경기가 "
+                "모두 완료된 후 "
                 "플레이오프를 생성할 수 있습니다."
             ),
         )
 
+
+    # =========================
+    # 기존 플레이오프 확인
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -28080,19 +27891,13 @@ def initialize_playoffs(
                     series_type = '플레이오프'
 
                     AND
-                    season_id = %s
-
-                    AND
                     playoff_stage = '준플레이오프'
 
                     AND
                     status <> 'cancelled'
 
                 LIMIT 1
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -28106,17 +27911,17 @@ def initialize_playoffs(
         raise HTTPException(
             status_code=400,
             detail=(
-                "선택한 시즌에 이미 "
-                "준플레이오프 SERIES가 "
-                "생성되어 있습니다."
+                "이미 준플레이오프 "
+                "SERIES가 생성되어 있습니다."
             ),
         )
 
 
-    standings = get_standings(
-        season=
-            selected_season_number
-    )
+    # =========================
+    # 정규리그 최종 순위
+    # =========================
+
+    standings = get_standings()
 
 
     if len(standings) < 4:
@@ -28130,41 +27935,10 @@ def initialize_playoffs(
         )
 
 
-    playoff_setting = (
-        get_playoff_setting(
-            "준플레이오프",
-            season=
-                selected_season_number,
-        )
-    )
-
-
-    if not playoff_setting:
-
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "선택한 시즌의 "
-                "준플레이오프 설정이 없습니다."
-            ),
-        )
-
-
-    best_of = int(
-        playoff_setting[
-            "best_of"
-        ]
-    )
-
-    wins_required = int(
-        playoff_setting[
-            "wins_required"
-        ]
-    )
-
-
     third_place = standings[2]
+
     fourth_place = standings[3]
+
 
     team_a_name = (
         third_place["name"]
@@ -28175,6 +27949,10 @@ def initialize_playoffs(
     )
 
 
+    # =========================
+    # 참가자 ID 조회
+    # =========================
+
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
@@ -28182,27 +27960,18 @@ def initialize_playoffs(
             cursor.execute(
                 """
                 SELECT
-                    p.id,
-                    p.fcl_name,
-                    p.fc_nickname
+                    id,
+                    fcl_name,
+                    fc_nickname
 
-                FROM season_participants AS sp
+                FROM participants
 
-                JOIN participants AS p
-                    ON p.id =
-                        sp.participant_id
-
-                WHERE
-                    sp.season_id = %s
-
-                    AND
-                    p.fcl_name IN (
-                        %s,
-                        %s
-                    )
+                WHERE fcl_name IN (
+                    %s,
+                    %s
+                )
                 """,
                 (
-                    selected_season_id,
                     team_a_name,
                     team_b_name,
                 ),
@@ -28238,7 +28007,6 @@ def initialize_playoffs(
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "선택한 시즌의 "
                         "플레이오프 참가자 정보를 "
                         "찾을 수 없습니다."
                     ),
@@ -28254,16 +28022,20 @@ def initialize_playoffs(
             ]
 
 
+            # =========================
+            # 준플레이오프 SERIES 생성
+            # =========================
+
             cursor.execute(
                 """
                 INSERT INTO series (
                     series_type,
-                    season_id,
 
                     team_a_id,
                     team_b_id,
 
                     match_type,
+
                     scheduled_date,
 
                     playoff_stage,
@@ -28276,17 +28048,17 @@ def initialize_playoffs(
 
                 VALUES (
                     '플레이오프',
-                    %s,
 
                     %s,
                     %s,
 
                     40,
+
                     %s,
 
                     '준플레이오프',
-                    %s,
-                    %s,
+                    5,
+                    3,
 
                     'pending',
                     'scheduled'
@@ -28301,12 +28073,9 @@ def initialize_playoffs(
                     status
                 """,
                 (
-                    selected_season_id,
                     team_a["id"],
                     team_b["id"],
                     scheduled_date,
-                    best_of,
-                    wins_required,
                 ),
             )
 
@@ -28320,9 +28089,6 @@ def initialize_playoffs(
 
 
     return {
-        "season_number":
-            selected_season_number,
-
         "series_id":
             series_row["id"],
 
@@ -28373,6 +28139,12 @@ def initialize_playoffs(
             series_row["status"],
     }
 
+
+# =========================
+# PLAYOFF ADVANCE
+# 다음 플레이오프 단계 생성
+# =========================
+
 @app.post(
     "/api/admin/playoffs/{series_id}/advance"
 )
@@ -28385,6 +28157,10 @@ def advance_playoff_series(
             require_admin
         ),
 ):
+
+    # =========================
+    # 다음 경기 날짜 검증
+    # =========================
 
     try:
 
@@ -28423,30 +28199,14 @@ def advance_playoff_series(
         )
 
 
-    selected_season = (
-        resolve_fcl_season_record_for_series(
-            series_id
-        )
-    )
+    # =========================
+    # 정규리그 최종 순위
+    #
+    # 다음 단계의
+    # 1위 / 2위 참가자 확인
+    # =========================
 
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
-
-    standings = get_standings(
-        season=
-            selected_season_number
-    )
+    standings = get_standings()
 
 
     if len(standings) < 4:
@@ -28454,8 +28214,8 @@ def advance_playoff_series(
         raise HTTPException(
             status_code=400,
             detail=(
-                "선택한 시즌의 정규리그 "
-                "최종 순위를 확인할 수 없습니다."
+                "정규리그 최종 순위를 "
+                "확인할 수 없습니다."
             ),
         )
 
@@ -28464,11 +28224,17 @@ def advance_playoff_series(
 
         with connection.cursor() as cursor:
 
+            # =========================
+            # 현재 플레이오프 SERIES
+            #
+            # 동시에 advance 되는 것을
+            # 방지하기 위해 행 잠금
+            # =========================
+
             cursor.execute(
                 """
                 SELECT
                     s.id,
-                    s.season_id,
                     s.series_type,
                     s.playoff_stage,
                     s.best_of,
@@ -28501,17 +28267,12 @@ def advance_playoff_series(
                     ON team_b.id =
                         s.team_b_id
 
-                WHERE
-                    s.id = %s
-
-                    AND
-                    s.season_id = %s
+                WHERE s.id = %s
 
                 FOR UPDATE OF s
                 """,
                 (
                     series_id,
-                    selected_season_id,
                 ),
             )
 
@@ -28524,11 +28285,14 @@ def advance_playoff_series(
                 raise HTTPException(
                     status_code=404,
                     detail=(
-                        "선택한 시즌의 SERIES를 "
-                        "찾을 수 없습니다."
+                        "SERIES를 찾을 수 없습니다."
                     ),
                 )
 
+
+            # =========================
+            # 플레이오프 확인
+            # =========================
 
             if (
                 series["series_type"]
@@ -28545,6 +28309,10 @@ def advance_playoff_series(
                 )
 
 
+            # =========================
+            # 완료 상태 확인
+            # =========================
+
             if (
                 series["status"]
                 != "completed"
@@ -28560,6 +28328,10 @@ def advance_playoff_series(
                 )
 
 
+            # =========================
+            # 결승은 다음 단계 없음
+            # =========================
+
             if (
                 series["playoff_stage"]
                 == "결승시리즈"
@@ -28573,6 +28345,10 @@ def advance_playoff_series(
                     ),
                 )
 
+
+            # =========================
+            # 현재 SERIES 세트 조회
+            # =========================
 
             cursor.execute(
                 """
@@ -28606,6 +28382,13 @@ def advance_playoff_series(
                 )
 
 
+            # =========================
+            # SERIES 승자 계산
+            #
+            # 선승 도달 이후 세트가
+            # 존재하는지도 검증
+            # =========================
+
             team_a_wins = 0
             team_b_wins = 0
 
@@ -28637,6 +28420,8 @@ def advance_playoff_series(
                     )
 
 
+                # 이미 선승 도달 후인데
+                # 추가 세트가 존재하면 비정상
                 if (
                     series_winner_side
                     is not None
@@ -28705,6 +28490,10 @@ def advance_playoff_series(
                     )
 
 
+            # =========================
+            # 선승 미도달 방어
+            # =========================
+
             if series_winner_side is None:
 
                 raise HTTPException(
@@ -28715,6 +28504,10 @@ def advance_playoff_series(
                     ),
                 )
 
+
+            # =========================
+            # 최대 세트 수 방어
+            # =========================
 
             if (
                 len(saved_sets)
@@ -28733,6 +28526,10 @@ def advance_playoff_series(
                     ),
                 )
 
+
+            # =========================
+            # 현재 SERIES 승자
+            # =========================
 
             if (
                 series_winner_side
@@ -28778,6 +28575,10 @@ def advance_playoff_series(
                 )
 
 
+            # =========================
+            # 다음 단계 설정
+            # =========================
+
             if (
                 series["playoff_stage"]
                 == "준플레이오프"
@@ -28812,12 +28613,9 @@ def advance_playoff_series(
                     ),
                 )
 
-
             next_playoff_setting = (
                 get_playoff_setting(
-                    next_stage,
-                    season=
-                        selected_season_number,
+                    next_stage
                 )
             )
 
@@ -28827,8 +28625,6 @@ def advance_playoff_series(
                 raise HTTPException(
                     status_code=500,
                     detail=(
-                        f"Season "
-                        f"{selected_season_number} "
                         f"{next_stage} 설정을 "
                         "찾을 수 없습니다."
                     ),
@@ -28849,6 +28645,11 @@ def advance_playoff_series(
             )
 
 
+            # =========================
+            # 이미 다음 단계가
+            # 생성되어 있는지 확인
+            # =========================
+
             cursor.execute(
                 """
                 SELECT
@@ -28862,9 +28663,6 @@ def advance_playoff_series(
                         '플레이오프'
 
                     AND
-                    season_id = %s
-
-                    AND
                     playoff_stage = %s
 
                     AND
@@ -28873,7 +28671,6 @@ def advance_playoff_series(
                 LIMIT 1
                 """,
                 (
-                    selected_season_id,
                     next_stage,
                 ),
             )
@@ -28889,12 +28686,16 @@ def advance_playoff_series(
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        f"선택한 시즌에 이미 "
-                        f"{next_stage} SERIES가 "
+                        f"이미 {next_stage} "
+                        "SERIES가 "
                         "생성되어 있습니다."
                     ),
                 )
 
+
+            # =========================
+            # 1위 또는 2위 확인
+            # =========================
 
             seeded_name = (
                 standings[
@@ -28908,24 +28709,15 @@ def advance_playoff_series(
             cursor.execute(
                 """
                 SELECT
-                    p.id,
-                    p.fcl_name,
-                    p.fc_nickname
+                    id,
+                    fcl_name,
+                    fc_nickname
 
-                FROM season_participants AS sp
+                FROM participants
 
-                JOIN participants AS p
-                    ON p.id =
-                        sp.participant_id
-
-                WHERE
-                    sp.season_id = %s
-
-                    AND
-                    p.fcl_name = %s
+                WHERE fcl_name = %s
                 """,
                 (
-                    selected_season_id,
                     seeded_name,
                 ),
             )
@@ -28941,7 +28733,6 @@ def advance_playoff_series(
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "선택한 시즌의 "
                         "시드 참가자 정보를 "
                         "찾을 수 없습니다."
                     ),
@@ -28962,11 +28753,17 @@ def advance_playoff_series(
                 )
 
 
+            # =========================
+            # 다음 SERIES 생성
+            #
+            # team_a = 상위 시드
+            # team_b = 이전 단계 승자
+            # =========================
+
             cursor.execute(
                 """
                 INSERT INTO series (
                     series_type,
-                    season_id,
 
                     team_a_id,
                     team_b_id,
@@ -28984,7 +28781,6 @@ def advance_playoff_series(
 
                 VALUES (
                     '플레이오프',
-                    %s,
 
                     %s,
                     %s,
@@ -29009,8 +28805,6 @@ def advance_playoff_series(
                     status
                 """,
                 (
-                    selected_season_id,
-
                     seeded_participant[
                         "id"
                     ],
@@ -29035,9 +28829,6 @@ def advance_playoff_series(
 
 
     return {
-        "season_number":
-            selected_season_number,
-
         "source_series": {
             "series_id":
                 series_id,
@@ -29141,6 +28932,12 @@ def advance_playoff_series(
                 "생성되었습니다."
             ),
     }
+
+
+# =========================
+# 선수 기록 동기화 상태
+# 정규리그만 확인
+# =========================
 
 @app.get("/api/player-rankings/sync-status")
 def get_player_rankings_sync_status(
@@ -29857,86 +29654,10 @@ def get_player_rankings(
 # 아직 확정하지 않음
 # =========================
 
-def resolve_fcl_season_record_for_series(
-    series_id: int,
-):
-
-    with get_db_connection() as connection:
-
-        with connection.cursor() as cursor:
-
-            cursor.execute(
-                """
-                SELECT
-                    season.id,
-                    season.season_number,
-                    season.title,
-                    season.status
-
-                FROM series AS s
-
-                JOIN seasons AS season
-                    ON season.id =
-                        s.season_id
-
-                WHERE
-                    s.id = %s
-
-                LIMIT 1
-                """,
-                (
-                    series_id,
-                ),
-            )
-
-
-            season = (
-                cursor.fetchone()
-            )
-
-
-    if season is None:
-
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "SERIES의 FCL 시즌 정보를 "
-                "찾을 수 없습니다."
-            ),
-        )
-
-
-    return season
-
-def get_locked_regular_seeds(
-    season: int | None = None,
-):
-
-    selected_season = (
-        resolve_fcl_season_record(
-            season
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+def get_locked_regular_seeds():
 
     standings = (
-        get_standings(
-            season=
-                selected_season_number
-        )
+        get_standings()
     )
 
 
@@ -29963,6 +29684,14 @@ def get_locked_regular_seeds(
         in standings
     }
 
+
+    # =========================
+    # 남은 정규리그 경기
+    #
+    # 세트 승 = 3점
+    # 따라서 경기당 최대:
+    # target_set_count * 3
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -29994,17 +29723,11 @@ def get_locked_regular_seeds(
                         '정규리그'
 
                     AND
-                    s.season_id = %s
-
-                    AND
                     s.status IN (
                         'scheduled',
                         'active'
                     )
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -30013,11 +29736,11 @@ def get_locked_regular_seeds(
             )
 
 
-    for series_row in remaining_series:
+    for series in remaining_series:
 
         max_series_points = (
             int(
-                series_row[
+                series[
                     "target_set_count"
                 ]
                 or 3
@@ -30028,13 +29751,13 @@ def get_locked_regular_seeds(
 
 
         team_a = (
-            series_row[
+            series[
                 "team_a"
             ]
         )
 
         team_b = (
-            series_row[
+            series[
                 "team_b"
             ]
         )
@@ -30060,6 +29783,10 @@ def get_locked_regular_seeds(
             ] += max_series_points
 
 
+    # =========================
+    # 최종 최대 가능 승점
+    # =========================
+
     maximum_final_points = {
         name:
             (
@@ -30075,6 +29802,11 @@ def get_locked_regular_seeds(
 
     locked_seeds = {}
 
+
+    # =========================
+    # 참가자별 정확한 최종 순위가
+    # 승점만으로 확정됐는지 확인
+    # =========================
 
     for participant in standings:
 
@@ -30131,6 +29863,8 @@ def get_locked_regular_seeds(
             )
 
 
+            # 상대가 어떤 경우에도
+            # 이 참가자보다 위
             if (
                 other_min
                 >
@@ -30142,6 +29876,8 @@ def get_locked_regular_seeds(
                 continue
 
 
+            # 이 참가자가 어떤 경우에도
+            # 상대보다 위
             if (
                 participant_min
                 >
@@ -30151,6 +29887,8 @@ def get_locked_regular_seeds(
                 continue
 
 
+            # 승점 동률 또는 역전 가능
+            # → 아직 정확한 순위 미확정
             rank_is_locked = False
 
             break
@@ -30183,22 +29921,7 @@ def get_locked_regular_seeds(
 
 def get_playoff_setting(
     playoff_stage: str,
-    season: int | None = None,
 ):
-
-    selected_season = (
-        resolve_fcl_season_record(
-            season
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
 
     with get_db_connection() as connection:
 
@@ -30212,19 +29935,13 @@ def get_playoff_setting(
                     best_of,
                     wins_required
 
-                FROM
-                    season_playoff_settings
+                FROM playoff_settings
 
-                WHERE
-                    season_id = %s
-
-                    AND
-                    playoff_stage = %s
+                WHERE playoff_stage = %s
 
                 LIMIT 1
                 """,
                 (
-                    selected_season_id,
                     playoff_stage,
                 ),
             )
@@ -30237,15 +29954,14 @@ def get_playoff_setting(
 
     return setting
 
+
 def get_playoff_schedule_date(
     playoff_stage: str,
-    season: int | None = None,
 ):
 
     setting = (
         get_playoff_setting(
-            playoff_stage,
-            season=season,
+            playoff_stage
         )
     )
 
@@ -30258,40 +29974,12 @@ def get_playoff_schedule_date(
         "scheduled_date"
     ]
 
-def create_initial_playoff_if_ready(
-    series_id: int | None = None,
-    season: int | None = None,
-):
 
-    if series_id is not None:
+def create_initial_playoff_if_ready():
 
-        selected_season = (
-            resolve_fcl_season_record_for_series(
-                series_id
-            )
-        )
-
-    else:
-
-        selected_season = (
-            resolve_fcl_season_record(
-                season
-            )
-        )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+    # =========================
+    # 정규리그 완료 여부
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -30313,15 +30001,9 @@ def create_initial_playoff_if_ready(
                         '정규리그'
 
                     AND
-                    season_id = %s
-
-                    AND
                     status <>
                         'cancelled'
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -30343,6 +30025,7 @@ def create_initial_playoff_if_ready(
     )
 
 
+    # 아직 정규리그가 안 끝남
     if (
         total_count != 20
         or
@@ -30351,6 +30034,10 @@ def create_initial_playoff_if_ready(
 
         return None
 
+
+    # =========================
+    # 이미 준PO가 있는지 확인
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -30368,9 +30055,6 @@ def create_initial_playoff_if_ready(
                         '플레이오프'
 
                     AND
-                    season_id = %s
-
-                    AND
                     playoff_stage =
                         '준플레이오프'
 
@@ -30379,10 +30063,7 @@ def create_initial_playoff_if_ready(
                         'cancelled'
 
                 LIMIT 1
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -30395,19 +30076,16 @@ def create_initial_playoff_if_ready(
 
         return {
             "created": False,
-
-            "season_number":
-                selected_season_number,
-
             "series_id":
                 existing_series["id"],
         }
 
 
-    standings = get_standings(
-        season=
-            selected_season_number
-    )
+    # =========================
+    # 최종 순위
+    # =========================
+
+    standings = get_standings()
 
 
     if len(standings) < 4:
@@ -30419,18 +30097,24 @@ def create_initial_playoff_if_ready(
     fourth_place = standings[3]
 
 
+    # =========================
+    # 기존 플레이오프 일정에서
+    # 준PO 날짜 가져오기
+    # =========================
+
     playoff_setting = (
         get_playoff_setting(
-            "준플레이오프",
-            season=
-                selected_season_number,
+            "준플레이오프"
         )
     )
 
 
     if not playoff_setting:
 
-        return None
+        raise RuntimeError(
+            "준플레이오프 설정을 "
+            "찾을 수 없습니다."
+        )
 
 
     best_of = int(
@@ -30446,41 +30130,42 @@ def create_initial_playoff_if_ready(
     )
 
     scheduled_date = (
-        playoff_setting[
-            "scheduled_date"
-        ]
+        get_playoff_schedule_date(
+            "준플레이오프"
+        )
     )
 
 
     if scheduled_date is None:
 
-        return None
+        raise RuntimeError(
+            "준플레이오프 일정 날짜를 "
+            "찾을 수 없습니다."
+        )
 
+
+    # =========================
+    # 참가자 조회 + SERIES 생성
+    # =========================
 
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
 
-            advisory_lock_key = (
-                202610100000
-                +
-                selected_season_id
-            )
-
-
+            # 중복 생성 방지
             cursor.execute(
                 """
                 SELECT
                     pg_advisory_xact_lock(
-                        %s
+                        20261010
                     )
-                """,
-                (
-                    advisory_lock_key,
-                ),
+                """
             )
 
 
+            # lock을 기다리는 동안
+            # 다른 요청이 먼저 만들었을 수 있으므로
+            # 다시 확인
             cursor.execute(
                 """
                 SELECT
@@ -30493,9 +30178,6 @@ def create_initial_playoff_if_ready(
                         '플레이오프'
 
                     AND
-                    season_id = %s
-
-                    AND
                     playoff_stage =
                         '준플레이오프'
 
@@ -30504,10 +30186,7 @@ def create_initial_playoff_if_ready(
                         'cancelled'
 
                 LIMIT 1
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -30520,10 +30199,6 @@ def create_initial_playoff_if_ready(
 
                 return {
                     "created": False,
-
-                    "season_number":
-                        selected_season_number,
-
                     "series_id":
                         existing_series[
                             "id"
@@ -30534,27 +30209,18 @@ def create_initial_playoff_if_ready(
             cursor.execute(
                 """
                 SELECT
-                    p.id,
-                    p.fcl_name,
-                    p.fc_nickname
+                    id,
+                    fcl_name,
+                    fc_nickname
 
-                FROM season_participants AS sp
+                FROM participants
 
-                JOIN participants AS p
-                    ON p.id =
-                        sp.participant_id
-
-                WHERE
-                    sp.season_id = %s
-
-                    AND
-                    p.fcl_name IN (
-                        %s,
-                        %s
-                    )
+                WHERE fcl_name IN (
+                    %s,
+                    %s
+                )
                 """,
                 (
-                    selected_season_id,
                     third_place["name"],
                     fourth_place["name"],
                 ),
@@ -30588,7 +30254,6 @@ def create_initial_playoff_if_ready(
             ):
 
                 raise RuntimeError(
-                    "선택한 시즌의 "
                     "플레이오프 참가자 정보를 "
                     "찾을 수 없습니다."
                 )
@@ -30607,18 +30272,13 @@ def create_initial_playoff_if_ready(
                 """
                 INSERT INTO series (
                     series_type,
-                    season_id,
-
                     team_a_id,
                     team_b_id,
-
                     match_type,
                     scheduled_date,
-
                     playoff_stage,
                     best_of,
                     wins_required,
-
                     stats_sync_status,
                     status
                 )
@@ -30626,17 +30286,12 @@ def create_initial_playoff_if_ready(
                 VALUES (
                     '플레이오프',
                     %s,
-
                     %s,
-                    %s,
-
                     40,
                     %s,
-
                     '준플레이오프',
-                    %s,
-                    %s,
-
+                    5,
+                    3,
                     'pending',
                     'scheduled'
                 )
@@ -30646,7 +30301,6 @@ def create_initial_playoff_if_ready(
                     scheduled_date
                 """,
                 (
-                    selected_season_id,
                     team_a["id"],
                     team_b["id"],
                     scheduled_date,
@@ -30667,9 +30321,6 @@ def create_initial_playoff_if_ready(
     return {
         "created": True,
 
-        "season_number":
-            selected_season_number,
-
         "series_id":
             playoff_series["id"],
 
@@ -30689,25 +30340,9 @@ def create_next_playoff_if_ready(
     series_id: int,
 ):
 
-    selected_season = (
-        resolve_fcl_season_record_for_series(
-            series_id
-        )
-    )
-
-
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
-
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
-
+    # =========================
+    # 현재 플레이오프 확인
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -30717,22 +30352,16 @@ def create_next_playoff_if_ready(
                 """
                 SELECT
                     id,
-                    season_id,
                     series_type,
                     playoff_stage,
                     status
 
                 FROM series
 
-                WHERE
-                    id = %s
-
-                    AND
-                    season_id = %s
+                WHERE id = %s
                 """,
                 (
                     series_id,
-                    selected_season_id,
                 ),
             )
 
@@ -30758,6 +30387,10 @@ def create_next_playoff_if_ready(
         return None
 
 
+    # =========================
+    # 다음 단계
+    # =========================
+
     if (
         series["playoff_stage"]
         == "준플레이오프"
@@ -30780,14 +30413,16 @@ def create_next_playoff_if_ready(
         return {
             "created": False,
             "reason": "final_completed",
-            "season_number":
-                selected_season_number,
         }
 
     else:
 
         return None
 
+
+    # =========================
+    # 이미 다음 SERIES가 있는지
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -30805,9 +30440,6 @@ def create_next_playoff_if_ready(
                         '플레이오프'
 
                     AND
-                    season_id = %s
-
-                    AND
                     playoff_stage = %s
 
                     AND
@@ -30817,7 +30449,6 @@ def create_next_playoff_if_ready(
                 LIMIT 1
                 """,
                 (
-                    selected_season_id,
                     next_stage,
                 ),
             )
@@ -30832,28 +30463,33 @@ def create_next_playoff_if_ready(
 
         return {
             "created": False,
-
-            "season_number":
-                selected_season_number,
-
             "series_id":
                 existing_series["id"],
         }
 
 
+    # =========================
+    # 기존 플레이오프 일정 날짜
+    # =========================
+
     scheduled_date = (
         get_playoff_schedule_date(
-            next_stage,
-            season=
-                selected_season_number,
+            next_stage
         )
     )
 
 
     if scheduled_date is None:
 
-        return None
+        raise RuntimeError(
+            f"{next_stage} 일정 날짜를 "
+            "찾을 수 없습니다."
+        )
 
+
+    # =========================
+    # 기존 검증된 ADVANCE 로직 재사용
+    # =========================
 
     request = PlayoffAdvanceRequest(
         scheduled_date=
@@ -30871,6 +30507,8 @@ def create_next_playoff_if_ready(
 
     except HTTPException:
 
+        # 동시에 두 요청이 들어온 경우
+        # 먼저 생성된 다음 SERIES 확인
         with get_db_connection() as connection:
 
             with connection.cursor() as cursor:
@@ -30887,9 +30525,6 @@ def create_next_playoff_if_ready(
                             '플레이오프'
 
                         AND
-                        season_id = %s
-
-                        AND
                         playoff_stage = %s
 
                         AND
@@ -30899,7 +30534,6 @@ def create_next_playoff_if_ready(
                     LIMIT 1
                     """,
                     (
-                        selected_season_id,
                         next_stage,
                     ),
                 )
@@ -30914,10 +30548,6 @@ def create_next_playoff_if_ready(
 
             return {
                 "created": False,
-
-                "season_number":
-                    selected_season_number,
-
                 "series_id":
                     existing_series["id"],
             }
@@ -30928,9 +30558,6 @@ def create_next_playoff_if_ready(
 
     return {
         "created": True,
-
-        "season_number":
-            selected_season_number,
 
         "series_id":
             result[
@@ -30946,30 +30573,112 @@ def create_next_playoff_if_ready(
             scheduled_date.isoformat(),
     }
 
+# =========================
+# 플레이오프 일정
+#
+# 날짜/단계:
+# playoffs.xlsx
+#
+# 실제 대진/진행 상태:
+# Neon SERIES
+# =========================
+
 @app.get("/api/playoffs")
-def get_playoffs(
-    season: int | None = None,
-):
+def get_playoffs():
 
-    selected_season = (
-        resolve_fcl_season_record(
-            season
+    # =========================
+    # 1. 기존 플레이오프 일정
+    # =========================
+
+    workbook = load_workbook(
+        PLAYOFFS_PATH,
+        data_only=True,
+    )
+
+    worksheet = workbook[
+        "플레이오프"
+    ]
+
+    schedule_rows = []
+
+
+    for row in worksheet.iter_rows(
+        min_row=2,
+        max_col=4,
+        values_only=True,
+    ):
+
+        (
+            match_date,
+            stage,
+            team_a,
+            team_b,
+        ) = row
+
+
+        if match_date is None:
+            continue
+
+
+        if hasattr(
+            match_date,
+            "strftime",
+        ):
+
+            match_date = (
+                match_date.strftime(
+                    "%Y-%m-%d"
+                )
+            )
+
+
+        stage_text = (
+            str(stage).strip()
+            if stage is not None
+            else ""
         )
-    )
 
 
-    selected_season_id = int(
-        selected_season[
-            "id"
-        ]
-    )
+        # DB에서는
+        # "결승시리즈"로 저장
+        if stage_text == "결승 시리즈":
 
-    selected_season_number = int(
-        selected_season[
-            "season_number"
-        ]
-    )
+            database_stage = (
+                "결승시리즈"
+            )
 
+        else:
+
+            database_stage = (
+                stage_text
+            )
+
+
+        schedule_rows.append(
+            {
+                "date":
+                    str(match_date),
+
+                "stage":
+                    stage_text,
+
+                "database_stage":
+                    database_stage,
+
+                "default_team_a":
+                    team_a,
+
+                "default_team_b":
+                    team_b,
+            }
+        )
+
+
+    workbook.close()
+
+    # =========================
+    # PLAYOFF 관리자 설정
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -30983,26 +30692,8 @@ def get_playoffs(
                     best_of,
                     wins_required
 
-                FROM
-                    season_playoff_settings
-
-                WHERE
-                    season_id = %s
-
-                ORDER BY
-                    CASE playoff_stage
-                        WHEN '준플레이오프'
-                            THEN 1
-                        WHEN '플레이오프'
-                            THEN 2
-                        WHEN '결승시리즈'
-                            THEN 3
-                        ELSE 99
-                    END
-                """,
-                (
-                    selected_season_id,
-                ),
+                FROM playoff_settings
+                """
             )
 
 
@@ -31011,20 +30702,28 @@ def get_playoffs(
             )
 
 
-    # 신규 시즌에 플레이오프 설정이 아직 없으면
-    # 다른 시즌의 설정을 섞지 않고 빈 상태로 반환한다.
-    if not setting_rows:
+    playoff_setting_map = {
+        row[
+            "playoff_stage"
+        ]:
+            row
 
-        return []
+        for row
+        in setting_rows
+    }
 
+    # =========================
+    # 정규리그 조기 확정 시드
+    # =========================
 
     locked_seeds = (
-        get_locked_regular_seeds(
-            season=
-                selected_season_number
-        )
+        get_locked_regular_seeds()
     )
 
+
+    # =========================
+    # 2. 실제 플레이오프 SERIES
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -31074,9 +30773,7 @@ def get_playoffs(
 
                     (
                         SELECT COUNT(*)
-
                         FROM series_sets AS ss
-
                         WHERE
                             ss.series_id = s.id
                     )
@@ -31084,29 +30781,21 @@ def get_playoffs(
 
                     (
                         SELECT COUNT(*)
-
                         FROM series_sets AS ss
-
                         WHERE
                             ss.series_id = s.id
-
                             AND
-                            ss.winner_side =
-                                'team_a'
+                            ss.winner_side = 'team_a'
                     )
                         AS team_a_wins,
 
                     (
                         SELECT COUNT(*)
-
                         FROM series_sets AS ss
-
                         WHERE
                             ss.series_id = s.id
-
                             AND
-                            ss.winner_side =
-                                'team_b'
+                            ss.winner_side = 'team_b'
                     )
                         AS team_b_wins
 
@@ -31125,18 +30814,12 @@ def get_playoffs(
                         '플레이오프'
 
                     AND
-                    s.season_id = %s
-
-                    AND
                     s.status <>
                         'cancelled'
 
                 ORDER BY
                     s.id DESC
-                """,
-                (
-                    selected_season_id,
-                ),
+                """
             )
 
 
@@ -31144,6 +30827,10 @@ def get_playoffs(
                 cursor.fetchall()
             )
 
+
+    # =========================
+    # 단계별 최신 SERIES
+    # =========================
 
     series_by_stage = {}
 
@@ -31167,26 +30854,18 @@ def get_playoffs(
             ] = series_row
 
 
-    stage_display_names = {
-        "준플레이오프":
-            "준플레이오프",
-
-        "플레이오프":
-            "플레이오프",
-
-        "결승시리즈":
-            "결승 시리즈",
-    }
-
+    # =========================
+    # 3. 일정 + SERIES 결합
+    # =========================
 
     playoffs = []
 
 
-    for setting_row in setting_rows:
+    for schedule_row in schedule_rows:
 
         database_stage = (
-            setting_row[
-                "playoff_stage"
+            schedule_row[
+                "database_stage"
             ]
         )
 
@@ -31198,22 +30877,63 @@ def get_playoffs(
         )
 
 
-        setting_date = (
-            setting_row[
-                "scheduled_date"
-            ].isoformat()
+        playoff_setting = (
+            playoff_setting_map.get(
+                database_stage
+            )
         )
 
-        default_best_of = int(
-            setting_row[
-                "best_of"
+
+        if playoff_setting:
+
+            setting_date = (
+                playoff_setting[
+                    "scheduled_date"
+                ].isoformat()
+            )
+
+            default_best_of = int(
+                playoff_setting[
+                    "best_of"
+                ]
+            )
+
+            default_wins_required = int(
+                playoff_setting[
+                    "wins_required"
+                ]
+            )
+
+        else:
+
+            setting_date = (
+                schedule_row[
+                    "date"
+                ]
+            )
+
+            default_best_of = None
+            default_wins_required = None
+
+        # =========================
+        # SERIES 생성 전
+        # 조기 확정 참가자 표시
+        # =========================
+
+        waiting_team_a = (
+            schedule_row[
+                "default_team_a"
             ]
+            or
+            "TBD"
         )
 
-        default_wins_required = int(
-            setting_row[
-                "wins_required"
+        waiting_team_b = (
+            schedule_row[
+                "default_team_b"
             ]
+            or
+            "TBD"
         )
 
 
@@ -31257,7 +30977,10 @@ def get_playoffs(
             )
 
 
-        else:
+        elif (
+            database_stage
+            == "결승시리즈"
+        ):
 
             waiting_team_a = (
                 locked_seeds.get(
@@ -31272,21 +30995,21 @@ def get_playoffs(
             )
 
 
+        # =====================
+        # 아직 SERIES 없음
+        # =====================
+
         if series_row is None:
 
             playoffs.append(
                 {
-                    "season_number":
-                        selected_season_number,
-
                     "date":
                         setting_date,
 
                     "stage":
-                        stage_display_names.get(
-                            database_stage,
-                            database_stage,
-                        ),
+                        schedule_row[
+                            "stage"
+                        ],
 
                     "playoff_stage":
                         database_stage,
@@ -31328,6 +31051,10 @@ def get_playoffs(
 
             continue
 
+
+        # =====================
+        # 실제 SERIES 존재
+        # =====================
 
         team_a_wins = int(
             series_row[
@@ -31385,9 +31112,8 @@ def get_playoffs(
 
         playoffs.append(
             {
-                "season_number":
-                    selected_season_number,
-
+                # 실제 SERIES가 생성된 뒤에는
+                # DB의 변경된 일정을 우선 사용
                 "date":
                     (
                         series_row[
@@ -31398,15 +31124,15 @@ def get_playoffs(
                             "scheduled_date"
                         ]
 
-                        else
-                        setting_date
+                        else schedule_row[
+                            "date"
+                        ]
                     ),
 
                 "stage":
-                    stage_display_names.get(
-                        database_stage,
-                        database_stage,
-                    ),
+                    schedule_row[
+                        "stage"
+                    ],
 
                 "playoff_stage":
                     database_stage,
@@ -31469,6 +31195,12 @@ def get_playoffs(
 
 
     return playoffs
+
+
+# =========================
+# FC Online
+# OUID 테스트
+# =========================
 
 @app.get(
     "/api/fconline/ouid/{nickname}"
@@ -34621,9 +34353,7 @@ def manual_complete_fcl_series(
         series["series_type"]
         == "정규리그"
     ):
-        create_initial_playoff_if_ready(
-            series_id=series_id
-        )
+        create_initial_playoff_if_ready()
 
     if (
         series["series_type"]
@@ -36697,9 +36427,7 @@ def sync_fcl_series_status(
             and
             status == "completed"
         ):
-            create_initial_playoff_if_ready(
-            series_id=series_id
-        )
+            create_initial_playoff_if_ready()
 
 
         if (
@@ -37378,9 +37106,7 @@ def sync_fcl_series_status(
         and
         status == "completed"
     ):
-        create_initial_playoff_if_ready(
-            series_id=series_id
-        )
+        create_initial_playoff_if_ready()
 
     if (
         series["series_type"]
