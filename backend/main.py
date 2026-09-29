@@ -4670,6 +4670,196 @@ def create_one_day_tournament(
             ),
         )
 
+    # ================================
+    # 원데이 토너먼트 시드 시즌
+    #
+    # 1. 현재 active 시즌
+    # 2. active가 없으면
+    #    가장 최근 completed 시즌
+    # ================================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number
+
+                FROM
+                    seasons
+
+                WHERE
+                    status IN (
+                        'active',
+                        'completed'
+                    )
+
+                ORDER BY
+                    CASE
+                        WHEN status = 'active'
+                        THEN 0
+                        ELSE 1
+                    END,
+
+                    season_number DESC
+
+                LIMIT 1
+                """
+            )
+
+
+            seed_season = (
+                cursor.fetchone()
+            )
+
+
+    # ================================
+    # 정규리그 순위
+    #
+    # 정규리그 참가자:
+    #     실제 순위 = 시드
+    #
+    # 정규리그 미참가자:
+    #     시드 대상 아님
+    #     정규리그 참가자 뒤에 배치
+    # ================================
+
+    regular_rank_by_name = {}
+
+
+    if seed_season is not None:
+
+        regular_standings = (
+            get_standings(
+                season=
+                    int(
+                        seed_season[
+                            "season_number"
+                        ]
+                    )
+            )
+        )
+
+
+        regular_rank_by_name = {
+            standing[
+                "name"
+            ].casefold():
+                int(
+                    standing[
+                        "rank"
+                    ]
+                )
+
+            for standing
+            in regular_standings
+        }
+
+
+    # ================================
+    # 참가자별 정규리그 순위 부여
+    #
+    # 정규리그 미참가자는
+    # regular_rank = None
+    # ================================
+
+    for (
+        input_order,
+        participant,
+    ) in enumerate(
+        participants
+    ):
+
+        participant[
+            "input_order"
+        ] = input_order
+
+
+        participant[
+            "regular_rank"
+        ] = (
+            regular_rank_by_name.get(
+                participant[
+                    "name"
+                ].casefold()
+            )
+        )
+
+
+    # ================================
+    # 토너먼트 시드 순서
+    #
+    # 1. 정규리그 순위
+    # 2. 정규리그 미참가자
+    #    기존 입력 순서 유지
+    # ================================
+
+    participants.sort(
+        key=lambda participant: (
+            participant[
+                "regular_rank"
+            ]
+            is None,
+
+            (
+                participant[
+                    "regular_rank"
+                ]
+
+                if
+                participant[
+                    "regular_rank"
+                ]
+                is not None
+
+                else
+                999999
+            ),
+
+            participant[
+                "input_order"
+            ],
+        )
+    )
+
+
+    # ================================
+    # 홀수 참가자 + 전원 외부 참가자
+    #
+    # 외부 참가자에게는 BYE를
+    # 줄 수 없으므로 생성 불가
+    # ================================
+
+    if (
+        len(
+            participants
+        )
+        % 2
+        == 1
+        and
+        not any(
+            participant[
+                "regular_rank"
+            ]
+            is not None
+
+            for participant
+            in participants
+        )
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "홀수 인원 토너먼트에서는 "
+                "정규리그 참가자에게만 "
+                "부전승을 부여할 수 있습니다."
+            ),
+        )
+
 
     bracket_size = (
         get_one_day_tournament_bracket_size(
@@ -4837,11 +5027,19 @@ def create_one_day_tournament(
             # ================================
             # V2 첫 라운드 생성
             #
-            # 최초 입력 순서가
+            # 정규리그 순위가
             # seed_number 기준이다.
             #
+            # 정규리그 미참가자는
+            # 정규리그 참가자 뒤에 배치한다.
+            #
             # 최초 참가자가 홀수이면
-            # seed 1만 최초 1회 BYE.
+            # 토너먼트 참가자 중
+            # 정규리그 최상위 시드만
+            # 최초 1회 BYE.
+            #
+            # 정규리그 미참가자는
+            # BYE를 받을 수 없다..
             #
             # 나머지 참가자들은
             # randomize 옵션에 따라
@@ -4863,6 +5061,19 @@ def create_one_day_tournament(
             initial_bye_entry_id = None
 
 
+            # ================================
+            # 최초 BYE
+            #
+            # 홀수 인원일 때만 발생.
+            #
+            # 정규리그 미참가자는
+            # 절대 BYE 대상이 될 수 없다.
+            #
+            # 토너먼트 참가자 중
+            # 정규리그 순위가 가장 높은
+            # 참가자에게만 BYE를 부여한다.
+            # ================================
+
             if (
                 len(
                     initial_entry_ids
@@ -4871,11 +5082,47 @@ def create_one_day_tournament(
                 == 1
             ):
 
-                initial_bye_entry_id = (
-                    initial_entry_ids[
-                        0
-                    ]
-                )
+                for (
+                    entry,
+                    participant_data,
+                ) in zip(
+                    entries,
+                    participants,
+                ):
+
+                    if (
+                        participant_data[
+                            "regular_rank"
+                        ]
+                        is None
+                    ):
+                        continue
+
+
+                    initial_bye_entry_id = (
+                        int(
+                            entry[
+                                "id"
+                            ]
+                        )
+                    )
+
+
+                    break
+
+
+                if (
+                    initial_bye_entry_id
+                    is None
+                ):
+
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "부전승을 받을 수 있는 "
+                            "정규리그 참가자가 없습니다."
+                        ),
+                    )
 
 
             initial_stage_name = (
