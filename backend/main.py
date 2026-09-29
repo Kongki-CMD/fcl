@@ -39018,14 +39018,18 @@ def get_fcl_series_status(
                     s.stats_sync_status,
                     s.status,
 
-                    team_a.fcl_name
-                        AS team_a_name,
+                    COALESCE(
+                        tournament_entry_a.display_name,
+                        team_a.fcl_name
+                    ) AS team_a_name,
 
                     team_a.fc_nickname
                         AS nickname_a,
 
-                    team_b.fcl_name
-                        AS team_b_name,
+                    COALESCE(
+                        tournament_entry_b.display_name,
+                        team_b.fcl_name
+                    ) AS team_b_name,
 
                     team_b.fc_nickname
                         AS nickname_b
@@ -39039,6 +39043,29 @@ def get_fcl_series_status(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    one_day_tournament_matches
+                        AS tournament_match
+
+                    ON tournament_match.series_id =
+                        s.id
+
+                LEFT JOIN
+                    one_day_tournament_entries
+                        AS tournament_entry_a
+
+                    ON tournament_entry_a.id =
+                        tournament_match
+                            .participant_a_entry_id
+
+                LEFT JOIN
+                    one_day_tournament_entries
+                        AS tournament_entry_b
+
+                    ON tournament_entry_b.id =
+                        tournament_match
+                            .participant_b_entry_id
 
                 WHERE s.id = %s
                 """,
@@ -42794,8 +42821,10 @@ def get_series_squads(
                     team_a.id
                         AS team_a_id,
 
-                    team_a.fcl_name
-                        AS team_a_fcl_name,
+                    COALESCE(
+                        tournament_entry_a.display_name,
+                        team_a.fcl_name
+                    ) AS team_a_fcl_name,
 
                     COALESCE(
                         s.team_a_snapshot_name,
@@ -42810,8 +42839,10 @@ def get_series_squads(
                     team_b.id
                         AS team_b_id,
 
-                    team_b.fcl_name
-                        AS team_b_fcl_name,
+                    COALESCE(
+                        tournament_entry_b.display_name,
+                        team_b.fcl_name
+                    ) AS team_b_fcl_name,
 
                     COALESCE(
                         s.team_b_snapshot_name,
@@ -42832,6 +42863,29 @@ def get_series_squads(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    one_day_tournament_matches
+                        AS tournament_match
+
+                    ON tournament_match.series_id =
+                        s.id
+
+                LEFT JOIN
+                    one_day_tournament_entries
+                        AS tournament_entry_a
+
+                    ON tournament_entry_a.id =
+                        tournament_match
+                            .participant_a_entry_id
+
+                LEFT JOIN
+                    one_day_tournament_entries
+                        AS tournament_entry_b
+
+                    ON tournament_entry_b.id =
+                        tournament_match
+                            .participant_b_entry_id
 
                 WHERE s.id = %s
                 """,
