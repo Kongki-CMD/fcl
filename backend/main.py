@@ -9706,6 +9706,19 @@ class AdminSeasonUpdateRequest(
 
     end_date: str | None = None
 
+class AdminSeasonPrepareRequest(
+    BaseModel
+):
+    title: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    start_date: str
+
+    end_date: str | None = None
+
+    participant_ids: list[int]
 
 class AdminSeasonParticipantsUpdateRequest(
     BaseModel
@@ -11001,6 +11014,462 @@ def admin_create_fcl_season(
             season
     }
 
+@app.post(
+    "/api/admin/seasons/prepare"
+)
+def admin_prepare_fcl_season(
+    request_data:
+        AdminSeasonPrepareRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    title = (
+        str(
+            request_data.title
+        )
+        .strip()
+    )
+
+
+    if not title:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 이름을 입력해주세요."
+            ),
+        )
+
+
+    start_date = (
+        parse_fcl_season_date(
+            request_data.start_date,
+            "시작일",
+        )
+    )
+
+
+    if start_date is None:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 시작일을 "
+                "입력해주세요."
+            ),
+        )
+
+    if (
+        start_date.weekday()
+        not in (
+            0,
+            2,
+            5,
+        )
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 시작일은 "
+                "월요일, 수요일, "
+                "토요일 중 하나여야 합니다."
+            ),
+        )
+
+
+    end_date = (
+        parse_fcl_season_date(
+            request_data.end_date,
+            "종료일",
+        )
+    )
+
+
+    if (
+        end_date is not None
+        and
+        end_date < start_date
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "시즌 종료일은 "
+                "시작일보다 빠를 수 없습니다."
+            ),
+        )
+
+
+    participant_ids = [
+        int(
+            participant_id
+        )
+
+        for participant_id
+        in request_data.participant_ids
+    ]
+
+
+    if len(participant_ids) != 5:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "정규리그 시즌 참가자는 "
+                "정확히 5명이어야 합니다."
+            ),
+        )
+
+
+    if (
+        len(
+            set(
+                participant_ids
+            )
+        )
+        != 5
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "같은 참가자를 "
+                "중복 등록할 수 없습니다."
+            ),
+        )
+
+
+    if any(
+        participant_id <= 0
+
+        for participant_id
+        in participant_ids
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바르지 않은 참가자 ID가 "
+                "포함되어 있습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 동시에 새 시즌을 만드는
+            # 요청이 겹치지 않도록 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    pg_advisory_xact_lock(
+                        %s
+                    )
+                """,
+                (
+                    202630000001,
+                ),
+            )
+
+
+            # =========================
+            # 이미 준비 중인 시즌 확인
+            #
+            # 한 번에 upcoming 시즌은
+            # 하나만 허용
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number
+
+                FROM
+                    seasons
+
+                WHERE
+                    status = 'upcoming'
+
+                ORDER BY
+                    season_number DESC
+
+                LIMIT 1
+
+                FOR UPDATE
+                """
+            )
+
+
+            existing_upcoming_season = (
+                cursor.fetchone()
+            )
+
+
+            if (
+                existing_upcoming_season
+                is not None
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 준비 중인 시즌이 있습니다. "
+                        f"(SEASON "
+                        f"{existing_upcoming_season['season_number']})"
+                    ),
+                )
+
+
+            # =========================
+            # 다음 시즌 번호 자동 결정
+            #
+            # SEASON 2까지 존재하면
+            # 자동으로 SEASON 3
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COALESCE(
+                        MAX(
+                            season_number
+                        ),
+                        0
+                    )
+                    + 1
+                        AS next_season_number
+
+                FROM
+                    seasons
+                """
+            )
+
+
+            next_season_number = int(
+                cursor.fetchone()[
+                    "next_season_number"
+                ]
+            )
+
+
+            # =========================
+            # 참가자 실제 존재 여부
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM
+                    participants
+
+                WHERE
+                    id = ANY(%s)
+                """,
+                (
+                    participant_ids,
+                ),
+            )
+
+
+            existing_participant_ids = {
+                int(
+                    row[
+                        "id"
+                    ]
+                )
+
+                for row
+                in cursor.fetchall()
+            }
+
+
+            missing_participant_ids = sorted(
+                set(
+                    participant_ids
+                )
+                -
+                existing_participant_ids
+            )
+
+
+            if missing_participant_ids:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "존재하지 않는 참가자 ID: "
+                        +
+                        ", ".join(
+                            str(
+                                participant_id
+                            )
+
+                            for participant_id
+                            in missing_participant_ids
+                        )
+                    ),
+                )
+
+
+            # =========================
+            # UPCOMING 시즌 생성
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO
+                    seasons (
+                        season_number,
+                        title,
+                        status,
+                        start_date,
+                        end_date
+                    )
+
+                VALUES (
+                    %s,
+                    %s,
+                    'upcoming',
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    season_number,
+                    title,
+                    status,
+                    start_date,
+                    end_date,
+                    activated_at,
+                    completed_at,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    next_season_number,
+                    title,
+                    start_date,
+                    end_date,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # 참가자 5명 등록
+            # =========================
+
+            for (
+                display_order,
+                participant_id,
+            ) in enumerate(
+                participant_ids,
+                start=1,
+            ):
+
+                cursor.execute(
+                    """
+                    INSERT INTO
+                        season_participants (
+                            season_id,
+                            participant_id,
+                            display_order
+                        )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s
+                    )
+                    """,
+                    (
+                        season[
+                            "id"
+                        ],
+                        participant_id,
+                        display_order,
+                    ),
+                )
+
+
+            # =========================
+            # 등록 결과 반환용
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id AS participant_id,
+                    p.fcl_name,
+                    p.fc_nickname,
+                    sp.display_order
+
+                FROM
+                    season_participants
+                        AS sp
+
+                JOIN
+                    participants
+                        AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order,
+                    p.id
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            participants = (
+                cursor.fetchall()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season":
+            season,
+
+        "participants":
+            participants,
+
+        "message":
+            (
+                f"SEASON {next_season_number} "
+                "준비가 완료되었습니다."
+            ),
+    }
+
 
 @app.put(
     "/api/admin/seasons/{season_number}"
@@ -11572,7 +12041,8 @@ def admin_activate_fcl_season(
                     id,
                     season_number,
                     title,
-                    status
+                    status,
+                    start_date
 
                 FROM
                     seasons
@@ -11665,14 +12135,109 @@ def admin_activate_fcl_season(
             )
 
 
-            if participant_count < 2:
+            if participant_count != 5:
 
                 raise HTTPException(
                     status_code=400,
                     detail=(
-                        "시즌 활성화 전 "
-                        "참가자를 2명 이상 "
-                        "등록해주세요."
+                        "정규리그 시즌 시작 전 "
+                        "참가자 5명이 정확히 "
+                        "등록되어 있어야 합니다."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 시작일 확인
+            # =========================
+
+            season_start_date = (
+                season[
+                    "start_date"
+                ]
+            )
+
+
+            if season_start_date is None:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "시즌 시작일을 먼저 "
+                        "설정해주세요."
+                    ),
+                )
+
+
+            today = datetime.now(
+                ZoneInfo(
+                    "Asia/Seoul"
+                )
+            ).date()
+
+
+            if today < season_start_date:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Season {season_number}은 "
+                        f"{season_start_date.isoformat()}부터 "
+                        "시작할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 정규리그 일정 확인
+            #
+            # 새로운 시즌을 시작하기 전에
+            # 20경기가 모두 생성되어 있어야 함
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS regular_count
+
+                FROM
+                    series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    series_type =
+                        '정규리그'
+
+                    AND
+                    status <> 'cancelled'
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            regular_count = int(
+                cursor.fetchone()[
+                    "regular_count"
+                ]
+            )
+
+
+            if regular_count != 20:
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "시즌 시작 전 "
+                        "정규리그 20경기가 "
+                        "모두 생성되어 있어야 합니다. "
+                        f"(현재 {regular_count}경기)"
                     ),
                 )
 

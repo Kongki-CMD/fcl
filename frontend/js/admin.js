@@ -53,6 +53,70 @@ const adminParticipantListElement =
         "#admin-participant-list"
     );
 
+const adminSeasonNextNumberElement =
+    document.querySelector(
+        "#admin-season-next-number"
+    );
+
+
+const adminSeasonCreateFormElement =
+    document.querySelector(
+        "#admin-season-create-form"
+    );
+
+
+const adminSeasonTitleElement =
+    document.querySelector(
+        "#admin-season-title"
+    );
+
+
+const adminSeasonStartDateElement =
+    document.querySelector(
+        "#admin-season-start-date"
+    );
+
+
+const adminSeasonEndDateElement =
+    document.querySelector(
+        "#admin-season-end-date"
+    );
+
+
+const adminSeasonParticipantListElement =
+    document.querySelector(
+        "#admin-season-participant-list"
+    );
+
+
+const adminSeasonSelectedCountElement =
+    document.querySelector(
+        "#admin-season-selected-count"
+    );
+
+
+const adminSeasonCreateMessageElement =
+    document.querySelector(
+        "#admin-season-create-message"
+    );
+
+
+const adminSeasonCreateButtonElement =
+    document.querySelector(
+        "#admin-season-create-button"
+    );
+
+
+const adminSeasonListElement =
+    document.querySelector(
+        "#admin-season-list"
+    );
+
+
+let adminSeasonManagementSeasons = [];
+
+let adminSeasonManagementParticipants = [];
+
 const adminUserListElement =
     document.querySelector(
         "#admin-user-list"
@@ -685,6 +749,13 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminParticipants();
+                }
+                if (
+                    targetPage
+                    === "seasons"
+                ) {
+
+                    loadAdminSeasonManagement();
                 }
                 if (
                     targetPage
@@ -1337,6 +1408,1024 @@ adminFconlineSyncButtonElement
         "click",
         syncAdminFconlineSeason
     );
+
+// =========================================
+// 시즌 관리
+// =========================================
+
+function getAdminSeasonStatusLabel(
+    status
+) {
+
+    if (
+        status
+        === "active"
+    ) {
+
+        return "진행 중";
+    }
+
+
+    if (
+        status
+        === "upcoming"
+    ) {
+
+        return "준비 중";
+    }
+
+
+    if (
+        status
+        === "completed"
+    ) {
+
+        return "종료";
+    }
+
+
+    return status;
+}
+
+
+function updateAdminSeasonSelectedCount() {
+
+    if (
+        !adminSeasonParticipantListElement
+        ||
+        !adminSeasonSelectedCountElement
+    ) {
+
+        return;
+    }
+
+
+    const checkedElements =
+        adminSeasonParticipantListElement
+            .querySelectorAll(
+                'input[type="checkbox"]:checked'
+            );
+
+
+    const selectedCount =
+        checkedElements.length;
+
+
+    adminSeasonSelectedCountElement
+        .textContent =
+            `${selectedCount} / 5명`;
+
+
+    const allCheckboxElements =
+        adminSeasonParticipantListElement
+            .querySelectorAll(
+                'input[type="checkbox"]'
+            );
+
+
+    allCheckboxElements.forEach(
+        checkboxElement => {
+
+            checkboxElement.disabled =
+                (
+                    !checkboxElement.checked
+                    &&
+                    selectedCount >= 5
+                );
+        }
+    );
+}
+
+
+function renderAdminSeasonParticipantList() {
+
+    if (
+        !adminSeasonParticipantListElement
+    ) {
+
+        return;
+    }
+
+
+    adminSeasonParticipantListElement
+        .innerHTML = "";
+
+
+    adminSeasonManagementParticipants
+        .forEach(
+            participant => {
+
+                const labelElement =
+                    document.createElement(
+                        "label"
+                    );
+
+
+                labelElement.className =
+                    "admin-season-participant-option";
+
+
+                labelElement.innerHTML = `
+                    <input
+                        type="checkbox"
+                        value="${participant.id}"
+                    >
+
+                    <span>
+                        <strong>
+                            ${participant.fcl_name}
+                        </strong>
+
+                        <small>
+                            ${
+                                participant.fc_nickname
+                                ?? ""
+                            }
+                        </small>
+                    </span>
+                `;
+
+
+                adminSeasonParticipantListElement
+                    .appendChild(
+                        labelElement
+                    );
+            }
+        );
+
+
+    adminSeasonParticipantListElement
+        .querySelectorAll(
+            'input[type="checkbox"]'
+        )
+        .forEach(
+            checkboxElement => {
+
+                checkboxElement
+                    .addEventListener(
+                        "change",
+                        updateAdminSeasonSelectedCount
+                    );
+            }
+        );
+
+
+    updateAdminSeasonSelectedCount();
+}
+
+
+function renderAdminSeasonList() {
+
+    if (!adminSeasonListElement) {
+        return;
+    }
+
+
+    adminSeasonListElement.innerHTML =
+        "";
+
+
+    const orderedSeasons =
+        [
+            ...adminSeasonManagementSeasons,
+        ].sort(
+            (
+                left,
+                right
+            ) =>
+                Number(
+                    right.season_number
+                )
+                -
+                Number(
+                    left.season_number
+                )
+        );
+
+
+    orderedSeasons.forEach(
+        season => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement.className =
+                "admin-season-state-card";
+
+
+            const statusLabel =
+                getAdminSeasonStatusLabel(
+                    season.status
+                );
+
+
+            const startDateText =
+                season.start_date
+                ?? "미설정";
+
+
+            const endDateText =
+                season.end_date
+                ?? "미설정";
+
+
+            const participantCount =
+                Number(
+                    season.participant_count
+                    ?? 0
+                );
+
+
+            const seriesCount =
+                Number(
+                    season.series_count
+                    ?? 0
+                );
+
+
+            const startButtonHtml =
+                (
+                    season.status
+                    === "upcoming"
+                )
+                    ? `
+                        <button
+                            type="button"
+                            class="admin-season-start-button"
+                            data-season-number="${
+                                season.season_number
+                            }"
+                        >
+                            SEASON ${
+                                season.season_number
+                            } 시작
+                        </button>
+                    `
+                    : "";
+
+
+            cardElement.innerHTML = `
+                <div
+                    class="admin-season-state-header"
+                >
+
+                    <div>
+                        <strong>
+                            SEASON ${
+                                season.season_number
+                            }
+                        </strong>
+
+                        <span>
+                            ${season.title}
+                        </span>
+                    </div>
+
+
+                    <span
+                        class="
+                            admin-season-status
+                            admin-season-status-${season.status}
+                        "
+                    >
+                        ${statusLabel}
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="admin-season-state-meta"
+                >
+
+                    <span>
+                        시작일
+                        <strong>
+                            ${startDateText}
+                        </strong>
+                    </span>
+
+                    <span>
+                        종료일
+                        <strong>
+                            ${endDateText}
+                        </strong>
+                    </span>
+
+                    <span>
+                        참가자
+                        <strong>
+                            ${participantCount}명
+                        </strong>
+                    </span>
+
+                    <span>
+                        SERIES
+                        <strong>
+                            ${seriesCount}개
+                        </strong>
+                    </span>
+
+                </div>
+
+
+                ${
+                    startButtonHtml
+                        ? `
+                            <div
+                                class="admin-season-state-actions"
+                            >
+                                ${startButtonHtml}
+
+                                <p
+                                    class="admin-season-start-message"
+                                    data-season-message="${
+                                        season.season_number
+                                    }"
+                                ></p>
+                            </div>
+                        `
+                        : ""
+                }
+            `;
+
+
+            adminSeasonListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+}
+
+
+function updateAdminSeasonCreateState() {
+
+    const upcomingSeason =
+        adminSeasonManagementSeasons.find(
+            season =>
+                season.status
+                === "upcoming"
+        );
+
+
+    const maxSeasonNumber =
+        adminSeasonManagementSeasons.reduce(
+            (
+                currentMax,
+                season
+            ) =>
+                Math.max(
+                    currentMax,
+                    Number(
+                        season.season_number
+                        ?? 0
+                    )
+                ),
+            0
+        );
+
+
+    const nextSeasonNumber =
+        maxSeasonNumber + 1;
+
+
+    if (adminSeasonNextNumberElement) {
+
+        adminSeasonNextNumberElement
+            .textContent =
+                `SEASON ${nextSeasonNumber}`;
+    }
+
+
+    const formInputElements =
+        adminSeasonCreateFormElement
+            ?.querySelectorAll(
+                "input, button"
+            )
+        ?? [];
+
+
+    if (upcomingSeason) {
+
+        formInputElements.forEach(
+            element => {
+
+                element.disabled = true;
+            }
+        );
+
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                (
+                    `SEASON ${
+                        upcomingSeason.season_number
+                    }이 이미 준비 중입니다. `
+                    + "해당 시즌을 시작한 뒤 "
+                    + "다음 시즌을 준비할 수 있습니다."
+                );
+
+
+        return;
+    }
+
+
+    formInputElements.forEach(
+        element => {
+
+            element.disabled = false;
+        }
+    );
+
+
+    adminSeasonCreateMessageElement
+        .textContent =
+            (
+                `다음 생성 시즌은 `
+                + `SEASON ${nextSeasonNumber}입니다.`
+            );
+
+
+    updateAdminSeasonSelectedCount();
+}
+
+
+async function loadAdminSeasonManagement() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    if (adminSeasonListElement) {
+
+        adminSeasonListElement
+            .textContent =
+                "시즌 정보를 불러오는 중...";
+    }
+
+
+    if (
+        adminSeasonParticipantListElement
+    ) {
+
+        adminSeasonParticipantListElement
+            .textContent =
+                "참가자를 불러오는 중...";
+    }
+
+
+    try {
+
+        const [
+            seasonResponse,
+            participantResponse,
+        ] = await Promise.all([
+            fetch(
+                `${apiBaseUrl}/api/seasons`
+            ),
+
+            fetch(
+                `${apiBaseUrl}/api/admin/participants`,
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            ),
+        ]);
+
+
+        if (
+            participantResponse.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        const seasonData =
+            await seasonResponse.json();
+
+
+        const participantData =
+            await participantResponse.json();
+
+
+        if (!seasonResponse.ok) {
+
+            throw new Error(
+                seasonData.detail
+                ?? "시즌 조회 실패"
+            );
+        }
+
+
+        if (!participantResponse.ok) {
+
+            throw new Error(
+                participantData.detail
+                ?? "참가자 조회 실패"
+            );
+        }
+
+
+        adminSeasonManagementSeasons =
+            Array.isArray(
+                seasonData.seasons
+            )
+                ? seasonData.seasons
+                : [];
+
+
+        adminSeasonManagementParticipants =
+            Array.isArray(
+                participantData
+            )
+                ? participantData
+                : [];
+
+
+        renderAdminSeasonParticipantList();
+
+        renderAdminSeasonList();
+
+        updateAdminSeasonCreateState();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        if (adminSeasonListElement) {
+
+            adminSeasonListElement
+                .textContent =
+                    (
+                        error.message
+                        ?? "시즌 정보를 불러오지 못했습니다."
+                    );
+        }
+
+
+        if (
+            adminSeasonParticipantListElement
+        ) {
+
+            adminSeasonParticipantListElement
+                .textContent =
+                    "참가자 정보를 불러오지 못했습니다.";
+        }
+    }
+}
+
+
+// =========================================
+// 새 시즌 준비
+// =========================================
+
+async function createAdminSeason(
+    event
+) {
+
+    event.preventDefault();
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const title =
+        adminSeasonTitleElement
+            .value
+            .trim();
+
+
+    const startDate =
+        adminSeasonStartDateElement
+            .value;
+
+
+    const endDate =
+        adminSeasonEndDateElement
+            .value
+            ||
+            null;
+
+
+    const participantIds =
+        Array.from(
+            adminSeasonParticipantListElement
+                .querySelectorAll(
+                    'input[type="checkbox"]:checked'
+                )
+        ).map(
+            checkboxElement =>
+                Number(
+                    checkboxElement.value
+                )
+        );
+
+
+    if (!title) {
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                "시즌 이름을 입력해주세요.";
+
+        return;
+    }
+
+
+    if (!startDate) {
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                "시즌 시작일을 선택해주세요.";
+
+        return;
+    }
+
+    const startDateObject =
+        new Date(
+            `${startDate}T00:00:00`
+        );
+
+
+    const allowedStartDays =
+        new Set(
+            [
+                1,
+                3,
+                6,
+            ]
+        );
+
+
+    if (
+        !allowedStartDays.has(
+            startDateObject.getDay()
+        )
+    ) {
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                (
+                    "시즌 시작일은 월요일, "
+                    + "수요일, 토요일 중 "
+                    + "하나로 선택해주세요."
+                );
+
+        return;
+    }
+
+
+    if (
+        participantIds.length
+        !== 5
+    ) {
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                "참가자를 정확히 5명 선택해주세요.";
+
+        return;
+    }
+
+
+    if (
+        endDate
+        &&
+        endDate < startDate
+    ) {
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                (
+                    "종료일은 시작일보다 "
+                    + "빠를 수 없습니다."
+                );
+
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            "새 시즌을 준비하시겠습니까?\n\n"
+            + `시즌명: ${title}\n`
+            + `시작일: ${startDate}\n`
+            + `참가자: ${participantIds.length}명\n\n`
+            + "생성된 시즌은 upcoming 상태로 "
+            + "등록됩니다."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    adminSeasonCreateButtonElement
+        .disabled = true;
+
+
+    adminSeasonCreateMessageElement
+        .textContent =
+            "새 시즌을 생성하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + "/api/admin/seasons/prepare",
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            title:
+                                title,
+
+                            start_date:
+                                startDate,
+
+                            end_date:
+                                endDate,
+
+                            participant_ids:
+                                participantIds,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "새 시즌 생성 실패"
+            );
+        }
+
+
+        sessionStorage.removeItem(
+            "fclSeasonsCacheV1"
+        );
+
+
+        adminSeasonCreateFormElement
+            .reset();
+
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                responseData.message
+                ?? "새 시즌 준비가 완료되었습니다.";
+
+
+        await loadAdminSeasonManagement();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminSeasonCreateMessageElement
+            .textContent =
+                error.message;
+
+
+    } finally {
+
+        updateAdminSeasonCreateState();
+    }
+}
+
+
+// =========================================
+// 시즌 시작
+// =========================================
+
+async function startAdminSeason(
+    seasonNumber
+) {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const season =
+        adminSeasonManagementSeasons.find(
+            currentSeason =>
+                Number(
+                    currentSeason
+                        .season_number
+                )
+                ===
+                Number(
+                    seasonNumber
+                )
+        );
+
+
+    if (!season) {
+
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            `SEASON ${seasonNumber}을 시작하시겠습니까?\n\n`
+            + "현재 active 시즌은 종료 처리되고\n"
+            + `SEASON ${seasonNumber}이 active가 됩니다.\n\n`
+            + "이 작업은 신중하게 진행해주세요."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const messageElement =
+        adminSeasonListElement
+            .querySelector(
+                `[data-season-message="${seasonNumber}"]`
+            );
+
+
+    const buttonElement =
+        adminSeasonListElement
+            .querySelector(
+                `[data-season-number="${seasonNumber}"]`
+            );
+
+
+    if (buttonElement) {
+
+        buttonElement.disabled =
+            true;
+    }
+
+
+    if (messageElement) {
+
+        messageElement.textContent =
+            "시즌 시작 조건을 확인하는 중...";
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/seasons/${seasonNumber}/activate`,
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "시즌 시작 실패"
+            );
+        }
+
+
+        sessionStorage.removeItem(
+            "fclSeasonsCacheV1"
+        );
+
+
+        await loadAdminSeasonManagement();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        if (messageElement) {
+
+            messageElement.textContent =
+                error.message;
+        }
+
+
+        if (buttonElement) {
+
+            buttonElement.disabled =
+                false;
+        }
+    }
+}
 
 // =========================================
 // 참가자 / 현재 팀 조회
@@ -9281,6 +10370,54 @@ adminRegularSeasonStartSaveButtonElement
         saveAdminRegularSeasonStartDate
     );
 
+adminSeasonCreateFormElement
+    ?.addEventListener(
+        "submit",
+        createAdminSeason
+    );
+
+
+adminSeasonListElement
+    ?.addEventListener(
+        "click",
+        event => {
+
+            const startButtonElement =
+                event.target.closest(
+                    ".admin-season-start-button"
+                );
+
+
+            if (!startButtonElement) {
+                return;
+            }
+
+
+            const seasonNumber =
+                Number(
+                    startButtonElement
+                        .dataset
+                        .seasonNumber
+                );
+
+
+            if (
+                !Number.isInteger(
+                    seasonNumber
+                )
+                ||
+                seasonNumber <= 0
+            ) {
+
+                return;
+            }
+
+
+            startAdminSeason(
+                seasonNumber
+            );
+        }
+    );
 
 // =========================================
 // 최초 실행

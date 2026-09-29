@@ -167,6 +167,14 @@
                     <button
                         type="button"
                         class="admin-menu-button"
+                        data-admin-page="seasons"
+                    >
+                        시즌 관리
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
                         data-admin-page="results"
                     >
                         경기 결과 관리
@@ -288,6 +296,169 @@
                         id="admin-participant-list"
                         class="admin-participant-list"
                     >
+                    </div>
+
+                </section>
+
+
+                <!-- 시즌 관리 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="seasons"
+                >
+
+                    <h1>
+                        시즌 관리
+                    </h1>
+
+                    <p>
+                        다음 시즌을 준비하고 실제 시즌 시작을 관리합니다.
+                    </p>
+
+
+                    <div class="admin-season-management-grid">
+
+                        <section class="admin-season-create-card">
+
+                            <div class="admin-season-card-header">
+
+                                <div>
+                                    <h2>
+                                        새 시즌 준비
+                                    </h2>
+
+                                    <p>
+                                        새 시즌은 upcoming 상태로 생성됩니다.
+                                    </p>
+                                </div>
+
+
+                                <strong
+                                    id="admin-season-next-number"
+                                    class="admin-season-next-number"
+                                >
+                                    SEASON -
+                                </strong>
+
+                            </div>
+
+
+                            <form
+                                id="admin-season-create-form"
+                                class="admin-season-create-form"
+                            >
+
+                                <label>
+                                    시즌 이름
+
+                                    <input
+                                        type="text"
+                                        id="admin-season-title"
+                                        maxlength="100"
+                                        placeholder="예: FCL Season 3"
+                                        required
+                                    >
+                                </label>
+
+
+                                <div class="admin-season-date-grid">
+
+                                    <label>
+                                        시작일
+
+                                        <input
+                                            type="date"
+                                            id="admin-season-start-date"
+                                            required
+                                        >
+                                    </label>
+
+
+                                    <label>
+                                        종료일
+
+                                        <input
+                                            type="date"
+                                            id="admin-season-end-date"
+                                        >
+                                    </label>
+
+                                </div>
+
+
+                                <div class="admin-season-participant-section">
+
+                                    <div class="admin-season-participant-header">
+
+                                        <strong>
+                                            참가자 선택
+                                        </strong>
+
+                                        <span
+                                            id="admin-season-selected-count"
+                                        >
+                                            0 / 5명
+                                        </span>
+
+                                    </div>
+
+
+                                    <div
+                                        id="admin-season-participant-list"
+                                        class="admin-season-participant-list"
+                                    >
+                                        참가자를 불러오는 중...
+                                    </div>
+
+                                </div>
+
+
+                                <p
+                                    id="admin-season-create-message"
+                                    class="admin-season-message"
+                                ></p>
+
+
+                                <button
+                                    type="submit"
+                                    id="admin-season-create-button"
+                                    class="admin-season-primary-button"
+                                >
+                                    새 시즌 생성
+                                </button>
+
+                            </form>
+
+                        </section>
+
+
+                        <section class="admin-season-list-card">
+
+                            <div class="admin-season-card-header">
+
+                                <div>
+                                    <h2>
+                                        FCL 시즌
+                                    </h2>
+
+                                    <p>
+                                        등록된 시즌 상태를 확인합니다.
+                                    </p>
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="admin-season-list"
+                                class="admin-season-list"
+                            >
+                                시즌 정보를 불러오는 중...
+                            </div>
+
+                        </section>
+
                     </div>
 
                 </section>
@@ -1085,7 +1256,7 @@
 
     <script
         type="module"
-        src="./js/admin.js?v=tournament-admin-1"
+        src="./js/admin.js?v=season-management-1"
     ></script>
 
 </body>
