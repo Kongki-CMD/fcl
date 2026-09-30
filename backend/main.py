@@ -29437,8 +29437,10 @@ def get_matches(
                         IS NOT NULL
 
                     AND
-                    s.series_type <>
-                        '토너먼트'
+                    s.series_type IN (
+                        '프리시즌',
+                        '정규리그'
+                    )
 
                     AND
                     s.status <>
