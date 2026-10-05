@@ -10173,11 +10173,181 @@ def get_match_integrity_conflict(
     return None
 
 # =========================
+# FCL SERIES MVP 승리팀
+#
+# 프리시즌 / 정규리그:
+# 전체 세트 득점 합계 기준
+#
+# 플레이오프 / 토너먼트:
+# 세트 승리 기준
+#
+# 무승부:
+# None 반환
+# → 기존 MVP 선정 방식 유지
+# =========================
+
+def resolve_series_mvp_winner_nickname(
+    matches,
+    nickname_a,
+    nickname_b,
+    series_type,
+    include_extra_time_result=False,
+    wins_required=None,
+):
+
+    if (
+        not matches
+        or
+        not nickname_a
+        or
+        not nickname_b
+    ):
+
+        return None
+
+
+    # =========================
+    # 플레이오프 / 토너먼트
+    # =========================
+
+    if series_type in (
+        "플레이오프",
+        "토너먼트",
+    ):
+
+        team_a_wins = 0
+        team_b_wins = 0
+
+
+        required_wins = (
+
+            max(
+                1,
+                int(wins_required),
+            )
+
+            if wins_required is not None
+
+            else 1
+        )
+
+
+        for match_data in matches:
+
+            winner_side = (
+                get_match_winner_side(
+                    match_data,
+                    nickname_a,
+                    nickname_b,
+                    series_type,
+                    True,
+                )
+            )
+
+
+            if winner_side == "team_a":
+
+                team_a_wins += 1
+
+
+                if (
+                    team_a_wins
+                    >= required_wins
+                ):
+
+                    return nickname_a
+
+
+            elif winner_side == "team_b":
+
+                team_b_wins += 1
+
+
+                if (
+                    team_b_wins
+                    >= required_wins
+                ):
+
+                    return nickname_b
+
+
+        return None
+
+
+    # =========================
+    # 프리시즌 / 정규리그
+    #
+    # 현재 SERIES 결과와 동일하게
+    # 각 세트 점수 합산으로 승패 결정
+    # =========================
+
+    team_a_total_score = 0
+    team_b_total_score = 0
+
+
+    for match_data in matches:
+
+        score_pair = (
+            get_match_score_pair(
+                match_data,
+                nickname_a,
+                nickname_b,
+                include_extra_time_result=
+                    bool(
+                        include_extra_time_result
+                    ),
+            )
+        )
+
+
+        if score_pair is None:
+
+            return None
+
+
+        (
+            team_a_score,
+            team_b_score,
+        ) = score_pair
+
+
+        team_a_total_score += int(
+            team_a_score
+        )
+
+        team_b_total_score += int(
+            team_b_score
+        )
+
+
+    if (
+        team_a_total_score
+        >
+        team_b_total_score
+    ):
+
+        return nickname_a
+
+
+    if (
+        team_b_total_score
+        >
+        team_a_total_score
+    ):
+
+        return nickname_b
+
+
+    # 무승부
+    return None
+
+# =========================
 # FCL SERIES MVP 계산
 # =========================
 
 def calculate_series_mvp_from_matches(
     matches,
+    winner_nickname=None,
 ):
 
     spid_metadata = get_spid_metadata()
@@ -10365,6 +10535,54 @@ def calculate_series_mvp_from_matches(
         )
     ]
 
+    # =========================
+    # 승패가 결정된 SERIES는
+    # 승리팀 선수만 MVP 후보
+    #
+    # 무승부는 winner_nickname이
+    # None이므로 기존 방식 유지
+    # =========================
+
+    if winner_nickname:
+
+        mvp_rankings = [
+
+            player
+
+            for player
+            in mvp_rankings
+
+            if (
+                player["nickname"]
+                ==
+                winner_nickname
+            )
+        ]
+
+
+        # 승리팀에서 최소 출전 조건을
+        # 만족한 선수가 없는 극단적인 경우에도
+        # 패배팀 MVP를 뽑지는 않는다.
+        #
+        # 승리팀 출전 선수 전체로만
+        # 후보 범위를 완화한다.
+
+        if not mvp_rankings:
+
+            mvp_rankings = [
+
+                player
+
+                for player
+                in all_player_stats
+
+                if (
+                    player["nickname"]
+                    ==
+                    winner_nickname
+                )
+            ]
+
 
     mvp_rankings.sort(
         key=lambda player: (
@@ -10415,7 +10633,6 @@ def get_series_mvp_test():
         key=lambda match:
             match["matchDate"]
     )
-
 
     (
         mvp,
@@ -37303,13 +37520,28 @@ def import_history_series(
         in detected_matches
     ]
 
+    winner_nickname = (
+        resolve_series_mvp_winner_nickname(
+            match_data_list,
+            nickname_a,
+            nickname_b,
+            "프리시즌",
+            bool(
+                request
+                    .include_extra_time_result
+            ),
+        )
+    )
+
 
     (
         mvp,
         _,
         player_stats,
     ) = calculate_series_mvp_from_matches(
-        match_data_list
+        match_data_list,
+        winner_nickname=
+            winner_nickname,
     )
 
 
@@ -41258,13 +41490,34 @@ def sync_fcl_series_status(
             in detected_matches
         ]
 
+        winner_nickname = (
+            resolve_series_mvp_winner_nickname(
+                mvp_matches,
+                nickname_a,
+                nickname_b,
+                series[
+                    "series_type"
+                ],
+                bool(
+                    series[
+                        "include_extra_time_result"
+                    ]
+                ),
+                series[
+                    "wins_required"
+                ],
+            )
+        )
+
 
         (
             mvp,
             _,
             player_stats,
         ) = calculate_series_mvp_from_matches(
-            mvp_matches
+            mvp_matches,
+            winner_nickname=
+                winner_nickname,
         )
 
 
@@ -41940,13 +42193,34 @@ def sync_fcl_series_status(
             ]
         ]
 
+        winner_nickname = (
+            resolve_series_mvp_winner_nickname(
+                mvp_matches,
+                nickname_a,
+                nickname_b,
+                series[
+                    "series_type"
+                ],
+                bool(
+                    series[
+                        "include_extra_time_result"
+                    ]
+                ),
+                series[
+                    "wins_required"
+                ],
+            )
+        )
+
 
         (
             mvp,
             _,
             player_stats,
         ) = calculate_series_mvp_from_matches(
-            mvp_matches
+            mvp_matches,
+            winner_nickname=
+                winner_nickname,
         )
 
 
