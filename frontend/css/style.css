@@ -23770,3 +23770,954 @@ button {
     opacity: 0.6;
     cursor: wait;
 }
+
+/* =========================================
+   SEASON SUMMARY
+========================================= */
+
+.season-summary-page {
+    width: 94vw;
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 42px 0 70px;
+}
+
+
+/* =========================================
+   PAGE HEADER
+========================================= */
+
+.season-summary-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 30px;
+    margin-bottom: 28px;
+}
+
+.season-summary-eyebrow {
+    display: block;
+    margin-bottom: 7px;
+    color: #b79a60;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+}
+
+.season-summary-heading h1 {
+    margin-bottom: 8px;
+    font-size: 36px;
+    line-height: 1;
+}
+
+.season-summary-heading p {
+    color: #888;
+    font-size: 14px;
+}
+
+.season-summary-selector-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+}
+
+.season-summary-selector-wrap label {
+    color: #b79a60;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.season-summary-selector {
+    min-width: 140px;
+    height: 42px;
+    padding: 0 38px 0 14px;
+    border: 1px solid #665633;
+    border-radius: 6px;
+    outline: none;
+    background: rgba(13, 13, 15, 0.95);
+    color: #eee;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+
+/* =========================================
+   COMMON PANEL
+========================================= */
+
+.season-summary-panel {
+    overflow: hidden;
+    border: 1px solid rgba(183, 154, 96, 0.22);
+    border-radius: 12px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(25, 25, 28, 0.97),
+            rgba(9, 9, 11, 0.97)
+        );
+    box-shadow:
+        0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.season-summary-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 74px;
+    padding: 17px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.season-summary-panel-heading span {
+    display: block;
+    margin-bottom: 3px;
+    color: #8c7548;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.season-summary-panel-heading h2 {
+    font-size: 20px;
+    letter-spacing: -0.5px;
+}
+
+
+/* =========================================
+   CHAMPION
+========================================= */
+
+.season-summary-champion {
+    position: relative;
+    display: grid;
+    grid-template-columns:
+        120px
+        minmax(0, 1.4fr)
+        minmax(260px, 0.8fr);
+    align-items: center;
+    min-height: 310px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(206, 173, 102, 0.55);
+    border-radius: 14px;
+    background:
+        radial-gradient(
+            circle at 78% 50%,
+            rgba(188, 145, 54, 0.22),
+            transparent 34%
+        ),
+        linear-gradient(
+            105deg,
+            rgba(12, 12, 15, 0.98) 0%,
+            rgba(29, 25, 18, 0.97) 55%,
+            rgba(10, 10, 12, 0.98) 100%
+        );
+    box-shadow:
+        0 22px 60px rgba(0, 0, 0, 0.45),
+        inset 0 0 60px rgba(183, 154, 96, 0.06);
+}
+
+.season-summary-champion::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.02),
+            transparent
+        );
+}
+
+.season-summary-champion-decoration {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.season-summary-crown {
+    color: #c8a55f;
+    font-size: 72px;
+    line-height: 1;
+    text-shadow:
+        0 0 28px rgba(200, 165, 95, 0.35);
+}
+
+.season-summary-champion-copy {
+    position: relative;
+    z-index: 2;
+    padding: 38px 20px;
+}
+
+.season-summary-champion-season {
+    display: block;
+    margin-bottom: 8px;
+    color: #b79a60;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 3px;
+}
+
+.season-summary-champion-copy h2 {
+    margin-bottom: 19px;
+    color: #f1d08a;
+    font-size: clamp(42px, 5vw, 70px);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: 2px;
+    text-shadow:
+        0 0 28px rgba(211, 177, 103, 0.2);
+}
+
+.season-summary-champion-name {
+    margin-bottom: 5px;
+    font-size: 28px;
+    font-weight: 900;
+}
+
+.season-summary-champion-nickname {
+    margin-bottom: 14px;
+    color: #aaa;
+    font-size: 14px;
+}
+
+.season-summary-champion-team {
+    display: inline-flex;
+    padding: 8px 13px;
+    border: 1px solid rgba(183, 154, 96, 0.4);
+    border-radius: 4px;
+    background: rgba(183, 154, 96, 0.08);
+    color: #d4bd8d;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.season-summary-champion-visual {
+    position: relative;
+    display: flex;
+    align-self: stretch;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+.season-summary-champion-logo {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 160px;
+    height: 160px;
+    border: 1px solid rgba(200, 165, 95, 0.55);
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle,
+            rgba(183, 154, 96, 0.22),
+            rgba(10, 10, 12, 0.95) 68%
+        );
+    box-shadow:
+        0 0 45px rgba(183, 154, 96, 0.15);
+}
+
+.season-summary-champion-logo span {
+    color: #897342;
+    font-size: 10px;
+    letter-spacing: 3px;
+}
+
+.season-summary-champion-logo strong {
+    margin-top: 4px;
+    color: #d6bd88;
+    font-size: 22px;
+}
+
+.season-summary-champion-glow {
+    position: absolute;
+    width: 240px;
+    height: 240px;
+    border-radius: 50%;
+    background: rgba(199, 160, 75, 0.13);
+    filter: blur(40px);
+}
+
+
+/* =========================================
+   MIDDLE GRID
+========================================= */
+
+.season-summary-middle-grid {
+    display: grid;
+    grid-template-columns:
+        minmax(330px, 0.78fr)
+        minmax(560px, 1.22fr);
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+
+/* =========================================
+   FINAL STANDINGS
+========================================= */
+
+.season-summary-standing-list {
+    padding: 8px 18px 18px;
+}
+
+.season-summary-standing-row {
+    display: grid;
+    grid-template-columns:
+        36px
+        48px
+        minmax(0, 1fr)
+        auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 78px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.season-summary-standing-row:last-child {
+    border-bottom: none;
+}
+
+.season-summary-standing-first {
+    margin-top: 6px;
+    border: 1px solid rgba(183, 154, 96, 0.3);
+    border-radius: 7px;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(183, 154, 96, 0.13),
+            rgba(183, 154, 96, 0.02)
+        );
+}
+
+.season-summary-standing-rank {
+    color: #aaa;
+    font-size: 19px;
+    font-weight: 900;
+    text-align: center;
+}
+
+.season-summary-standing-first
+.season-summary-standing-rank {
+    color: #dbbb76;
+}
+
+.season-summary-standing-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid #333;
+    border-radius: 50%;
+    background: #171719;
+    color: #777;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.season-summary-standing-participant {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.season-summary-standing-participant strong {
+    overflow: hidden;
+    font-size: 15px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.season-summary-standing-participant span {
+    overflow: hidden;
+    color: #777;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.season-summary-standing-team {
+    color: #9d875a;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+
+/* =========================================
+   BEST 11
+========================================= */
+
+.season-summary-formation {
+    color: #c0a365;
+    font-size: 15px;
+    letter-spacing: 2px;
+}
+
+.season-summary-pitch {
+    position: relative;
+    min-height: 680px;
+    margin: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(219, 230, 217, 0.38);
+    border-radius: 8px;
+    background:
+        linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0.025) 50%,
+            transparent 50%
+        ),
+        repeating-linear-gradient(
+            0deg,
+            #172d20 0,
+            #172d20 68px,
+            #14281c 68px,
+            #14281c 136px
+        );
+    box-shadow:
+        inset 0 0 50px rgba(0, 0, 0, 0.38);
+}
+
+.season-summary-pitch::before {
+    content: "";
+    position: absolute;
+    inset: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    pointer-events: none;
+}
+
+.season-summary-pitch-half-line {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    right: 12px;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.season-summary-pitch-circle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 105px;
+    height: 105px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.season-summary-pitch-box {
+    position: absolute;
+    left: 50%;
+    width: 260px;
+    height: 80px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    transform: translateX(-50%);
+}
+
+.season-summary-pitch-box-top {
+    top: 12px;
+    border-top: none;
+}
+
+.season-summary-pitch-box-bottom {
+    bottom: 12px;
+    border-bottom: none;
+}
+
+
+/* =========================================
+   BEST 11 PLAYER
+========================================= */
+
+.season-summary-best11-player {
+    position: absolute;
+    z-index: 3;
+    display: flex;
+    width: 92px;
+    transform: translate(-50%, -50%);
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.season-summary-best11-position {
+    position: absolute;
+    top: -5px;
+    right: -2px;
+    z-index: 4;
+    min-width: 30px;
+    padding: 3px 5px;
+    border: 1px solid #967d49;
+    border-radius: 3px;
+    background: #17130c;
+    color: #d7bc81;
+    font-size: 8px;
+    font-weight: 900;
+}
+
+.season-summary-best11-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 57px;
+    height: 57px;
+    margin-bottom: 4px;
+    overflow: hidden;
+    border: 2px solid rgba(190, 161, 98, 0.72);
+    border-radius: 50%;
+    background:
+        linear-gradient(
+            145deg,
+            #253a50,
+            #0c1118
+        );
+    color: #d8c08e;
+    font-size: 14px;
+    font-weight: 900;
+    box-shadow:
+        0 5px 15px rgba(0, 0, 0, 0.38);
+}
+
+.season-summary-best11-player strong {
+    max-width: 90px;
+    overflow: hidden;
+    padding: 3px 5px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.78);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.season-summary-best11-player small {
+    margin-top: 2px;
+    color: #d8c08e;
+    font-size: 9px;
+    font-weight: 800;
+}
+
+
+/* ST */
+
+.season-summary-slot-st-left {
+    top: 13%;
+    left: 38%;
+}
+
+.season-summary-slot-st-right {
+    top: 13%;
+    left: 62%;
+}
+
+
+/* MID */
+
+.season-summary-slot-lm {
+    top: 39%;
+    left: 16%;
+}
+
+.season-summary-slot-lcm {
+    top: 40%;
+    left: 38%;
+}
+
+.season-summary-slot-rcm {
+    top: 40%;
+    left: 62%;
+}
+
+.season-summary-slot-rm {
+    top: 39%;
+    left: 84%;
+}
+
+
+/* DEF */
+
+.season-summary-slot-lb {
+    top: 68%;
+    left: 14%;
+}
+
+.season-summary-slot-lcb {
+    top: 68%;
+    left: 38%;
+}
+
+.season-summary-slot-rcb {
+    top: 68%;
+    left: 62%;
+}
+
+.season-summary-slot-rb {
+    top: 68%;
+    left: 86%;
+}
+
+
+/* GK */
+
+.season-summary-slot-gk {
+    top: 88%;
+    left: 50%;
+}
+
+
+/* =========================================
+   AWARDS
+========================================= */
+
+.season-summary-awards-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.season-summary-award-list {
+    padding: 8px 18px 18px;
+}
+
+.season-summary-award-player {
+    display: grid;
+    grid-template-columns:
+        26px
+        48px
+        minmax(0, 1fr)
+        auto;
+    align-items: center;
+    gap: 10px;
+    min-height: 72px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.season-summary-award-player:last-child {
+    border-bottom: none;
+}
+
+.season-summary-award-rank {
+    color: #8b7547;
+    font-size: 16px;
+    font-weight: 900;
+    text-align: center;
+}
+
+.season-summary-award-player:first-child
+.season-summary-award-rank {
+    color: #d6b76e;
+}
+
+.season-summary-award-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border: 1px solid #493f2a;
+    border-radius: 50%;
+    background: #151516;
+    color: #ad9561;
+    font-size: 11px;
+    font-weight: 900;
+}
+
+.season-summary-award-info {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.season-summary-award-info strong {
+    overflow: hidden;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.season-summary-award-info span {
+    color: #777;
+    font-size: 10px;
+}
+
+.season-summary-award-player b {
+    color: #d4b66f;
+    font-size: 18px;
+}
+
+.season-summary-status {
+    margin-top: 22px;
+    padding: 20px;
+    border: 1px solid #333;
+    border-radius: 8px;
+    background: rgba(10, 10, 12, 0.9);
+    color: #aaa;
+    text-align: center;
+}
+
+
+/* =========================================
+   TABLET
+========================================= */
+
+@media (max-width: 1100px) {
+
+    .season-summary-middle-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .season-summary-pitch {
+        min-height: 720px;
+    }
+
+    .season-summary-awards-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+/* =========================================
+   MOBILE
+========================================= */
+
+@media (max-width: 768px) {
+
+    .season-summary-page {
+        width: 100%;
+        padding:
+            24px
+            14px
+            45px;
+    }
+
+    .season-summary-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 18px;
+    }
+
+    .season-summary-heading h1 {
+        font-size: 29px;
+    }
+
+    .season-summary-selector-wrap {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    .season-summary-selector {
+        width: 100%;
+    }
+
+
+    /* CHAMPION */
+
+    .season-summary-champion {
+        grid-template-columns: 1fr;
+        min-height: 0;
+        padding:
+            24px
+            18px
+            28px;
+        text-align: center;
+    }
+
+    .season-summary-champion-decoration {
+        margin-bottom: 2px;
+    }
+
+    .season-summary-crown {
+        font-size: 46px;
+    }
+
+    .season-summary-champion-copy {
+        padding:
+            8px
+            0
+            18px;
+    }
+
+    .season-summary-champion-copy h2 {
+        margin-bottom: 15px;
+        font-size: 42px;
+    }
+
+    .season-summary-champion-name {
+        font-size: 26px;
+    }
+
+    .season-summary-champion-team {
+        justify-content: center;
+    }
+
+    .season-summary-champion-visual {
+        min-height: 125px;
+    }
+
+    .season-summary-champion-logo {
+        width: 92px;
+        height: 92px;
+    }
+
+    .season-summary-champion-logo strong {
+        font-size: 14px;
+    }
+
+    .season-summary-champion-glow {
+        width: 140px;
+        height: 140px;
+    }
+
+
+    /* MIDDLE */
+
+    .season-summary-middle-grid {
+        gap: 16px;
+    }
+
+    .season-summary-panel-heading {
+        min-height: 65px;
+        padding: 14px;
+    }
+
+    .season-summary-panel-heading h2 {
+        font-size: 18px;
+    }
+
+
+    /* STANDINGS */
+
+    .season-summary-standing-list {
+        padding:
+            7px
+            12px
+            12px;
+    }
+
+    .season-summary-standing-row {
+        grid-template-columns:
+            26px
+            38px
+            minmax(0, 1fr);
+        gap: 8px;
+        min-height: 67px;
+    }
+
+    .season-summary-standing-logo {
+        width: 34px;
+        height: 34px;
+    }
+
+    .season-summary-standing-team {
+        display: none;
+    }
+
+
+    /* BEST 11 */
+
+    .season-summary-pitch {
+        min-height: 610px;
+        margin: 10px;
+    }
+
+    .season-summary-best11-player {
+        width: 68px;
+    }
+
+    .season-summary-best11-image {
+        width: 47px;
+        height: 47px;
+    }
+
+    .season-summary-best11-player strong {
+        max-width: 66px;
+        font-size: 8px;
+    }
+
+    .season-summary-best11-position {
+        right: -3px;
+        min-width: 27px;
+        font-size: 7px;
+    }
+
+    .season-summary-slot-lm {
+        left: 13%;
+    }
+
+    .season-summary-slot-rm {
+        left: 87%;
+    }
+
+    .season-summary-slot-lb {
+        left: 12%;
+    }
+
+    .season-summary-slot-rb {
+        left: 88%;
+    }
+
+
+    /* AWARDS */
+
+    .season-summary-awards-grid {
+        gap: 16px;
+    }
+
+}
+
+
+/* =========================================
+   SMALL MOBILE
+========================================= */
+
+@media (max-width: 480px) {
+
+    .season-summary-pitch {
+        min-height: 570px;
+    }
+
+    .season-summary-best11-image {
+        width: 42px;
+        height: 42px;
+    }
+
+    .season-summary-best11-player strong {
+        max-width: 60px;
+        font-size: 7px;
+    }
+
+    .season-summary-best11-player small {
+        font-size: 8px;
+    }
+
+    .season-summary-slot-lm {
+        left: 11%;
+    }
+
+    .season-summary-slot-rm {
+        left: 89%;
+    }
+
+    .season-summary-slot-lb {
+        left: 10%;
+    }
+
+    .season-summary-slot-rb {
+        left: 90%;
+    }
+
+}

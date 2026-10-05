@@ -172,6 +172,14 @@ if (siteMainMenuElement) {
 
                 {
                     label:
+                        "시즌 결산",
+
+                    href:
+                        "./season-summary.html",
+                },
+
+                {
+                    label:
                         "AI 예측 기록",
 
                     href:
