@@ -23842,6 +23842,36 @@ button {
     font-weight: 700;
 }
 
+.season-summary-finalization-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 9px;
+    border: 1px solid #665633;
+    border-radius: 999px;
+    background: rgba(183, 154, 96, 0.06);
+    color: #bda46f;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+
+.season-summary-finalization-badge.is-finalized {
+    border-color: rgba(183, 154, 96, 0.55);
+    background: rgba(183, 154, 96, 0.12);
+    color: #dbc17f;
+}
+
+
+.season-summary-finalization-badge.is-pending {
+    border-color: rgba(159, 125, 61, 0.42);
+    background: rgba(159, 125, 61, 0.08);
+    color: #b99a60;
+}
+
 
 /* =========================================
    COMMON PANEL

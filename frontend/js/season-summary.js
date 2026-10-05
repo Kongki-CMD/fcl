@@ -10,6 +10,11 @@ const seasonSummarySelectorElement =
         "#season-summary-selector"
     );
 
+const seasonSummaryFinalizationBadgeElement =
+    document.querySelector(
+        "#season-summary-finalization-badge"
+    );
+
 
 const seasonSummaryChampionSeasonElement =
     document.querySelector(
@@ -331,6 +336,26 @@ function renderSeasonSummarySelector() {
     );
 }
 
+// =========================================
+// 현재 선택 시즌
+// =========================================
+
+function getSelectedSeasonSummaryRecord() {
+
+    return (
+        availableSeasonSummarySeasons
+            .find(
+                season =>
+                    Number(
+                        season.season_number
+                    )
+                    ===
+                    selectedSeasonSummaryNumber
+            )
+        ||
+        null
+    );
+}
 
 // =========================================
 // 공통 시즌 표시
@@ -341,6 +366,10 @@ function updateSeasonSummaryLabels() {
     if (!selectedSeasonSummaryNumber) {
         return;
     }
+
+
+    const selectedSeason =
+        getSelectedSeasonSummaryRecord();
 
 
     if (
@@ -364,6 +393,78 @@ function updateSeasonSummaryLabels() {
             String(
                 selectedSeasonSummaryNumber
             );
+    }
+
+
+    if (
+        seasonSummaryFinalizationBadgeElement
+    ) {
+
+        const seasonStatus =
+            selectedSeason?.status
+            || "";
+
+
+        seasonSummaryFinalizationBadgeElement
+            .classList
+            .remove(
+                "is-finalized",
+                "is-pending"
+            );
+
+
+        if (
+            seasonStatus
+            === "completed"
+        ) {
+
+            seasonSummaryFinalizationBadgeElement
+                .textContent =
+                "확정";
+
+
+            seasonSummaryFinalizationBadgeElement
+                .classList
+                .add(
+                    "is-finalized"
+                );
+
+
+            seasonSummaryFinalizationBadgeElement
+                .title =
+                "종료된 시즌의 확정 기록입니다.";
+
+        } else {
+
+            seasonSummaryFinalizationBadgeElement
+                .textContent =
+                (
+                    seasonStatus
+                    === "active"
+
+                    ?
+                    "진행 중 · 미확정"
+
+                    :
+                    "미확정"
+                );
+
+
+            seasonSummaryFinalizationBadgeElement
+                .classList
+                .add(
+                    "is-pending"
+                );
+
+
+            seasonSummaryFinalizationBadgeElement
+                .title =
+                (
+                    "시즌 종료 전 기록은 "
+                    +
+                    "변동될 수 있습니다."
+                );
+        }
     }
 }
 
@@ -409,6 +510,131 @@ function hideSeasonSummaryStatus() {
         .add(
             "hidden"
         );
+}
+
+// =========================================
+// SECTION LOAD ERROR
+//
+// 한 영역이 실패해도
+// 다른 시즌 결산 영역은 유지
+// =========================================
+
+function renderSeasonSummarySectionError(
+    sectionKey
+) {
+
+    if (
+        sectionKey
+        === "champion"
+    ) {
+
+        if (
+            seasonSummaryChampionNameElement
+        ) {
+
+            seasonSummaryChampionNameElement
+                .textContent =
+                "정보 확인 불가";
+        }
+
+
+        if (
+            seasonSummaryChampionNicknameElement
+        ) {
+
+            seasonSummaryChampionNicknameElement
+                .textContent =
+                "우승자 정보를 불러오지 못했습니다.";
+        }
+
+
+        if (
+            seasonSummaryChampionTeamElement
+        ) {
+
+            seasonSummaryChampionTeamElement
+                .textContent =
+                "잠시 후 다시 확인해주세요.";
+        }
+
+
+        renderSeasonChampionLogo(
+            null
+        );
+
+
+        return;
+    }
+
+
+    if (
+        sectionKey
+        === "standings"
+    ) {
+
+        renderSeasonFinalStandings(
+            {
+                finalized: false,
+
+                standings: [],
+
+                message:
+                    "시즌 최종 순위를 불러오지 못했습니다.",
+            }
+        );
+
+
+        return;
+    }
+
+
+    if (
+        sectionKey
+        === "best11"
+    ) {
+
+        renderSeasonBest11(
+            {
+                best11: [],
+
+                empty_label:
+                    "정보 없음",
+            }
+        );
+
+
+        return;
+    }
+
+
+    if (
+        sectionKey
+        === "awards"
+    ) {
+
+        renderSeasonAwardList(
+            seasonSummaryGoalsElement,
+            [],
+            "goals",
+            "득점 순위를 불러오지 못했습니다."
+        );
+
+
+        renderSeasonAwardList(
+            seasonSummaryAssistsElement,
+            [],
+            "assists",
+            "도움 순위를 불러오지 못했습니다."
+        );
+
+
+        renderSeasonAwardList(
+            seasonSummaryRatingsElement,
+            [],
+            "average_rating",
+            "평점 순위를 불러오지 못했습니다."
+        );
+    }
 }
 
 // =========================================
@@ -1074,7 +1300,8 @@ function resetSeasonBest11Pitch() {
 
 function createSeasonBest11PlayerElement(
     slot,
-    player
+    player,
+    emptyLabel = "최소 2세트"
 ) {
 
     const playerElement =
@@ -1158,7 +1385,7 @@ function createSeasonBest11PlayerElement(
 
 
         ownerElement.textContent =
-            "최소 2세트";
+            emptyLabel;
 
 
         playerElement.append(
@@ -1322,7 +1549,9 @@ function renderSeasonBest11(
             const playerElement =
                 createSeasonBest11PlayerElement(
                     slot,
-                    player
+                    player,
+                    data?.empty_label
+                    || "최소 2세트"
                 );
 
 
@@ -1788,19 +2017,143 @@ async function loadSeasonAwards() {
 async function refreshSeasonSummary() {
 
     if (!selectedSeasonSummaryNumber) {
-        return;
+        return false;
     }
+
+
+    const requestedSeasonNumber =
+        selectedSeasonSummaryNumber;
 
 
     updateSeasonSummaryLabels();
 
 
-    await Promise.all([
-        loadSeasonChampion(),
-        loadSeasonFinalStandings(),
-        loadSeasonBest11(),
-        loadSeasonAwards(),
-    ]);
+    const sections = [
+
+        {
+            key: "champion",
+            label: "우승자",
+            loader:
+                loadSeasonChampion,
+        },
+
+        {
+            key: "standings",
+            label: "최종 순위",
+            loader:
+                loadSeasonFinalStandings,
+        },
+
+        {
+            key: "best11",
+            label: "Best11",
+            loader:
+                loadSeasonBest11,
+        },
+
+        {
+            key: "awards",
+            label: "TOP3",
+            loader:
+                loadSeasonAwards,
+        },
+    ];
+
+
+    const results =
+        await Promise.allSettled(
+
+            sections.map(
+                section =>
+                    section.loader()
+            )
+        );
+
+
+    // 시즌을 빠르게 변경한 경우
+    // 이전 refresh가 현재 화면의 상태 메시지를
+    // 덮어쓰지 않도록 함
+    if (
+        requestedSeasonNumber
+        !==
+        selectedSeasonSummaryNumber
+    ) {
+
+        return true;
+    }
+
+
+    const failedSections = [];
+
+
+    results.forEach(
+        (
+            result,
+            index
+        ) => {
+
+            if (
+                result.status
+                !== "rejected"
+            ) {
+
+                return;
+            }
+
+
+            const section =
+                sections[
+                    index
+                ];
+
+
+            failedSections.push(
+                section.label
+            );
+
+
+            console.error(
+                (
+                    `Season ${requestedSeasonNumber} `
+                    +
+                    `${section.label} 로드 실패`
+                ),
+                result.reason
+            );
+
+
+            renderSeasonSummarySectionError(
+                section.key
+            );
+        }
+    );
+
+
+    if (
+        failedSections.length > 0
+    ) {
+
+        showSeasonSummaryStatus(
+            (
+                "일부 시즌 결산 정보를 "
+                +
+                "불러오지 못했습니다: "
+                +
+                failedSections.join(
+                    ", "
+                )
+            )
+        );
+
+
+        return false;
+    }
+
+
+    hideSeasonSummaryStatus();
+
+
+    return true;
 }
 
 
@@ -1845,6 +2198,15 @@ async function handleSeasonSummaryChange(
 
 
     updateSeasonSummaryUrl();
+
+
+    showSeasonSummaryStatus(
+        (
+            `Season ${nextSeasonNumber} `
+            +
+            "결산 정보를 불러오는 중입니다."
+        )
+    );
 
 
     await refreshSeasonSummary();
@@ -1925,9 +2287,6 @@ async function initializeSeasonSummary() {
 
 
         await refreshSeasonSummary();
-
-
-        hideSeasonSummaryStatus();
 
 
     } catch (error) {
