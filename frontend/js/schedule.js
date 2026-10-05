@@ -171,6 +171,45 @@ scheduleListElement.addEventListener(
     }
 );
 
+// =========================================
+// PLAYOFF SERIES CONTROL
+// =========================================
+
+playoffMatchListElement.addEventListener(
+    "click",
+    (event) => {
+
+        const startButtonElement =
+            event.target.closest(
+                ".playoff-series-start-button"
+            );
+
+
+        if (startButtonElement) {
+
+            startRegularSeries(
+                startButtonElement
+            );
+
+            return;
+        }
+
+
+        const viewButtonElement =
+            event.target.closest(
+                ".playoff-series-view-button"
+            );
+
+
+        if (viewButtonElement) {
+
+            openPreseasonSeries(
+                viewButtonElement
+            );
+        }
+    }
+);
+
 
 function renderAiPredictionBar(match) {
 
@@ -784,6 +823,17 @@ async function startRegularSeries(
         );
 
 
+        if (selectedSeasonNumber) {
+
+            localStorage.setItem(
+                "fclCurrentSeriesSeasonNumber",
+                String(
+                    selectedSeasonNumber
+                )
+            );
+        }
+
+
         window.location.href =
             "./preseason.html?mode=result";
 
@@ -1003,6 +1053,17 @@ function openPreseasonSeries(
     );
 
 
+    if (selectedSeasonNumber) {
+
+        localStorage.setItem(
+            "fclCurrentSeriesSeasonNumber",
+            String(
+                selectedSeasonNumber
+            )
+        );
+    }
+
+
     window.location.href =
         "./preseason.html?mode=result";
 }
@@ -1011,6 +1072,31 @@ function renderPlayoffSchedule(matches) {
 
     playoffMatchListElement.innerHTML =
         "";
+
+
+    const today =
+        new Date();
+
+
+    const todayString = [
+        today.getFullYear(),
+
+        String(
+            today.getMonth() + 1
+        ).padStart(
+            2,
+            "0"
+        ),
+
+        String(
+            today.getDate()
+        ).padStart(
+            2,
+            "0"
+        ),
+    ].join(
+        "-"
+    );
 
 
     if (matches.length === 0) {
@@ -1194,6 +1280,78 @@ function renderPlayoffSchedule(matches) {
                 `;
             }
 
+            // =========================
+            // SERIES CONTROL
+            // =========================
+
+            let seriesControlHtml =
+                "";
+
+
+            const isTodayMatch =
+                match.date
+                === todayString;
+
+
+            // 예약된 플레이오프
+            // + 실제 SERIES 존재
+            // + 경기 당일
+            if (
+                match.series_id
+                != null
+                &&
+                match.status
+                === "scheduled"
+                &&
+                isTodayMatch
+            ) {
+
+                seriesControlHtml = `
+                    <div class="schedule-series-control">
+
+                        <button
+                            type="button"
+                            class="
+                                regular-series-start-button
+                                playoff-series-start-button
+                            "
+                            data-series-id="${match.series_id}"
+                        >
+                            SERIES START
+                        </button>
+
+                    </div>
+                `;
+            }
+
+
+            // 이미 시작된 플레이오프
+            if (
+                match.series_id
+                != null
+                &&
+                match.status
+                === "active"
+            ) {
+
+                seriesControlHtml = `
+                    <div class="schedule-series-control">
+
+                        <button
+                            type="button"
+                            class="
+                                regular-series-view-button
+                                playoff-series-view-button
+                            "
+                            data-series-id="${match.series_id}"
+                        >
+                            경기 결과 입력
+                        </button>
+
+                    </div>
+                `;
+            }
+
 
             // =========================
             // 카드
@@ -1261,7 +1419,10 @@ function renderPlayoffSchedule(matches) {
 
 
                 ${progressHtml}
-            `;
+
+
+                ${seriesControlHtml}
+                `;
 
 
             playoffMatchListElement.appendChild(
@@ -1273,9 +1434,27 @@ function renderPlayoffSchedule(matches) {
 
 
 function renderSchedule(matches) {
-    scheduleListElement.innerHTML = "";
 
-    if (matches.length === 0) {
+    scheduleListElement.innerHTML =
+        "";
+
+
+    const visibleMatches =
+        matches.filter(
+            match =>
+                (
+                    match.match_type
+                    === "프리시즌"
+                )
+                ||
+                (
+                    match.match_type
+                    === "정규리그"
+                )
+        );
+
+
+    if (visibleMatches.length === 0) {
         scheduleListElement.innerHTML = `
             <p>등록된 경기 일정이 없습니다.</p>
         `;
@@ -1311,7 +1490,7 @@ function renderSchedule(matches) {
     // =========================================
 
     const sortedMatches =
-        [...matches].sort(
+        [...visibleMatches].sort(
             (matchA, matchB) => {
 
                 const isPastMatchA =
@@ -1388,7 +1567,10 @@ function renderSchedule(matches) {
         let matchStatusLabel = "";
 
 
-        if (match.match_type === "프리시즌") {
+        if (
+            match.match_type
+            === "프리시즌"
+        ) {
 
             matchLabel = `
                 <span class="match-preseason">
@@ -1396,7 +1578,13 @@ function renderSchedule(matches) {
                 </span>
             `;
 
-        } else {
+        } else if (
+            match.match_type
+            === "정규리그"
+            &&
+            match.round
+            != null
+        ) {
 
             matchLabel = `
                 <span class="match-round">

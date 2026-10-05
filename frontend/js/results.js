@@ -2374,11 +2374,31 @@ function renderResults(
         let resultLabel = "";
 
 
-        if (result.match_type === "프리시즌") {
+        if (
+            result.match_type
+            === "프리시즌"
+        ) {
 
             resultLabel = `
                 <span class="match-preseason">
                     PRE-SEASON
+                </span>
+            `;
+
+        } else if (
+            result.match_type
+            === "플레이오프"
+        ) {
+
+            const playoffLabel =
+                getResultDetailCompetitionLabel(
+                    result
+                );
+
+
+            resultLabel = `
+                <span class="match-round">
+                    ${playoffLabel}
                 </span>
             `;
 
@@ -2389,7 +2409,6 @@ function renderResults(
                     ROUND ${result.round}
                 </span>
             `;
-
         }
 
         const finishedTimeHtml =

@@ -192,6 +192,31 @@ let currentWinsRequired = null;
 
 let statusTimer = null;
 
+function getCurrentSeriesSeasonNumber() {
+
+    const seasonNumber =
+        Number(
+            localStorage.getItem(
+                "fclCurrentSeriesSeasonNumber"
+            )
+        );
+
+
+    if (
+        Number.isInteger(
+            seasonNumber
+        )
+        &&
+        seasonNumber > 0
+    ) {
+
+        return seasonNumber;
+    }
+
+
+    return null;
+}
+
 
 /* =========================
    참가자 불러오기
@@ -1541,8 +1566,16 @@ function closeManualResultPanel() {
     }
 
 
+    const seasonNumber =
+        getCurrentSeriesSeasonNumber();
+
+
     window.location.href =
-        "./schedule.html";
+        seasonNumber
+            ? (
+                `./schedule.html?season=${seasonNumber}`
+            )
+            : "./schedule.html";
 }
 
 
@@ -1830,6 +1863,10 @@ async function completeManualResult() {
             === "토너먼트";
 
 
+        const completedSeasonNumber =
+            getCurrentSeriesSeasonNumber();
+
+
         if (!response.ok) {
 
             throw new Error(
@@ -1844,6 +1881,9 @@ async function completeManualResult() {
             "fclCurrentSeriesId"
         );
 
+        localStorage.removeItem(
+            "fclCurrentSeriesSeasonNumber"
+        );
 
         currentSeriesId = null;
 
@@ -1860,7 +1900,14 @@ async function completeManualResult() {
         window.location.href =
             isTournamentSeries
                 ? "./tournament.html"
-                : "./results.html";
+                : (
+                    completedSeasonNumber
+                        ? (
+                            "./results.html"
+                            + `?season=${completedSeasonNumber}`
+                        )
+                        : "./results.html"
+                );
 
 
     } catch (error) {

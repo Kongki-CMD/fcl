@@ -39771,7 +39771,7 @@ def get_fcl_series_status(
                     played_at,
                     team_a_score,
                     team_b_score,
-                    score_source
+                    score_source,
                     winner_side
 
                 FROM series_sets
