@@ -49,6 +49,23 @@ const seasonSummaryBest11PitchElement =
         "#season-summary-best11-pitch"
     );
 
+const seasonSummaryGoalsElement =
+    document.querySelector(
+        "#season-summary-goals"
+    );
+
+
+const seasonSummaryAssistsElement =
+    document.querySelector(
+        "#season-summary-assists"
+    );
+
+
+const seasonSummaryRatingsElement =
+    document.querySelector(
+        "#season-summary-ratings"
+    );
+
 const seasonSummaryStatusElement =
     document.querySelector(
         "#season-summary-status"
@@ -1386,6 +1403,373 @@ async function loadSeasonBest11() {
     );
 }
 
+// =========================================
+// AWARD PLAYER
+// =========================================
+
+function createSeasonAwardPlayerElement(
+    player,
+    valueKey
+) {
+
+    const rowElement =
+        document.createElement(
+            "div"
+        );
+
+
+    rowElement.className =
+        "season-summary-award-player";
+
+
+    const rankElement =
+        document.createElement(
+            "span"
+        );
+
+
+    rankElement.className =
+        "season-summary-award-rank";
+
+
+    rankElement.textContent =
+        String(
+            player.rank
+        );
+
+
+    const imageWrapElement =
+        document.createElement(
+            "div"
+        );
+
+
+    imageWrapElement.className =
+        "season-summary-award-image";
+
+
+    const imageUrl =
+        getSeasonSummaryPlayerImage(
+            player
+        );
+
+
+    if (imageUrl) {
+
+        const imageElement =
+            document.createElement(
+                "img"
+            );
+
+
+        imageElement.src =
+            imageUrl;
+
+
+        imageElement.alt =
+            player.player_name
+            || "선수";
+
+
+        imageElement.addEventListener(
+            "error",
+            () => {
+
+                imageWrapElement.innerHTML =
+                    "";
+
+
+                imageWrapElement.textContent =
+                    "P";
+            },
+            {
+                once: true,
+            }
+        );
+
+
+        imageWrapElement.appendChild(
+            imageElement
+        );
+
+    } else {
+
+        imageWrapElement.textContent =
+            "P";
+    }
+
+
+    const infoElement =
+        document.createElement(
+            "div"
+        );
+
+
+    infoElement.className =
+        "season-summary-award-info";
+
+
+    const nameElement =
+        document.createElement(
+            "strong"
+        );
+
+
+    nameElement.textContent =
+        player.player_name
+        || "-";
+
+
+    const ownerElement =
+        document.createElement(
+            "span"
+        );
+
+
+    ownerElement.textContent =
+        (
+            player.nickname
+
+            ?
+            (
+                `${player.fcl_name}`
+                +
+                ` · ${player.nickname}`
+            )
+
+            :
+            (
+                player.fcl_name
+                || "-"
+            )
+        );
+
+
+    infoElement.append(
+        nameElement,
+        ownerElement
+    );
+
+
+    const valueElement =
+        document.createElement(
+            "b"
+        );
+
+
+    if (
+        valueKey
+        === "average_rating"
+    ) {
+
+        valueElement.textContent =
+            Number(
+                player.average_rating
+                ?? 0
+            ).toFixed(2);
+
+    } else {
+
+        valueElement.textContent =
+            String(
+                Number(
+                    player[
+                        valueKey
+                    ]
+                    ?? 0
+                )
+            );
+    }
+
+
+    rowElement.title =
+        (
+            `${player.player_name}`
+            +
+            ` · ${player.fcl_name}`
+            +
+            ` · ${player.sets_played}세트`
+        );
+
+
+    rowElement.append(
+        rankElement,
+        imageWrapElement,
+        infoElement,
+        valueElement
+    );
+
+
+    return rowElement;
+}
+
+
+// =========================================
+// AWARD LIST
+// =========================================
+
+function renderSeasonAwardList(
+    element,
+    players,
+    valueKey,
+    emptyMessage
+) {
+
+    if (!element) {
+        return;
+    }
+
+
+    element.innerHTML =
+        "";
+
+
+    if (
+        !Array.isArray(
+            players
+        )
+        ||
+        players.length === 0
+    ) {
+
+        const emptyElement =
+            document.createElement(
+                "div"
+            );
+
+
+        emptyElement.className =
+            "season-summary-award-empty";
+
+
+        emptyElement.textContent =
+            emptyMessage;
+
+
+        element.appendChild(
+            emptyElement
+        );
+
+
+        return;
+    }
+
+
+    players.forEach(
+        player => {
+
+            element.appendChild(
+                createSeasonAwardPlayerElement(
+                    player,
+                    valueKey
+                )
+            );
+        }
+    );
+}
+
+
+// =========================================
+// AWARDS 출력
+// =========================================
+
+function renderSeasonAwards(
+    data
+) {
+
+    renderSeasonAwardList(
+        seasonSummaryGoalsElement,
+        data?.goals,
+        "goals",
+        "아직 득점 기록이 없습니다."
+    );
+
+
+    renderSeasonAwardList(
+        seasonSummaryAssistsElement,
+        data?.assists,
+        "assists",
+        "아직 도움 기록이 없습니다."
+    );
+
+
+    renderSeasonAwardList(
+        seasonSummaryRatingsElement,
+        data?.ratings,
+        "average_rating",
+        "평점 순위를 계산할 기록이 없습니다."
+    );
+}
+
+
+// =========================================
+// AWARDS 불러오기
+// =========================================
+
+async function loadSeasonAwards() {
+
+    const requestedSeasonNumber =
+        selectedSeasonSummaryNumber;
+
+
+    if (!requestedSeasonNumber) {
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            (
+                `${apiBaseUrl}`
+                +
+                "/api/season/awards"
+                +
+                `?season=${requestedSeasonNumber}`
+            )
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "시즌 TOP3 기록을 불러오지 못했습니다."
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    if (
+        requestedSeasonNumber
+        !==
+        selectedSeasonSummaryNumber
+    ) {
+
+        return;
+    }
+
+
+    if (
+        Number(
+            data.season
+        )
+        !==
+        requestedSeasonNumber
+    ) {
+
+        throw new Error(
+            "요청한 시즌과 TOP3 데이터의 시즌이 일치하지 않습니다."
+        );
+    }
+
+
+    renderSeasonAwards(
+        data
+    );
+}
+
 
 // =========================================
 // 시즌 데이터 새로고침
@@ -1415,6 +1799,7 @@ async function refreshSeasonSummary() {
         loadSeasonChampion(),
         loadSeasonFinalStandings(),
         loadSeasonBest11(),
+        loadSeasonAwards(),
     ]);
 }
 

@@ -24484,12 +24484,32 @@ button {
     justify-content: center;
     width: 42px;
     height: 42px;
+    overflow: hidden;
     border: 1px solid #493f2a;
     border-radius: 50%;
     background: #151516;
     color: #ad9561;
     font-size: 11px;
     font-weight: 900;
+}
+
+.season-summary-award-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.season-summary-award-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    padding: 24px 15px;
+    color: #777;
+    font-size: 12px;
+    line-height: 1.6;
+    text-align: center;
 }
 
 .season-summary-award-info {

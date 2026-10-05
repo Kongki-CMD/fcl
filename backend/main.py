@@ -44941,6 +44941,616 @@ def get_season_best11(
     }
 
 # =========================
+# SEASON AWARDS
+#
+# 득점 TOP3
+# 도움 TOP3
+# 평점 TOP3
+#
+# 공식 경기:
+# 정규리그 + 플레이오프
+# =========================
+
+@app.get("/api/season/awards")
+def get_season_awards(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                WITH aggregated_stats AS (
+
+                    SELECT
+                        sps.participant_id,
+
+                        p.fcl_name,
+
+                        p.fc_nickname
+                            AS nickname,
+
+                        TRIM(
+                            sps.player_name
+                        )
+                            AS player_name,
+
+                        COUNT(
+                            DISTINCT s.id
+                        )
+                            AS series_played,
+
+                        SUM(
+                            sps.sets_played
+                        )
+                            AS sets_played,
+
+                        SUM(
+                            sps.rating_total
+                        )
+                            AS rating_total,
+
+                        SUM(
+                            sps.goals
+                        )
+                            AS goals,
+
+                        SUM(
+                            sps.assists
+                        )
+                            AS assists
+
+                    FROM series_player_stats
+                        AS sps
+
+                    JOIN series AS s
+                        ON s.id =
+                            sps.series_id
+
+                    JOIN participants AS p
+                        ON p.id =
+                            sps.participant_id
+
+                    WHERE
+                        s.status =
+                            'completed'
+
+                        AND
+                        s.series_type IN (
+                            '정규리그',
+                            '플레이오프'
+                        )
+
+                        AND
+                        s.season_id = %s
+
+                    GROUP BY
+                        sps.participant_id,
+                        p.fcl_name,
+                        p.fc_nickname,
+
+                        TRIM(
+                            sps.player_name
+                        )
+                ),
+
+
+                latest_cards AS (
+
+                    SELECT DISTINCT ON (
+                        sps.participant_id,
+
+                        TRIM(
+                            sps.player_name
+                        )
+                    )
+
+                        sps.participant_id,
+
+                        TRIM(
+                            sps.player_name
+                        )
+                            AS player_name,
+
+                        sps.sp_id,
+                        sps.image_url
+
+                    FROM series_player_stats
+                        AS sps
+
+                    JOIN series AS s
+                        ON s.id =
+                            sps.series_id
+
+                    WHERE
+                        s.status =
+                            'completed'
+
+                        AND
+                        s.series_type IN (
+                            '정규리그',
+                            '플레이오프'
+                        )
+
+                        AND
+                        s.season_id = %s
+
+                    ORDER BY
+                        sps.participant_id,
+
+                        TRIM(
+                            sps.player_name
+                        ),
+
+                        s.completed_at DESC
+                            NULLS LAST,
+
+                        s.id DESC,
+
+                        sps.updated_at DESC,
+
+                        sps.id DESC
+                )
+
+
+                SELECT
+                    stats.participant_id,
+
+                    stats.fcl_name,
+                    stats.nickname,
+
+                    stats.player_name,
+
+                    stats.series_played,
+                    stats.sets_played,
+                    stats.rating_total,
+                    stats.goals,
+                    stats.assists,
+
+                    card.sp_id,
+                    card.image_url
+
+                FROM aggregated_stats
+                    AS stats
+
+                LEFT JOIN latest_cards
+                    AS card
+
+                    ON card.participant_id =
+                        stats.participant_id
+
+                    AND
+                    card.player_name =
+                        stats.player_name
+
+                ORDER BY
+                    stats.player_name,
+                    stats.participant_id
+                """,
+                (
+                    selected_season_id,
+                    selected_season_id,
+                ),
+            )
+
+
+            rows = (
+                cursor.fetchall()
+            )
+
+
+    players = []
+
+
+    for row in rows:
+
+        sets_played = int(
+            row[
+                "sets_played"
+            ]
+            or 0
+        )
+
+
+        if sets_played <= 0:
+
+            continue
+
+
+        rating_total = float(
+            row[
+                "rating_total"
+            ]
+            or 0
+        )
+
+
+        average_rating_raw = (
+            rating_total
+            /
+            sets_played
+        )
+
+
+        players.append(
+            {
+                "participant_id":
+                    int(
+                        row[
+                            "participant_id"
+                        ]
+                    ),
+
+                "fcl_name":
+                    row[
+                        "fcl_name"
+                    ],
+
+                "nickname":
+                    row[
+                        "nickname"
+                    ],
+
+                "player_name":
+                    row[
+                        "player_name"
+                    ],
+
+                "sp_id":
+                    row[
+                        "sp_id"
+                    ],
+
+                "image_url":
+                    row[
+                        "image_url"
+                    ],
+
+                "series_played":
+                    int(
+                        row[
+                            "series_played"
+                        ]
+                        or 0
+                    ),
+
+                "sets_played":
+                    sets_played,
+
+                "rating_total":
+                    round(
+                        rating_total,
+                        2,
+                    ),
+
+                "average_rating":
+                    round(
+                        average_rating_raw,
+                        2,
+                    ),
+
+                "goals":
+                    int(
+                        row[
+                            "goals"
+                        ]
+                        or 0
+                    ),
+
+                "assists":
+                    int(
+                        row[
+                            "assists"
+                        ]
+                        or 0
+                    ),
+
+                "_average_rating_raw":
+                    average_rating_raw,
+            }
+        )
+
+
+    # =========================
+    # 득점 TOP3
+    #
+    # 0골 선수는 TOP3에
+    # 억지로 포함하지 않음
+    # =========================
+
+    goal_players = [
+
+        player
+
+        for player
+        in players
+
+        if player[
+            "goals"
+        ] > 0
+    ]
+
+
+    goal_players.sort(
+        key=lambda player: (
+            -player[
+                "goals"
+            ],
+
+            -player[
+                "assists"
+            ],
+
+            -player[
+                "_average_rating_raw"
+            ],
+
+            -player[
+                "sets_played"
+            ],
+
+            player[
+                "player_name"
+            ].casefold(),
+
+            player[
+                "fcl_name"
+            ].casefold(),
+        )
+    )
+
+
+    # =========================
+    # 도움 TOP3
+    # =========================
+
+    assist_players = [
+
+        player
+
+        for player
+        in players
+
+        if player[
+            "assists"
+        ] > 0
+    ]
+
+
+    assist_players.sort(
+        key=lambda player: (
+            -player[
+                "assists"
+            ],
+
+            -player[
+                "goals"
+            ],
+
+            -player[
+                "_average_rating_raw"
+            ],
+
+            -player[
+                "sets_played"
+            ],
+
+            player[
+                "player_name"
+            ].casefold(),
+
+            player[
+                "fcl_name"
+            ].casefold(),
+        )
+    )
+
+
+    # =========================
+    # 평점 TOP3
+    #
+    # Best11과 동일하게
+    # 최소 2세트 출전
+    # =========================
+
+    rating_players = [
+
+        player
+
+        for player
+        in players
+
+        if (
+            player[
+                "sets_played"
+            ]
+            >=
+            SEASON_SUMMARY_MINIMUM_SETS
+
+            and
+
+            player[
+                "_average_rating_raw"
+            ]
+            > 0
+        )
+    ]
+
+
+    rating_players.sort(
+        key=lambda player: (
+            -player[
+                "_average_rating_raw"
+            ],
+
+            -player[
+                "sets_played"
+            ],
+
+            -player[
+                "goals"
+            ],
+
+            -player[
+                "assists"
+            ],
+
+            player[
+                "player_name"
+            ].casefold(),
+
+            player[
+                "fcl_name"
+            ].casefold(),
+        )
+    )
+
+
+    # =========================
+    # API 응답용 변환
+    # =========================
+
+    def build_award_rows(
+        rankings,
+    ):
+
+        result = []
+
+
+        for rank, player in enumerate(
+            rankings[:3],
+            start=1,
+        ):
+
+            result.append(
+                {
+                    "rank":
+                        rank,
+
+                    "participant_id":
+                        player[
+                            "participant_id"
+                        ],
+
+                    "fcl_name":
+                        player[
+                            "fcl_name"
+                        ],
+
+                    "nickname":
+                        player[
+                            "nickname"
+                        ],
+
+                    "player_name":
+                        player[
+                            "player_name"
+                        ],
+
+                    "sp_id":
+                        player[
+                            "sp_id"
+                        ],
+
+                    "image_url":
+                        player[
+                            "image_url"
+                        ],
+
+                    "series_played":
+                        player[
+                            "series_played"
+                        ],
+
+                    "sets_played":
+                        player[
+                            "sets_played"
+                        ],
+
+                    "rating_total":
+                        player[
+                            "rating_total"
+                        ],
+
+                    "average_rating":
+                        player[
+                            "average_rating"
+                        ],
+
+                    "goals":
+                        player[
+                            "goals"
+                        ],
+
+                    "assists":
+                        player[
+                            "assists"
+                        ],
+                }
+            )
+
+
+        return result
+
+
+    return {
+        "season":
+            selected_season_number,
+
+        "finalized":
+            selected_season[
+                "status"
+            ]
+            == "completed",
+
+        "minimum_rating_sets":
+            SEASON_SUMMARY_MINIMUM_SETS,
+
+        "competitions": [
+            "정규리그",
+            "플레이오프",
+        ],
+
+        "goals":
+            build_award_rows(
+                goal_players
+            ),
+
+        "assists":
+            build_award_rows(
+                assist_players
+            ),
+
+        "ratings":
+            build_award_rows(
+                rating_players
+            ),
+    }
+
+# =========================
 # 완료된 SERIES 결과 조회
 # =========================
 
