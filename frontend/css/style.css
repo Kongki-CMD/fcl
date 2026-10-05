@@ -24132,6 +24132,13 @@ button {
     font-weight: 800;
 }
 
+.season-summary-standing-logo img {
+    display: block;
+    width: 30px;
+    height: 30px;
+    object-fit: contain;
+}
+
 .season-summary-standing-participant {
     display: flex;
     min-width: 0;
@@ -24159,6 +24166,18 @@ button {
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 1px;
+}
+
+.season-summary-standing-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 330px;
+    padding: 30px;
+    color: #777;
+    font-size: 13px;
+    line-height: 1.7;
+    text-align: center;
 }
 
 
@@ -24632,6 +24651,11 @@ button {
     .season-summary-standing-logo {
         width: 34px;
         height: 34px;
+    }
+
+    .season-summary-standing-logo img {
+        width: 26px;
+        height: 26px;
     }
 
     .season-summary-standing-team {

@@ -39,6 +39,11 @@ const seasonSummaryChampionLogoElement =
         ".season-summary-champion-logo"
     );
 
+const seasonSummaryFinalStandingsElement =
+    document.querySelector(
+        "#season-summary-final-standings"
+    );
+
 const seasonSummaryStatusElement =
     document.querySelector(
         "#season-summary-status"
@@ -571,6 +576,313 @@ async function loadSeasonChampion() {
     );
 }
 
+// =========================================
+// FINAL STANDINGS 출력
+// =========================================
+
+function renderSeasonFinalStandings(
+    data
+) {
+
+    if (
+        !seasonSummaryFinalStandingsElement
+    ) {
+
+        return;
+    }
+
+
+    seasonSummaryFinalStandingsElement
+        .innerHTML =
+        "";
+
+
+    const standings =
+        Array.isArray(
+            data?.standings
+        )
+            ? data.standings
+            : [];
+
+
+    if (
+        !data?.finalized
+        ||
+        standings.length !== 5
+    ) {
+
+        const emptyElement =
+            document.createElement(
+                "div"
+            );
+
+
+        emptyElement.className =
+            "season-summary-standing-empty";
+
+
+        emptyElement.textContent =
+            (
+                data?.message
+                ||
+                "시즌 최종 순위가 아직 확정되지 않았습니다."
+            );
+
+
+        seasonSummaryFinalStandingsElement
+            .appendChild(
+                emptyElement
+            );
+
+
+        return;
+    }
+
+
+    standings.forEach(
+        standing => {
+
+            const rowElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            rowElement.className =
+                "season-summary-standing-row";
+
+
+            if (
+                Number(
+                    standing.rank
+                )
+                === 1
+            ) {
+
+                rowElement.classList.add(
+                    "season-summary-standing-first"
+                );
+            }
+
+
+            const rankElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            rankElement.className =
+                "season-summary-standing-rank";
+
+
+            rankElement.textContent =
+                String(
+                    standing.rank
+                );
+
+
+            const logoElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            logoElement.className =
+                "season-summary-standing-logo";
+
+
+            if (standing.team_logo_path) {
+
+                const imageElement =
+                    document.createElement(
+                        "img"
+                    );
+
+
+                imageElement.src =
+                    standing.team_logo_path;
+
+
+                imageElement.alt =
+                    (
+                        `${standing.fcl_name} `
+                        +
+                        "팀 로고"
+                    );
+
+
+                imageElement.addEventListener(
+                    "error",
+                    () => {
+
+                        logoElement.innerHTML =
+                            "";
+
+
+                        logoElement.textContent =
+                            String(
+                                standing.rank
+                            );
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+
+                logoElement.appendChild(
+                    imageElement
+                );
+
+            } else {
+
+                logoElement.textContent =
+                    String(
+                        standing.rank
+                    );
+            }
+
+
+            const participantElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            participantElement.className =
+                "season-summary-standing-participant";
+
+
+            const nameElement =
+                document.createElement(
+                    "strong"
+                );
+
+
+            nameElement.textContent =
+                standing.fcl_name
+                || "-";
+
+
+            const nicknameElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            nicknameElement.textContent =
+                standing.nickname
+                || "-";
+
+
+            participantElement.append(
+                nameElement,
+                nicknameElement
+            );
+
+
+            const teamElement =
+                document.createElement(
+                    "div"
+                );
+
+
+            teamElement.className =
+                "season-summary-standing-team";
+
+
+            teamElement.textContent =
+                standing.team_name
+                || "TEAM";
+
+
+            rowElement.append(
+                rankElement,
+                logoElement,
+                participantElement,
+                teamElement
+            );
+
+
+            seasonSummaryFinalStandingsElement
+                .appendChild(
+                    rowElement
+                );
+        }
+    );
+}
+
+
+// =========================================
+// FINAL STANDINGS 불러오기
+// =========================================
+
+async function loadSeasonFinalStandings() {
+
+    const requestedSeasonNumber =
+        selectedSeasonSummaryNumber;
+
+
+    if (!requestedSeasonNumber) {
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            (
+                `${apiBaseUrl}`
+                +
+                "/api/season/final-standings"
+                +
+                `?season=${requestedSeasonNumber}`
+            )
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "시즌 최종 순위를 불러오지 못했습니다."
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    // 이전 시즌 요청이 늦게 도착한 경우
+    // 현재 화면에 반영하지 않음
+    if (
+        requestedSeasonNumber
+        !==
+        selectedSeasonSummaryNumber
+    ) {
+
+        return;
+    }
+
+
+    if (
+        Number(
+            data.season
+        )
+        !==
+        requestedSeasonNumber
+    ) {
+
+        throw new Error(
+            "요청한 시즌과 최종 순위 데이터의 시즌이 일치하지 않습니다."
+        );
+    }
+
+
+    renderSeasonFinalStandings(
+        data
+    );
+}
+
 
 // =========================================
 // 시즌 데이터 새로고침
@@ -596,7 +908,10 @@ async function refreshSeasonSummary() {
     updateSeasonSummaryLabels();
 
 
-    await loadSeasonChampion();
+    await Promise.all([
+        loadSeasonChampion(),
+        loadSeasonFinalStandings(),
+    ]);
 }
 
 

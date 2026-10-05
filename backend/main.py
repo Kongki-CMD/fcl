@@ -43053,6 +43053,822 @@ def get_season_champion(
 
 
 # =========================
+# SEASON FINAL STANDINGS
+#
+# 1위: 결승 승자
+# 2위: 결승 패자
+# 3위: 플레이오프 패자
+# 4위: 준플레이오프 패자
+# 5위: 정규리그 5위
+# =========================
+
+@app.get("/api/season/final-standings")
+def get_season_final_standings(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    # =========================
+    # 정규리그 순위
+    #
+    # 최종 5위는
+    # 정규리그 5위를 그대로 사용
+    # =========================
+
+    regular_standings = (
+        get_standings(
+            season=
+                selected_season_number
+        )
+    )
+
+
+    if len(regular_standings) < 5:
+
+        return {
+            "season":
+                selected_season_number,
+
+            "finalized":
+                False,
+
+            "standings":
+                [],
+
+            "message":
+                (
+                    "정규리그 최종 순위를 "
+                    "확인할 수 없습니다."
+                ),
+        }
+
+
+    regular_fifth = (
+        regular_standings[4]
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 플레이오프 SERIES
+            #
+            # 같은 단계가 여러 번 존재할 경우
+            # 가장 최근 SERIES 사용
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.playoff_stage,
+                    s.status,
+                    s.best_of,
+                    s.wins_required,
+
+                    s.team_a_id,
+                    s.team_b_id,
+
+                    s.team_a_snapshot_name,
+                    s.team_a_snapshot_logo_path,
+
+                    s.team_b_snapshot_name,
+                    s.team_b_snapshot_logo_path,
+
+                    team_a.fcl_name
+                        AS team_a_name,
+
+                    team_a.fc_nickname
+                        AS team_a_nickname,
+
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
+                    team_b.fcl_name
+                        AS team_b_name,
+
+                    team_b.fc_nickname
+                        AS team_b_nickname,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.series_type =
+                        '플레이오프'
+
+                    AND
+                    s.season_id = %s
+
+                    AND
+                    s.playoff_stage IN (
+                        '준플레이오프',
+                        '플레이오프',
+                        '결승시리즈'
+                    )
+
+                    AND
+                    s.status <>
+                        'cancelled'
+
+                ORDER BY
+                    s.id
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            playoff_rows = (
+                cursor.fetchall()
+            )
+
+
+            playoff_map = {}
+
+
+            for playoff_row in playoff_rows:
+
+                playoff_map[
+                    playoff_row[
+                        "playoff_stage"
+                    ]
+                ] = playoff_row
+
+
+            required_stages = (
+                "준플레이오프",
+                "플레이오프",
+                "결승시리즈",
+            )
+
+
+            # =========================
+            # 세 단계 모두 완료되어야
+            # 최종 순위 확정
+            # =========================
+
+            for playoff_stage in (
+                required_stages
+            ):
+
+                playoff_series = (
+                    playoff_map.get(
+                        playoff_stage
+                    )
+                )
+
+
+                if (
+                    not playoff_series
+                    or
+                    playoff_series[
+                        "status"
+                    ]
+                    != "completed"
+                ):
+
+                    return {
+                        "season":
+                            selected_season_number,
+
+                        "finalized":
+                            False,
+
+                        "standings":
+                            [],
+
+                        "message":
+                            (
+                                "플레이오프가 "
+                                "아직 종료되지 않았습니다."
+                            ),
+                    }
+
+
+            # =========================
+            # 각 SERIES 세트 결과
+            # =========================
+
+            playoff_set_map = {}
+
+
+            for playoff_stage in (
+                required_stages
+            ):
+
+                playoff_series = (
+                    playoff_map[
+                        playoff_stage
+                    ]
+                )
+
+
+                cursor.execute(
+                    """
+                    SELECT
+                        set_number,
+                        winner_side
+
+                    FROM series_sets
+
+                    WHERE series_id = %s
+
+                    ORDER BY set_number
+                    """,
+                    (
+                        playoff_series[
+                            "id"
+                        ],
+                    ),
+                )
+
+
+                playoff_set_map[
+                    playoff_stage
+                ] = cursor.fetchall()
+
+
+            # =========================
+            # 정규리그 5위 참가자
+            #
+            # season_participants의
+            # 시즌 snapshot 우선
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    p.id
+                        AS participant_id,
+
+                    p.fcl_name,
+
+                    p.fc_nickname
+                        AS nickname,
+
+                    COALESCE(
+                        sp.team_name_snapshot,
+                        p.current_team_name
+                    )
+                        AS team_name,
+
+                    COALESCE(
+                        sp.team_logo_path_snapshot,
+                        p.current_team_logo_path
+                    )
+                        AS team_logo_path
+
+                FROM season_participants
+                    AS sp
+
+                JOIN participants AS p
+                    ON p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                    AND
+                    p.fcl_name = %s
+
+                LIMIT 1
+                """,
+                (
+                    selected_season_id,
+                    regular_fifth[
+                        "name"
+                    ],
+                ),
+            )
+
+
+            fifth_place_row = (
+                cursor.fetchone()
+            )
+
+
+    # =========================
+    # 참가자 데이터 생성
+    # =========================
+
+    def build_playoff_participant(
+        playoff_series,
+        side,
+    ):
+
+        if side == "team_a":
+
+            return {
+                "participant_id":
+                    playoff_series[
+                        "team_a_id"
+                    ],
+
+                "fcl_name":
+                    playoff_series[
+                        "team_a_name"
+                    ],
+
+                "nickname":
+                    playoff_series[
+                        "team_a_nickname"
+                    ],
+
+                "team_name":
+                    (
+                        playoff_series[
+                            "team_a_snapshot_name"
+                        ]
+                        or
+                        playoff_series[
+                            "team_a_current_team_name"
+                        ]
+                    ),
+
+                "team_logo_path":
+                    (
+                        playoff_series[
+                            "team_a_snapshot_logo_path"
+                        ]
+                        or
+                        playoff_series[
+                            "team_a_current_team_logo_path"
+                        ]
+                    ),
+            }
+
+
+        return {
+            "participant_id":
+                playoff_series[
+                    "team_b_id"
+                ],
+
+            "fcl_name":
+                playoff_series[
+                    "team_b_name"
+                ],
+
+            "nickname":
+                playoff_series[
+                    "team_b_nickname"
+                ],
+
+            "team_name":
+                (
+                    playoff_series[
+                        "team_b_snapshot_name"
+                    ]
+                    or
+                    playoff_series[
+                        "team_b_current_team_name"
+                    ]
+                ),
+
+            "team_logo_path":
+                (
+                    playoff_series[
+                        "team_b_snapshot_logo_path"
+                    ]
+                    or
+                    playoff_series[
+                        "team_b_current_team_logo_path"
+                    ]
+                ),
+        }
+
+
+    # =========================
+    # 플레이오프 승자 / 패자 판정
+    # =========================
+
+    def resolve_playoff_result(
+        playoff_series,
+        saved_sets,
+    ):
+
+        team_a_wins = 0
+        team_b_wins = 0
+
+        winner_side = None
+
+
+        for saved_set in saved_sets:
+
+            saved_winner_side = (
+                saved_set[
+                    "winner_side"
+                ]
+            )
+
+
+            if saved_winner_side not in (
+                "team_a",
+                "team_b",
+            ):
+
+                return None
+
+
+            # 이미 선승 확정 뒤
+            # 추가 세트가 존재하면
+            # 비정상 데이터
+            if winner_side is not None:
+
+                return None
+
+
+            if (
+                saved_winner_side
+                == "team_a"
+            ):
+
+                team_a_wins += 1
+
+            else:
+
+                team_b_wins += 1
+
+
+            if (
+                team_a_wins
+                >=
+                int(
+                    playoff_series[
+                        "wins_required"
+                    ]
+                )
+            ):
+
+                winner_side = (
+                    "team_a"
+                )
+
+
+            elif (
+                team_b_wins
+                >=
+                int(
+                    playoff_series[
+                        "wins_required"
+                    ]
+                )
+            ):
+
+                winner_side = (
+                    "team_b"
+                )
+
+
+        if winner_side is None:
+
+            return None
+
+
+        loser_side = (
+            "team_b"
+            if winner_side == "team_a"
+            else
+            "team_a"
+        )
+
+
+        return {
+            "winner":
+                build_playoff_participant(
+                    playoff_series,
+                    winner_side,
+                ),
+
+            "loser":
+                build_playoff_participant(
+                    playoff_series,
+                    loser_side,
+                ),
+        }
+
+
+    quarter_result = (
+        resolve_playoff_result(
+            playoff_map[
+                "준플레이오프"
+            ],
+            playoff_set_map[
+                "준플레이오프"
+            ],
+        )
+    )
+
+
+    playoff_result = (
+        resolve_playoff_result(
+            playoff_map[
+                "플레이오프"
+            ],
+            playoff_set_map[
+                "플레이오프"
+            ],
+        )
+    )
+
+
+    final_result = (
+        resolve_playoff_result(
+            playoff_map[
+                "결승시리즈"
+            ],
+            playoff_set_map[
+                "결승시리즈"
+            ],
+        )
+    )
+
+
+    if (
+        not quarter_result
+        or
+        not playoff_result
+        or
+        not final_result
+        or
+        not fifth_place_row
+    ):
+
+        return {
+            "season":
+                selected_season_number,
+
+            "finalized":
+                False,
+
+            "standings":
+                [],
+
+            "message":
+                (
+                    "시즌 최종 순위 데이터를 "
+                    "확정할 수 없습니다."
+                ),
+        }
+
+    # =========================
+    # 플레이오프 진출 경로 검증
+    #
+    # 준플레이오프 승자는
+    # 플레이오프에 참가해야 하고,
+    #
+    # 플레이오프 승자는
+    # 결승에 참가해야 함
+    # =========================
+
+    quarter_winner_id = (
+        quarter_result[
+            "winner"
+        ][
+            "participant_id"
+        ]
+    )
+
+
+    playoff_participant_ids = {
+        playoff_map[
+            "플레이오프"
+        ][
+            "team_a_id"
+        ],
+
+        playoff_map[
+            "플레이오프"
+        ][
+            "team_b_id"
+        ],
+    }
+
+
+    playoff_winner_id = (
+        playoff_result[
+            "winner"
+        ][
+            "participant_id"
+        ]
+    )
+
+
+    final_participant_ids = {
+        playoff_map[
+            "결승시리즈"
+        ][
+            "team_a_id"
+        ],
+
+        playoff_map[
+            "결승시리즈"
+        ][
+            "team_b_id"
+        ],
+    }
+
+
+    if (
+        quarter_winner_id
+        not in playoff_participant_ids
+        or
+        playoff_winner_id
+        not in final_participant_ids
+    ):
+
+        return {
+            "season":
+                selected_season_number,
+
+            "finalized":
+                False,
+
+            "standings":
+                [],
+
+            "message":
+                (
+                    "플레이오프 대진 연결 정보를 "
+                    "확인할 수 없습니다."
+                ),
+        }
+
+
+    fifth_place = {
+        "participant_id":
+            fifth_place_row[
+                "participant_id"
+            ],
+
+        "fcl_name":
+            fifth_place_row[
+                "fcl_name"
+            ],
+
+        "nickname":
+            fifth_place_row[
+                "nickname"
+            ],
+
+        "team_name":
+            fifth_place_row[
+                "team_name"
+            ],
+
+        "team_logo_path":
+            fifth_place_row[
+                "team_logo_path"
+            ],
+    }
+
+
+    final_standings = [
+        {
+            "rank": 1,
+            "source_stage":
+                "결승시리즈",
+            **final_result[
+                "winner"
+            ],
+        },
+
+        {
+            "rank": 2,
+            "source_stage":
+                "결승시리즈",
+            **final_result[
+                "loser"
+            ],
+        },
+
+        {
+            "rank": 3,
+            "source_stage":
+                "플레이오프",
+            **playoff_result[
+                "loser"
+            ],
+        },
+
+        {
+            "rank": 4,
+            "source_stage":
+                "준플레이오프",
+            **quarter_result[
+                "loser"
+            ],
+        },
+
+        {
+            "rank": 5,
+            "source_stage":
+                "정규리그",
+            **fifth_place,
+        },
+    ]
+
+
+    # =========================
+    # 데이터 무결성
+    #
+    # 최종 1~5위에
+    # 동일 참가자가 중복되면
+    # 확정하지 않음
+    # =========================
+
+    participant_ids = [
+        standing[
+            "participant_id"
+        ]
+
+        for standing
+        in final_standings
+    ]
+
+
+    if (
+        len(
+            set(
+                participant_ids
+            )
+        )
+        != 5
+    ):
+
+        return {
+            "season":
+                selected_season_number,
+
+            "finalized":
+                False,
+
+            "standings":
+                [],
+
+            "message":
+                (
+                    "시즌 최종 순위에 "
+                    "중복 참가자가 있습니다."
+                ),
+        }
+
+
+    return {
+        "season":
+            selected_season_number,
+
+        "finalized":
+            True,
+
+        "standings":
+            final_standings,
+
+        "message":
+            "시즌 최종 순위가 확정되었습니다.",
+    }
+
+# =========================
 # 완료된 SERIES 결과 조회
 # =========================
 
