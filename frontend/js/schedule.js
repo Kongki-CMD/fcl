@@ -217,15 +217,15 @@ function renderAiPredictionBar(match) {
         match.ai_prediction;
 
 
-    if (
-        !prediction
-        ||
-        match.match_type
-        !== "정규리그"
-    ) {
+    if (!prediction) {
 
         return "";
     }
+
+
+    const isTwoWayPrediction =
+        prediction.prediction_mode
+        === "two_way";
 
 
     const teamAWin = Math.max(
@@ -236,13 +236,18 @@ function renderAiPredictionBar(match) {
         || 0
     );
 
-    const draw = Math.max(
-        0,
-        Number(
-            prediction.draw
-        )
-        || 0
-    );
+
+    const draw =
+        isTwoWayPrediction
+            ? 0
+            : Math.max(
+                0,
+                Number(
+                    prediction.draw
+                )
+                || 0
+            );
+
 
     const teamBWin = Math.max(
         0,
@@ -275,6 +280,7 @@ function renderAiPredictionBar(match) {
         )
         * 100;
 
+
     const drawWidth =
         (
             draw
@@ -282,6 +288,7 @@ function renderAiPredictionBar(match) {
             total
         )
         * 100;
+
 
     const teamBWidth =
         (
@@ -363,6 +370,60 @@ function renderAiPredictionBar(match) {
             : "";
 
 
+    // =====================================
+    // 무승부 영역
+    //
+    // 정규리그:
+    // 승 / 무 / 패
+    //
+    // 플레이오프:
+    // 승 / 패
+    // =====================================
+
+    const drawHtml =
+        isTwoWayPrediction
+            ? ""
+            : `
+                <div
+                    class="
+                        schedule-ai-prediction-segment
+                        draw
+                    "
+                    style="
+                        width:
+                        ${drawWidth}%;
+                    "
+                    title="
+                        무승부
+                        ${Math.round(draw)}%
+                    "
+                >
+                    <span>
+                        무승부
+                        ${Math.round(draw)}%
+                    </span>
+                </div>
+            `;
+
+
+    const ariaLabel =
+        isTwoWayPrediction
+            ? `
+                ${match.team_a} 승리
+                ${Math.round(teamAWin)}%,
+                ${match.team_b} 승리
+                ${Math.round(teamBWin)}%
+            `
+            : `
+                ${match.team_a} 승리
+                ${Math.round(teamAWin)}%,
+                무승부
+                ${Math.round(draw)}%,
+                ${match.team_b} 승리
+                ${Math.round(teamBWin)}%
+            `;
+
+
     return `
         <div class="schedule-ai-prediction">
 
@@ -390,14 +451,7 @@ function renderAiPredictionBar(match) {
                 class="
                     schedule-ai-prediction-bar
                 "
-                aria-label="
-                    ${match.team_a} 승리
-                    ${Math.round(teamAWin)}%,
-                    무승부
-                    ${Math.round(draw)}%,
-                    ${match.team_b} 승리
-                    ${Math.round(teamBWin)}%
-                "
+                aria-label="${ariaLabel}"
             >
 
                 <div
@@ -421,25 +475,7 @@ function renderAiPredictionBar(match) {
                 </div>
 
 
-                <div
-                    class="
-                        schedule-ai-prediction-segment
-                        draw
-                    "
-                    style="
-                        width:
-                        ${drawWidth}%;
-                    "
-                    title="
-                        무승부
-                        ${Math.round(draw)}%
-                    "
-                >
-                    <span>
-                        무승부
-                        ${Math.round(draw)}%
-                    </span>
-                </div>
+                ${drawHtml}
 
 
                 <div
@@ -1281,6 +1317,15 @@ function renderPlayoffSchedule(matches) {
             }
 
             // =========================
+            // AI 승률 예측
+            // =========================
+
+            const aiPredictionHtml =
+                renderAiPredictionBar(
+                    match
+                );
+
+            // =========================
             // SERIES CONTROL
             // =========================
 
@@ -1416,6 +1461,9 @@ function renderPlayoffSchedule(matches) {
                     </div>
 
                 </div>
+
+
+                ${aiPredictionHtml}
 
 
                 ${progressHtml}

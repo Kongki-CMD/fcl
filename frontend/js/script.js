@@ -585,6 +585,56 @@ function renderTodayMatches(matches) {
             match.series_status
             ?? match.status;
 
+        // ================================
+        // 플레이오프 경기 정보
+        // ================================
+
+        const isPlayoffMatch =
+            match.match_type
+            === "플레이오프";
+
+
+        const playoffStageText =
+            match.playoff_stage
+            === "결승시리즈"
+                ? "결승 시리즈"
+                : (
+                    match.playoff_stage
+                    ?? "플레이오프"
+                );
+
+
+        const playoffFormatText =
+            (
+                match.best_of
+                &&
+                match.wins_required
+            )
+                ? (
+                    `${match.best_of}판 `
+                    + `${match.wins_required}선승`
+                )
+                : "";
+
+
+        const playoffMetaHtml =
+            isPlayoffMatch
+                ? `
+                    <span class="today-playoff-meta">
+                        ${playoffStageText}
+
+                        ${
+                            playoffFormatText
+                                ? `
+                                    <small>
+                                        ${playoffFormatText}
+                                    </small>
+                                `
+                                : ""
+                        }
+                    </span>
+                `
+                : "";
 
         let seriesControlHtml = "";
 
@@ -613,6 +663,7 @@ function renderTodayMatches(matches) {
                         class="today-series-button"
                         data-series-action="view"
                         data-series-id="${match.series_id}"
+                        data-season-number="${match.season_number ?? ""}"
                     >
                         경기 결과 입력
                     </button>
@@ -632,6 +683,7 @@ function renderTodayMatches(matches) {
                         class="today-series-button"
                         data-series-action="start"
                         data-series-id="${match.series_id}"
+                        data-season-number="${match.season_number ?? ""}"
                     >
                         경기 시작
                     </button>
@@ -674,7 +726,13 @@ function renderTodayMatches(matches) {
             ${seriesControlHtml}
 
             <span class="today-versus">
-                VS
+
+                ${playoffMetaHtml}
+
+                <span class="today-versus-label">
+                    VS
+                </span>
+
             </span>
 
             <div class="team-box">
@@ -734,6 +792,23 @@ todayMatchListElement.addEventListener(
 
         const action =
             buttonElement.dataset.seriesAction;
+
+        const seasonNumber =
+            Number(
+                buttonElement.dataset
+                    .seasonNumber
+            );
+
+
+        if (seasonNumber) {
+
+            localStorage.setItem(
+                "fclCurrentSeriesSeasonNumber",
+                String(
+                    seasonNumber
+                )
+            );
+        }
 
 
         // ================================

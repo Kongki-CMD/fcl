@@ -8,6 +8,8 @@ import hmac
 import secrets
 import heapq
 
+from math import comb
+
 
 from pathlib import Path
 from datetime import (
@@ -27418,6 +27420,197 @@ def calculate_ai_match_prediction(
         },
     }
 
+def calculate_ai_playoff_prediction(
+    context,
+    team_a,
+    team_b,
+    wins_required,
+):
+
+    base_prediction = (
+        calculate_ai_match_prediction(
+            context,
+            team_a,
+            team_b,
+        )
+    )
+
+
+    team_a_win = float(
+        base_prediction.get(
+            "team_a_win",
+            0,
+        )
+    )
+
+    team_b_win = float(
+        base_prediction.get(
+            "team_b_win",
+            0,
+        )
+    )
+
+
+    # =========================================
+    # 플레이오프는 무승부가 없으므로
+    # A승 / B승 확률만 다시 정규화
+    # =========================================
+
+    decisive_total = (
+        team_a_win
+        +
+        team_b_win
+    )
+
+
+    if decisive_total <= 0:
+
+        set_team_a_probability = 0.5
+
+    else:
+
+        set_team_a_probability = (
+            team_a_win
+            /
+            decisive_total
+        )
+
+
+    set_team_b_probability = (
+        1.0
+        -
+        set_team_a_probability
+    )
+
+
+    required_wins = max(
+        1,
+        int(
+            wins_required
+            or 1
+        ),
+    )
+
+
+    # =========================================
+    # N선승 SERIES 승리 확률
+    #
+    # 예:
+    # 3판 2선승 -> required_wins = 2
+    # 5판 3선승 -> required_wins = 3
+    # =========================================
+
+    team_a_series_probability = 0.0
+
+
+    for losses in range(
+        required_wins
+    ):
+
+        team_a_series_probability += (
+            comb(
+                required_wins
+                - 1
+                + losses,
+                losses,
+            )
+            *
+            (
+                set_team_a_probability
+                **
+                required_wins
+            )
+            *
+            (
+                set_team_b_probability
+                **
+                losses
+            )
+        )
+
+
+    team_a_series_probability = min(
+        1.0,
+        max(
+            0.0,
+            team_a_series_probability,
+        ),
+    )
+
+
+    team_b_series_probability = (
+        1.0
+        -
+        team_a_series_probability
+    )
+
+
+    team_a_percent = round(
+        team_a_series_probability
+        *
+        100,
+        1,
+    )
+
+    team_b_percent = round(
+        100.0
+        -
+        team_a_percent,
+        1,
+    )
+
+
+    return {
+        "team_a_win":
+            team_a_percent,
+
+        "draw":
+            0,
+
+        "team_b_win":
+            team_b_percent,
+
+        "prediction_mode":
+            "two_way",
+
+        "wins_required":
+            required_wins,
+
+        "sample_size":
+            base_prediction.get(
+                "sample_size",
+                0,
+            ),
+
+        "head_to_head_sample":
+            base_prediction.get(
+                "head_to_head_sample",
+                0,
+            ),
+
+        "confidence":
+            base_prediction.get(
+                "confidence",
+                "low",
+            ),
+
+        "model":
+            base_prediction.get(
+                "model",
+                AI_PREDICTION_MODEL,
+            ),
+
+        "elo":
+            base_prediction.get(
+                "elo"
+            ),
+
+        "factors":
+            base_prediction.get(
+                "factors"
+            ),
+    }
+
 
 def calculate_ai_series_prediction(
     prediction,
@@ -30257,20 +30450,65 @@ def get_today_matches():
     )
 
 
-    # 기존 Excel 일정 사용
-    all_matches = get_matches()
+    # =========================
+    # 현재 ACTIVE 시즌
+    # =========================
+
+    selected_season = (
+        resolve_fcl_season_record()
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    # =========================
+    # 프리시즌 + 정규리그
+    # =========================
+
+    all_matches = (
+        get_matches(
+            season=
+                selected_season_number
+        )
+    )
 
 
     matches = [
         match
-        for match in all_matches
-        if match["date"] == today_string
+
+        for match
+        in all_matches
+
+        if (
+            match[
+                "date"
+            ]
+            ==
+            today_string
+        )
     ]
 
 
     with get_db_connection() as connection:
 
         with connection.cursor() as cursor:
+
+            # =========================
+            # 기존 오늘 경기
+            # SERIES 상태 보정
+            # =========================
 
             for match in matches:
 
@@ -30295,6 +30533,9 @@ def get_today_matches():
 
                         AND
                         s.series_type = %s
+
+                        AND
+                        s.season_id = %s
 
                         AND
                         s.status <> 'cancelled'
@@ -30338,37 +30579,313 @@ def get_today_matches():
                     (
                         today,
 
-                        match["match_type"],
+                        match[
+                            "match_type"
+                        ],
 
-                        match["team_a"],
-                        match["team_b"],
+                        selected_season_id,
 
-                        match["team_b"],
-                        match["team_a"],
+                        match[
+                            "team_a"
+                        ],
+
+                        match[
+                            "team_b"
+                        ],
+
+                        match[
+                            "team_b"
+                        ],
+
+                        match[
+                            "team_a"
+                        ],
                     ),
                 )
 
 
-                series = cursor.fetchone()
+                series = (
+                    cursor.fetchone()
+                )
 
 
                 if series:
 
-                    match["series_id"] = (
-                        series["series_id"]
+                    match[
+                        "series_id"
+                    ] = (
+                        series[
+                            "series_id"
+                        ]
                     )
 
-                    match["series_status"] = (
-                        series["series_status"]
+                    match[
+                        "series_status"
+                    ] = (
+                        series[
+                            "series_status"
+                        ]
                     )
 
                 else:
 
-                    match["series_id"] = None
+                    match[
+                        "series_id"
+                    ] = None
 
-                    match["series_status"] = (
+                    match[
+                        "series_status"
+                    ] = (
                         "not_started"
                     )
+
+
+            # =========================
+            # 오늘의 플레이오프
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id AS series_id,
+                    s.status AS series_status,
+                    s.playoff_stage,
+                    s.best_of,
+                    s.wins_required,
+
+                    s.team_a_snapshot_name,
+                    s.team_a_snapshot_logo_path,
+
+                    s.team_b_snapshot_name,
+                    s.team_b_snapshot_logo_path,
+
+                    team_a.fcl_name
+                        AS team_a,
+
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
+                    team_b.fcl_name
+                        AS team_b,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path
+
+                FROM series AS s
+
+                JOIN participants AS team_a
+                    ON team_a.id =
+                        s.team_a_id
+
+                JOIN participants AS team_b
+                    ON team_b.id =
+                        s.team_b_id
+
+                WHERE
+                    s.scheduled_date = %s
+
+                    AND
+                    s.series_type =
+                        '플레이오프'
+
+                    AND
+                    s.season_id = %s
+
+                    AND
+                    s.status <> 'cancelled'
+
+                ORDER BY
+                    CASE s.playoff_stage
+
+                        WHEN '준플레이오프'
+                            THEN 1
+
+                        WHEN '플레이오프'
+                            THEN 2
+
+                        WHEN '결승시리즈'
+                            THEN 3
+
+                        ELSE 99
+
+                    END,
+
+                    s.id
+                """,
+                (
+                    today,
+                    selected_season_id,
+                ),
+            )
+
+
+            playoff_rows = (
+                cursor.fetchall()
+            )
+
+
+    # =========================
+    # 플레이오프를 오늘 경기와 병합
+    # =========================
+
+    for playoff_row in playoff_rows:
+
+        use_snapshot = (
+            playoff_row[
+                "series_status"
+            ]
+            ==
+            "completed"
+        )
+
+
+        matches.append(
+            {
+                "season_number":
+                    selected_season_number,
+
+                "series_id":
+                    playoff_row[
+                        "series_id"
+                    ],
+
+                "fixture_number":
+                    None,
+
+                "source":
+                    "database",
+
+                "date":
+                    today_string,
+
+                "round":
+                    None,
+
+                "match_type":
+                    "플레이오프",
+
+                "playoff_stage":
+                    playoff_row[
+                        "playoff_stage"
+                    ],
+
+                "best_of":
+                    playoff_row[
+                        "best_of"
+                    ],
+
+                "wins_required":
+                    playoff_row[
+                        "wins_required"
+                    ],
+
+                "team_a":
+                    playoff_row[
+                        "team_a"
+                    ],
+
+                "team_b":
+                    playoff_row[
+                        "team_b"
+                    ],
+
+                "status":
+                    playoff_row[
+                        "series_status"
+                    ],
+
+                "series_status":
+                    playoff_row[
+                        "series_status"
+                    ],
+
+                "team_a_current_team_name":
+                    (
+                        playoff_row[
+                            "team_a_snapshot_name"
+                        ]
+
+                        if (
+                            use_snapshot
+                            and
+                            playoff_row[
+                                "team_a_snapshot_name"
+                            ]
+                        )
+
+                        else
+                        playoff_row[
+                            "team_a_current_team_name"
+                        ]
+                    ),
+
+                "team_a_current_team_logo_path":
+                    (
+                        playoff_row[
+                            "team_a_snapshot_logo_path"
+                        ]
+
+                        if (
+                            use_snapshot
+                            and
+                            playoff_row[
+                                "team_a_snapshot_logo_path"
+                            ]
+                        )
+
+                        else
+                        playoff_row[
+                            "team_a_current_team_logo_path"
+                        ]
+                    ),
+
+                "team_b_current_team_name":
+                    (
+                        playoff_row[
+                            "team_b_snapshot_name"
+                        ]
+
+                        if (
+                            use_snapshot
+                            and
+                            playoff_row[
+                                "team_b_snapshot_name"
+                            ]
+                        )
+
+                        else
+                        playoff_row[
+                            "team_b_current_team_name"
+                        ]
+                    ),
+
+                "team_b_current_team_logo_path":
+                    (
+                        playoff_row[
+                            "team_b_snapshot_logo_path"
+                        ]
+
+                        if (
+                            use_snapshot
+                            and
+                            playoff_row[
+                                "team_b_snapshot_logo_path"
+                            ]
+                        )
+
+                        else
+                        playoff_row[
+                            "team_b_current_team_logo_path"
+                        ]
+                    ),
+            }
+        )
 
 
     return matches
@@ -35842,6 +36359,9 @@ def get_playoffs(
                     s.status,
                     s.scheduled_date,
 
+                    s.ai_prediction_snapshot,
+                    s.ai_prediction_snapshot_at,
+
                     team_a.fcl_name
                         AS team_a_name,
 
@@ -35961,6 +36481,18 @@ def get_playoffs(
             series_by_stage[
                 playoff_stage
             ] = series_row
+
+    # =========================
+    # 플레이오프 AI 예측용 Context
+    #
+    # build_ai_prediction_context()는
+    # 플레이오프 결과를 학습 데이터에서
+    # 제외한 상태로 Context를 생성
+    # =========================
+
+    ai_prediction_context = (
+        build_ai_prediction_context()
+    )
 
 
     # =========================
@@ -36129,10 +36661,68 @@ def get_playoffs(
 
                     "team_b_wins":
                         0,
+
+                    "ai_prediction":
+                        None,
+
+                    "ai_prediction_snapshot_at":
+                        None,
                 }
             )
 
             continue
+
+        # =========================
+        # PLAYOFF AI 예측
+        #
+        # 예정:
+        # 현재 데이터를 기준으로 실시간 계산
+        #
+        # 진행 / 완료:
+        # SERIES START 순간 저장된
+        # Snapshot 사용
+        # =========================
+
+        ai_prediction = None
+
+
+        if (
+            series_row[
+                "status"
+            ]
+            ==
+            "scheduled"
+        ):
+
+            ai_prediction = (
+                calculate_ai_playoff_prediction(
+                    ai_prediction_context,
+
+                    series_row[
+                        "team_a_name"
+                    ],
+
+                    series_row[
+                        "team_b_name"
+                    ],
+
+                    series_row[
+                        "wins_required"
+                    ],
+                )
+            )
+
+        elif (
+            series_row[
+                "ai_prediction_snapshot"
+            ]
+        ):
+
+            ai_prediction = (
+                series_row[
+                    "ai_prediction_snapshot"
+                ]
+            )
 
 
         # =====================
@@ -36278,6 +36868,22 @@ def get_playoffs(
 
                 "winner":
                     winner,
+
+                "ai_prediction":
+                    ai_prediction,
+
+                "ai_prediction_snapshot_at":
+                    (
+                        series_row[
+                            "ai_prediction_snapshot_at"
+                        ].isoformat()
+
+                        if series_row[
+                            "ai_prediction_snapshot_at"
+                        ]
+
+                        else None
+                    ),
             }
         )
 
@@ -38134,11 +38740,15 @@ def activate_fcl_series(
             # =========================
             # AI 경기 예측 Snapshot
             #
-            # 정규리그만 저장
+            # 정규리그:
+            # 승 / 무 / 패 예측
             #
-            # 아직 status가 scheduled이므로
-            # 현재 SERIES 결과가 학습 데이터에
-            # 들어갈 일도 없음
+            # 플레이오프:
+            # 승 / 패 SERIES 예측
+            #
+            # 플레이오프 결과는
+            # build_ai_prediction_context()에서
+            # 학습 데이터로 사용하지 않음
             # =========================
 
             ai_prediction_snapshot = None
@@ -38148,8 +38758,10 @@ def activate_fcl_series(
                 series[
                     "series_type"
                 ]
-                ==
-                "정규리그"
+                in (
+                    "정규리그",
+                    "플레이오프",
+                )
             ):
 
                 ai_prediction_context = (
@@ -38157,19 +38769,47 @@ def activate_fcl_series(
                 )
 
 
-                ai_prediction_snapshot = (
-                    calculate_ai_match_prediction(
-                        ai_prediction_context,
+                if (
+                    series[
+                        "series_type"
+                    ]
+                    ==
+                    "플레이오프"
+                ):
 
-                        series[
-                            "team_a"
-                        ],
+                    ai_prediction_snapshot = (
+                        calculate_ai_playoff_prediction(
+                            ai_prediction_context,
 
-                        series[
-                            "team_b"
-                        ],
+                            series[
+                                "team_a"
+                            ],
+
+                            series[
+                                "team_b"
+                            ],
+
+                            series[
+                                "wins_required"
+                            ],
+                        )
                     )
-                )
+
+                else:
+
+                    ai_prediction_snapshot = (
+                        calculate_ai_match_prediction(
+                            ai_prediction_context,
+
+                            series[
+                                "team_a"
+                            ],
+
+                            series[
+                                "team_b"
+                            ],
+                        )
+                    )
 
 
             # =========================

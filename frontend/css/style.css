@@ -388,9 +388,46 @@ main {
 }
 
 .today-versus {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
     margin: 0 40px;
     font-weight: bold;
     color: #888;
+}
+
+.today-versus-label {
+    line-height: 1;
+}
+
+.today-playoff-meta {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px 8px;
+    border: 1px solid
+        rgba(210, 170, 70, 0.4);
+    border-radius: 6px;
+    background: rgba(
+        210,
+        170,
+        70,
+        0.08
+    );
+    color: #d6b65d;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.today-playoff-meta small {
+    color: #aaa;
+    font-size: 9px;
+    font-weight: 600;
 }
 
 .team-box {
@@ -7409,6 +7446,16 @@ body.site-auth-modal-open {
     .today-versus {
         margin: 0 8px;
         font-size: 12px;
+    }
+
+    .today-playoff-meta {
+        gap: 1px;
+        padding: 3px 5px;
+        font-size: 8px;
+    }
+
+    .today-playoff-meta small {
+        font-size: 7px;
     }
 
     .today-series-control {
