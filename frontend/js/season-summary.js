@@ -44,10 +44,114 @@ const seasonSummaryFinalStandingsElement =
         "#season-summary-final-standings"
     );
 
+const seasonSummaryBest11PitchElement =
+    document.querySelector(
+        "#season-summary-best11-pitch"
+    );
+
 const seasonSummaryStatusElement =
     document.querySelector(
         "#season-summary-status"
     );
+
+const seasonSummaryCustomPlayerImages = {
+
+    "주앙 칸셀루":
+        "./assets/images/players/custom/cancelo.png",
+
+    "닉 포프":
+        "./assets/images/players/custom/nick_pope.png",
+
+    "곤살루 게드스":
+        "./assets/images/players/custom/goncalo_guedes.png",
+
+    "로빈 반페르시":
+        "./assets/images/players/custom/van_persie.png",
+};
+
+
+const seasonSummaryBest11Slots = [
+
+    {
+        slot: "st_left",
+        position: "ST",
+        className:
+            "season-summary-slot-st-left",
+    },
+
+    {
+        slot: "st_right",
+        position: "ST",
+        className:
+            "season-summary-slot-st-right",
+    },
+
+
+    {
+        slot: "lm",
+        position: "LM",
+        className:
+            "season-summary-slot-lm",
+    },
+
+    {
+        slot: "lcm",
+        position: "LCM",
+        className:
+            "season-summary-slot-lcm",
+    },
+
+    {
+        slot: "rcm",
+        position: "RCM",
+        className:
+            "season-summary-slot-rcm",
+    },
+
+    {
+        slot: "rm",
+        position: "RM",
+        className:
+            "season-summary-slot-rm",
+    },
+
+
+    {
+        slot: "lb",
+        position: "LB",
+        className:
+            "season-summary-slot-lb",
+    },
+
+    {
+        slot: "lcb",
+        position: "LCB",
+        className:
+            "season-summary-slot-lcb",
+    },
+
+    {
+        slot: "rcb",
+        position: "RCB",
+        className:
+            "season-summary-slot-rcb",
+    },
+
+    {
+        slot: "rb",
+        position: "RB",
+        className:
+            "season-summary-slot-rb",
+    },
+
+
+    {
+        slot: "gk",
+        position: "GK",
+        className:
+            "season-summary-slot-gk",
+    },
+];
 
 
 const seasonSummaryPageElement =
@@ -883,6 +987,405 @@ async function loadSeasonFinalStandings() {
     );
 }
 
+// =========================================
+// BEST11 PLAYER IMAGE
+// =========================================
+
+function getSeasonSummaryPlayerImage(
+    player
+) {
+
+    return (
+        seasonSummaryCustomPlayerImages[
+            player?.player_name
+        ]
+        ||
+        player?.image_url
+        ||
+        ""
+    );
+}
+
+
+// =========================================
+// BEST11 PITCH 기본 라인
+// =========================================
+
+function resetSeasonBest11Pitch() {
+
+    if (!seasonSummaryBest11PitchElement) {
+        return;
+    }
+
+
+    seasonSummaryBest11PitchElement
+        .innerHTML =
+        `
+            <div
+                class="
+                    season-summary-pitch-line
+                    season-summary-pitch-half-line
+                "
+            ></div>
+
+            <div
+                class="
+                    season-summary-pitch-circle
+                "
+            ></div>
+
+            <div
+                class="
+                    season-summary-pitch-box
+                    season-summary-pitch-box-top
+                "
+            ></div>
+
+            <div
+                class="
+                    season-summary-pitch-box
+                    season-summary-pitch-box-bottom
+                "
+            ></div>
+        `;
+}
+
+
+// =========================================
+// BEST11 PLAYER CARD
+// =========================================
+
+function createSeasonBest11PlayerElement(
+    slot,
+    player
+) {
+
+    const playerElement =
+        document.createElement(
+            "div"
+        );
+
+
+    playerElement.className =
+        (
+            "season-summary-best11-player "
+            +
+            slot.className
+        );
+
+
+    const positionElement =
+        document.createElement(
+            "span"
+        );
+
+
+    positionElement.className =
+        "season-summary-best11-position";
+
+
+    positionElement.textContent =
+        slot.position;
+
+
+    const imageWrapElement =
+        document.createElement(
+            "div"
+        );
+
+
+    imageWrapElement.className =
+        "season-summary-best11-image";
+
+
+    const nameElement =
+        document.createElement(
+            "strong"
+        );
+
+
+    const ratingElement =
+        document.createElement(
+            "small"
+        );
+
+
+    const ownerElement =
+        document.createElement(
+            "span"
+        );
+
+
+    ownerElement.className =
+        "season-summary-best11-owner";
+
+
+    // EMPTY
+    if (!player) {
+
+        playerElement.classList.add(
+            "is-empty"
+        );
+
+
+        imageWrapElement.textContent =
+            "-";
+
+
+        nameElement.textContent =
+            "미확정";
+
+
+        ratingElement.textContent =
+            "평점 -";
+
+
+        ownerElement.textContent =
+            "최소 2세트";
+
+
+        playerElement.append(
+            positionElement,
+            imageWrapElement,
+            nameElement,
+            ratingElement,
+            ownerElement
+        );
+
+
+        return playerElement;
+    }
+
+
+    const imageUrl =
+        getSeasonSummaryPlayerImage(
+            player
+        );
+
+
+    if (imageUrl) {
+
+        const imageElement =
+            document.createElement(
+                "img"
+            );
+
+
+        imageElement.src =
+            imageUrl;
+
+
+        imageElement.alt =
+            player.player_name;
+
+
+        imageElement.addEventListener(
+            "error",
+            () => {
+
+                imageWrapElement.innerHTML =
+                    "";
+
+
+                imageWrapElement.textContent =
+                    slot.position;
+            },
+            {
+                once: true,
+            }
+        );
+
+
+        imageWrapElement.appendChild(
+            imageElement
+        );
+
+    } else {
+
+        imageWrapElement.textContent =
+            slot.position;
+    }
+
+
+    nameElement.textContent =
+        player.player_name
+        || "-";
+
+
+    ratingElement.textContent =
+        (
+            "평점 "
+            +
+            Number(
+                player.average_rating
+                ?? 0
+            ).toFixed(2)
+        );
+
+
+    ownerElement.textContent =
+        player.fcl_name
+        || "-";
+
+
+    playerElement.title =
+        (
+            `${player.player_name}`
+            +
+            ` · ${player.fcl_name}`
+            +
+            ` · ${player.sets_played}세트`
+            +
+            ` · 평균 ${Number(
+                player.average_rating
+                ?? 0
+            ).toFixed(2)}`
+        );
+
+
+    playerElement.append(
+        positionElement,
+        imageWrapElement,
+        nameElement,
+        ratingElement,
+        ownerElement
+    );
+
+
+    return playerElement;
+}
+
+
+// =========================================
+// BEST11 출력
+// =========================================
+
+function renderSeasonBest11(
+    data
+) {
+
+    if (!seasonSummaryBest11PitchElement) {
+        return;
+    }
+
+
+    resetSeasonBest11Pitch();
+
+
+    const best11 =
+        Array.isArray(
+            data?.best11
+        )
+            ? data.best11
+            : [];
+
+
+    const playerBySlot =
+        new Map(
+            best11.map(
+                player => [
+                    player.slot,
+                    player,
+                ]
+            )
+        );
+
+
+    seasonSummaryBest11Slots.forEach(
+        slot => {
+
+            const player =
+                playerBySlot.get(
+                    slot.slot
+                )
+                ||
+                null;
+
+
+            const playerElement =
+                createSeasonBest11PlayerElement(
+                    slot,
+                    player
+                );
+
+
+            seasonSummaryBest11PitchElement
+                .appendChild(
+                    playerElement
+                );
+        }
+    );
+}
+
+
+// =========================================
+// BEST11 불러오기
+// =========================================
+
+async function loadSeasonBest11() {
+
+    const requestedSeasonNumber =
+        selectedSeasonSummaryNumber;
+
+
+    if (!requestedSeasonNumber) {
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            (
+                `${apiBaseUrl}`
+                +
+                "/api/season/best11"
+                +
+                `?season=${requestedSeasonNumber}`
+            )
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "Season Best11을 불러오지 못했습니다."
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    if (
+        requestedSeasonNumber
+        !==
+        selectedSeasonSummaryNumber
+    ) {
+
+        return;
+    }
+
+
+    if (
+        Number(
+            data.season
+        )
+        !==
+        requestedSeasonNumber
+    ) {
+
+        throw new Error(
+            "요청한 시즌과 Best11 데이터의 시즌이 일치하지 않습니다."
+        );
+    }
+
+
+    renderSeasonBest11(
+        data
+    );
+}
+
 
 // =========================================
 // 시즌 데이터 새로고침
@@ -911,6 +1414,7 @@ async function refreshSeasonSummary() {
     await Promise.all([
         loadSeasonChampion(),
         loadSeasonFinalStandings(),
+        loadSeasonBest11(),
     ]);
 }
 

@@ -43869,6 +43869,1078 @@ def get_season_final_standings(
     }
 
 # =========================
+# SEASON SUMMARY
+# 최소 출전 세트
+#
+# Best11
+# Rating TOP3
+# 공통으로 사용
+# =========================
+
+SEASON_SUMMARY_MINIMUM_SETS = 2
+
+
+# =========================
+# SEASON BEST 11
+#
+# 공식 경기:
+# 정규리그 + 플레이오프
+#
+# 포메이션:
+# 4-4-2
+# =========================
+
+@app.get("/api/season/best11")
+def get_season_best11(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+
+    selected_season_id = int(
+        selected_season[
+            "id"
+        ]
+    )
+
+
+    selected_season_number = int(
+        selected_season[
+            "season_number"
+        ]
+    )
+
+
+    # =========================
+    # 포지션 번호
+    #
+    # FC Online spPosition
+    # =========================
+
+    position_name_map = {
+        0: "GK",
+        1: "SW",
+
+        2: "RWB",
+        3: "RB",
+        4: "RCB",
+        5: "CB",
+        6: "LCB",
+        7: "LB",
+        8: "LWB",
+
+        9: "RDM",
+        10: "CDM",
+        11: "LDM",
+
+        12: "RM",
+        13: "RCM",
+        14: "CM",
+        15: "LCM",
+        16: "LM",
+
+        17: "RAM",
+        18: "CAM",
+        19: "LAM",
+
+        20: "RF",
+        21: "CF",
+        22: "LF",
+
+        23: "RW",
+        24: "RS",
+        25: "ST",
+        26: "LS",
+        27: "LW",
+    }
+
+
+    # =========================
+    # 4-4-2 SLOT
+    #
+    # 사용자가 정한 실제
+    # 포지션 허용 규칙
+    # =========================
+
+    slot_specs = {
+
+        "st_left": {
+            "position": "ST",
+            "eligible": {
+                25,  # ST
+                21,  # CF
+            },
+        },
+
+        "st_right": {
+            "position": "ST",
+            "eligible": {
+                25,  # ST
+                21,  # CF
+            },
+        },
+
+
+        "lm": {
+            "position": "LM",
+            "eligible": {
+                27,  # LW
+                23,  # RW
+                16,  # LM
+                12,  # RM
+            },
+        },
+
+        "lcm": {
+            "position": "LCM",
+            "eligible": {
+                14,  # CM
+                19,  # LAM
+                17,  # RAM
+                18,  # CAM
+                10,  # CDM
+                11,  # LDM
+                9,   # RDM
+            },
+        },
+
+        "rcm": {
+            "position": "RCM",
+            "eligible": {
+                14,  # CM
+                19,  # LAM
+                17,  # RAM
+                18,  # CAM
+                10,  # CDM
+                11,  # LDM
+                9,   # RDM
+            },
+        },
+
+        "rm": {
+            "position": "RM",
+            "eligible": {
+                27,  # LW
+                23,  # RW
+                16,  # LM
+                12,  # RM
+            },
+        },
+
+
+        "lb": {
+            "position": "LB",
+            "eligible": {
+                7,  # LB
+                8,  # LWB
+            },
+        },
+
+        "lcb": {
+            "position": "LCB",
+            "eligible": {
+                5,  # CB
+            },
+        },
+
+        "rcb": {
+            "position": "RCB",
+            "eligible": {
+                5,  # CB
+            },
+        },
+
+        "rb": {
+            "position": "RB",
+            "eligible": {
+                3,  # RB
+                2,  # RWB
+            },
+        },
+
+
+        "gk": {
+            "position": "GK",
+            "eligible": {
+                0,  # GK
+            },
+        },
+    }
+
+
+    # =========================
+    # 실제 선발 순서
+    #
+    # 후보가 좁은 포지션부터
+    # 먼저 확정
+    # =========================
+
+    selection_order = [
+        "gk",
+
+        "lb",
+        "rb",
+
+        "lcb",
+        "rcb",
+
+        "st_left",
+        "st_right",
+
+        "lm",
+        "rm",
+
+        "lcm",
+        "rcm",
+    ]
+
+
+    # 화면 4-4-2 순서
+    display_order = [
+        "st_left",
+        "st_right",
+
+        "lm",
+        "lcm",
+        "rcm",
+        "rm",
+
+        "lb",
+        "lcb",
+        "rcb",
+        "rb",
+
+        "gk",
+    ]
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 공식 경기 시즌 누적 기록
+            #
+            # 기존 선수 기록처럼
+            # rating_total / sets_played
+            # 방식 사용
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sps.participant_id,
+
+                    p.fcl_name,
+
+                    p.fc_nickname
+                        AS nickname,
+
+                    TRIM(
+                        sps.player_name
+                    )
+                        AS player_name,
+
+                    COUNT(
+                        DISTINCT s.id
+                    )
+                        AS series_played,
+
+                    SUM(
+                        sps.sets_played
+                    )
+                        AS sets_played,
+
+                    SUM(
+                        sps.rating_total
+                    )
+                        AS rating_total,
+
+                    SUM(
+                        sps.goals
+                    )
+                        AS goals,
+
+                    SUM(
+                        sps.assists
+                    )
+                        AS assists
+
+                FROM series_player_stats
+                    AS sps
+
+                JOIN series AS s
+                    ON s.id =
+                        sps.series_id
+
+                JOIN participants AS p
+                    ON p.id =
+                        sps.participant_id
+
+                WHERE
+                    s.status =
+                        'completed'
+
+                    AND
+                    s.series_type IN (
+                        '정규리그',
+                        '플레이오프'
+                    )
+
+                    AND
+                    s.season_id = %s
+
+                GROUP BY
+                    sps.participant_id,
+                    p.fcl_name,
+                    p.fc_nickname,
+                    TRIM(
+                        sps.player_name
+                    )
+
+                HAVING
+                    SUM(
+                        sps.sets_played
+                    ) >= %s
+                """,
+                (
+                    selected_season_id,
+                    SEASON_SUMMARY_MINIMUM_SETS,
+                ),
+            )
+
+
+            stats_rows = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # 실제 출전 포지션 횟수
+            #
+            # 벤치 28 제외
+            # 선발 0 ~ 27만 사용
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sssp.participant_id,
+
+                    TRIM(
+                        sssp.player_name
+                    )
+                        AS player_name,
+
+                    sssp.sp_position,
+
+                    COUNT(*)
+                        AS appearances
+
+                FROM series_set_squad_players
+                    AS sssp
+
+                JOIN series_sets AS ss
+                    ON ss.id =
+                        sssp.series_set_id
+
+                JOIN series AS s
+                    ON s.id =
+                        ss.series_id
+
+                WHERE
+                    s.status =
+                        'completed'
+
+                    AND
+                    s.series_type IN (
+                        '정규리그',
+                        '플레이오프'
+                    )
+
+                    AND
+                    s.season_id = %s
+
+                    AND
+                    sssp.sp_position
+                        BETWEEN 0 AND 27
+
+                GROUP BY
+                    sssp.participant_id,
+
+                    TRIM(
+                        sssp.player_name
+                    ),
+
+                    sssp.sp_position
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            position_rows = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # 카드 표시용 최신 실제 출전
+            #
+            # spId
+            # 강화 단계
+            # 선수 사진
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT DISTINCT ON (
+                    sssp.participant_id,
+                    TRIM(
+                        sssp.player_name
+                    )
+                )
+
+                    sssp.participant_id,
+
+                    TRIM(
+                        sssp.player_name
+                    )
+                        AS player_name,
+
+                    sssp.sp_id,
+                    sssp.sp_grade,
+                    sssp.image_url
+
+                FROM series_set_squad_players
+                    AS sssp
+
+                JOIN series_sets AS ss
+                    ON ss.id =
+                        sssp.series_set_id
+
+                JOIN series AS s
+                    ON s.id =
+                        ss.series_id
+
+                WHERE
+                    s.status =
+                        'completed'
+
+                    AND
+                    s.series_type IN (
+                        '정규리그',
+                        '플레이오프'
+                    )
+
+                    AND
+                    s.season_id = %s
+
+                    AND
+                    sssp.sp_position
+                        BETWEEN 0 AND 27
+
+                ORDER BY
+                    sssp.participant_id,
+
+                    TRIM(
+                        sssp.player_name
+                    ),
+
+                    s.completed_at DESC
+                        NULLS LAST,
+
+                    ss.set_number DESC,
+
+                    sssp.created_at DESC,
+
+                    sssp.id DESC
+                """,
+                (
+                    selected_season_id,
+                ),
+            )
+
+
+            latest_card_rows = (
+                cursor.fetchall()
+            )
+
+
+    # =========================
+    # 실제 포지션 MAP
+    # =========================
+
+    position_count_map = {}
+
+
+    for row in position_rows:
+
+        key = (
+            int(
+                row[
+                    "participant_id"
+                ]
+            ),
+
+            row[
+                "player_name"
+            ],
+        )
+
+
+        if (
+            key
+            not in position_count_map
+        ):
+
+            position_count_map[
+                key
+            ] = {}
+
+
+        position_count_map[
+            key
+        ][
+            int(
+                row[
+                    "sp_position"
+                ]
+            )
+        ] = int(
+            row[
+                "appearances"
+            ]
+        )
+
+
+    # =========================
+    # 최신 카드 MAP
+    # =========================
+
+    latest_card_map = {
+
+        (
+            int(
+                row[
+                    "participant_id"
+                ]
+            ),
+
+            row[
+                "player_name"
+            ],
+        ):
+            row
+
+        for row
+        in latest_card_rows
+    }
+
+
+    # =========================
+    # 후보 선수
+    # =========================
+
+    candidates = []
+
+
+    for row in stats_rows:
+
+        participant_id = int(
+            row[
+                "participant_id"
+            ]
+        )
+
+
+        player_name = (
+            row[
+                "player_name"
+            ]
+        )
+
+
+        key = (
+            participant_id,
+            player_name,
+        )
+
+
+        player_position_counts = (
+            position_count_map.get(
+                key,
+                {}
+            )
+        )
+
+
+        # 실제 포지션 Snapshot이 없으면
+        # Best11 후보로 사용하지 않음
+        if not player_position_counts:
+
+            continue
+
+
+        sets_played = int(
+            row[
+                "sets_played"
+            ]
+            or 0
+        )
+
+
+        rating_total = float(
+            row[
+                "rating_total"
+            ]
+            or 0
+        )
+
+
+        if sets_played <= 0:
+
+            continue
+
+
+        average_rating_raw = (
+            rating_total
+            /
+            sets_played
+        )
+
+
+        latest_card = (
+            latest_card_map.get(
+                key
+            )
+            or
+            {}
+        )
+
+
+        sorted_positions = sorted(
+            player_position_counts.items(),
+
+            key=lambda item: (
+                -item[1],
+                item[0],
+            ),
+        )
+
+
+        actual_positions = [
+
+            {
+                "position":
+                    position_name_map.get(
+                        position_code,
+                        str(
+                            position_code
+                        ),
+                    ),
+
+                "sp_position":
+                    position_code,
+
+                "appearances":
+                    appearances,
+            }
+
+            for (
+                position_code,
+                appearances,
+            )
+            in sorted_positions
+        ]
+
+
+        candidates.append(
+            {
+                "participant_id":
+                    participant_id,
+
+                "fcl_name":
+                    row[
+                        "fcl_name"
+                    ],
+
+                "nickname":
+                    row[
+                        "nickname"
+                    ],
+
+                "player_name":
+                    player_name,
+
+                "sp_id":
+                    latest_card.get(
+                        "sp_id"
+                    ),
+
+                "sp_grade":
+                    int(
+                        latest_card.get(
+                            "sp_grade"
+                        )
+                        or 0
+                    ),
+
+                "image_url":
+                    latest_card.get(
+                        "image_url"
+                    ),
+
+                "series_played":
+                    int(
+                        row[
+                            "series_played"
+                        ]
+                        or 0
+                    ),
+
+                "sets_played":
+                    sets_played,
+
+                "rating_total":
+                    round(
+                        rating_total,
+                        2,
+                    ),
+
+                "average_rating":
+                    round(
+                        average_rating_raw,
+                        2,
+                    ),
+
+                "goals":
+                    int(
+                        row[
+                            "goals"
+                        ]
+                        or 0
+                    ),
+
+                "assists":
+                    int(
+                        row[
+                            "assists"
+                        ]
+                        or 0
+                    ),
+
+                "actual_positions":
+                    actual_positions,
+
+                "_average_rating_raw":
+                    average_rating_raw,
+
+                "_position_counts":
+                    player_position_counts,
+
+                # 같은 실제 축구선수가
+                # 여러 참가자 스쿼드에 있어도
+                # Best11에서는 한 번만 허용
+                "_unique_player_key":
+                    player_name
+                        .strip()
+                        .casefold(),
+            }
+        )
+
+
+    # =========================
+    # SLOT별 정렬 기준
+    #
+    # 1. 평균 평점
+    # 2. 전체 출전 세트
+    # 3. 해당 SLOT 허용 포지션 출전
+    # 4. 골
+    # 5. 도움
+    # 6. 이름
+    # =========================
+
+    def get_candidate_sort_key(
+        candidate,
+        eligible_positions,
+    ):
+
+        eligible_appearances = sum(
+
+            candidate[
+                "_position_counts"
+            ].get(
+                position,
+                0,
+            )
+
+            for position
+            in eligible_positions
+        )
+
+
+        return (
+            -candidate[
+                "_average_rating_raw"
+            ],
+
+            -candidate[
+                "sets_played"
+            ],
+
+            -eligible_appearances,
+
+            -candidate[
+                "goals"
+            ],
+
+            -candidate[
+                "assists"
+            ],
+
+            candidate[
+                "player_name"
+            ].casefold(),
+
+            candidate[
+                "fcl_name"
+            ].casefold(),
+        )
+
+
+    # =========================
+    # BEST11 선발
+    # =========================
+
+    selected_by_slot = {}
+
+    used_player_keys = set()
+
+
+    for slot_key in selection_order:
+
+        slot_spec = (
+            slot_specs[
+                slot_key
+            ]
+        )
+
+
+        eligible_positions = (
+            slot_spec[
+                "eligible"
+            ]
+        )
+
+
+        eligible_candidates = [
+
+            candidate
+
+            for candidate
+            in candidates
+
+            if (
+                candidate[
+                    "_unique_player_key"
+                ]
+                not in used_player_keys
+
+                and
+
+                any(
+                    position
+                    in eligible_positions
+
+                    for position
+                    in candidate[
+                        "_position_counts"
+                    ]
+                )
+            )
+        ]
+
+
+        eligible_candidates.sort(
+            key=lambda candidate:
+                get_candidate_sort_key(
+                    candidate,
+                    eligible_positions,
+                )
+        )
+
+
+        if not eligible_candidates:
+
+            continue
+
+
+        selected_candidate = (
+            eligible_candidates[0]
+        )
+
+
+        eligible_appearances = sum(
+
+            selected_candidate[
+                "_position_counts"
+            ].get(
+                position,
+                0,
+            )
+
+            for position
+            in eligible_positions
+        )
+
+
+        selected_player = {
+
+            key:
+                value
+
+            for (
+                key,
+                value,
+            )
+            in selected_candidate.items()
+
+            if not key.startswith(
+                "_"
+            )
+        }
+
+
+        selected_player[
+            "slot"
+        ] = slot_key
+
+
+        selected_player[
+            "position"
+        ] = slot_spec[
+            "position"
+        ]
+
+
+        selected_player[
+            "eligible_position_appearances"
+        ] = eligible_appearances
+
+
+        selected_by_slot[
+            slot_key
+        ] = selected_player
+
+
+        used_player_keys.add(
+            selected_candidate[
+                "_unique_player_key"
+            ]
+        )
+
+
+    # =========================
+    # 화면용 4-4-2 순서
+    # =========================
+
+    best11 = [
+
+        selected_by_slot[
+            slot_key
+        ]
+
+        for slot_key
+        in display_order
+
+        if slot_key
+        in selected_by_slot
+    ]
+
+
+    complete = (
+        len(best11)
+        == 11
+    )
+
+
+    finalized = (
+        selected_season[
+            "status"
+        ]
+        == "completed"
+
+        and
+
+        complete
+    )
+
+
+    if not candidates:
+
+        message = (
+            "Best11을 계산할 수 있는 "
+            "공식 경기 선수 기록이 없습니다."
+        )
+
+    elif not complete:
+
+        message = (
+            "일부 포지션의 최소 출전 조건을 "
+            "충족하는 선수가 부족합니다."
+        )
+
+    elif finalized:
+
+        message = (
+            "Season Best11이 "
+            "확정되었습니다."
+        )
+
+    else:
+
+        message = (
+            "현재 공식 경기 기록 기준 "
+            "Best11입니다."
+        )
+
+
+    return {
+        "season":
+            selected_season_number,
+
+        "formation":
+            "4-4-2",
+
+        "minimum_sets":
+            SEASON_SUMMARY_MINIMUM_SETS,
+
+        "competitions": [
+            "정규리그",
+            "플레이오프",
+        ],
+
+        "complete":
+            complete,
+
+        "finalized":
+            finalized,
+
+        "best11":
+            best11,
+
+        "message":
+            message,
+    }
+
+# =========================
 # 완료된 SERIES 결과 조회
 # =========================
 

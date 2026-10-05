@@ -24316,6 +24316,13 @@ button {
         0 5px 15px rgba(0, 0, 0, 0.38);
 }
 
+.season-summary-best11-image img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
 .season-summary-best11-player strong {
     max-width: 90px;
     overflow: hidden;
@@ -24332,6 +24339,31 @@ button {
     color: #d8c08e;
     font-size: 9px;
     font-weight: 800;
+}
+
+.season-summary-best11-owner {
+    display: block;
+    max-width: 88px;
+    margin-top: 2px;
+    overflow: hidden;
+    color: #aaa;
+    font-size: 8px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+.season-summary-best11-player.is-empty {
+    opacity: 0.5;
+}
+
+
+.season-summary-best11-player.is-empty
+.season-summary-best11-image {
+    border-style: dashed;
+    background: rgba(0, 0, 0, 0.28);
+    color: #777;
 }
 
 
@@ -24684,6 +24716,11 @@ button {
         font-size: 8px;
     }
 
+    .season-summary-best11-owner {
+        max-width: 66px;
+        font-size: 7px;
+    }
+
     .season-summary-best11-position {
         right: -3px;
         min-width: 27px;
@@ -24734,6 +24771,11 @@ button {
     .season-summary-best11-player strong {
         max-width: 60px;
         font-size: 7px;
+    }
+
+    .season-summary-best11-owner {
+        max-width: 58px;
+        font-size: 6px;
     }
 
     .season-summary-best11-player small {
