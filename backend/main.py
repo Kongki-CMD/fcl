@@ -42520,7 +42520,37 @@ def get_saved_series_mvp(
 # =========================
 
 @app.get("/api/season/champion")
-def get_season_champion():
+def get_season_champion(
+    season: int | None = None,
+):
+
+    selected_season_id = None
+
+    selected_season_number = None
+
+
+    if season is not None:
+
+        selected_season = (
+            resolve_fcl_season_record(
+                season
+            )
+        )
+
+
+        selected_season_id = int(
+            selected_season[
+                "id"
+            ]
+        )
+
+
+        selected_season_number = int(
+            selected_season[
+                "season_number"
+            ]
+        )
+
 
     with get_db_connection() as connection:
 
@@ -42556,11 +42586,23 @@ def get_season_champion():
                     team_a.fc_nickname
                         AS team_a_nickname,
 
+                    team_a.current_team_name
+                        AS team_a_current_team_name,
+
+                    team_a.current_team_logo_path
+                        AS team_a_current_team_logo_path,
+
                     team_b.fcl_name
                         AS team_b_name,
 
                     team_b.fc_nickname
-                        AS team_b_nickname
+                        AS team_b_nickname,
+
+                    team_b.current_team_name
+                        AS team_b_current_team_name,
+
+                    team_b.current_team_logo_path
+                        AS team_b_current_team_logo_path
 
                 FROM series AS s
 
@@ -42583,28 +42625,73 @@ def get_season_champion():
                     s.playoff_stage = '결승시리즈'
 
                     AND
-                    s.status = 'completed'
+                    (
+                        (
+                            %s = TRUE
+
+                            AND
+                            s.status = 'completed'
+                        )
+
+                        OR
+
+                        (
+                            %s = FALSE
+
+                            AND
+                            s.status <> 'cancelled'
+
+                            AND
+                            s.season_id = %s
+                        )
+                    )
 
                 ORDER BY
                     season.season_number DESC,
                     s.id DESC
 
                 LIMIT 1
-                """
+                """,
+                (
+                    season is None,
+                    season is None,
+                    selected_season_id,
+                ),
             )
 
 
             final_series = cursor.fetchone()
 
+            if (
+                final_series
+                and
+                selected_season_number is None
+            ):
+
+                selected_season_number = int(
+                    final_series[
+                        "season_number"
+                    ]
+                )
+
 
             # 결승 자체가 아직 없음
             if not final_series:
                 return {
-                    "season": None,
-                    "completed": False,
-                    "champion": None,
-                    "final": None,
-                    "final_mvp": None,
+                    "season":
+                        selected_season_number,
+
+                    "completed":
+                        False,
+
+                    "champion":
+                        None,
+
+                    "final":
+                        None,
+
+                    "final_mvp":
+                        None,
                 }
 
 
@@ -42707,17 +42794,16 @@ def get_season_champion():
             # =========================
 
             if (
+                final_series["status"]
+                != "completed"
+                or
                 invalid_final
                 or
                 champion_side is None
             ):
                 return {
                     "season":
-                        int(
-                            final_series[
-                                "season_number"
-                            ]
-                        ),
+                        selected_season_number,
                     "completed": False,
                     "champion": None,
 
@@ -42762,14 +42848,26 @@ def get_season_champion():
                         ],
 
                     "team_name":
-                        final_series[
-                            "team_a_snapshot_name"
-                        ],
+                        (
+                            final_series[
+                                "team_a_snapshot_name"
+                            ]
+                            or
+                            final_series[
+                                "team_a_current_team_name"
+                            ]
+                        ),
 
                     "team_logo_path":
-                        final_series[
-                            "team_a_snapshot_logo_path"
-                        ],
+                        (
+                            final_series[
+                                "team_a_snapshot_logo_path"
+                            ]
+                            or
+                            final_series[
+                                "team_a_current_team_logo_path"
+                            ]
+                        ),
                 }
 
             else:
@@ -42791,14 +42889,26 @@ def get_season_champion():
                         ],
 
                     "team_name":
-                        final_series[
-                            "team_b_snapshot_name"
-                        ],
+                        (
+                            final_series[
+                                "team_b_snapshot_name"
+                            ]
+                            or
+                            final_series[
+                                "team_b_current_team_name"
+                            ]
+                        ),
 
                     "team_logo_path":
-                        final_series[
-                            "team_b_snapshot_logo_path"
-                        ],
+                        (
+                            final_series[
+                                "team_b_snapshot_logo_path"
+                            ]
+                            or
+                            final_series[
+                                "team_b_current_team_logo_path"
+                            ]
+                        ),
                 }
 
 
@@ -42903,11 +43013,7 @@ def get_season_champion():
 
     return {
         "season":
-            int(
-                final_series[
-                    "season_number"
-                ]
-            ),
+            selected_season_number,
 
         "completed": True,
 

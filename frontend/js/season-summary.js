@@ -1,4 +1,5 @@
 import {
+    apiBaseUrl,
     loadFclSeasons,
     resolvePublicDisplaySeason,
 } from "./config.js?v=season-default-1";
@@ -15,6 +16,28 @@ const seasonSummaryChampionSeasonElement =
         ".season-summary-champion-season"
     );
 
+const seasonSummaryChampionNameElement =
+    document.querySelector(
+        ".season-summary-champion-name"
+    );
+
+
+const seasonSummaryChampionNicknameElement =
+    document.querySelector(
+        ".season-summary-champion-nickname"
+    );
+
+
+const seasonSummaryChampionTeamElement =
+    document.querySelector(
+        ".season-summary-champion-team"
+    );
+
+
+const seasonSummaryChampionLogoElement =
+    document.querySelector(
+        ".season-summary-champion-logo"
+    );
 
 const seasonSummaryStatusElement =
     document.querySelector(
@@ -262,6 +285,292 @@ function hideSeasonSummaryStatus() {
         );
 }
 
+// =========================================
+// CHAMPION LOGO
+// =========================================
+
+function renderSeasonChampionLogo(
+    champion
+) {
+
+    if (!seasonSummaryChampionLogoElement) {
+        return;
+    }
+
+
+    seasonSummaryChampionLogoElement
+        .innerHTML =
+        "";
+
+
+    if (
+        !champion
+        ||
+        !champion.team_logo_path
+    ) {
+
+        const labelElement =
+            document.createElement(
+                "span"
+            );
+
+
+        labelElement.textContent =
+            "TEAM";
+
+
+        const valueElement =
+            document.createElement(
+                "strong"
+            );
+
+
+        valueElement.textContent =
+            "LOGO";
+
+
+        seasonSummaryChampionLogoElement
+            .append(
+                labelElement,
+                valueElement
+            );
+
+
+        return;
+    }
+
+
+    const imageElement =
+        document.createElement(
+            "img"
+        );
+
+
+    imageElement.src =
+        champion.team_logo_path;
+
+
+    imageElement.alt =
+        (
+            `${champion.fcl_name} `
+            +
+            "우승 당시 팀 로고"
+        );
+
+
+    imageElement.addEventListener(
+        "error",
+        () => {
+
+            seasonSummaryChampionLogoElement
+                .innerHTML =
+                "";
+
+
+            const labelElement =
+                document.createElement(
+                    "span"
+                );
+
+
+            labelElement.textContent =
+                "TEAM";
+
+
+            const valueElement =
+                document.createElement(
+                    "strong"
+                );
+
+
+            valueElement.textContent =
+                "LOGO";
+
+
+            seasonSummaryChampionLogoElement
+                .append(
+                    labelElement,
+                    valueElement
+                );
+        },
+        {
+            once: true,
+        }
+    );
+
+
+    seasonSummaryChampionLogoElement
+        .appendChild(
+            imageElement
+        );
+}
+
+// =========================================
+// CHAMPION 출력
+// =========================================
+
+function renderSeasonChampion(
+    data
+) {
+
+    const champion =
+        data?.champion
+        ?? null;
+
+
+    if (
+        !data?.completed
+        ||
+        !champion
+    ) {
+
+        if (
+            seasonSummaryChampionNameElement
+        ) {
+
+            seasonSummaryChampionNameElement
+                .textContent =
+                "시즌 진행 중";
+        }
+
+
+        if (
+            seasonSummaryChampionNicknameElement
+        ) {
+
+            seasonSummaryChampionNicknameElement
+                .textContent =
+                "우승자 미확정";
+        }
+
+
+        if (
+            seasonSummaryChampionTeamElement
+        ) {
+
+            seasonSummaryChampionTeamElement
+                .textContent =
+                "결승 종료 후 확정";
+        }
+
+
+        renderSeasonChampionLogo(
+            null
+        );
+
+
+        return;
+    }
+
+
+    if (
+        seasonSummaryChampionNameElement
+    ) {
+
+        seasonSummaryChampionNameElement
+            .textContent =
+            champion.fcl_name
+            || "-";
+    }
+
+
+    if (
+        seasonSummaryChampionNicknameElement
+    ) {
+
+        seasonSummaryChampionNicknameElement
+            .textContent =
+            champion.nickname
+            || "-";
+    }
+
+
+    if (
+        seasonSummaryChampionTeamElement
+    ) {
+
+        seasonSummaryChampionTeamElement
+            .textContent =
+            champion.team_name
+            || "팀 정보 없음";
+    }
+
+
+    renderSeasonChampionLogo(
+        champion
+    );
+}
+
+// =========================================
+// CHAMPION 불러오기
+// =========================================
+
+async function loadSeasonChampion() {
+
+    const requestedSeasonNumber =
+        selectedSeasonSummaryNumber;
+
+
+    if (!requestedSeasonNumber) {
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            (
+                `${apiBaseUrl}`
+                +
+                "/api/season/champion"
+                +
+                `?season=${requestedSeasonNumber}`
+            )
+        );
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            "시즌 우승자 정보를 불러오지 못했습니다."
+        );
+    }
+
+
+    const data =
+        await response.json();
+
+
+    // 시즌 변경 중 이전 요청이
+    // 늦게 도착한 경우 화면에 반영하지 않음
+    if (
+        requestedSeasonNumber
+        !==
+        selectedSeasonSummaryNumber
+    ) {
+
+        return;
+    }
+
+
+    if (
+        Number(
+            data.season
+        )
+        !==
+        requestedSeasonNumber
+    ) {
+
+        throw new Error(
+            "요청한 시즌과 우승자 데이터의 시즌이 일치하지 않습니다."
+        );
+    }
+
+
+    renderSeasonChampion(
+        data
+    );
+}
+
 
 // =========================================
 // 시즌 데이터 새로고침
@@ -287,20 +596,7 @@ async function refreshSeasonSummary() {
     updateSeasonSummaryLabels();
 
 
-    // =====================================
-    // 다음 단계부터 실제 API 연결
-    // =====================================
-    //
-    // await Promise.all([
-    //     loadSeasonChampion(),
-    //     loadSeasonFinalStandings(),
-    //     loadSeasonBest11(),
-    //     loadSeasonTopPlayers(),
-    // ]);
-    //
-    // 모든 함수는
-    // selectedSeasonSummaryNumber
-    // 하나만 기준으로 사용한다.
+    await loadSeasonChampion();
 }
 
 

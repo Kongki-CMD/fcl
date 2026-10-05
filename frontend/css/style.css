@@ -24038,6 +24038,13 @@ button {
     font-size: 22px;
 }
 
+.season-summary-champion-logo img {
+    display: block;
+    width: 112px;
+    height: 112px;
+    object-fit: contain;
+}
+
 .season-summary-champion-glow {
     position: absolute;
     width: 240px;
@@ -24571,6 +24578,11 @@ button {
     .season-summary-champion-logo {
         width: 92px;
         height: 92px;
+    }
+
+    .season-summary-champion-logo img {
+        width: 68px;
+        height: 68px;
     }
 
     .season-summary-champion-logo strong {
