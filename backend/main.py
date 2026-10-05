@@ -39595,10 +39595,15 @@ def manual_complete_fcl_series(
                                 status_code=400,
                                 detail=(
                                     f"{set_number}세트가 동점입니다. "
-                                    "토너먼트 경기에서는 실제 승자를 "
-                                    "지정해야 합니다."
+                                    "플레이오프 또는 토너먼트에서는 "
+                                    "실제 승자를 지정해야 합니다."
                                 ),
                             )
+
+
+                        winner_side = (
+                            explicit_winner_side
+                        )
 
                 # =========================
                 # 선승 이후 추가 세트 방어
