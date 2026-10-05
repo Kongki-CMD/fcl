@@ -189,6 +189,158 @@ let availableSeasonSummarySeasons =
 let selectedSeasonSummaryNumber =
     null;
 
+let seasonSummaryPlayerSeasonMap =
+    new Map();
+
+// =========================================
+// FC ONLINE 선수 시즌 메타데이터
+// =========================================
+
+async function loadSeasonSummaryPlayerSeasonMetadata() {
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/fconline/metadata/seasons`
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "선수 시즌 메타데이터 조회 실패"
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        seasonSummaryPlayerSeasonMap =
+            new Map(
+                (
+                    Array.isArray(
+                        data?.seasons
+                    )
+                        ? data.seasons
+                        : []
+                ).map(
+                    season => [
+                        Number(
+                            season.season_id
+                        ),
+                        season,
+                    ]
+                )
+            );
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        seasonSummaryPlayerSeasonMap =
+            new Map();
+    }
+}
+
+
+// =========================================
+// spId → 시즌 정보
+// =========================================
+
+function getSeasonSummaryPlayerSeasonInfo(
+    spId
+) {
+
+    const numericSpId =
+        Number(
+            spId
+        );
+
+
+    if (
+        !Number.isFinite(
+            numericSpId
+        )
+    ) {
+
+        return null;
+    }
+
+
+    const seasonId =
+        Math.floor(
+            numericSpId
+            /
+            1_000_000
+        );
+
+
+    return (
+        seasonSummaryPlayerSeasonMap.get(
+            seasonId
+        )
+        ||
+        null
+    );
+}
+
+
+// =========================================
+// BEST11 시즌 아이콘
+// =========================================
+
+function createSeasonSummaryPlayerSeasonIcon(
+    spId
+) {
+
+    const season =
+        getSeasonSummaryPlayerSeasonInfo(
+            spId
+        );
+
+
+    if (
+        !season
+        ||
+        !season.season_image_url
+    ) {
+
+        return null;
+    }
+
+
+    const imageElement =
+        document.createElement(
+            "img"
+        );
+
+
+    imageElement.className =
+        "season-summary-best11-season-icon";
+
+
+    imageElement.src =
+        season.season_image_url;
+
+
+    imageElement.alt =
+        season.class_name
+        || "시즌";
+
+
+    imageElement.title =
+        season.class_name
+        || "시즌";
+
+
+    return imageElement;
+}
 
 // =========================================
 // URL 시즌
@@ -1348,6 +1500,16 @@ function createSeasonBest11PlayerElement(
         );
 
 
+    const statsElement =
+        document.createElement(
+            "span"
+        );
+
+
+    statsElement.className =
+        "season-summary-best11-stats";
+
+
     const ratingElement =
         document.createElement(
             "small"
@@ -1379,6 +1541,9 @@ function createSeasonBest11PlayerElement(
         nameElement.textContent =
             "미확정";
 
+        statsElement.textContent =
+            "골/도움 -";
+
 
         ratingElement.textContent =
             "평점 -";
@@ -1392,6 +1557,7 @@ function createSeasonBest11PlayerElement(
             positionElement,
             imageWrapElement,
             nameElement,
+            statsElement,
             ratingElement,
             ownerElement
         );
@@ -1451,9 +1617,55 @@ function createSeasonBest11PlayerElement(
     }
 
 
-    nameElement.textContent =
+    const seasonIconElement =
+        createSeasonSummaryPlayerSeasonIcon(
+            player.sp_id
+        );
+
+
+    const nameTextElement =
+        document.createElement(
+            "span"
+        );
+
+
+    nameTextElement.className =
+        "season-summary-best11-name-text";
+
+
+    nameTextElement.textContent =
         player.player_name
         || "-";
+
+
+    if (seasonIconElement) {
+
+        nameElement.append(
+            seasonIconElement,
+            nameTextElement
+        );
+
+    } else {
+
+        nameElement.appendChild(
+            nameTextElement
+        );
+    }
+
+    statsElement.textContent =
+        (
+            `${Number(
+                player.goals
+                ?? 0
+            )}골`
+            +
+            " · "
+            +
+            `${Number(
+                player.assists
+                ?? 0
+            )}도움`
+        );
 
 
     ratingElement.textContent =
@@ -1480,6 +1692,16 @@ function createSeasonBest11PlayerElement(
             +
             ` · ${player.sets_played}세트`
             +
+            ` · ${Number(
+                player.goals
+                ?? 0
+            )}골`
+            +
+            ` · ${Number(
+                player.assists
+                ?? 0
+            )}도움`
+            +
             ` · 평균 ${Number(
                 player.average_rating
                 ?? 0
@@ -1491,6 +1713,7 @@ function createSeasonBest11PlayerElement(
         positionElement,
         imageWrapElement,
         nameElement,
+        statsElement,
         ratingElement,
         ownerElement
     );
@@ -2229,6 +2452,7 @@ async function initializeSeasonSummary() {
         availableSeasonSummarySeasons =
             await loadFclSeasons();
 
+        await loadSeasonSummaryPlayerSeasonMetadata();
 
         if (
             availableSeasonSummarySeasons
