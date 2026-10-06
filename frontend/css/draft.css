@@ -43,6 +43,14 @@
     font-size: 14px;
 }
 
+.draft-waiting-create-button {
+    display: block;
+
+    min-width: 180px;
+
+    margin: 24px auto 0;
+}
+
 
 /* =========================
    CONNECTION

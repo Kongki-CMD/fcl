@@ -1010,9 +1010,28 @@ function renderDraftAdminControls(
         getAdminToken();
 
 
-    const canControl =
+    const userToken =
+        getUserToken();
+
+
+    const isAdminMember =
         Boolean(
-            adminToken
+            userToken
+        )
+        &&
+        Boolean(
+            currentUser
+                ?.is_admin
+        );
+
+
+    const canControl =
+        (
+            Boolean(
+                adminToken
+            )
+            ||
+            isAdminMember
         )
         &&
         (
@@ -1120,14 +1139,12 @@ async function updateDraftBanPhaseSetting(
     }
 
 
-    const adminToken =
-        getAdminToken();
-
-
-    if (!adminToken) {
+    if (
+        !canCurrentUserControlDraft()
+    ) {
 
         window.alert(
-            "관리자 로그인이 필요합니다."
+            "Draft 관리자 권한이 필요합니다."
         );
 
         return;
@@ -1157,13 +1174,10 @@ async function updateDraftBanPhaseSetting(
                     method:
                         "PATCH",
 
-                    headers: {
-                        "Content-Type":
-                            "application/json",
-
-                        "X-Admin-Token":
-                            adminToken,
-                    },
+                    headers:
+                        getDraftControlHeaders(
+                            true
+                        ),
 
                     body:
                         JSON.stringify(
@@ -1257,14 +1271,12 @@ async function changeDraftRunState(
     }
 
 
-    const adminToken =
-        getAdminToken();
-
-
-    if (!adminToken) {
+    if (
+        !canCurrentUserControlDraft()
+    ) {
 
         window.alert(
-            "관리자 로그인이 필요합니다."
+            "Draft 관리자 권한이 필요합니다."
         );
 
         return;
@@ -1309,10 +1321,8 @@ async function changeDraftRunState(
                     method:
                         "POST",
 
-                    headers: {
-                        "X-Admin-Token":
-                            adminToken,
-                    },
+                    headers:
+                        getDraftControlHeaders(),
                 }
             );
 
@@ -1325,13 +1335,28 @@ async function changeDraftRunState(
             response.status === 401
         ) {
 
-            sessionStorage.removeItem(
-                adminTokenStorageKey
-            );
+            if (
+                getAdminToken()
+            ) {
+
+                sessionStorage.removeItem(
+                    adminTokenStorageKey
+                );
+
+            } else {
+
+                localStorage.removeItem(
+                    "fclUserToken"
+                );
+
+
+                currentUser =
+                    null;
+            }
 
 
             throw new Error(
-                "관리자 로그인이 만료되었습니다."
+                "로그인이 만료되었습니다."
             );
         }
 
@@ -2526,11 +2551,154 @@ function renderActions(
             .join("");
 }
 
+async function createDraftSessionFromWaiting() {
+
+    if (
+        draftControlSubmitting
+    ) {
+
+        return;
+    }
+
+
+    if (
+        !canCurrentUserControlDraft()
+    ) {
+
+        window.alert(
+            "Draft 관리자 권한이 필요합니다."
+        );
+
+        return;
+    }
+
+
+    const createButton =
+        document.querySelector(
+            "#draft-waiting-create-button"
+        );
+
+
+    draftControlSubmitting =
+        true;
+
+
+    if (createButton) {
+
+        createButton.disabled =
+            true;
+
+        createButton.textContent =
+            "Draft 준비 중...";
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/seasons/`
+                + `${currentSeasonNumber}`
+                + `/draft`,
+                {
+                    method:
+                        "POST",
+
+                    headers:
+                        getDraftControlHeaders(
+                            true
+                        ),
+
+                    body:
+                        JSON.stringify(
+                            {
+                                allow_duplicate_picks:
+                                    false,
+
+                                ban_enabled:
+                                    true,
+
+                                turn_seconds:
+                                    60,
+
+                                timeout_policy:
+                                    "pause",
+                            }
+                        ),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status === 401
+        ) {
+
+            throw new Error(
+                "로그인이 만료되었습니다."
+            );
+        }
+
+
+        if (
+            response.status === 403
+        ) {
+
+            throw new Error(
+                "Draft 관리자 권한이 없습니다."
+            );
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ??
+                "Draft 생성에 실패했습니다."
+            );
+        }
+
+
+        await loadInitialDraftState();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        window.alert(
+            error.message
+        );
+
+
+    } finally {
+
+        draftControlSubmitting =
+            false;
+
+
+        if (createButton) {
+
+            createButton.disabled =
+                false;
+
+            createButton.textContent =
+                "Draft 준비";
+        }
+    }
+}
 
 // =========================
 // EMPTY / ERROR
 // =========================
-
 function showWaitingForDraft() {
 
     draftContentElement
@@ -2557,6 +2725,92 @@ function showWaitingForDraft() {
             +
             "생성되면 이 화면에 자동으로 표시됩니다."
         );
+
+
+    let createButton =
+        document.querySelector(
+            "#draft-waiting-create-button"
+        );
+
+
+    // =========================
+    // MEMBER에게는 생성 버튼 숨김
+    // =========================
+
+    if (
+        !canCurrentUserControlDraft()
+    ) {
+
+        if (createButton) {
+
+            createButton.remove();
+        }
+
+
+        return;
+    }
+
+
+    // =========================
+    // ADMIN 회원
+    // Draft 준비 버튼
+    // =========================
+
+    if (!createButton) {
+
+        createButton =
+            document.createElement(
+                "button"
+            );
+
+
+        createButton.type =
+            "button";
+
+
+        createButton.id =
+            "draft-waiting-create-button";
+
+
+        createButton.className =
+            (
+                "draft-control-button "
+                +
+                "start "
+                +
+                "draft-waiting-create-button"
+            );
+
+
+        createButton.textContent =
+            "Draft 준비";
+
+
+        createButton.addEventListener(
+            "click",
+            async () => {
+
+                const confirmed =
+                    window.confirm(
+                        "새 Draft를 준비하시겠습니까?"
+                    );
+
+
+                if (!confirmed) {
+
+                    return;
+                }
+
+
+                await createDraftSessionFromWaiting();
+            }
+        );
+
+
+        messagePanelElement.append(
+            createButton
+        );
+    }
 }
 
 
@@ -2597,6 +2851,86 @@ function getAdminToken() {
     return sessionStorage.getItem(
         adminTokenStorageKey
     );
+}
+
+function canCurrentUserControlDraft() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (adminToken) {
+
+        return true;
+    }
+
+
+    const userToken =
+        getUserToken();
+
+
+    return (
+        Boolean(
+            userToken
+        )
+        &&
+        Boolean(
+            currentUser
+                ?.is_admin
+        )
+    );
+}
+
+
+function getDraftControlHeaders(
+    includeJson = false
+) {
+
+    const headers = {};
+
+
+    if (includeJson) {
+
+        headers[
+            "Content-Type"
+        ] =
+            "application/json";
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (adminToken) {
+
+        headers[
+            "X-Admin-Token"
+        ] =
+            adminToken;
+
+
+        return headers;
+    }
+
+
+    const userToken =
+        getUserToken();
+
+
+    if (
+        userToken
+        &&
+        currentUser
+            ?.is_admin
+    ) {
+
+        headers.Authorization =
+            `Bearer ${userToken}`;
+    }
+
+
+    return headers;
 }
 
 async function submitDraftClubAction(

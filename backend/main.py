@@ -13751,6 +13751,81 @@ def require_admin(
 
     return x_admin_token
 
+def require_draft_control_admin(
+    x_admin_token: str | None =
+        Header(
+            default=None
+        ),
+
+    credentials:
+        HTTPAuthorizationCredentials
+        | None
+        = Depends(
+            user_bearer_scheme
+        ),
+):
+
+    # =========================
+    # 기존 관리자 페이지 토큰
+    # =========================
+
+    if x_admin_token:
+
+        require_admin(
+            x_admin_token
+        )
+
+
+        return {
+            "auth_type":
+                "admin_token",
+
+            "user":
+                None,
+        }
+
+
+    # =========================
+    # 일반 회원 로그인 토큰
+    # =========================
+
+    if credentials:
+
+        user = require_user(
+            credentials
+        )
+
+
+        if not user[
+            "is_admin"
+        ]:
+
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Draft 관리자 권한이 "
+                    "필요합니다."
+                ),
+            )
+
+
+        return {
+            "auth_type":
+                "user_admin",
+
+            "user":
+                user,
+        }
+
+
+    raise HTTPException(
+        status_code=401,
+        detail=(
+            "관리자 로그인이 "
+            "필요합니다."
+        ),
+    )
+
 @app.post(
     "/api/admin/login"
 )
@@ -15668,8 +15743,8 @@ def admin_create_draft_session(
     request_data:
         AdminDraftSessionCreateRequest,
 
-    admin_token: str = Depends(
-        require_admin
+    draft_admin = Depends(
+        require_draft_control_admin
     ),
 ):
 
@@ -16299,8 +16374,8 @@ def admin_update_draft_settings(
     request_data:
         AdminDraftSettingsUpdateRequest,
 
-    admin_token: str = Depends(
-        require_admin
+    draft_admin = Depends(
+        require_draft_control_admin
     ),
 ):
 
@@ -16662,8 +16737,8 @@ def apply_draft_timeout_pause(
 def admin_start_draft_session(
     season_number: int,
 
-    admin_token: str = Depends(
-        require_admin
+    draft_admin = Depends(
+        require_draft_control_admin
     ),
 ):
 
@@ -17113,8 +17188,8 @@ def admin_start_draft_session(
 def admin_pause_draft_session(
     season_number: int,
 
-    admin_token: str = Depends(
-        require_admin
+    draft_admin = Depends(
+        require_draft_control_admin
     ),
 ):
 
@@ -17277,8 +17352,8 @@ def admin_pause_draft_session(
 def admin_resume_draft_session(
     season_number: int,
 
-    admin_token: str = Depends(
-        require_admin
+    draft_admin = Depends(
+        require_draft_control_admin
     ),
 ):
 
