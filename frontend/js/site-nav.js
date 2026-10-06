@@ -133,6 +133,14 @@ if (siteMainMenuElement) {
 
                 {
                     label:
+                        "드래프트",
+
+                    href:
+                        "./draft.html",
+                },
+
+                {
+                    label:
                         "경기 규칙",
 
                     href:
@@ -1213,3 +1221,185 @@ authAreaElement
 
 
 initializeUserAuthUi();
+
+// =========================================
+// DRAFT COMPLETE
+// OPEN TAB REFRESH
+//
+// Draft가 완료되면
+// 이미 열려 있는 시즌 관련 탭을
+// 자동으로 새로고침해서
+// 새 팀 / 엠블럼을 반영한다.
+// =========================================
+
+const siteDraftEventChannelName =
+    "fcl-draft-events";
+
+
+const siteDraftCompletionEventStorageKey =
+    "fclDraftCompletionEvent";
+
+
+let siteDraftRefreshStarted =
+    false;
+
+
+const siteDraftRefreshPages =
+    new Set(
+        [
+            "",
+            "index.html",
+
+            "schedule.html",
+            "results.html",
+
+            "standings.html",
+            "players.html",
+
+            "season-summary.html",
+
+            "prediction.html",
+            "ai-predictions.html",
+        ]
+    );
+
+
+function refreshPageAfterDraftCompletion(
+    payload
+) {
+
+    if (
+        !payload
+        ||
+        payload.type
+        !== "draft_completed"
+    ) {
+
+        return;
+    }
+
+
+    if (siteDraftRefreshStarted) {
+
+        return;
+    }
+
+
+    const currentPageName =
+        window.location.pathname
+            .split("/")
+            .pop()
+        ?? "";
+
+
+    // Draft 페이지 자신은
+    // WebSocket으로 이미 최신 상태
+    if (
+        currentPageName
+        === "draft.html"
+    ) {
+
+        return;
+    }
+
+
+    if (
+        !siteDraftRefreshPages.has(
+            currentPageName
+        )
+    ) {
+
+        return;
+    }
+
+
+    siteDraftRefreshStarted =
+        true;
+
+
+    window.setTimeout(
+        () => {
+
+            window.location.reload();
+
+        },
+        300
+    );
+}
+
+
+// =========================================
+// BroadcastChannel
+// =========================================
+
+if (
+    "BroadcastChannel"
+    in window
+) {
+
+    const siteDraftEventChannel =
+        new BroadcastChannel(
+            siteDraftEventChannelName
+        );
+
+
+    siteDraftEventChannel
+        .addEventListener(
+            "message",
+            event => {
+
+                refreshPageAfterDraftCompletion(
+                    event.data
+                );
+
+            }
+        );
+}
+
+
+// =========================================
+// localStorage fallback
+// =========================================
+
+window.addEventListener(
+    "storage",
+    event => {
+
+        if (
+            event.key
+            !==
+            siteDraftCompletionEventStorageKey
+        ) {
+
+            return;
+        }
+
+
+        if (!event.newValue) {
+
+            return;
+        }
+
+
+        try {
+
+            const payload =
+                JSON.parse(
+                    event.newValue
+                );
+
+
+            refreshPageAfterDraftCompletion(
+                payload
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Draft 완료 이벤트 파싱 실패:",
+                error
+            );
+        }
+    }
+);

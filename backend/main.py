@@ -1,4 +1,5 @@
 import os
+import asyncio
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +18,8 @@ from datetime import (
     timedelta,
 )
 from zoneinfo import ZoneInfo
+
+from psycopg import cursor
 from backend.player_catalog import (
     PLAYER_DATABASE_STAT_FILTER_MAP,
     PLAYER_STAT_COLUMN_MAP,
@@ -77,6 +80,8 @@ from fastapi import (
     Header,
     Depends,
     Request,
+    WebSocket,
+    WebSocketDisconnect,
 )
 
 from fastapi.security import (
@@ -87,6 +92,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
@@ -301,6 +307,10 @@ DATABASE_POOL = (
                 dict_row,
         },
 
+        check=
+            ConnectionPool
+            .check_connection,
+
         timeout=10.0,
 
         max_idle=300.0,
@@ -315,8 +325,16 @@ DATABASE_POOL = (
 )
 
 
-ADMIN_SESSION_SECONDS = (
-    8 * 60 * 60
+ADMIN_SESSION_SECONDS = int(
+    os.getenv(
+        "ADMIN_SESSION_SECONDS",
+        str(
+            30
+            * 24
+            * 60
+            * 60
+        ),
+    )
 )
 
 
@@ -6694,6 +6712,8 @@ def initialize_database():
                 CREATE TABLE IF NOT EXISTS participants (
                     id BIGSERIAL PRIMARY KEY,
 
+                    user_id BIGINT,
+
                     fcl_name VARCHAR(50)
                         NOT NULL
                         UNIQUE,
@@ -6710,8 +6730,83 @@ def initialize_database():
 
                     updated_at TIMESTAMPTZ
                         NOT NULL
-                        DEFAULT NOW()
+                        DEFAULT NOW(),
+
+                    CONSTRAINT
+                        fk_participants_user_id
+
+                    FOREIGN KEY (
+                        user_id
+                    )
+
+                    REFERENCES users(id)
+                    ON DELETE SET NULL
                 )
+                """
+            )
+
+            cursor.execute(
+                """
+                ALTER TABLE participants
+
+                ADD COLUMN IF NOT EXISTS
+                    user_id BIGINT
+                """
+            )
+
+
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+
+                    IF NOT EXISTS (
+                        SELECT 1
+                        FROM pg_constraint
+
+                        WHERE
+                            conname =
+                                'fk_participants_user_id'
+
+                            AND
+                            conrelid =
+                                'participants'::regclass
+                    )
+
+                    THEN
+
+                        ALTER TABLE participants
+
+                        ADD CONSTRAINT
+                            fk_participants_user_id
+
+                        FOREIGN KEY (
+                            user_id
+                        )
+
+                        REFERENCES users(id)
+
+                        ON DELETE SET NULL;
+
+                    END IF;
+
+                END
+                $$;
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    ux_participants_user_id
+
+                ON participants (
+                    user_id
+                )
+
+                WHERE
+                    user_id IS NOT NULL
                 """
             )
 
@@ -6833,6 +6928,152 @@ def initialize_database():
                 """
             )
 
+            # =========================
+            # CLUBS
+            #
+            # FCL Draft에서 사용하는
+            # 클럽 마스터
+            #
+            # official_team_id:
+            # FC Online 공식 Team ID
+            #
+            # league_id:
+            # FC Online 공식 리그 ID
+            #
+            # league_name:
+            # FC Online 공식 리그 이름
+            #
+            # 기존 수동 등록 클럽도
+            # 그대로 유지한다.
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    clubs (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        code VARCHAR(100)
+                            NOT NULL
+                            UNIQUE,
+
+                        name VARCHAR(100)
+                            NOT NULL,
+
+                        short_name VARCHAR(100),
+
+                        official_team_id BIGINT,
+
+                        league_id INTEGER,
+
+                        league_name VARCHAR(150),
+
+                        logo_source_url TEXT,
+
+                        logo_data BYTEA,
+
+                        logo_content_type
+                            VARCHAR(100),
+
+                        is_active BOOLEAN
+                            NOT NULL
+                            DEFAULT TRUE,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW()
+                    )
+                """
+            )
+
+
+            # =========================
+            # 기존 DB 마이그레이션
+            #
+            # 이미 clubs 테이블이
+            # 생성되어 있는 경우에도
+            # FC Online 컬럼 추가
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE clubs
+
+                ADD COLUMN IF NOT EXISTS
+                    official_team_id BIGINT
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE clubs
+
+                ADD COLUMN IF NOT EXISTS
+                    league_id INTEGER
+                """
+            )
+
+
+            cursor.execute(
+                """
+                ALTER TABLE clubs
+
+                ADD COLUMN IF NOT EXISTS
+                    league_name VARCHAR(150)
+                """
+            )
+
+
+            # =========================
+            # FC Online Team ID
+            # 중복 방지
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    ux_clubs_official_team_id
+
+                ON clubs (
+                    official_team_id
+                )
+
+                WHERE
+                    official_team_id
+                    IS NOT NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_clubs_active_name
+
+                ON clubs (
+                    is_active,
+                    name
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_clubs_league
+
+                ON clubs (
+                    league_id,
+                    name
+                )
+                """
+            )
 
             # =========================
             # SEASON PARTICIPANTS
@@ -6889,6 +7130,696 @@ def initialize_database():
                 ADD COLUMN IF NOT EXISTS
                     snapshot_at
                         TIMESTAMPTZ
+                """
+            )
+
+            # =========================
+            # SEASON PARTICIPANTS
+            # Draft 클럽 연결
+            #
+            # club_id:
+            # 현재 배정된 클럽
+            #
+            # initial_club_id:
+            # 최초 Draft에서 PICK한 클럽
+            # 관리자 변경 후에도 유지
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    season_participants
+
+                ADD COLUMN IF NOT EXISTS
+                    club_id BIGINT
+                    REFERENCES clubs(id)
+                    ON DELETE SET NULL,
+
+                ADD COLUMN IF NOT EXISTS
+                    initial_club_id BIGINT
+                    REFERENCES clubs(id)
+                    ON DELETE SET NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_season_participants_club
+
+                ON season_participants (
+                    season_id,
+                    club_id
+                )
+                """
+            )
+
+            # =========================
+            # SEASON PARTICIPANTS
+            # 시즌별 현재 클럽
+            #
+            # Draft 최초 배정
+            # + 관리자 1회 변경
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    season_participants
+
+                ADD COLUMN IF NOT EXISTS
+                    team_name
+                        VARCHAR(100),
+
+                ADD COLUMN IF NOT EXISTS
+                    team_logo_path
+                        VARCHAR(500),
+
+                ADD COLUMN IF NOT EXISTS
+                    initial_team_name
+                        VARCHAR(100),
+
+                ADD COLUMN IF NOT EXISTS
+                    initial_team_logo_path
+                        VARCHAR(500),
+
+                ADD COLUMN IF NOT EXISTS
+                    team_assignment_source
+                        VARCHAR(20),
+
+                ADD COLUMN IF NOT EXISTS
+                    team_change_count
+                        SMALLINT
+                        NOT NULL
+                        DEFAULT 0,
+
+                ADD COLUMN IF NOT EXISTS
+                    team_changed_at
+                        TIMESTAMPTZ
+                """
+            )
+
+
+            # =========================
+            # 시즌 중 팀 변경은 최대 1회
+            # DB에서도 강제
+            # =========================
+
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+
+                    IF NOT EXISTS (
+                        SELECT 1
+
+                        FROM pg_constraint
+
+                        WHERE
+                            conname =
+                                'chk_season_participants_team_change_count'
+                    ) THEN
+
+                        ALTER TABLE
+                            season_participants
+
+                        ADD CONSTRAINT
+                            chk_season_participants_team_change_count
+
+                        CHECK (
+                            team_change_count
+                            BETWEEN 0 AND 1
+                        );
+
+                    END IF;
+
+                END
+                $$;
+                """
+            )
+
+
+            # =========================
+            # 팀 배정 출처
+            #
+            # legacy:
+            # 기존 사이트 데이터
+            #
+            # draft:
+            # 실시간 Draft PICK
+            #
+            # admin:
+            # 관리자 수동 변경
+            # =========================
+
+            cursor.execute(
+                """
+                DO $$
+                BEGIN
+
+                    IF NOT EXISTS (
+                        SELECT 1
+
+                        FROM pg_constraint
+
+                        WHERE
+                            conname =
+                                'chk_season_participants_team_source'
+                    ) THEN
+
+                        ALTER TABLE
+                            season_participants
+
+                        ADD CONSTRAINT
+                            chk_season_participants_team_source
+
+                        CHECK (
+                            team_assignment_source
+                            IS NULL
+
+                            OR
+
+                            team_assignment_source IN (
+                                'legacy',
+                                'draft',
+                                'admin'
+                            )
+                        );
+
+                    END IF;
+
+                END
+                $$;
+                """
+            )
+
+            # =========================
+            # DRAFT SESSIONS
+            #
+            # 시즌당 하나의 Draft
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    draft_sessions (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        season_id BIGINT
+                            NOT NULL
+                            UNIQUE
+                            REFERENCES seasons(id)
+                            ON DELETE CASCADE,
+
+                        status VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'setup',
+
+                        phase VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'ban',
+
+                        allow_duplicate_picks BOOLEAN
+                            NOT NULL
+                            DEFAULT FALSE,
+
+                        ban_enabled BOOLEAN
+                            NOT NULL
+                            DEFAULT TRUE,
+
+                        turn_seconds INTEGER
+                            NOT NULL
+                            DEFAULT 60,
+
+                        timeout_policy VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'pause',
+
+                        current_action_index INTEGER
+                            NOT NULL
+                            DEFAULT 0,
+
+                        state_version BIGINT
+                            NOT NULL
+                            DEFAULT 0,
+
+                        started_at TIMESTAMPTZ,
+
+                        turn_started_at TIMESTAMPTZ,
+
+                        paused_at TIMESTAMPTZ,
+
+                        completed_at TIMESTAMPTZ,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        CHECK (
+                            status IN (
+                                'setup',
+                                'active',
+                                'paused',
+                                'completed',
+                                'cancelled'
+                            )
+                        ),
+
+                        CHECK (
+                            phase IN (
+                                'ban',
+                                'pick',
+                                'completed'
+                            )
+                        ),
+
+                        CHECK (
+                            turn_seconds
+                            BETWEEN 0 AND 3600
+                        ),
+
+                        CHECK (
+                            timeout_policy IN (
+                                'pause',
+                                'skip',
+                                'auto'
+                            )
+                        ),
+
+                        CHECK (
+                            current_action_index >= 0
+                        ),
+
+                        CHECK (
+                            state_version >= 0
+                        )
+                    )
+                """
+            )
+
+            # =========================
+            # BAN PHASE 설정
+            #
+            # 기존 DB에도 안전하게
+            # 컬럼 추가
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    draft_sessions
+
+                ADD COLUMN IF NOT EXISTS
+                    ban_enabled BOOLEAN
+                    NOT NULL
+                    DEFAULT TRUE
+                """
+            )
+
+            # =========================
+            # 기존 Draft 설정 컬럼 제거
+            #
+            # Draft 순서는 서버 고정:
+            #
+            # BAN
+            # 1 → 2 → 3 → 4 → 5
+            #
+            # PICK
+            # 5 → 4 → 3 → 2 → 1
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    draft_sessions
+
+                DROP COLUMN IF EXISTS
+                    ban_rounds,
+
+                DROP COLUMN IF EXISTS
+                    pick_rounds,
+
+                DROP COLUMN IF EXISTS
+                    ban_order,
+
+                DROP COLUMN IF EXISTS
+                    pick_order
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_draft_sessions_status
+
+                ON draft_sessions (
+                    status,
+                    season_id
+                )
+                """
+            )
+
+
+            # =========================
+            # DRAFT PARTICIPANTS
+            #
+            # Draft 시작 시점의
+            # 참가자와 순서를 고정
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    draft_participants (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        draft_session_id BIGINT
+                            NOT NULL
+                            REFERENCES draft_sessions(id)
+                            ON DELETE CASCADE,
+
+                        participant_id BIGINT
+                            NOT NULL
+                            REFERENCES participants(id)
+                            ON DELETE RESTRICT,
+
+                        draft_order SMALLINT
+                            NOT NULL,
+
+                        discord_user_id VARCHAR(64),
+
+                        is_ready BOOLEAN
+                            NOT NULL
+                            DEFAULT FALSE,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        updated_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        CHECK (
+                            draft_order > 0
+                        )
+                    )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    idx_draft_participants_discord
+
+                ON draft_participants (
+                    draft_session_id,
+                    discord_user_id
+                )
+
+                WHERE
+                    discord_user_id
+                    IS NOT NULL
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_draft_participants_order
+
+                ON draft_participants (
+                    draft_session_id,
+                    draft_order
+                )
+                """
+            )
+
+
+            # =========================
+            # DRAFT ACTIONS
+            #
+            # BAN / PICK 모든 행동 기록
+            #
+            # Undo 시 DELETE하지 않고
+            # is_undone으로 기록 보존
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS
+                    draft_actions (
+                        id BIGSERIAL PRIMARY KEY,
+
+                        draft_session_id BIGINT
+                            NOT NULL
+                            REFERENCES draft_sessions(id)
+                            ON DELETE CASCADE,
+
+                        action_index INTEGER
+                            NOT NULL,
+
+                        action_type VARCHAR(20)
+                            NOT NULL,
+
+                        round_number SMALLINT
+                            NOT NULL,
+
+                        participant_id BIGINT
+                            NOT NULL
+                            REFERENCES participants(id)
+                            ON DELETE RESTRICT,
+
+                        club_id BIGINT
+                            NOT NULL
+                            REFERENCES clubs(id)
+                            ON DELETE RESTRICT,
+
+                        actor_type VARCHAR(20)
+                            NOT NULL
+                            DEFAULT 'participant',
+
+                        actor_reference VARCHAR(100),
+
+                        is_undone BOOLEAN
+                            NOT NULL
+                            DEFAULT FALSE,
+
+                        undone_at TIMESTAMPTZ,
+
+                        undo_reason TEXT,
+
+                        created_at TIMESTAMPTZ
+                            NOT NULL
+                            DEFAULT NOW(),
+
+                        UNIQUE (
+                            draft_session_id,
+                            action_index
+                        ),
+
+                        CHECK (
+                            action_index >= 0
+                        ),
+
+                        CHECK (
+                            action_type IN (
+                                'ban',
+                                'pick'
+                            )
+                        ),
+
+                        CHECK (
+                            round_number > 0
+                        ),
+
+                        CHECK (
+                            actor_type IN (
+                                'participant',
+                                'admin',
+                                'system'
+                            )
+                        )
+                    )
+                """
+            )
+
+            # =========================
+            # 기존 UNIQUE 마이그레이션
+            #
+            # Undo된 행동은 이력으로 남기고
+            # 같은 action_index를 다시
+            # 실행할 수 있어야 한다.
+            # =========================
+
+            cursor.execute(
+                """
+                ALTER TABLE
+                    draft_actions
+
+                DROP CONSTRAINT IF EXISTS
+                    draft_actions_draft_session_id_action_index_key
+                """
+            )
+
+
+            # =========================
+            # 활성 행동만 턴당 1개 허용
+            # =========================
+
+            cursor.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS
+                    idx_draft_actions_active_action
+
+                ON draft_actions (
+                    draft_session_id,
+                    action_index
+                )
+
+                WHERE
+                    is_undone = FALSE
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_draft_actions_session
+
+                ON draft_actions (
+                    draft_session_id,
+                    action_index
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_draft_actions_club
+
+                ON draft_actions (
+                    draft_session_id,
+                    club_id
+                )
+                """
+            )
+
+
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS
+                    idx_draft_actions_participant
+
+                ON draft_actions (
+                    draft_session_id,
+                    participant_id
+                )
+                """
+            )
+
+
+            # =========================
+            # 기존 시즌 데이터 호환
+            #
+            # 완료 시즌:
+            # 시즌 Snapshot 우선
+            #
+            # 현재 시즌:
+            # participants 현재 팀 사용
+            #
+            # upcoming 시즌은
+            # Draft 전이므로 건드리지 않음
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE
+                    season_participants AS sp
+
+                SET
+                    team_name =
+                        COALESCE(
+                            sp.team_name,
+                            sp.team_name_snapshot,
+                            p.current_team_name
+                        ),
+
+                    team_logo_path =
+                        COALESCE(
+                            sp.team_logo_path,
+                            sp.team_logo_path_snapshot,
+                            p.current_team_logo_path
+                        ),
+
+                    initial_team_name =
+                        COALESCE(
+                            sp.initial_team_name,
+                            sp.team_name_snapshot,
+                            p.current_team_name
+                        ),
+
+                    initial_team_logo_path =
+                        COALESCE(
+                            sp.initial_team_logo_path,
+                            sp.team_logo_path_snapshot,
+                            p.current_team_logo_path
+                        ),
+
+                    team_assignment_source =
+                        COALESCE(
+                            sp.team_assignment_source,
+                            'legacy'
+                        )
+
+                FROM
+                    participants AS p,
+                    seasons AS s
+
+                WHERE
+                    p.id =
+                        sp.participant_id
+
+                    AND
+                    s.id =
+                        sp.season_id
+
+                    AND
+                    s.status IN (
+                        'active',
+                        'completed'
+                    )
+
+                    AND (
+                        sp.team_name IS NULL
+
+                        OR
+
+                        sp.team_logo_path IS NULL
+
+                        OR
+
+                        sp.initial_team_name IS NULL
+
+                        OR
+
+                        sp.initial_team_logo_path IS NULL
+
+                        OR
+
+                        sp.team_assignment_source IS NULL
+                    )
                 """
             )
 
@@ -11255,6 +12186,15 @@ class AdminUserRoleRequest(
 ):
     is_admin: bool
 
+class AdminUserParticipantRequest(
+    BaseModel
+):
+    participant_id: int | None = Field(
+        default=None,
+        gt=0,
+        strict=True,
+    )
+
 class AdminPointShopProductCreateRequest(
     BaseModel
 ):
@@ -11356,6 +12296,231 @@ class AdminSeasonParticipantsUpdateRequest(
         max_length=100,
     )
 
+class AdminSeasonParticipantClubUpdateRequest(
+    BaseModel
+):
+    club_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+class AdminDraftSessionCreateRequest(
+    BaseModel
+):
+    allow_duplicate_picks: bool = False
+
+    ban_enabled: bool = True
+
+    turn_seconds: int = Field(
+        default=60,
+        ge=0,
+        le=3600,
+    )
+
+    timeout_policy: Literal[
+        "pause",
+        "skip",
+        "auto",
+    ] = "pause"
+
+
+class AdminDraftSettingsUpdateRequest(
+    BaseModel
+):
+    ban_enabled: bool
+
+class AdminDraftActionRequest(
+    BaseModel
+):
+    participant_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+    club_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+class ParticipantDraftActionRequest(
+    BaseModel
+):
+    club_id: int = Field(
+        gt=0,
+        strict=True,
+    )
+
+def build_draft_turn_plan(
+    draft_participants,
+    ban_enabled: bool = True,
+):
+
+    ordered_participants = sorted(
+        draft_participants,
+        key=lambda participant:
+            int(
+                participant[
+                    "draft_order"
+                ]
+            ),
+    )
+
+
+    turn_plan = []
+
+    action_index = 0
+
+
+    # =========================
+    # BAN
+    #
+    # BAN 페이즈 사용 시에만
+    #
+    # 지난 시즌 순위
+    # 1 → 2 → 3 → 4 → 5
+    # =========================
+
+    if ban_enabled:
+
+        for participant in (
+            ordered_participants
+        ):
+
+            turn_plan.append(
+                {
+                    "action_index":
+                        action_index,
+
+                    "action_type":
+                        "ban",
+
+                    "round_number":
+                        1,
+
+                    "participant_id":
+                        participant[
+                            "participant_id"
+                        ],
+
+                    "draft_order":
+                        participant[
+                            "draft_order"
+                        ],
+
+                    "fcl_name":
+                        participant[
+                            "fcl_name"
+                        ],
+
+                    "fc_nickname":
+                        participant[
+                            "fc_nickname"
+                        ],
+                }
+            )
+
+
+            action_index += 1
+
+
+    # =========================
+    # PICK
+    #
+    # 지난 시즌 순위 역순
+    # 5 → 4 → 3 → 2 → 1
+    #
+    # BAN 사용 여부와 상관없이
+    # 항상 진행
+    # =========================
+
+    for participant in reversed(
+        ordered_participants
+    ):
+
+        turn_plan.append(
+            {
+                "action_index":
+                    action_index,
+
+                "action_type":
+                    "pick",
+
+                "round_number":
+                    1,
+
+                "participant_id":
+                    participant[
+                        "participant_id"
+                    ],
+
+                "draft_order":
+                    participant[
+                        "draft_order"
+                    ],
+
+                "fcl_name":
+                    participant[
+                        "fcl_name"
+                    ],
+
+                "fc_nickname":
+                    participant[
+                        "fc_nickname"
+                    ],
+            }
+        )
+
+
+        action_index += 1
+
+
+    return turn_plan
+
+def get_current_draft_turn(
+    draft_session,
+    draft_participants,
+):
+
+    turn_plan = (
+        build_draft_turn_plan(
+            draft_participants,
+            ban_enabled=
+                bool(
+                    draft_session[
+                        "ban_enabled"
+                    ]
+                ),
+        )
+    )
+
+
+    current_action_index = int(
+        draft_session[
+            "current_action_index"
+        ]
+        or 0
+    )
+
+
+    if (
+        current_action_index < 0
+
+        or
+
+        current_action_index
+        >= len(
+            turn_plan
+        )
+    ):
+
+        return None
+
+
+    return (
+        turn_plan[
+            current_action_index
+        ]
+    )
 
 def parse_fcl_season_date(
     value: str | None,
@@ -11398,6 +12563,31 @@ def parse_fcl_season_date(
 
 class AdminLoginRequest(BaseModel):
     password: str
+
+class AdminClubCreateRequest(
+    BaseModel
+):
+    code: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    name: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    short_name: str | None = Field(
+        default=None,
+        max_length=100,
+    )
+
+    logo_source_url: str = Field(
+        min_length=1,
+        max_length=2000,
+    )
+
+    is_active: bool = True
 
 class AdminParticipantTeamUpdateRequest(
     BaseModel
@@ -11809,13 +12999,26 @@ def require_user(
                     users.nickname,
                     users.points,
                     users.is_admin,
-                    users.created_at
+                    users.created_at,
+
+                    participants.id
+                        AS participant_id,
+
+                    participants.fcl_name
+                        AS participant_fcl_name,
+
+                    participants.fc_nickname
+                        AS participant_fc_nickname
 
                 FROM user_sessions
 
                 JOIN users
                     ON users.id
                     = user_sessions.user_id
+
+                LEFT JOIN participants
+                    ON participants.user_id
+                    = users.id
 
                 WHERE
                     user_sessions.token_hash
@@ -11829,7 +13032,6 @@ def require_user(
                     token_hash,
                 ),
             )
-
 
             user = (
                 cursor.fetchone()
@@ -12388,18 +13590,46 @@ def get_mypage_point_transactions(
 
 def create_admin_session():
 
-    token = secrets.token_urlsafe(
-        32
+    if not ADMIN_PASSWORD:
+
+        raise RuntimeError(
+            "ADMIN_PASSWORD가 설정되지 않았습니다."
+        )
+
+
+    expires_at = (
+        int(
+            time.time()
+        )
+        +
+        ADMIN_SESSION_SECONDS
     )
 
 
-    ADMIN_SESSIONS[token] = (
-        time.time()
-        + ADMIN_SESSION_SECONDS
+    nonce = secrets.token_urlsafe(
+        24
     )
 
 
-    return token
+    payload = (
+        f"{expires_at}.{nonce}"
+    )
+
+
+    signature = hmac.new(
+        ADMIN_PASSWORD.encode(
+            "utf-8"
+        ),
+        payload.encode(
+            "utf-8"
+        ),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+    return (
+        f"{payload}.{signature}"
+    )
 
 
 def require_admin(
@@ -12415,33 +13645,111 @@ def require_admin(
         )
 
 
-    expires_at = (
-        ADMIN_SESSIONS.get(
-            x_admin_token
+    if not ADMIN_PASSWORD:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "ADMIN_PASSWORD가 "
+                "설정되지 않았습니다."
+            ),
+        )
+
+
+    token_parts = (
+        x_admin_token.split(
+            ".",
+            2,
         )
     )
 
 
     if (
-        expires_at is None
-        or
-        expires_at < time.time()
+        len(token_parts)
+        != 3
     ):
-
-        ADMIN_SESSIONS.pop(
-            x_admin_token,
-            None,
-        )
-
 
         raise HTTPException(
             status_code=401,
-            detail="관리자 로그인이 만료되었습니다.",
+            detail=(
+                "관리자 로그인 정보가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    (
+        expires_at_text,
+        nonce,
+        signature,
+    ) = token_parts
+
+
+    try:
+
+        expires_at = int(
+            expires_at_text
+        )
+
+    except ValueError:
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "관리자 로그인 정보가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    payload = (
+        f"{expires_at}.{nonce}"
+    )
+
+
+    expected_signature = hmac.new(
+        ADMIN_PASSWORD.encode(
+            "utf-8"
+        ),
+        payload.encode(
+            "utf-8"
+        ),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+    if not secrets.compare_digest(
+        signature,
+        expected_signature,
+    ):
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "관리자 로그인 정보가 "
+                "올바르지 않습니다."
+            ),
+        )
+
+
+    if (
+        expires_at
+        <=
+        int(
+            time.time()
+        )
+    ):
+
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "관리자 로그인이 "
+                "만료되었습니다."
+            ),
         )
 
 
     return x_admin_token
-
 
 @app.post(
     "/api/admin/login"
@@ -13435,6 +14743,50 @@ def admin_update_fcl_season_participants(
                     ),
                 )
 
+            # =========================
+            # Draft 생성 후
+            # 시즌 참가자 변경 금지
+            #
+            # Draft 순서는 참가자와
+            # 연결되어 있으므로 고정한다.
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    status
+
+                FROM draft_sessions
+
+                WHERE
+                    season_id = %s
+
+                LIMIT 1
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            existing_draft = (
+                cursor.fetchone()
+            )
+
+
+            if existing_draft:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft가 생성된 시즌의 "
+                        "참가자는 변경할 수 없습니다."
+                    ),
+                )
+
 
             if participant_ids:
 
@@ -13615,6 +14967,4948 @@ def admin_update_fcl_season_participants(
             participants,
     }
 
+# =========================
+# ADMIN SEASON PARTICIPANT CLUB
+#
+# 시즌별 참가자 클럽 배정 / 변경
+#
+# 최초 배정:
+# 변경권 소모 없음
+#
+# 이후 관리자 변경:
+# 최대 1회
+# =========================
+
+@app.put(
+    "/api/admin/seasons/"
+    "{season_number}/participants/"
+    "{participant_id}/club"
+)
+def admin_update_fcl_season_participant_club(
+    season_number: int,
+    participant_id: int,
+
+    request_data:
+        AdminSeasonParticipantClubUpdateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    club_id = int(
+        request_data.club_id
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 시즌 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number,
+                    title,
+                    status
+
+                FROM seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                season[
+                    "status"
+                ]
+                ==
+                "completed"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "종료된 시즌의 클럽은 "
+                        "변경할 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 클럽 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+                    is_active,
+
+                    (
+                        logo_data IS NOT NULL
+                    ) AS has_logo
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+
+                LIMIT 1
+                """,
+                (
+                    club_id,
+                ),
+            )
+
+
+            club = (
+                cursor.fetchone()
+            )
+
+
+            if club is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "클럽을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if not club[
+                "is_active"
+            ]:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "현재 Draft에서 "
+                        "사용 중지된 클럽입니다."
+                    ),
+                )
+
+
+            if not club[
+                "has_logo"
+            ]:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "로고가 등록되지 않은 "
+                        "클럽은 배정할 수 없습니다."
+                    ),
+                )
+
+
+            club_logo_path = (
+                "/api/clubs/"
+                f"{club_id}/logo"
+            )
+
+
+            # =========================
+            # 시즌 참가자 확인 + 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sp.season_id,
+                    sp.participant_id,
+
+                    sp.club_id,
+                    sp.initial_club_id,
+
+                    sp.team_name,
+                    sp.team_logo_path,
+
+                    sp.initial_team_name,
+                    sp.initial_team_logo_path,
+
+                    sp.team_assignment_source,
+                    sp.team_change_count,
+                    sp.team_changed_at,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    season_participants AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                    AND
+                    sp.participant_id = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                    participant_id,
+                ),
+            )
+
+
+            season_participant = (
+                cursor.fetchone()
+            )
+
+
+            if season_participant is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "해당 시즌 참가자를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 이미 같은 클럽이면
+            # 변경권 소모 없이 종료
+            # =========================
+
+            if (
+                season_participant[
+                    "club_id"
+                ]
+                ==
+                club_id
+            ):
+
+                return {
+                    "season_number":
+                        season_number,
+
+                    "participant_id":
+                        participant_id,
+
+                    "fcl_name":
+                        season_participant[
+                            "fcl_name"
+                        ],
+
+                    "club_id":
+                        club_id,
+
+                    "club_code":
+                        club[
+                            "code"
+                        ],
+
+                    "team_name":
+                        season_participant[
+                            "team_name"
+                        ],
+
+                    "team_logo_path":
+                        season_participant[
+                            "team_logo_path"
+                        ],
+
+                    "team_assignment_source":
+                        season_participant[
+                            "team_assignment_source"
+                        ],
+
+                    "team_change_count":
+                        season_participant[
+                            "team_change_count"
+                        ],
+
+                    "message":
+                        "이미 배정된 클럽입니다.",
+                }
+
+
+            # =========================
+            # LEGACY 클럽 연결 판정
+            #
+            # 기존 팀 이름과 같은 클럽을
+            # club_id만 연결하는 경우
+            # 변경권을 소모하지 않음
+            # =========================
+
+            legacy_team_name = (
+                str(
+                    season_participant[
+                        "team_name"
+                    ]
+                    or ""
+                )
+                .strip()
+                .casefold()
+            )
+
+
+            new_club_name = (
+                str(
+                    club[
+                        "name"
+                    ]
+                )
+                .strip()
+                .casefold()
+            )
+
+
+            is_legacy_catalog_mapping = (
+                season_participant[
+                    "club_id"
+                ]
+                is None
+
+                and
+
+                season_participant[
+                    "team_assignment_source"
+                ]
+                ==
+                "legacy"
+
+                and
+
+                legacy_team_name
+
+                and
+
+                legacy_team_name
+                ==
+                new_club_name
+            )
+
+
+            # =========================
+            # 진짜 최초 배정 여부
+            # =========================
+
+            is_initial_assignment = (
+                (
+                    season_participant[
+                        "club_id"
+                    ]
+                    is None
+
+                    and
+
+                    not season_participant[
+                        "team_name"
+                    ]
+                )
+
+                or
+
+                is_legacy_catalog_mapping
+            )
+
+
+            # =========================
+            # 최초 배정
+            #
+            # 변경 횟수는 그대로 0
+            # =========================
+
+            if is_initial_assignment:
+
+                assignment_source = (
+                    "legacy"
+
+                    if
+                    is_legacy_catalog_mapping
+
+                    else
+                    "admin"
+                )
+
+
+                cursor.execute(
+                    """
+                    UPDATE
+                        season_participants
+
+                    SET
+                        club_id = %s,
+
+                        initial_club_id =
+                            COALESCE(
+                                initial_club_id,
+                                %s
+                            ),
+
+                        team_name = %s,
+                        team_logo_path = %s,
+
+                        initial_team_name =
+                            COALESCE(
+                                initial_team_name,
+                                %s
+                            ),
+
+                        initial_team_logo_path =
+                            COALESCE(
+                                initial_team_logo_path,
+                                %s
+                            ),
+
+                        team_assignment_source = %s,
+
+                        team_change_count = 0,
+                        team_changed_at = NULL
+
+                    WHERE
+                        season_id = %s
+
+                        AND
+                        participant_id = %s
+                    """,
+                    (
+                        club_id,
+                        club_id,
+
+                        club[
+                            "name"
+                        ],
+
+                        club_logo_path,
+
+                        club[
+                            "name"
+                        ],
+
+                        club_logo_path,
+
+                        assignment_source,
+
+                        season[
+                            "id"
+                        ],
+
+                        participant_id,
+                    ),
+                )
+
+
+            # =========================
+            # 기존 팀 → 관리자 변경
+            # =========================
+
+            else:
+
+                team_change_count = int(
+                    season_participant[
+                        "team_change_count"
+                    ]
+                    or 0
+                )
+
+
+                if (
+                    team_change_count
+                    >= 1
+                ):
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "이 참가자는 이번 시즌에 "
+                            "이미 팀 변경권을 "
+                            "사용했습니다."
+                        ),
+                    )
+
+
+                # =========================
+                # 진행 중 경기 보호
+                # =========================
+
+                cursor.execute(
+                    """
+                    SELECT
+                        id,
+                        series_type,
+                        playoff_stage
+
+                    FROM series
+
+                    WHERE
+                        season_id = %s
+
+                        AND
+                        status = 'active'
+
+                        AND (
+                            team_a_id = %s
+
+                            OR
+
+                            team_b_id = %s
+                        )
+
+                    LIMIT 1
+
+                    FOR UPDATE
+                    """,
+                    (
+                        season[
+                            "id"
+                        ],
+
+                        participant_id,
+                        participant_id,
+                    ),
+                )
+
+
+                active_series = (
+                    cursor.fetchone()
+                )
+
+
+                if active_series:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "진행 중인 경기가 있는 동안에는 "
+                            "팀을 변경할 수 없습니다. "
+                            "경기 종료 후 다시 시도해주세요."
+                        ),
+                    )
+
+
+                cursor.execute(
+                    """
+                    UPDATE
+                        season_participants
+
+                    SET
+                        club_id = %s,
+
+                        team_name = %s,
+                        team_logo_path = %s,
+
+                        team_assignment_source =
+                            'admin',
+
+                        team_change_count =
+                            team_change_count + 1,
+
+                        team_changed_at =
+                            NOW()
+
+                    WHERE
+                        season_id = %s
+
+                        AND
+                        participant_id = %s
+                    """,
+                    (
+                        club_id,
+
+                        club[
+                            "name"
+                        ],
+
+                        club_logo_path,
+
+                        season[
+                            "id"
+                        ],
+
+                        participant_id,
+                    ),
+                )
+
+
+            # =========================
+            # 최종 상태 반환
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sp.participant_id,
+
+                    p.fcl_name,
+                    p.fc_nickname,
+
+                    sp.club_id,
+                    sp.initial_club_id,
+
+                    sp.team_name,
+                    sp.team_logo_path,
+
+                    sp.initial_team_name,
+                    sp.initial_team_logo_path,
+
+                    sp.team_assignment_source,
+                    sp.team_change_count,
+                    sp.team_changed_at
+
+                FROM
+                    season_participants AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                    AND
+                    sp.participant_id = %s
+
+                LIMIT 1
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+
+                    participant_id,
+                ),
+            )
+
+
+            updated_participant = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season_number":
+            season_number,
+
+        "participant":
+            updated_participant,
+
+        "message":
+            (
+                "시즌 클럽 최초 배정이 완료되었습니다."
+
+                if is_initial_assignment
+
+                else
+                "시즌 팀 변경이 완료되었습니다."
+            ),
+    }
+
+# =========================
+# ADMIN DRAFT SESSION CREATE
+#
+# 시즌 참가자 5명을
+# Draft 참가자로 고정하고
+# BAN / PICK 순서를 생성
+# =========================
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/draft"
+)
+
+def admin_create_draft_session(
+    season_number: int,
+
+    request_data:
+        AdminDraftSessionCreateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    if season_number <= 1:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지난 시즌 순위가 없는 시즌은 "
+                "Draft 순서를 자동 결정할 수 없습니다."
+            ),
+        )
+
+
+    previous_season_number = (
+        season_number - 1
+    )
+
+
+    # =========================
+    # LOCAL DRAFT TEST MODE
+    #
+    # True:
+    # 이전 시즌이 아직 끝나지 않아도
+    # 현재 시즌 참가자 5명을
+    # 임시 랜덤 1~5위로 사용
+    #
+    # 실제 운영 전에는
+    # False로 변경
+    # =========================
+
+    local_draft_test_mode = False
+
+
+    previous_final_standings = (
+        get_season_final_standings(
+            season=
+                previous_season_number
+        )
+    )
+
+
+    previous_standings_finalized = (
+        previous_final_standings[
+            "finalized"
+        ]
+        and
+        len(
+            previous_final_standings[
+                "standings"
+            ]
+        )
+        == 5
+    )
+
+
+    if (
+        not previous_standings_finalized
+        and
+        not local_draft_test_mode
+    ):
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Season {previous_season_number}의 "
+                "최종 1~5위가 확정되어야 "
+                "Draft를 생성할 수 있습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 시즌 확인 + 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    season_number,
+                    title,
+                    status
+
+                FROM seasons
+
+                WHERE
+                    season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            season = (
+                cursor.fetchone()
+            )
+
+
+            if season is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        f"Season {season_number}을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # Draft는 시즌 시작 전에만
+            # 생성 가능
+            # =========================
+
+            if (
+                season[
+                    "status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft는 upcoming 상태의 "
+                        "시즌에서만 생성할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 기존 Draft 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    status
+
+                FROM draft_sessions
+
+                WHERE
+                    season_id = %s
+
+                LIMIT 1
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            existing_draft = (
+                cursor.fetchone()
+            )
+
+
+            if existing_draft:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "해당 시즌에는 이미 "
+                        "Draft가 존재합니다."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 참가자 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sp.participant_id,
+                    sp.display_order,
+
+                    sp.club_id,
+                    sp.team_assignment_source,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    season_participants AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                ORDER BY
+                    sp.display_order,
+                    sp.participant_id
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            season_participants = (
+                cursor.fetchall()
+            )
+
+
+            if (
+                len(
+                    season_participants
+                )
+                != 5
+            ):
+
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Draft 생성 전 "
+                        "시즌 참가자 5명이 정확히 "
+                        "등록되어 있어야 합니다."
+                    ),
+                )
+
+
+            season_participant_ids = [
+                int(
+                    participant[
+                        "participant_id"
+                    ]
+                )
+
+                for participant
+                in season_participants
+            ]
+
+
+            # =========================
+            # Draft 순서 결정
+            #
+            # 정상 운영:
+            # 지난 시즌 실제 1~5위
+            #
+            # 로컬 테스트:
+            # 현재 시즌 참가자 랜덤
+            # =========================
+
+            if previous_standings_finalized:
+
+                previous_ranked_participants = sorted(
+                    previous_final_standings[
+                        "standings"
+                    ],
+                    key=lambda standing:
+                        int(
+                            standing[
+                                "rank"
+                            ]
+                        ),
+                )
+
+
+                draft_participant_ids = [
+                    int(
+                        standing[
+                            "participant_id"
+                        ]
+                    )
+
+                    for standing
+                    in previous_ranked_participants
+                ]
+
+
+            else:
+
+                draft_participant_ids = (
+                    season_participant_ids.copy()
+                )
+
+
+                secrets.SystemRandom().shuffle(
+                    draft_participant_ids
+                )
+
+
+            # =========================
+            # 실제 지난 시즌 순위를
+            # 사용할 경우에만
+            # 참가자 일치 여부 확인
+            # =========================
+
+            if (
+                previous_standings_finalized
+                and
+                set(
+                    draft_participant_ids
+                )
+                !=
+                set(
+                    season_participant_ids
+                )
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "현재 시즌 참가자와 "
+                        "지난 시즌 최종순위 참가자가 "
+                        "일치하지 않습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 이미 클럽 배정이 된 참가자 확인
+            #
+            # Draft가 최초 클럽을 결정해야 함
+            # =========================
+
+            preassigned_participants = [
+                participant
+
+                for participant
+                in season_participants
+
+                if participant[
+                    "club_id"
+                ]
+                is not None
+            ]
+
+
+            if preassigned_participants:
+
+                names = ", ".join(
+                    str(
+                        participant[
+                            "fcl_name"
+                        ]
+                    )
+
+                    for participant
+                    in preassigned_participants
+                )
+
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 클럽이 배정된 "
+                        "참가자가 있습니다: "
+                        f"{names}"
+                    ),
+                )
+
+
+            # =========================
+            # Draft Session 생성
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO draft_sessions (
+                    season_id,
+
+                    status,
+                    phase,
+
+                    allow_duplicate_picks,
+                    ban_enabled,
+
+                    turn_seconds,
+                    timeout_policy,
+
+                    current_action_index,
+                    state_version
+                )
+
+                VALUES (
+                    %s,
+
+                    'setup',
+                    %s,
+
+                    %s,
+                    %s,
+
+                    %s,
+                    %s,
+
+                    0,
+                    0
+                )
+
+                RETURNING
+                    id,
+                    season_id,
+
+                    status,
+                    phase,
+
+                    allow_duplicate_picks,
+                    ban_enabled,
+
+                    turn_seconds,
+                    timeout_policy,
+
+                    current_action_index,
+                    state_version,
+
+                    started_at,
+                    turn_started_at,
+                    paused_at,
+                    completed_at,
+
+                    created_at,
+                    updated_at
+                """,
+                (
+                    season[
+                        "id"
+                    ],
+
+                    (
+                        "ban"
+
+                        if request_data.ban_enabled
+
+                        else "pick"
+                    ),
+
+                    request_data.allow_duplicate_picks,
+                    request_data.ban_enabled,
+
+                    request_data.turn_seconds,
+                    request_data.timeout_policy,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # Draft 참가자 고정
+            #
+            # draft_order:
+            # 1 = 지난 시즌 1위
+            # 2 = 지난 시즌 2위
+            # 3 = 지난 시즌 3위
+            # 4 = 지난 시즌 4위
+            # 5 = 지난 시즌 5위
+            #
+            # LOCAL TEST에서는
+            # 랜덤 임시 순위
+            # =========================
+
+            for (
+                draft_order,
+                participant_id,
+            ) in enumerate(
+                draft_participant_ids,
+                start=1,
+            ):
+
+                cursor.execute(
+                    """
+                    INSERT INTO
+                        draft_participants (
+                            draft_session_id,
+                            participant_id,
+                            draft_order
+                        )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        %s
+                    )
+                    """,
+                    (
+                        draft_session[
+                            "id"
+                        ],
+
+                        participant_id,
+
+                        draft_order,
+                    ),
+                )
+
+
+            # =========================
+            # 생성된 Draft 참가자 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    dp.id
+                        AS draft_participant_id,
+
+                    dp.participant_id,
+                    dp.draft_order,
+
+                    dp.is_ready,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    draft_participants AS dp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        dp.participant_id
+
+                WHERE
+                    dp.draft_session_id = %s
+
+                ORDER BY
+                    dp.draft_order
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            draft_participants = (
+                cursor.fetchall()
+            )
+
+
+        connection.commit()
+
+
+    # =========================
+    # BAN / PICK 전체 턴 계산
+    # =========================
+
+    turn_plan = (
+        build_draft_turn_plan(
+            draft_participants,
+            ban_enabled=
+                bool(
+                    draft_session[
+                        "ban_enabled"
+                    ]
+                ),
+        )
+    )
+
+
+    return {
+        "season": {
+            "season_number":
+                season[
+                    "season_number"
+                ],
+
+            "title":
+                season[
+                    "title"
+                ],
+        },
+
+        "draft_session":
+            draft_session,
+
+        "participants":
+            draft_participants,
+
+        "turn_plan":
+            turn_plan,
+
+        "total_actions":
+            len(
+                turn_plan
+            ),
+
+        "message":
+            "Draft 세션이 생성되었습니다.",
+    }
+
+# =========================
+# ADMIN DRAFT SETTINGS
+#
+# Draft 시작 전 설정
+# =========================
+
+@app.patch(
+    "/api/admin/seasons/"
+    "{season_number}/draft/settings"
+)
+def admin_update_draft_settings(
+    season_number: int,
+
+    request_data:
+        AdminDraftSettingsUpdateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.id,
+                    ds.status,
+                    ds.ban_enabled,
+
+                    s.status
+                        AS season_status
+
+                FROM
+                    draft_sessions AS ds
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌 시작 전 Draft만 "
+                        "설정을 변경할 수 있습니다."
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "status"
+                ]
+                !=
+                "setup"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft 시작 전에는 "
+                        "설정만 변경할 수 있습니다."
+                    ),
+                )
+
+
+            next_phase = (
+                "ban"
+
+                if request_data.ban_enabled
+
+                else "pick"
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE draft_sessions
+
+                SET
+                    ban_enabled = %s,
+
+                    phase = %s,
+
+                    current_action_index = 0,
+
+                    state_version =
+                        state_version + 1,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    status,
+                    phase,
+
+                    allow_duplicate_picks,
+                    ban_enabled,
+
+                    turn_seconds,
+                    timeout_policy,
+
+                    current_action_index,
+                    state_version,
+
+                    started_at,
+                    turn_started_at,
+                    paused_at,
+                    completed_at,
+
+                    created_at,
+                    updated_at
+                """,
+                (
+                    request_data.ban_enabled,
+
+                    next_phase,
+
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            updated_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "draft_session":
+            updated_draft,
+
+        "message":
+            (
+                "BAN 페이즈를 사용합니다."
+
+                if request_data.ban_enabled
+
+                else
+                "BAN 페이즈 없이 PICK부터 시작합니다."
+            ),
+    }
+
+
+# =========================
+# ADMIN DRAFT START
+#
+# Draft 시작
+#
+# BAN:
+# 지난 시즌 1 → 2 → 3 → 4 → 5위
+#
+# PICK:
+# 지난 시즌 5 → 4 → 3 → 2 → 1위
+# =========================
+
+def apply_draft_timeout_pause(
+    cursor,
+    draft_session,
+):
+
+    if (
+        draft_session[
+            "status"
+        ]
+        !=
+        "active"
+    ):
+
+        return (
+            draft_session,
+            False,
+        )
+
+
+    turn_seconds = int(
+        draft_session[
+            "turn_seconds"
+        ]
+        or 0
+    )
+
+
+    if (
+        turn_seconds
+        <= 0
+    ):
+
+        return (
+            draft_session,
+            False,
+        )
+
+
+    if (
+        draft_session[
+            "timeout_policy"
+        ]
+        !=
+        "pause"
+    ):
+
+        return (
+            draft_session,
+            False,
+        )
+
+
+    turn_started_at = (
+        draft_session[
+            "turn_started_at"
+        ]
+    )
+
+
+    if turn_started_at is None:
+
+        return (
+            draft_session,
+            False,
+        )
+
+
+    now = datetime.now(
+        ZoneInfo(
+            "UTC"
+        )
+    )
+
+
+    elapsed_seconds = (
+        now
+        -
+        turn_started_at
+    ).total_seconds()
+
+
+    if (
+        elapsed_seconds
+        <
+        turn_seconds
+    ):
+
+        return (
+            draft_session,
+            False,
+        )
+
+
+    # =========================
+    # 시간 초과
+    #
+    # paused_at = NULL이면
+    # 자동 시간 초과 정지로 취급한다.
+    #
+    # 이후 관리자가 재개하면
+    # 해당 TURN은 전체 시간부터
+    # 다시 시작한다.
+    # =========================
+
+    cursor.execute(
+        """
+        UPDATE draft_sessions
+
+        SET
+            status = 'paused',
+
+            paused_at = NULL,
+
+            state_version =
+                state_version + 1,
+
+            updated_at = NOW()
+
+        WHERE id = %s
+
+        RETURNING
+            id,
+            status,
+            phase,
+
+            current_action_index,
+            state_version,
+
+            turn_seconds,
+            timeout_policy,
+
+            started_at,
+            turn_started_at,
+            paused_at,
+            completed_at,
+
+            updated_at
+        """,
+        (
+            draft_session[
+                "id"
+            ],
+        ),
+    )
+
+
+    timeout_state = (
+        cursor.fetchone()
+    )
+
+
+    updated_session = dict(
+        draft_session
+    )
+
+
+    updated_session.update(
+        timeout_state
+    )
+
+
+    return (
+        updated_session,
+        True,
+    )
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/draft/start"
+)
+def admin_start_draft_session(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # Draft + 시즌 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.id,
+                    ds.season_id,
+
+                    ds.status,
+                    ds.phase,
+
+                    ds.allow_duplicate_picks,
+                    ds.ban_enabled,
+
+                    ds.turn_seconds,
+                    ds.timeout_policy,
+
+                    ds.current_action_index,
+                    ds.state_version,
+
+                    ds.started_at,
+                    ds.turn_started_at,
+                    ds.paused_at,
+                    ds.completed_at,
+
+                    s.season_number,
+                    s.title
+                        AS season_title,
+
+                    s.status
+                        AS season_status
+
+                FROM
+                    draft_sessions AS ds
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 상태 확인
+            # =========================
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft는 시즌 시작 전 "
+                        "upcoming 상태에서만 "
+                        "시작할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # Draft 상태 확인
+            # =========================
+
+            if (
+                draft_session[
+                    "status"
+                ]
+                !=
+                "setup"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "setup 상태의 Draft만 "
+                        "시작할 수 있습니다. "
+                        f"(현재: "
+                        f"{draft_session['status']})"
+                    ),
+                )
+
+
+            # =========================
+            # Draft 참가자 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    dp.id
+                        AS draft_participant_id,
+
+                    dp.participant_id,
+                    dp.draft_order,
+
+                    dp.discord_user_id,
+                    dp.is_ready,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    draft_participants AS dp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        dp.participant_id
+
+                WHERE
+                    dp.draft_session_id = %s
+
+                ORDER BY
+                    dp.draft_order
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            draft_participants = (
+                cursor.fetchall()
+            )
+
+
+            if (
+                len(
+                    draft_participants
+                )
+                != 5
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft 참가자는 "
+                        "정확히 5명이어야 합니다."
+                    ),
+                )
+
+
+            # =========================
+            # Draft 순위 검증
+            #
+            # draft_order:
+            # 지난 시즌 1~5위
+            # =========================
+
+            draft_orders = [
+                int(
+                    participant[
+                        "draft_order"
+                    ]
+                )
+
+                for participant
+                in draft_participants
+            ]
+
+
+            if (
+                draft_orders
+                !=
+                [
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                ]
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft 순위 정보가 "
+                        "올바르지 않습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 전체 TURN PLAN 검증
+            #
+            # BAN 5 + PICK 5
+            # = 총 10턴
+            # =========================
+
+            turn_plan = (
+                build_draft_turn_plan(
+                    draft_participants,
+                    ban_enabled=
+                        bool(
+                            draft_session[
+                                "ban_enabled"
+                            ]
+                        ),
+                )
+            )
+
+
+            expected_turn_count = (
+                10
+
+                if draft_session[
+                    "ban_enabled"
+                ]
+
+                else 5
+            )
+
+
+            if (
+                len(
+                    turn_plan
+                )
+                !=
+                expected_turn_count
+            ):
+
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Draft TURN PLAN이 "
+                        "올바르지 않습니다."
+                    ),
+                )
+
+
+            initial_phase = (
+                turn_plan[
+                    0
+                ][
+                    "action_type"
+                ]
+            )
+
+
+            # =========================
+            # 기존 유효 행동 확인
+            #
+            # setup 상태에서는
+            # 행동 기록이 없어야 함
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS action_count
+
+                FROM
+                    draft_actions
+
+                WHERE
+                    draft_session_id = %s
+
+                    AND
+                    is_undone = FALSE
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            action_count = int(
+                cursor.fetchone()[
+                    "action_count"
+                ]
+            )
+
+
+            if action_count != 0:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 Draft 행동 기록이 "
+                        "존재합니다."
+                    ),
+                )
+
+
+            # =========================
+            # Draft 시작
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE
+                    draft_sessions
+
+                SET
+                    status = 'active',
+
+                    phase = %s,
+
+                    current_action_index = 0,
+
+                    state_version =
+                        state_version + 1,
+
+                    started_at = NOW(),
+
+                    turn_started_at = NOW(),
+
+                    paused_at = NULL,
+
+                    completed_at = NULL,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    season_id,
+
+                    status,
+                    phase,
+
+                    allow_duplicate_picks,
+                    ban_enabled,
+
+                    turn_seconds,
+                    timeout_policy,
+
+                    current_action_index,
+                    state_version,
+
+                    started_at,
+                    turn_started_at,
+                    paused_at,
+                    completed_at,
+
+                    created_at,
+                    updated_at
+                """,
+                (
+                    initial_phase,
+
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            started_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    current_turn = (
+        get_current_draft_turn(
+            started_draft,
+            draft_participants,
+        )
+    )
+
+
+    return {
+        "season_number":
+            season_number,
+
+        "draft_session":
+            started_draft,
+
+        "current_turn":
+            current_turn,
+
+        "turn_plan":
+            turn_plan,
+
+        "total_actions":
+            len(
+                turn_plan
+            ),
+
+        "message":
+            "Draft가 시작되었습니다.",
+    }
+
+# =========================
+# ADMIN DRAFT PAUSE
+# =========================
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/draft/pause"
+)
+def admin_pause_draft_session(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.*,
+
+                    s.status
+                        AS season_status
+
+                FROM draft_sessions AS ds
+
+                JOIN seasons AS s
+                    ON s.id = ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌 시작 전 Draft만 "
+                        "일시정지할 수 있습니다."
+                    ),
+                )
+
+
+            (
+                draft_session,
+                timed_out,
+            ) = apply_draft_timeout_pause(
+                cursor,
+                draft_session,
+            )
+
+
+            if timed_out:
+
+                connection.commit()
+
+                return {
+                    "draft_session":
+                        draft_session,
+
+                    "message":
+                        (
+                            "TURN 시간이 초과되어 "
+                            "Draft가 자동 일시정지되었습니다."
+                        ),
+                }
+
+
+            if (
+                draft_session[
+                    "status"
+                ]
+                !=
+                "active"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "진행 중인 Draft만 "
+                        "일시정지할 수 있습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE draft_sessions
+
+                SET
+                    status = 'paused',
+
+                    paused_at = NOW(),
+
+                    state_version =
+                        state_version + 1,
+
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING *
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            paused_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "draft_session":
+            paused_draft,
+
+        "message":
+            "Draft가 일시정지되었습니다.",
+    }
+
+
+# =========================
+# ADMIN DRAFT RESUME
+# =========================
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/draft/resume"
+)
+def admin_resume_draft_session(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.*,
+
+                    s.status
+                        AS season_status
+
+                FROM draft_sessions AS ds
+
+                JOIN seasons AS s
+                    ON s.id = ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌 시작 전 Draft만 "
+                        "재개할 수 있습니다."
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "status"
+                ]
+                !=
+                "paused"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "일시정지된 Draft만 "
+                        "재개할 수 있습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                UPDATE draft_sessions
+
+                SET
+                    status = 'active',
+
+                    turn_started_at =
+                        CASE
+
+                            WHEN
+                                paused_at IS NULL
+
+                            THEN NOW()
+
+                            WHEN
+                                turn_started_at IS NULL
+
+                            THEN NOW()
+
+                            ELSE
+                                turn_started_at
+                                +
+                                (
+                                    NOW()
+                                    -
+                                    paused_at
+                                )
+
+                        END,
+
+                    paused_at = NULL,
+
+                    state_version =
+                        state_version + 1,
+
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING *
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            resumed_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "draft_session":
+            resumed_draft,
+
+        "message":
+            "Draft가 재개되었습니다.",
+    }
+
+# =========================
+# ADMIN DRAFT ACTION
+#
+# 현재 TURN의 참가자만
+# BAN / PICK 가능
+#
+# action_type은 클라이언트가
+# 보내지 않고 서버가 판정
+# =========================
+
+def execute_draft_action_core(
+    season_number: int,
+    participant_id: int,
+    club_id: int,
+    actor_type: str,
+    actor_reference: str | None,
+):
+
+    participant_id = int(
+        participant_id
+    )
+
+    club_id = int(
+        club_id
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # Draft 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.id,
+                    ds.season_id,
+
+                    ds.status,
+                    ds.phase,
+
+                    ds.allow_duplicate_picks,
+                    ds.ban_enabled,
+
+                    ds.turn_seconds,
+                    ds.timeout_policy,
+
+                    ds.current_action_index,
+                    ds.state_version,
+
+                    ds.started_at,
+                    ds.turn_started_at,
+                    ds.paused_at,
+                    ds.completed_at,
+
+                    s.status
+                        AS season_status
+
+                FROM
+                    draft_sessions AS ds
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+            (
+                draft_session,
+                timed_out,
+            ) = apply_draft_timeout_pause(
+                cursor,
+                draft_session,
+            )
+
+
+            if timed_out:
+
+                connection.commit()
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "TURN 시간이 초과되어 "
+                        "Draft가 자동 일시정지되었습니다."
+                    ),
+                )
+
+            if (
+                draft_session[
+                    "status"
+                ]
+                !=
+                "active"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "진행 중인 Draft가 아닙니다. "
+                        f"(현재: "
+                        f"{draft_session['status']})"
+                    ),
+                )
+
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌 시작 전 Draft에서만 "
+                        "BAN/PICK을 진행할 수 있습니다."
+                    ),
+                )
+
+
+            # =========================
+            # Draft 참가자
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    dp.id
+                        AS draft_participant_id,
+
+                    dp.participant_id,
+                    dp.draft_order,
+
+                    dp.discord_user_id,
+                    dp.is_ready,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    draft_participants AS dp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        dp.participant_id
+
+                WHERE
+                    dp.draft_session_id = %s
+
+                ORDER BY
+                    dp.draft_order
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            draft_participants = (
+                cursor.fetchall()
+            )
+
+
+            if (
+                len(
+                    draft_participants
+                )
+                != 5
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft 참가자 정보가 "
+                        "올바르지 않습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 현재 TURN
+            # =========================
+
+            current_turn = (
+                get_current_draft_turn(
+                    draft_session,
+                    draft_participants,
+                )
+            )
+
+
+            if current_turn is None:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "현재 진행할 Draft TURN이 "
+                        "없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 현재 참가자 검증
+            # =========================
+
+            if (
+                int(
+                    current_turn[
+                        "participant_id"
+                    ]
+                )
+                !=
+                participant_id
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "현재 TURN의 참가자가 "
+                        "아닙니다. "
+                        f"현재 참가자: "
+                        f"{current_turn['fcl_name']}"
+                    ),
+                )
+
+
+            action_type = str(
+                current_turn[
+                    "action_type"
+                ]
+            )
+
+
+            # =========================
+            # 현재 Phase와 TURN 일치 확인
+            # =========================
+
+            if (
+                action_type
+                !=
+                draft_session[
+                    "phase"
+                ]
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Draft Phase와 현재 TURN이 "
+                        "일치하지 않습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 클럽 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+
+                    is_active,
+
+                    (
+                        logo_data IS NOT NULL
+                    ) AS has_logo
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+
+                LIMIT 1
+                """,
+                (
+                    club_id,
+                ),
+            )
+
+
+            club = (
+                cursor.fetchone()
+            )
+
+
+            if club is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "클럽을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            if not club[
+                "is_active"
+            ]:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "현재 Draft에서 "
+                        "사용할 수 없는 클럽입니다."
+                    ),
+                )
+
+
+            # =========================
+            # 해당 클럽의 기존 행동 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    action_type,
+                    participant_id
+
+                FROM draft_actions
+
+                WHERE
+                    draft_session_id = %s
+
+                    AND
+                    club_id = %s
+
+                    AND
+                    is_undone = FALSE
+
+                ORDER BY
+                    action_index,
+                    id
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+
+                    club_id,
+                ),
+            )
+
+
+            existing_club_actions = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # BAN 검증
+            #
+            # 이미 사용된 클럽은
+            # 다시 BAN 불가
+            # =========================
+
+            if (
+                action_type
+                ==
+                "ban"
+            ):
+
+                if existing_club_actions:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "이미 BAN 또는 PICK된 "
+                            "클럽입니다."
+                        ),
+                    )
+
+
+            # =========================
+            # PICK 검증
+            # =========================
+
+            else:
+
+                was_banned = any(
+                    action[
+                        "action_type"
+                    ]
+                    ==
+                    "ban"
+
+                    for action
+                    in existing_club_actions
+                )
+
+
+                if was_banned:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "BAN된 클럽은 "
+                            "PICK할 수 없습니다."
+                        ),
+                    )
+
+
+                was_picked = any(
+                    action[
+                        "action_type"
+                    ]
+                    ==
+                    "pick"
+
+                    for action
+                    in existing_club_actions
+                )
+
+
+                if (
+                    was_picked
+
+                    and
+
+                    not draft_session[
+                        "allow_duplicate_picks"
+                    ]
+                ):
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "이미 다른 참가자가 "
+                            "PICK한 클럽입니다."
+                        ),
+                    )
+
+
+            # =========================
+            # 행동 기록
+            # =========================
+
+            cursor.execute(
+                """
+                INSERT INTO draft_actions (
+                    draft_session_id,
+
+                    action_index,
+                    action_type,
+                    round_number,
+
+                    participant_id,
+                    club_id,
+
+                    actor_type,
+                    actor_reference
+                )
+
+                VALUES (
+                    %s,
+
+                    %s,
+                    %s,
+                    1,
+
+                    %s,
+                    %s,
+
+                    %s,
+                    %s
+                )
+
+                RETURNING
+                    id,
+                    draft_session_id,
+
+                    action_index,
+                    action_type,
+                    round_number,
+
+                    participant_id,
+                    club_id,
+
+                    actor_type,
+                    actor_reference,
+
+                    is_undone,
+                    created_at
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+
+                    current_turn[
+                        "action_index"
+                    ],
+
+                    action_type,
+
+                    participant_id,
+                    club_id,
+
+                    actor_type,
+                    actor_reference,
+                ),
+            )
+
+
+            created_action = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # PICK이면
+            # 시즌 클럽 최초 배정
+            #
+            # 변경권은 소모하지 않음
+            # =========================
+
+            if (
+                action_type
+                ==
+                "pick"
+            ):
+
+                club_logo_path = (
+                    (
+                        "/api/clubs/"
+                        f"{club_id}/logo"
+                    )
+
+                    if club[
+                        "has_logo"
+                    ]
+
+                    else None
+                )
+
+
+                cursor.execute(
+                    """
+                    UPDATE
+                        season_participants
+
+                    SET
+                        club_id = %s,
+
+                        initial_club_id =
+                            COALESCE(
+                                initial_club_id,
+                                %s
+                            ),
+
+                        team_name = %s,
+                        team_logo_path = %s,
+
+                        initial_team_name =
+                            COALESCE(
+                                initial_team_name,
+                                %s
+                            ),
+
+                        initial_team_logo_path =
+                            COALESCE(
+                                initial_team_logo_path,
+                                %s
+                            ),
+
+                        team_assignment_source =
+                            'draft',
+
+                        team_change_count = 0,
+
+                        team_changed_at = NULL
+
+                    WHERE
+                        season_id = %s
+
+                        AND
+                        participant_id = %s
+
+                        AND
+                        club_id IS NULL
+
+                    RETURNING
+                        participant_id,
+                        club_id,
+                        initial_club_id,
+                        team_name,
+                        team_logo_path,
+                        team_assignment_source,
+                        team_change_count
+                    """,
+                    (
+                        club_id,
+                        club_id,
+
+                        club[
+                            "name"
+                        ],
+
+                        club_logo_path,
+
+                        club[
+                            "name"
+                        ],
+
+                        club_logo_path,
+
+                        draft_session[
+                            "season_id"
+                        ],
+
+                        participant_id,
+                    ),
+                )
+
+
+                assigned_participant = (
+                    cursor.fetchone()
+                )
+
+
+                if (
+                    assigned_participant
+                    is None
+                ):
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "해당 참가자에게 이미 "
+                            "클럽이 배정되어 있습니다."
+                        ),
+                    )
+
+
+            else:
+
+                assigned_participant = None
+
+
+            # =========================
+            # 전체 TURN PLAN
+            # =========================
+
+            turn_plan = (
+                build_draft_turn_plan(
+                    draft_participants,
+                    ban_enabled=
+                        bool(
+                            draft_session[
+                                "ban_enabled"
+                            ]
+                        ),
+                )
+            )
+
+
+            # =========================
+            # 다음 TURN 계산
+            # =========================
+
+            next_action_index = (
+                int(
+                    draft_session[
+                        "current_action_index"
+                    ]
+                )
+                + 1
+            )
+
+
+            # =========================
+            # 전체 TURN 완료
+            # =========================
+
+            if (
+                next_action_index
+                >= len(
+                    turn_plan
+                )
+            ):
+
+                next_status = (
+                    "completed"
+                )
+
+                next_phase = (
+                    "completed"
+                )
+
+
+            else:
+
+                next_status = (
+                    "active"
+                )
+
+                next_phase = (
+                    turn_plan[
+                        next_action_index
+                    ][
+                        "action_type"
+                    ]
+                )
+
+
+            # =========================
+            # Draft 상태 갱신
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE
+                    draft_sessions
+
+                SET
+                    status = %s,
+
+                    phase = %s,
+
+                    current_action_index = %s,
+
+                    state_version =
+                        state_version + 1,
+
+                    turn_started_at =
+                        CASE
+                            WHEN %s = 'completed'
+                            THEN NULL
+
+                            ELSE NOW()
+                        END,
+
+                    completed_at =
+                        CASE
+                            WHEN %s = 'completed'
+                            THEN NOW()
+
+                            ELSE completed_at
+                        END,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id,
+                    season_id,
+
+                    status,
+                    phase,
+
+                    allow_duplicate_picks,
+                    ban_enabled,
+
+                    turn_seconds,
+                    timeout_policy,
+
+                    current_action_index,
+                    state_version,
+
+                    started_at,
+                    turn_started_at,
+                    paused_at,
+                    completed_at,
+
+                    created_at,
+                    updated_at
+                """,
+                (
+                    next_status,
+                    next_phase,
+
+                    next_action_index,
+
+                    next_status,
+                    next_status,
+
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            updated_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    # =========================
+    # 다음 TURN
+    # =========================
+
+    next_turn = None
+
+
+    if (
+        updated_draft[
+            "status"
+        ]
+        ==
+        "active"
+    ):
+
+        next_turn = (
+            get_current_draft_turn(
+                updated_draft,
+                draft_participants,
+            )
+        )
+
+
+    return {
+        "action":
+            created_action,
+
+        "club": {
+            "club_id":
+                club[
+                    "id"
+                ],
+
+            "code":
+                club[
+                    "code"
+                ],
+
+            "name":
+                club[
+                    "name"
+                ],
+
+            "logo_url":
+                (
+                    (
+                        "/api/clubs/"
+                        f"{club['id']}/logo"
+                    )
+
+                    if club[
+                        "has_logo"
+                    ]
+
+                    else None
+                ),
+        },
+
+        "assigned_participant":
+            assigned_participant,
+
+        "draft_session":
+            updated_draft,
+
+        "next_turn":
+            next_turn,
+
+        "message":
+            (
+                "Draft가 완료되었습니다."
+
+                if
+                updated_draft[
+                    "status"
+                ]
+                ==
+                "completed"
+
+                else
+                (
+                    f"{action_type.upper()}이 "
+                    "완료되었습니다."
+                )
+            ),
+    }
+
+# =========================
+# ADMIN DRAFT ACTION
+# =========================
+
+@app.post(
+    "/api/admin/seasons/"
+    "{season_number}/draft/action"
+)
+def admin_execute_draft_action(
+    season_number: int,
+
+    request_data:
+        AdminDraftActionRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    return execute_draft_action_core(
+        season_number=
+            season_number,
+
+        participant_id=
+            request_data.participant_id,
+
+        club_id=
+            request_data.club_id,
+
+        actor_type=
+            "admin",
+
+        actor_reference=
+            "admin",
+    )
+
+
+# =========================
+# PARTICIPANT DRAFT ACTION
+#
+# participant_id는
+# 클라이언트를 신뢰하지 않고
+# 로그인 계정에서 결정
+# =========================
+
+@app.post(
+    "/api/seasons/"
+    "{season_number}/draft/action"
+)
+def participant_execute_draft_action(
+    season_number: int,
+
+    request_data:
+        ParticipantDraftActionRequest,
+
+    user = Depends(
+        require_user
+    ),
+):
+
+    participant_id = (
+        user[
+            "participant_id"
+        ]
+    )
+
+
+    if participant_id is None:
+
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "FCL 참가자와 연결된 "
+                "계정만 Draft에 참여할 수 있습니다."
+            ),
+        )
+
+
+    return execute_draft_action_core(
+        season_number=
+            season_number,
+
+        participant_id=
+            int(
+                participant_id
+            ),
+
+        club_id=
+            request_data.club_id,
+
+        actor_type=
+            "participant",
+
+        actor_reference=
+            str(
+                user[
+                    "id"
+                ]
+            ),
+    )
+
+# =========================
+# DRAFT STATE
+#
+# 브라우저에서 사용하는
+# Draft 전체 현재 상태
+# =========================
+
+@app.get(
+    "/api/seasons/"
+    "{season_number}/draft"
+)
+def get_draft_state(
+    season_number: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # Draft Session
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.id,
+                    ds.season_id,
+
+                    ds.status,
+                    ds.phase,
+
+                    ds.allow_duplicate_picks,
+                    ds.ban_enabled,
+
+                    ds.turn_seconds,
+                    ds.timeout_policy,
+
+                    ds.current_action_index,
+                    ds.state_version,
+
+                    ds.started_at,
+                    ds.turn_started_at,
+                    ds.paused_at,
+                    ds.completed_at,
+
+                    ds.created_at,
+                    ds.updated_at,
+
+                    s.season_number,
+                    s.title
+                        AS season_title,
+
+                    s.status
+                        AS season_status
+
+                FROM
+                    draft_sessions AS ds
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "생성된 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            (
+                draft_session,
+                timed_out,
+            ) = apply_draft_timeout_pause(
+                cursor,
+                draft_session,
+            )
+
+
+            if timed_out:
+
+                connection.commit()
+
+
+            # =========================
+            # Draft 참가자
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    dp.id
+                        AS draft_participant_id,
+
+                    dp.participant_id,
+                    dp.draft_order,
+
+                    dp.discord_user_id,
+                    dp.is_ready,
+
+                    p.fcl_name,
+                    p.fc_nickname
+
+                FROM
+                    draft_participants AS dp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        dp.participant_id
+
+                WHERE
+                    dp.draft_session_id = %s
+
+                ORDER BY
+                    dp.draft_order
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            draft_participants = (
+                cursor.fetchall()
+            )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    da.id,
+
+                    da.action_index,
+                    da.action_type,
+                    da.round_number,
+
+                    da.participant_id,
+                    da.club_id,
+
+                    da.actor_type,
+                    da.actor_reference,
+
+                    da.created_at,
+
+                    p.fcl_name,
+                    p.fc_nickname,
+
+                    c.code
+                        AS club_code,
+
+                    c.name
+                        AS club_name,
+
+                    c.short_name
+                        AS club_short_name,
+
+                    (
+                        c.logo_data IS NOT NULL
+                    ) AS club_has_logo
+
+                FROM
+                    draft_actions AS da
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        da.participant_id
+
+                JOIN
+                    clubs AS c
+
+                    ON
+                        c.id =
+                        da.club_id
+
+                WHERE
+                    da.draft_session_id = %s
+
+                    AND
+                    da.is_undone = FALSE
+
+                ORDER BY
+                    da.action_index,
+                    da.id
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            draft_actions = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # Draft 클럽 목록
+            #
+            # 활성 클럽 +
+            # 이미 사용된 클럽은
+            # 비활성화돼도 표시 유지
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    c.id,
+                    c.code,
+                    c.name,
+                    c.short_name,
+
+                    c.official_team_id,
+                    c.league_id,
+                    c.league_name,
+
+                    c.is_active,
+
+                    (
+                        c.logo_data IS NOT NULL
+                    ) AS has_logo
+
+                FROM
+                    clubs AS c
+
+                WHERE
+                    c.is_active = TRUE
+
+                    OR
+
+                    c.id IN (
+                        SELECT
+                            da.club_id
+
+                        FROM
+                            draft_actions AS da
+
+                        WHERE
+                            da.draft_session_id = %s
+
+                            AND
+                            da.is_undone = FALSE
+                    )
+
+                ORDER BY
+                    c.league_name,
+                    c.name,
+                    c.id
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            club_rows = (
+                cursor.fetchall()
+            )
+
+
+    # =========================
+    # 전체 10턴
+    # =========================
+
+    turn_plan = (
+        build_draft_turn_plan(
+            draft_participants,
+            ban_enabled=
+                bool(
+                    draft_session[
+                        "ban_enabled"
+                    ]
+                ),
+        )
+    )
+
+
+    # =========================
+    # 현재 TURN
+    # =========================
+
+    current_turn = None
+
+
+    if (
+        draft_session[
+            "status"
+        ]
+        in (
+            "active",
+            "paused",
+        )
+    ):
+
+        current_turn = (
+            get_current_draft_turn(
+                draft_session,
+                draft_participants,
+            )
+        )
+
+
+    # =========================
+    # 클럽별 행동 Map
+    # =========================
+
+    actions_by_club_id = {}
+
+
+    for action in (
+        draft_actions
+    ):
+
+        club_id = int(
+            action[
+                "club_id"
+            ]
+        )
+
+
+        actions_by_club_id.setdefault(
+            club_id,
+            [],
+        ).append(
+            action
+        )
+
+
+    # =========================
+    # 참가자 PICK Map
+    # =========================
+
+    picked_action_by_participant = {}
+
+
+    for action in (
+        draft_actions
+    ):
+
+        if (
+            action[
+                "action_type"
+            ]
+            !=
+            "pick"
+        ):
+
+            continue
+
+
+        picked_action_by_participant[
+            int(
+                action[
+                    "participant_id"
+                ]
+            )
+        ] = action
+
+
+    # =========================
+    # 참가자 응답
+    # =========================
+
+    participants = []
+
+
+    for participant in (
+        draft_participants
+    ):
+
+        participant_id = int(
+            participant[
+                "participant_id"
+            ]
+        )
+
+
+        picked_action = (
+            picked_action_by_participant.get(
+                participant_id
+            )
+        )
+
+
+        participants.append(
+            {
+                "draft_participant_id":
+                    participant[
+                        "draft_participant_id"
+                    ],
+
+                "participant_id":
+                    participant_id,
+
+                "draft_order":
+                    participant[
+                        "draft_order"
+                    ],
+
+                "fcl_name":
+                    participant[
+                        "fcl_name"
+                    ],
+
+                "fc_nickname":
+                    participant[
+                        "fc_nickname"
+                    ],
+
+                "discord_user_id":
+                    participant[
+                        "discord_user_id"
+                    ],
+
+                "is_ready":
+                    participant[
+                        "is_ready"
+                    ],
+
+                "picked_club":
+                    (
+                        {
+                            "club_id":
+                                picked_action[
+                                    "club_id"
+                                ],
+
+                            "code":
+                                picked_action[
+                                    "club_code"
+                                ],
+
+                            "name":
+                                picked_action[
+                                    "club_name"
+                                ],
+
+                            "short_name":
+                                picked_action[
+                                    "club_short_name"
+                                ],
+
+                            "logo_url":
+                                (
+                                    (
+                                        "/api/clubs/"
+                                        f"{picked_action['club_id']}"
+                                        "/logo"
+                                    )
+
+                                    if picked_action[
+                                        "club_has_logo"
+                                    ]
+
+                                    else None
+                                ),
+                        }
+
+                        if picked_action
+
+                        else None
+                    ),
+            }
+        )
+
+
+    # =========================
+    # 클럽 응답
+    # =========================
+
+    clubs = []
+
+
+    for club in (
+        club_rows
+    ):
+
+        club_id = int(
+            club[
+                "id"
+            ]
+        )
+
+
+        club_actions = (
+            actions_by_club_id.get(
+                club_id,
+                [],
+            )
+        )
+
+
+        ban_action = next(
+            (
+                action
+
+                for action
+                in club_actions
+
+                if action[
+                    "action_type"
+                ]
+                ==
+                "ban"
+            ),
+            None,
+        )
+
+
+        pick_actions = [
+            action
+
+            for action
+            in club_actions
+
+            if action[
+                "action_type"
+            ]
+            ==
+            "pick"
+        ]
+
+
+        if ban_action:
+
+            club_status = (
+                "banned"
+            )
+
+
+        elif pick_actions:
+
+            club_status = (
+                "picked"
+            )
+
+
+        elif not club[
+            "is_active"
+        ]:
+
+            club_status = (
+                "inactive"
+            )
+
+
+        else:
+
+            club_status = (
+                "available"
+            )
+
+
+        can_ban = (
+            draft_session[
+                "status"
+            ]
+            ==
+            "active"
+
+            and
+
+            draft_session[
+                "phase"
+            ]
+            ==
+            "ban"
+
+            and
+
+            club_status
+            ==
+            "available"
+
+            and
+
+            bool(
+                club[
+                    "is_active"
+                ]
+            )
+        )
+
+
+        can_pick = (
+            draft_session[
+                "status"
+            ]
+            ==
+            "active"
+
+            and
+
+            draft_session[
+                "phase"
+            ]
+            ==
+            "pick"
+
+            and
+
+            ban_action
+            is None
+
+            and
+
+            bool(
+                club[
+                    "is_active"
+                ]
+            )
+
+            and
+            (
+                not pick_actions
+
+                or
+
+                bool(
+                    draft_session[
+                        "allow_duplicate_picks"
+                    ]
+                )
+            )
+        )
+
+
+        clubs.append(
+            {
+                "club_id":
+                    club_id,
+
+                "code":
+                    club[
+                        "code"
+                    ],
+
+                "name":
+                    club[
+                        "name"
+                    ],
+
+                "short_name":
+                    club[
+                        "short_name"
+                    ],
+
+                "official_team_id":
+                    club[
+                        "official_team_id"
+                    ],
+
+                "league_id":
+                    club[
+                        "league_id"
+                    ],
+
+                "league_name":
+                    club[
+                        "league_name"
+                    ],
+
+                "has_logo":
+                    bool(
+                        club[
+                            "has_logo"
+                        ]
+                    ),
+
+                "logo_url":
+                    (
+                        (
+                            "/api/clubs/"
+                            f"{club_id}/logo"
+                        )
+
+                        if club[
+                            "has_logo"
+                        ]
+
+                        else None
+                    ),
+
+                "is_active":
+                    bool(
+                        club[
+                            "is_active"
+                        ]
+                    ),
+
+                "status":
+                    club_status,
+
+                "can_ban":
+                    can_ban,
+
+                "can_pick":
+                    can_pick,
+
+                "ban":
+                    (
+                        {
+                            "action_index":
+                                ban_action[
+                                    "action_index"
+                                ],
+
+                            "participant_id":
+                                ban_action[
+                                    "participant_id"
+                                ],
+
+                            "fcl_name":
+                                ban_action[
+                                    "fcl_name"
+                                ],
+                        }
+
+                        if ban_action
+
+                        else None
+                    ),
+
+                "picks": [
+                    {
+                        "action_index":
+                            pick_action[
+                                "action_index"
+                            ],
+
+                        "participant_id":
+                            pick_action[
+                                "participant_id"
+                            ],
+
+                        "fcl_name":
+                            pick_action[
+                                "fcl_name"
+                            ],
+                    }
+
+                    for pick_action
+                    in pick_actions
+                ],
+            }
+        )
+
+    # =========================
+    # 진행률
+    # =========================
+
+    completed_action_count = len(
+        draft_actions
+    )
+
+
+    total_action_count = len(
+        turn_plan
+    )
+
+
+    return {
+        "season": {
+            "season_number":
+                draft_session[
+                    "season_number"
+                ],
+
+            "title":
+                draft_session[
+                    "season_title"
+                ],
+
+            "status":
+                draft_session[
+                    "season_status"
+                ],
+        },
+
+        "draft_session": {
+            "id":
+                draft_session[
+                    "id"
+                ],
+
+            "status":
+                draft_session[
+                    "status"
+                ],
+
+            "phase":
+                draft_session[
+                    "phase"
+                ],
+
+            "current_action_index":
+                draft_session[
+                    "current_action_index"
+                ],
+
+            "state_version":
+                draft_session[
+                    "state_version"
+                ],
+
+            "allow_duplicate_picks":
+                draft_session[
+                    "allow_duplicate_picks"
+                ],
+
+            "ban_enabled":
+                bool(
+                    draft_session[
+                        "ban_enabled"
+                    ]
+                ),
+
+            "turn_seconds":
+                draft_session[
+                    "turn_seconds"
+                ],
+
+            "timeout_policy":
+                draft_session[
+                    "timeout_policy"
+                ],
+
+            "started_at":
+                draft_session[
+                    "started_at"
+                ],
+
+            "turn_started_at":
+                draft_session[
+                    "turn_started_at"
+                ],
+
+            "paused_at":
+                draft_session[
+                    "paused_at"
+                ],
+
+            "completed_at":
+                draft_session[
+                    "completed_at"
+                ],
+        },
+
+        "current_turn":
+            current_turn,
+
+        "progress": {
+            "completed_actions":
+                completed_action_count,
+
+            "total_actions":
+                total_action_count,
+
+            "remaining_actions":
+                max(
+                    0,
+                    total_action_count
+                    -
+                    completed_action_count,
+                ),
+        },
+
+        "participants":
+            participants,
+
+        "actions":
+            draft_actions,
+
+        "clubs":
+            clubs,
+
+        "turn_plan":
+            turn_plan,
+    }
+
+# =========================
+# DRAFT WEBSOCKET
+#
+# state_version이 변경될 때만
+# 최신 Draft 상태를 전송
+# =========================
+
+@app.websocket(
+    "/ws/seasons/"
+    "{season_number}/draft"
+)
+async def draft_state_websocket(
+    websocket: WebSocket,
+    season_number: int,
+):
+
+    await websocket.accept()
+
+
+    last_state_version = None
+
+
+    try:
+
+        while True:
+
+            try:
+
+                draft_state = await asyncio.to_thread(
+                    get_draft_state,
+                    season_number,
+                )
+
+
+                draft_session = (
+                    draft_state[
+                        "draft_session"
+                    ]
+                )
+
+
+                state_version = int(
+                    draft_session[
+                        "state_version"
+                    ]
+                    or 0
+                )
+
+
+                # =========================
+                # 최초 접속 또는
+                # Draft 상태 변경 시에만 전송
+                # =========================
+
+                if (
+                    last_state_version
+                    is None
+
+                    or
+
+                    state_version
+                    !=
+                    last_state_version
+                ):
+
+                    await websocket.send_json(
+                        jsonable_encoder(
+                            {
+                                "type":
+                                    "draft_state",
+
+                                "data":
+                                    draft_state,
+                            }
+                        )
+                    )
+
+
+                    last_state_version = (
+                        state_version
+                    )
+
+
+                # =========================
+                # 클라이언트 메시지 대기
+                #
+                # 0.5초마다 상태 변경 확인
+                # =========================
+
+                try:
+
+                    message = (
+                        await asyncio.wait_for(
+                            websocket.receive_text(),
+                            timeout=0.5,
+                        )
+                    )
+
+
+                    if message == "ping":
+
+                        await websocket.send_json(
+                            {
+                                "type":
+                                    "pong",
+                            }
+                        )
+
+
+                except asyncio.TimeoutError:
+
+                    pass
+
+
+            except HTTPException as error:
+
+                await websocket.send_json(
+                    {
+                        "type":
+                            "draft_error",
+
+                        "status_code":
+                            error.status_code,
+
+                        "detail":
+                            error.detail,
+                    }
+                )
+
+
+                await asyncio.sleep(
+                    1.0
+                )
+
+
+    except WebSocketDisconnect:
+
+        pass
+
+# =========================
+# ADMIN DRAFT RESET
+#
+# 개발 / 테스트 중
+# setup / active / paused Draft를
+# 완전히 초기화
+#
+# 완료된 Draft는 보호
+# =========================
+
+@app.delete(
+    "/api/admin/seasons/"
+    "{season_number}/draft"
+)
+def admin_reset_draft_session(
+    season_number: int,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # Draft + 시즌 잠금
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    ds.id,
+                    ds.season_id,
+                    ds.status
+                        AS draft_status,
+
+                    s.status
+                        AS season_status
+
+                FROM
+                    draft_sessions AS ds
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        ds.season_id
+
+                WHERE
+                    s.season_number = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF ds, s
+                """,
+                (
+                    season_number,
+                ),
+            )
+
+
+            draft_session = (
+                cursor.fetchone()
+            )
+
+
+            if draft_session is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "초기화할 Draft를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 시즌 시작 후에는
+            # Draft 초기화 금지
+            # =========================
+
+            if (
+                draft_session[
+                    "season_status"
+                ]
+                !=
+                "upcoming"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "시즌이 시작된 이후에는 "
+                        "Draft를 초기화할 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 완료 Draft 보호
+            #
+            # 로컬 Draft 테스트 중에는
+            # 완료된 Draft도 초기화 허용
+            # =========================
+
+            local_draft_test_mode = True
+
+
+            if (
+                draft_session[
+                    "draft_status"
+                ]
+                ==
+                "completed"
+
+                and
+
+                not local_draft_test_mode
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "완료된 Draft는 "
+                        "초기화할 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 관리자 팀 변경 여부 확인
+            #
+            # Draft PICK 후 관리자가
+            # 팀 변경권을 사용했다면
+            # 자동 초기화하지 않는다.
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    sp.participant_id,
+                    sp.team_assignment_source,
+                    sp.team_change_count,
+
+                    p.fcl_name
+
+                FROM
+                    season_participants AS sp
+
+                JOIN
+                    draft_participants AS dp
+
+                    ON
+                        dp.participant_id =
+                        sp.participant_id
+
+                    AND
+                        dp.draft_session_id = %s
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                WHERE
+                    sp.season_id = %s
+
+                    AND (
+                        sp.team_change_count > 0
+
+                        OR
+
+                        sp.team_assignment_source =
+                            'admin'
+                    )
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+
+                    draft_session[
+                        "season_id"
+                    ],
+                ),
+            )
+
+
+            protected_participants = (
+                cursor.fetchall()
+            )
+
+
+            if protected_participants:
+
+                protected_names = ", ".join(
+                    str(
+                        participant[
+                            "fcl_name"
+                        ]
+                    )
+
+                    for participant
+                    in protected_participants
+                )
+
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "관리자 팀 변경 이력이 있는 "
+                        "참가자가 있어 Draft를 "
+                        "초기화할 수 없습니다: "
+                        f"{protected_names}"
+                    ),
+                )
+
+
+            # =========================
+            # 초기화 전 행동 수 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)
+                        AS action_count,
+
+                    COUNT(*) FILTER (
+                        WHERE
+                            action_type = 'pick'
+
+                            AND
+
+                            is_undone = FALSE
+                    )
+                        AS pick_count
+
+                FROM
+                    draft_actions
+
+                WHERE
+                    draft_session_id = %s
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            action_summary = (
+                cursor.fetchone()
+            )
+
+
+            # =========================
+            # Draft PICK으로 배정된
+            # 시즌 클럽 원상복구
+            #
+            # 관리자 변경권은
+            # 사용하지 않은 상태만 대상
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE
+                    season_participants AS sp
+
+                SET
+                    club_id = NULL,
+
+                    initial_club_id = NULL,
+
+                    team_name = NULL,
+                    team_logo_path = NULL,
+
+                    initial_team_name = NULL,
+                    initial_team_logo_path = NULL,
+
+                    team_assignment_source = NULL,
+
+                    team_change_count = 0,
+                    team_changed_at = NULL
+
+                WHERE
+                    sp.season_id = %s
+
+                    AND
+                    sp.team_assignment_source =
+                        'draft'
+
+                    AND
+                    sp.team_change_count = 0
+
+                    AND
+                    sp.participant_id IN (
+                        SELECT
+                            dp.participant_id
+
+                        FROM
+                            draft_participants AS dp
+
+                        WHERE
+                            dp.draft_session_id = %s
+                    )
+                """,
+                (
+                    draft_session[
+                        "season_id"
+                    ],
+
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            cleared_assignment_count = (
+                cursor.rowcount
+            )
+
+
+            # =========================
+            # Draft Session 삭제
+            #
+            # FK CASCADE:
+            # draft_participants 삭제
+            # draft_actions 삭제
+            # =========================
+
+            cursor.execute(
+                """
+                DELETE FROM
+                    draft_sessions
+
+                WHERE
+                    id = %s
+
+                RETURNING
+                    id
+                """,
+                (
+                    draft_session[
+                        "id"
+                    ],
+                ),
+            )
+
+
+            deleted_draft = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season_number":
+            season_number,
+
+        "deleted_draft_id":
+            deleted_draft[
+                "id"
+            ],
+
+        "deleted_action_count":
+            int(
+                action_summary[
+                    "action_count"
+                ]
+                or 0
+            ),
+
+        "deleted_pick_count":
+            int(
+                action_summary[
+                    "pick_count"
+                ]
+                or 0
+            ),
+
+        "cleared_assignment_count":
+            int(
+                cleared_assignment_count
+                or 0
+            ),
+
+        "message":
+            "Draft가 초기화되었습니다.",
+    }
 
 def snapshot_fcl_season_participant_teams(
     cursor,
@@ -13629,10 +19923,16 @@ def snapshot_fcl_season_participant_teams(
 
         SET
             team_name_snapshot =
-                p.current_team_name,
+                COALESCE(
+                    sp.team_name,
+                    p.current_team_name
+                ),
 
             team_logo_path_snapshot =
-                p.current_team_logo_path,
+                COALESCE(
+                    sp.team_logo_path,
+                    p.current_team_logo_path
+                ),
 
             snapshot_at =
                 COALESCE(
@@ -14116,7 +20416,6 @@ def admin_complete_fcl_season(
                     "message":
                         "이미 종료된 시즌입니다.",
                 }
-                
 
             # =========================
             # 시즌 종료 전
@@ -15035,14 +21334,6 @@ def admin_sync_player_popularity(
 
         PLAYER_POPULARITY_SYNC_LOCK.release()
 
-# =========================
-# ADMIN USERS
-# =========================
-
-@app.get(
-    "/api/admin/users"
-)
-
 @app.get(
     "/api/admin/player-popularity/status"
 )
@@ -15427,6 +21718,9 @@ def admin_sync_player_generation_status(
     }
 
 
+@app.get(
+    "/api/admin/users"
+)
 def get_admin_users(
     admin_token = Depends(
         require_admin
@@ -15440,19 +21734,31 @@ def get_admin_users(
             cursor.execute(
                 """
                 SELECT
-                    id,
-                    email,
-                    nickname,
-                    points,
-                    is_admin,
-                    created_at,
-                    updated_at
+                    u.id,
+                    u.email,
+                    u.nickname,
+                    u.points,
+                    u.is_admin,
+                    u.created_at,
+                    u.updated_at,
 
-                FROM users
+                    p.id
+                        AS participant_id,
+
+                    p.fcl_name
+                        AS participant_fcl_name,
+
+                    p.fc_nickname
+                        AS participant_fc_nickname
+
+                FROM users AS u
+
+                LEFT JOIN participants AS p
+                    ON p.user_id = u.id
 
                 ORDER BY
-                    created_at DESC,
-                    id DESC
+                    u.created_at DESC,
+                    u.id DESC
                 """
             )
 
@@ -15465,6 +21771,244 @@ def get_admin_users(
     return {
         "users":
             users
+    }
+
+
+@app.patch(
+    "/api/admin/users/"
+    "{user_id}/participant"
+)
+def change_admin_user_participant(
+    user_id: int,
+
+    request:
+        AdminUserParticipantRequest,
+
+    admin_token = Depends(
+        require_admin
+    ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 회원 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    nickname
+
+                FROM users
+
+                WHERE id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    user_id,
+                ),
+            )
+
+
+            user = (
+                cursor.fetchone()
+            )
+
+
+            if not user:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "회원을 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 연결 해제
+            # =========================
+
+            if (
+                request.participant_id
+                is None
+            ):
+
+                cursor.execute(
+                    """
+                    UPDATE participants
+
+                    SET
+                        user_id = NULL,
+                        updated_at = NOW()
+
+                    WHERE user_id = %s
+                    """,
+                    (
+                        user_id,
+                    ),
+                )
+
+
+                connection.commit()
+
+
+                return {
+                    "message":
+                        "참가자 연결이 해제되었습니다.",
+
+                    "user_id":
+                        user_id,
+
+                    "participant":
+                        None,
+                }
+
+
+            participant_id = int(
+                request.participant_id
+            )
+
+
+            # =========================
+            # 참가자 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    user_id,
+                    fcl_name,
+                    fc_nickname
+
+                FROM participants
+
+                WHERE id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    participant_id,
+                ),
+            )
+
+
+            participant = (
+                cursor.fetchone()
+            )
+
+
+            if not participant:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "참가자를 찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 다른 회원에게 이미 연결됨
+            # =========================
+
+            if (
+                participant["user_id"]
+                is not None
+
+                and
+
+                int(
+                    participant["user_id"]
+                )
+                !=
+                user_id
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이미 다른 회원 계정에 "
+                        "연결된 참가자입니다."
+                    ),
+                )
+
+
+            # =========================
+            # 현재 회원의 기존 연결 해제
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE participants
+
+                SET
+                    user_id = NULL,
+                    updated_at = NOW()
+
+                WHERE
+                    user_id = %s
+
+                    AND
+                    id <> %s
+                """,
+                (
+                    user_id,
+                    participant_id,
+                ),
+            )
+
+
+            # =========================
+            # 새 참가자 연결
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE participants
+
+                SET
+                    user_id = %s,
+                    updated_at = NOW()
+
+                WHERE id = %s
+
+                RETURNING
+                    id,
+                    user_id,
+                    fcl_name,
+                    fc_nickname
+                """,
+                (
+                    user_id,
+                    participant_id,
+                ),
+            )
+
+
+            linked_participant = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "회원과 참가자가 연결되었습니다.",
+
+        "user_id":
+            user_id,
+
+        "participant":
+            linked_participant,
     }
 
 @app.post(
@@ -15636,6 +22180,2620 @@ def change_admin_user_role(
             user,
     }
 
+# =========================
+# CLUBS
+# Draft 클럽 목록
+# =========================
+
+@app.get(
+    "/api/clubs"
+)
+def get_clubs():
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+
+                    logo_source_url,
+
+                    (
+                        logo_data IS NOT NULL
+                    ) AS has_logo,
+
+                    is_active
+
+                FROM clubs
+
+                WHERE
+                    is_active = TRUE
+
+                ORDER BY
+                    name ASC,
+                    id ASC
+                """
+            )
+
+
+            club_rows = (
+                cursor.fetchall()
+            )
+
+
+    return [
+        {
+            "club_id":
+                club[
+                    "id"
+                ],
+
+            "code":
+                club[
+                    "code"
+                ],
+
+            "name":
+                club[
+                    "name"
+                ],
+
+            "short_name":
+                club[
+                    "short_name"
+                ],
+
+            "has_logo":
+                bool(
+                    club[
+                        "has_logo"
+                    ]
+                ),
+
+            "logo_url":
+                (
+                    (
+                        "/api/clubs/"
+                        f"{club['id']}/logo"
+                    )
+
+                    if club[
+                        "has_logo"
+                    ]
+
+                    else None
+                ),
+
+            "is_active":
+                club[
+                    "is_active"
+                ],
+        }
+
+        for club
+        in club_rows
+    ]
+
+
+# =========================
+# CLUB LOGO
+#
+# DB에 Snapshot된 이미지를
+# 직접 반환
+# =========================
+
+@app.get(
+    "/api/clubs/{club_id}/logo"
+)
+def get_club_logo(
+    club_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    logo_data,
+                    logo_content_type
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    club_id,
+                ),
+            )
+
+
+            club = (
+                cursor.fetchone()
+            )
+
+
+    if not club:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "클럽을 찾을 수 없습니다."
+            ),
+        )
+
+
+    if not club[
+        "logo_data"
+    ]:
+
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "등록된 클럽 로고가 없습니다."
+            ),
+        )
+
+
+    logo_content_type = (
+        club[
+            "logo_content_type"
+        ]
+        or
+        "image/png"
+    )
+
+
+    return Response(
+        content=
+            bytes(
+                club[
+                    "logo_data"
+                ]
+            ),
+
+        media_type=
+            logo_content_type,
+
+        headers={
+            "Cache-Control":
+                "public, max-age=86400",
+        },
+    )
+
+# =========================
+# CLUB LOGO DOWNLOAD
+#
+# 외부 로고는 등록 순간
+# DB Snapshot으로 저장
+# =========================
+
+MAX_CLUB_LOGO_BYTES = (
+    5 * 1024 * 1024
+)
+
+
+def download_club_logo(
+    source_url: str,
+):
+
+    normalized_url = (
+        str(
+            source_url
+        )
+        .strip()
+    )
+
+
+    if not normalized_url:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고 URL을 "
+                "입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # URL 기본 검증
+    # =========================
+
+    try:
+
+        parsed_url = httpx.URL(
+            normalized_url
+        )
+
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "올바른 클럽 로고 "
+                "URL이 아닙니다."
+            ),
+        ) from error
+
+
+    if (
+        parsed_url.scheme
+        not in (
+            "http",
+            "https",
+        )
+        or
+        not parsed_url.host
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고는 "
+                "http 또는 https URL만 "
+                "사용할 수 있습니다."
+            ),
+        )
+
+
+    # =========================
+    # 이미지 다운로드
+    # =========================
+
+    try:
+
+        response = httpx.get(
+            normalized_url,
+            timeout=20.0,
+            follow_redirects=True,
+        )
+
+
+    except httpx.RequestError as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "클럽 로고 이미지를 "
+                "다운로드할 수 없습니다."
+            ),
+        ) from error
+
+
+    if response.status_code != 200:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고 URL에서 "
+                "이미지를 가져올 수 없습니다. "
+                f"(HTTP {response.status_code})"
+            ),
+        )
+
+
+    logo_content_type = (
+        response
+        .headers
+        .get(
+            "content-type",
+            "",
+        )
+        .split(";")[0]
+        .strip()
+        .lower()
+    )
+
+
+    if not logo_content_type.startswith(
+        "image/"
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고 URL이 "
+                "이미지 파일이 아닙니다."
+            ),
+        )
+
+
+    logo_data = (
+        response.content
+    )
+
+
+    if not logo_data:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고 이미지가 "
+                "비어 있습니다."
+            ),
+        )
+
+
+    if (
+        len(
+            logo_data
+        )
+        >
+        MAX_CLUB_LOGO_BYTES
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 로고 이미지는 "
+                "5MB 이하만 사용할 수 있습니다."
+            ),
+        )
+
+
+    return {
+        "source_url":
+            normalized_url,
+
+        "data":
+            logo_data,
+
+        "content_type":
+            logo_content_type,
+    }
+
+# =========================
+# ADMIN CLUB SYNC
+#
+# FC Online 공식 선수검색
+# 리그 / 클럽 필터에서
+# 전체 클럽을 가져와
+# Draft clubs 테이블과 동기화
+# =========================
+
+@app.post(
+    "/api/admin/clubs/sync-fconline"
+)
+def admin_sync_fconline_clubs(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # FC Online 공식 데이터
+    # 강제 새로고침
+    # =========================
+
+    try:
+
+        player_catalog_service.PLAYER_FILTER_GROUP_CACHE = (
+            None
+        )
+
+
+        filter_groups = (
+            player_catalog_service
+            .get_player_filter_groups()
+        )
+
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 공식 클럽 목록을 "
+                "가져오지 못했습니다. "
+                f"{type(error).__name__}: "
+                f"{error}"
+            ),
+        ) from error
+
+
+    leagues = (
+        filter_groups.get(
+            "leagues",
+            []
+        )
+    )
+
+
+    # =========================
+    # 공식 클럽 목록 평탄화
+    # =========================
+
+    official_clubs = []
+
+    seen_official_team_ids = set()
+
+
+    for league in leagues:
+
+        try:
+
+            league_id = int(
+                league[
+                    "id"
+                ]
+            )
+
+
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+
+            continue
+
+
+        league_name = (
+            str(
+                league.get(
+                    "name"
+                )
+                or
+                ""
+            )
+            .strip()
+        )
+
+
+        if (
+            league_id <= 0
+            or
+            not league_name
+        ):
+
+            continue
+
+
+        for official_club in (
+            league.get(
+                "clubs",
+                []
+            )
+        ):
+
+            try:
+
+                official_team_id = int(
+                    official_club[
+                        "official_team_id"
+                    ]
+                )
+
+
+            except (
+                KeyError,
+                TypeError,
+                ValueError,
+            ):
+
+                continue
+
+
+            team_name = (
+                str(
+                    official_club.get(
+                        "team_name"
+                    )
+                    or
+                    ""
+                )
+                .strip()
+            )
+
+
+            if (
+                official_team_id <= 0
+                or
+                not team_name
+            ):
+
+                continue
+
+
+            if (
+                official_team_id
+                in
+                seen_official_team_ids
+            ):
+
+                continue
+
+
+            seen_official_team_ids.add(
+                official_team_id
+            )
+
+
+            official_clubs.append(
+                {
+                    "official_team_id":
+                        official_team_id,
+
+                    "team_name":
+                        team_name,
+
+                    "league_id":
+                        league_id,
+
+                    "league_name":
+                        league_name,
+                }
+            )
+
+
+    if not official_clubs:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online에서 "
+                "클럽 목록을 찾지 못했습니다."
+            ),
+        )
+
+
+    # =========================
+    # DB 기존 클럽 조회
+    # =========================
+
+    created_count = 0
+    updated_count = 0
+    linked_manual_count = 0
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    official_team_id
+
+                FROM clubs
+
+                ORDER BY
+                    id
+                """
+            )
+
+
+            existing_clubs = (
+                cursor.fetchall()
+            )
+
+
+            # =========================
+            # Official Team ID 기준
+            # 기존 클럽 Map
+            # =========================
+
+            existing_by_official_id = {}
+
+
+            # =========================
+            # 수동 등록 팀 이름 기준
+            # Map
+            #
+            # 예:
+            # 기존 Arsenal 등록을
+            # 새로 중복 생성하지 않고
+            # 공식 ID만 연결
+            # =========================
+
+            manual_by_name = {}
+
+
+            for existing_club in (
+                existing_clubs
+            ):
+
+                existing_official_team_id = (
+                    existing_club[
+                        "official_team_id"
+                    ]
+                )
+
+
+                if (
+                    existing_official_team_id
+                    is not None
+                ):
+
+                    existing_by_official_id[
+                        int(
+                            existing_official_team_id
+                        )
+                    ] = existing_club
+
+                    continue
+
+
+                normalized_name = (
+                    player_catalog_service
+                    .normalize_player_filter_name(
+                        existing_club[
+                            "name"
+                        ]
+                    )
+                )
+
+
+                if normalized_name:
+
+                    manual_by_name.setdefault(
+                        normalized_name,
+                        existing_club,
+                    )
+
+
+            # =========================
+            # FC Online 클럽 UPSERT
+            # =========================
+
+            for official_club in (
+                official_clubs
+            ):
+
+                official_team_id = int(
+                    official_club[
+                        "official_team_id"
+                    ]
+                )
+
+                team_name = (
+                    official_club[
+                        "team_name"
+                    ]
+                )
+
+                league_id = int(
+                    official_club[
+                        "league_id"
+                    ]
+                )
+
+                league_name = (
+                    official_club[
+                        "league_name"
+                    ]
+                )
+
+
+                # =========================
+                # 이미 공식 ID가 연결된 팀
+                # =========================
+
+                existing_club = (
+                    existing_by_official_id.get(
+                        official_team_id
+                    )
+                )
+
+
+                if existing_club:
+
+                    cursor.execute(
+                        """
+                        UPDATE clubs
+
+                        SET
+                            name = %s,
+
+                            league_id = %s,
+
+                            league_name = %s,
+
+                            is_active = TRUE,
+
+                            updated_at = NOW()
+
+                        WHERE
+                            id = %s
+                        """,
+                        (
+                            team_name,
+
+                            league_id,
+
+                            league_name,
+
+                            existing_club[
+                                "id"
+                            ],
+                        ),
+                    )
+
+
+                    updated_count += 1
+
+                    continue
+
+
+                # =========================
+                # 기존 수동 등록 팀과
+                # 이름이 같으면 연결
+                #
+                # 기존 로고 / code 유지
+                # =========================
+
+                normalized_team_name = (
+                    player_catalog_service
+                    .normalize_player_filter_name(
+                        team_name
+                    )
+                )
+
+
+                manual_club = (
+                    manual_by_name.get(
+                        normalized_team_name
+                    )
+                )
+
+
+                if manual_club:
+
+                    cursor.execute(
+                        """
+                        UPDATE clubs
+
+                        SET
+                            official_team_id = %s,
+
+                            name = %s,
+
+                            league_id = %s,
+
+                            league_name = %s,
+
+                            is_active = TRUE,
+
+                            updated_at = NOW()
+
+                        WHERE
+                            id = %s
+                        """,
+                        (
+                            official_team_id,
+
+                            team_name,
+
+                            league_id,
+
+                            league_name,
+
+                            manual_club[
+                                "id"
+                            ],
+                        ),
+                    )
+
+
+                    manual_club[
+                        "official_team_id"
+                    ] = (
+                        official_team_id
+                    )
+
+
+                    existing_by_official_id[
+                        official_team_id
+                    ] = manual_club
+
+
+                    manual_by_name.pop(
+                        normalized_team_name,
+                        None,
+                    )
+
+
+                    linked_manual_count += 1
+
+                    continue
+
+
+                # =========================
+                # 신규 FC Online 팀
+                # =========================
+
+                club_code = (
+                    f"fconline-"
+                    f"{official_team_id}"
+                )
+
+
+                cursor.execute(
+                    """
+                    INSERT INTO clubs (
+                        code,
+                        name,
+                        short_name,
+
+                        official_team_id,
+
+                        league_id,
+                        league_name,
+
+                        is_active
+                    )
+
+                    VALUES (
+                        %s,
+                        %s,
+                        NULL,
+
+                        %s,
+
+                        %s,
+                        %s,
+
+                        TRUE
+                    )
+
+                    ON CONFLICT (
+                        code
+                    )
+
+                    DO UPDATE SET
+                        name =
+                            EXCLUDED.name,
+
+                        official_team_id =
+                            EXCLUDED.official_team_id,
+
+                        league_id =
+                            EXCLUDED.league_id,
+
+                        league_name =
+                            EXCLUDED.league_name,
+
+                        is_active =
+                            TRUE,
+
+                        updated_at =
+                            NOW()
+
+                    RETURNING
+                        id
+                    """,
+                    (
+                        club_code,
+
+                        team_name,
+
+                        official_team_id,
+
+                        league_id,
+
+                        league_name,
+                    ),
+                )
+
+
+                created_or_updated = (
+                    cursor.fetchone()
+                )
+
+
+                if created_or_updated:
+
+                    created_count += 1
+
+
+        connection.commit()
+
+
+    # =========================
+    # 결과
+    # =========================
+
+    return {
+        "message":
+            (
+                "FC Online 클럽 동기화가 "
+                "완료되었습니다."
+            ),
+
+        "league_count":
+            len(
+                leagues
+            ),
+
+        "official_club_count":
+            len(
+                official_clubs
+            ),
+
+        "created_count":
+            created_count,
+
+        "updated_count":
+            updated_count,
+
+        "linked_manual_count":
+            linked_manual_count,
+    }
+
+# =========================
+# FC ONLINE CLUB CREST
+# =========================
+
+FC_ONLINE_CLUB_CREST_URL_TEMPLATE = (
+    "https://fco.dn.nexoncdn.co.kr/"
+    "live/externalAssets/common/"
+    "crests/light/medium/"
+    "l{official_team_id}.png"
+)
+
+FC_ONLINE_NATIONAL_FLAG_URL_TEMPLATE = (
+    "https://fco.dn.nexoncdn.co.kr/"
+    "live/externalAssets/common/"
+    "countries/largeflags/"
+    "f_{nation_id}.png"
+)
+
+def download_fconline_team_logo(
+    club,
+):
+
+    club_id = int(
+        club[
+            "club_id"
+        ]
+    )
+
+
+    club_name = (
+        club[
+            "name"
+        ]
+    )
+
+
+    logo_type = (
+        club[
+            "logo_type"
+        ]
+    )
+
+
+    if (
+        logo_type
+        ==
+        "national"
+    ):
+
+        nation_id = int(
+            club[
+                "nation_id"
+            ]
+        )
+
+
+        logo_url = (
+            FC_ONLINE_NATIONAL_FLAG_URL_TEMPLATE
+            .format(
+                nation_id=
+                    nation_id
+            )
+        )
+
+
+    else:
+
+        official_team_id = int(
+            club[
+                "official_team_id"
+            ]
+        )
+
+
+        logo_url = (
+            FC_ONLINE_CLUB_CREST_URL_TEMPLATE
+            .format(
+                official_team_id=
+                    official_team_id
+            )
+        )
+
+
+    try:
+
+        logo_snapshot = (
+            download_club_logo(
+                logo_url
+            )
+        )
+
+
+        return {
+            "success":
+                True,
+
+            "club_id":
+                club_id,
+
+            "name":
+                club_name,
+
+            "logo_type":
+                logo_type,
+
+            "logo_url":
+                logo_snapshot[
+                    "source_url"
+                ],
+
+            "logo_data":
+                logo_snapshot[
+                    "data"
+                ],
+
+            "logo_content_type":
+                logo_snapshot[
+                    "content_type"
+                ],
+        }
+
+
+    except HTTPException as error:
+
+        return {
+            "success":
+                False,
+
+            "club_id":
+                club_id,
+
+            "name":
+                club_name,
+
+            "logo_type":
+                logo_type,
+
+            "logo_url":
+                logo_url,
+
+            "error":
+                str(
+                    error.detail
+                ),
+        }
+
+
+    except Exception as error:
+
+        return {
+            "success":
+                False,
+
+            "club_id":
+                club_id,
+
+            "name":
+                club_name,
+
+            "logo_type":
+                logo_type,
+
+            "logo_url":
+                logo_url,
+
+            "error":
+                (
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                ),
+        }
+
+
+def download_fconline_club_crest(
+    club,
+):
+
+    club_id = int(
+        club[
+            "club_id"
+        ]
+    )
+
+    official_team_id = int(
+        club[
+            "official_team_id"
+        ]
+    )
+
+    club_name = (
+        club[
+            "name"
+        ]
+    )
+
+
+    logo_url = (
+        FC_ONLINE_CLUB_CREST_URL_TEMPLATE
+        .format(
+            official_team_id=
+                official_team_id
+        )
+    )
+
+
+    try:
+
+        logo_snapshot = (
+            download_club_logo(
+                logo_url
+            )
+        )
+
+
+        return {
+            "success":
+                True,
+
+            "club_id":
+                club_id,
+
+            "official_team_id":
+                official_team_id,
+
+            "name":
+                club_name,
+
+            "logo_url":
+                logo_snapshot[
+                    "source_url"
+                ],
+
+            "logo_data":
+                logo_snapshot[
+                    "data"
+                ],
+
+            "logo_content_type":
+                logo_snapshot[
+                    "content_type"
+                ],
+        }
+
+
+    except HTTPException as error:
+
+        return {
+            "success":
+                False,
+
+            "club_id":
+                club_id,
+
+            "official_team_id":
+                official_team_id,
+
+            "name":
+                club_name,
+
+            "logo_url":
+                logo_url,
+
+            "error":
+                str(
+                    error.detail
+                ),
+        }
+
+
+    except Exception as error:
+
+        return {
+            "success":
+                False,
+
+            "club_id":
+                club_id,
+
+            "official_team_id":
+                official_team_id,
+
+            "name":
+                club_name,
+
+            "logo_url":
+                logo_url,
+
+            "error":
+                (
+                    f"{type(error).__name__}: "
+                    f"{error}"
+                ),
+        }
+
+
+# =========================
+# ADMIN FC ONLINE CLUB LOGO SYNC
+#
+# official_team_id를 기준으로
+# FC Online 공식 CDN에서
+# 엠블럼을 다운로드해 DB에 저장
+# =========================
+
+@app.post(
+    "/api/admin/clubs/"
+    "sync-fconline-logos"
+)
+
+def admin_sync_fconline_club_logos(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    # =========================
+    # FC Online 국가 ID 준비
+    #
+    # 국가대표팀 이름과
+    # nationality 이름을 매칭해서
+    # nation_id를 확보한다.
+    # =========================
+
+    try:
+
+        filter_groups = (
+            player_catalog_service
+            .get_player_filter_groups()
+        )
+
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "FC Online 국가 정보를 "
+                "가져오지 못했습니다. "
+                f"{type(error).__name__}: "
+                f"{error}"
+            ),
+        ) from error
+
+
+    nation_id_by_name = {}
+
+
+    for continent in (
+        filter_groups.get(
+            "continents",
+            []
+        )
+    ):
+
+        for nation in (
+            continent.get(
+                "nations",
+                []
+            )
+        ):
+
+            nation_name = (
+                str(
+                    nation.get(
+                        "nation_name"
+                    )
+                    or
+                    ""
+                )
+                .strip()
+            )
+
+
+            if not nation_name:
+
+                continue
+
+
+            try:
+
+                nation_id = int(
+                    nation[
+                        "nation_id"
+                    ]
+                )
+
+
+            except (
+                KeyError,
+                TypeError,
+                ValueError,
+            ):
+
+                continue
+
+
+            normalized_name = (
+                player_catalog_service
+                .normalize_player_filter_name(
+                    nation_name
+                )
+            )
+
+
+            if not normalized_name:
+
+                continue
+
+
+            nation_id_by_name[
+                normalized_name
+            ] = nation_id
+
+
+    # =========================
+    # 아직 로고가 없는
+    # FC Online 팀 조회
+    # =========================
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+                        AS club_id,
+
+                    name,
+
+                    official_team_id,
+
+                    league_id,
+                    league_name
+
+                FROM clubs
+
+                WHERE
+                    official_team_id
+                    IS NOT NULL
+
+                    AND
+                    is_active = TRUE
+
+                    AND
+                    logo_data IS NULL
+
+                ORDER BY
+                    id
+                """
+            )
+
+
+            club_rows = (
+                cursor.fetchall()
+            )
+
+
+    if not club_rows:
+
+        return {
+            "message":
+                (
+                    "동기화할 FC Online "
+                    "팀 엠블럼이 없습니다."
+                ),
+
+            "requested_count":
+                0,
+
+            "updated_count":
+                0,
+
+            "club_crest_count":
+                0,
+
+            "national_flag_count":
+                0,
+
+            "failed_count":
+                0,
+
+            "failures":
+                [],
+        }
+
+
+    # =========================
+    # 다운로드 작업 준비
+    # =========================
+
+    download_jobs = []
+
+    precheck_failures = []
+
+
+    # =========================
+    # 국가대표팀 이름 별칭
+    #
+    # 팀 목록에서는 일부 국가명이
+    # 축약되어 있지만
+    # 국적 목록에서는 정식 명칭을 사용
+    # =========================
+
+    national_team_name_aliases = {
+        "보스니아 H.":
+            "보스니아 헤르체고비나",
+    }
+
+
+    for club in club_rows:
+
+        club_id = int(
+            club[
+                "club_id"
+            ]
+        )
+
+
+        club_name = (
+            str(
+                club[
+                    "name"
+                ]
+            )
+            .strip()
+        )
+
+
+        official_team_id = int(
+            club[
+                "official_team_id"
+            ]
+        )
+
+
+        league_name = (
+            str(
+                club[
+                    "league_name"
+                ]
+                or
+                ""
+            )
+            .strip()
+        )
+
+
+        # =========================
+        # 국가대표팀
+        # =========================
+
+        if (
+            league_name
+            ==
+            "국가대표팀"
+        ):
+
+            nation_lookup_name = (
+                national_team_name_aliases.get(
+                    club_name,
+                    club_name,
+                )
+            )
+
+
+            normalized_club_name = (
+                player_catalog_service
+                .normalize_player_filter_name(
+                    nation_lookup_name
+                )
+            )
+
+
+            nation_id = (
+                nation_id_by_name.get(
+                    normalized_club_name
+                )
+            )
+
+
+            if nation_id is None:
+
+                precheck_failures.append(
+                    {
+                        "success":
+                            False,
+
+                        "club_id":
+                            club_id,
+
+                        "name":
+                            club_name,
+
+                        "logo_type":
+                            "national",
+
+                        "logo_url":
+                            None,
+
+                        "error":
+                            (
+                                "FC Online nation_id를 "
+                                "찾지 못했습니다."
+                            ),
+                    }
+                )
+
+                continue
+
+
+            download_jobs.append(
+                {
+                    "club_id":
+                        club_id,
+
+                    "name":
+                        club_name,
+
+                    "official_team_id":
+                        official_team_id,
+
+                    "logo_type":
+                        "national",
+
+                    "nation_id":
+                        nation_id,
+                }
+            )
+
+
+        # =========================
+        # 일반 클럽
+        # =========================
+
+        else:
+
+            download_jobs.append(
+                {
+                    "club_id":
+                        club_id,
+
+                    "name":
+                        club_name,
+
+                    "official_team_id":
+                        official_team_id,
+
+                    "logo_type":
+                        "club",
+
+                    "nation_id":
+                        None,
+                }
+            )
+
+
+    # =========================
+    # 이미지 병렬 다운로드
+    # =========================
+
+    if download_jobs:
+
+        with ThreadPoolExecutor(
+            max_workers=8
+        ) as executor:
+
+            download_results = list(
+                executor.map(
+                    download_fconline_team_logo,
+                    download_jobs,
+                )
+            )
+
+
+    else:
+
+        download_results = []
+
+
+    results = (
+        precheck_failures
+        +
+        download_results
+    )
+
+
+    successful_results = [
+        result
+
+        for result
+        in results
+
+        if result[
+            "success"
+        ]
+    ]
+
+
+    failed_results = [
+        result
+
+        for result
+        in results
+
+        if not result[
+            "success"
+        ]
+    ]
+
+
+    # =========================
+    # DB 저장
+    # =========================
+
+    updated_count = 0
+
+    club_crest_count = 0
+
+    national_flag_count = 0
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            for result in (
+                successful_results
+            ):
+
+                cursor.execute(
+                    """
+                    UPDATE clubs
+
+                    SET
+                        logo_source_url = %s,
+
+                        logo_data = %s,
+
+                        logo_content_type = %s,
+
+                        updated_at = NOW()
+
+                    WHERE
+                        id = %s
+                    """,
+                    (
+                        result[
+                            "logo_url"
+                        ],
+
+                        result[
+                            "logo_data"
+                        ],
+
+                        result[
+                            "logo_content_type"
+                        ],
+
+                        result[
+                            "club_id"
+                        ],
+                    ),
+                )
+
+
+                if (
+                    cursor.rowcount
+                    <= 0
+                ):
+
+                    continue
+
+
+                updated_count += 1
+
+
+                if (
+                    result[
+                        "logo_type"
+                    ]
+                    ==
+                    "national"
+                ):
+
+                    national_flag_count += 1
+
+
+                else:
+
+                    club_crest_count += 1
+
+
+        connection.commit()
+
+
+    failure_preview = [
+        {
+            "club_id":
+                result[
+                    "club_id"
+                ],
+
+            "name":
+                result[
+                    "name"
+                ],
+
+            "logo_type":
+                result[
+                    "logo_type"
+                ],
+
+            "logo_url":
+                result[
+                    "logo_url"
+                ],
+
+            "error":
+                result[
+                    "error"
+                ],
+        }
+
+        for result
+        in failed_results[
+            :50
+        ]
+    ]
+
+
+    return {
+        "message":
+            (
+                "FC Online 팀 엠블럼 "
+                "동기화가 완료되었습니다."
+            ),
+
+        "requested_count":
+            len(
+                club_rows
+            ),
+
+        "updated_count":
+            updated_count,
+
+        "club_crest_count":
+            club_crest_count,
+
+        "national_flag_count":
+            national_flag_count,
+
+        "failed_count":
+            len(
+                failed_results
+            ),
+
+        "failures":
+            failure_preview,
+    }
+
+# =========================
+# ADMIN CLUBS
+# 전체 클럽 조회
+# =========================
+
+@app.get(
+    "/api/admin/clubs"
+)
+def admin_get_clubs(
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+                    logo_source_url,
+
+                    (
+                        logo_data IS NOT NULL
+                    ) AS has_logo,
+
+                    logo_content_type,
+                    is_active,
+                    created_at,
+                    updated_at
+
+                FROM clubs
+
+                ORDER BY
+                    name ASC,
+                    id ASC
+                """
+            )
+
+
+            club_rows = (
+                cursor.fetchall()
+            )
+
+
+    return [
+        {
+            "club_id":
+                club[
+                    "id"
+                ],
+
+            "code":
+                club[
+                    "code"
+                ],
+
+            "name":
+                club[
+                    "name"
+                ],
+
+            "short_name":
+                club[
+                    "short_name"
+                ],
+
+            "logo_source_url":
+                club[
+                    "logo_source_url"
+                ],
+
+            "has_logo":
+                bool(
+                    club[
+                        "has_logo"
+                    ]
+                ),
+
+            "logo_url":
+                (
+                    "/api/clubs/"
+                    f"{club['id']}/logo"
+
+                    if club[
+                        "has_logo"
+                    ]
+
+                    else None
+                ),
+
+            "is_active":
+                club[
+                    "is_active"
+                ],
+
+            "created_at":
+                club[
+                    "created_at"
+                ],
+
+            "updated_at":
+                club[
+                    "updated_at"
+                ],
+        }
+
+        for club
+        in club_rows
+    ]
+
+# =========================
+# ADMIN CLUB MERGE
+#
+# 기존 수동 등록 클럽을
+# FC Online 공식 클럽으로 병합
+#
+# source_club_id:
+# 삭제할 기존 클럽
+#
+# target_club_id:
+# 유지할 공식 클럽
+# =========================
+
+@app.post(
+    "/api/admin/clubs/"
+    "{source_club_id}/merge/"
+    "{target_club_id}"
+)
+def admin_merge_club(
+    source_club_id: int,
+    target_club_id: int,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    if (
+        source_club_id
+        ==
+        target_club_id
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "같은 클럽끼리는 "
+                "병합할 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 원본 클럽 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+
+                    official_team_id,
+                    league_id,
+                    league_name,
+
+                    logo_source_url,
+                    logo_data,
+                    logo_content_type,
+
+                    is_active
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    source_club_id,
+                ),
+            )
+
+
+            source_club = (
+                cursor.fetchone()
+            )
+
+
+            if source_club is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "병합할 기존 클럽을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 대상 공식 클럽 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+
+                    official_team_id,
+                    league_id,
+                    league_name,
+
+                    logo_source_url,
+                    logo_data,
+                    logo_content_type,
+
+                    is_active
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+
+                FOR UPDATE
+                """,
+                (
+                    target_club_id,
+                ),
+            )
+
+
+            target_club = (
+                cursor.fetchone()
+            )
+
+
+            if target_club is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "병합 대상 공식 클럽을 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 공식 클럽 보호
+            #
+            # 수동 클럽을 공식 클럽에
+            # 병합하는 용도로 사용
+            # =========================
+
+            if (
+                target_club[
+                    "official_team_id"
+                ]
+                is None
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "병합 대상 클럽에 "
+                        "FC Online 공식 Team ID가 "
+                        "없습니다."
+                    ),
+                )
+
+
+            # =========================
+            # 기존 수동 클럽의
+            # 로고 / 약어를 공식 클럽에 이전
+            #
+            # 공식 클럽에 이미 값이 있다면
+            # 기존 공식 값을 유지
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE clubs
+
+                SET
+                    short_name =
+                        COALESCE(
+                            short_name,
+                            %s
+                        ),
+
+                    logo_source_url =
+                        COALESCE(
+                            logo_source_url,
+                            %s
+                        ),
+
+                    logo_data =
+                        COALESCE(
+                            logo_data,
+                            %s
+                        ),
+
+                    logo_content_type =
+                        COALESCE(
+                            logo_content_type,
+                            %s
+                        ),
+
+                    is_active = TRUE,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    source_club[
+                        "short_name"
+                    ],
+
+                    source_club[
+                        "logo_source_url"
+                    ],
+
+                    source_club[
+                        "logo_data"
+                    ],
+
+                    source_club[
+                        "logo_content_type"
+                    ],
+
+                    target_club_id,
+                ),
+            )
+
+
+            # =========================
+            # 시즌 참가자
+            # 현재 클럽 참조 변경
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE season_participants
+
+                SET
+                    club_id = %s
+
+                WHERE
+                    club_id = %s
+                """,
+                (
+                    target_club_id,
+                    source_club_id,
+                ),
+            )
+
+
+            current_club_reference_count = (
+                cursor.rowcount
+            )
+
+
+            # =========================
+            # 시즌 참가자
+            # 최초 Draft 클럽 참조 변경
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE season_participants
+
+                SET
+                    initial_club_id = %s
+
+                WHERE
+                    initial_club_id = %s
+                """,
+                (
+                    target_club_id,
+                    source_club_id,
+                ),
+            )
+
+
+            initial_club_reference_count = (
+                cursor.rowcount
+            )
+
+
+            # =========================
+            # Draft BAN / PICK 기록
+            # 클럽 참조 변경
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE draft_actions
+
+                SET
+                    club_id = %s
+
+                WHERE
+                    club_id = %s
+                """,
+                (
+                    target_club_id,
+                    source_club_id,
+                ),
+            )
+
+
+            draft_action_reference_count = (
+                cursor.rowcount
+            )
+
+
+            # =========================
+            # 기존 수동 클럽 삭제
+            # =========================
+
+            cursor.execute(
+                """
+                DELETE FROM clubs
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    source_club_id,
+                ),
+            )
+
+
+            # =========================
+            # 병합 완료된 공식 클럽 조회
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    id,
+                    code,
+                    name,
+                    short_name,
+
+                    official_team_id,
+                    league_id,
+                    league_name,
+
+                    logo_source_url,
+
+                    (
+                        logo_data IS NOT NULL
+                    ) AS has_logo,
+
+                    is_active
+
+                FROM clubs
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    target_club_id,
+                ),
+            )
+
+
+            merged_club = (
+                cursor.fetchone()
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "message":
+            "클럽 병합이 완료되었습니다.",
+
+        "removed_club": {
+            "club_id":
+                source_club[
+                    "id"
+                ],
+
+            "code":
+                source_club[
+                    "code"
+                ],
+
+            "name":
+                source_club[
+                    "name"
+                ],
+        },
+
+        "club": {
+            "club_id":
+                merged_club[
+                    "id"
+                ],
+
+            "code":
+                merged_club[
+                    "code"
+                ],
+
+            "name":
+                merged_club[
+                    "name"
+                ],
+
+            "short_name":
+                merged_club[
+                    "short_name"
+                ],
+
+            "official_team_id":
+                merged_club[
+                    "official_team_id"
+                ],
+
+            "league_id":
+                merged_club[
+                    "league_id"
+                ],
+
+            "league_name":
+                merged_club[
+                    "league_name"
+                ],
+
+            "logo_source_url":
+                merged_club[
+                    "logo_source_url"
+                ],
+
+            "has_logo":
+                bool(
+                    merged_club[
+                        "has_logo"
+                    ]
+                ),
+
+            "logo_url":
+                (
+                    "/api/clubs/"
+                    f"{merged_club['id']}/logo"
+
+                    if merged_club[
+                        "has_logo"
+                    ]
+
+                    else None
+                ),
+
+            "is_active":
+                merged_club[
+                    "is_active"
+                ],
+        },
+
+        "moved_references": {
+            "season_current_club":
+                current_club_reference_count,
+
+            "season_initial_club":
+                initial_club_reference_count,
+
+            "draft_actions":
+                draft_action_reference_count,
+        },
+    }
+
+# =========================
+# ADMIN CLUB CREATE
+#
+# 클럽 등록 시
+# 외부 로고를 DB에 Snapshot
+# =========================
+
+@app.post(
+    "/api/admin/clubs"
+)
+def admin_create_club(
+    request:
+        AdminClubCreateRequest,
+
+    admin_token: str =
+        Depends(
+            require_admin
+        ),
+):
+
+    code = (
+        request.code
+        .strip()
+        .lower()
+    )
+
+    name = (
+        request.name
+        .strip()
+    )
+
+    short_name = (
+        request.short_name
+        .strip()
+
+        if request.short_name
+        else None
+    )
+
+
+    if not re.fullmatch(
+        r"[a-z0-9][a-z0-9_-]{0,99}",
+        code,
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 코드는 영문 소문자, "
+                "숫자, -, _ 만 사용할 수 있습니다."
+            ),
+        )
+
+
+    if not name:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "클럽 이름을 입력해주세요."
+            ),
+        )
+
+
+    # =========================
+    # 외부 로고 Snapshot
+    # =========================
+
+    logo = download_club_logo(
+        request.logo_source_url
+    )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                INSERT INTO clubs (
+                    code,
+                    name,
+                    short_name,
+
+                    logo_source_url,
+                    logo_data,
+                    logo_content_type,
+
+                    is_active
+                )
+
+                VALUES (
+                    %s,
+                    %s,
+                    %s,
+
+                    %s,
+                    %s,
+                    %s,
+
+                    %s
+                )
+
+                ON CONFLICT (
+                    code
+                )
+
+                DO NOTHING
+
+                RETURNING
+                    id,
+                    code,
+                    name,
+                    short_name,
+                    is_active,
+                    created_at,
+                    updated_at
+                """,
+                (
+                    code,
+                    name,
+                    short_name,
+
+                    logo[
+                        "source_url"
+                    ],
+
+                    logo[
+                        "data"
+                    ],
+
+                    logo[
+                        "content_type"
+                    ],
+
+                    request.is_active,
+                ),
+            )
+
+
+            club = (
+                cursor.fetchone()
+            )
+
+
+            if not club:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "같은 코드의 클럽이 "
+                        "이미 등록되어 있습니다."
+                    ),
+                )
+
+
+        connection.commit()
+
+
+    return {
+        "club_id":
+            club[
+                "id"
+            ],
+
+        "code":
+            club[
+                "code"
+            ],
+
+        "name":
+            club[
+                "name"
+            ],
+
+        "short_name":
+            club[
+                "short_name"
+            ],
+
+        "logo_url":
+            (
+                "/api/clubs/"
+                f"{club['id']}/logo"
+            ),
+
+        "is_active":
+            club[
+                "is_active"
+            ],
+
+        "created_at":
+            club[
+                "created_at"
+            ],
+
+        "updated_at":
+            club[
+                "updated_at"
+            ],
+    }
+
 
 # =========================
 # ADMIN PARTICIPANTS
@@ -15658,16 +24816,27 @@ def admin_get_participants(
             cursor.execute(
                 """
                 SELECT
-                    id,
-                    fcl_name,
-                    fc_nickname,
+                    p.id,
+                    p.user_id,
 
-                    current_team_name,
-                    current_team_logo_path
+                    p.fcl_name,
+                    p.fc_nickname,
 
-                FROM participants
+                    p.current_team_name,
+                    p.current_team_logo_path,
 
-                ORDER BY id
+                    u.nickname
+                        AS linked_user_nickname,
+
+                    u.email
+                        AS linked_user_email
+
+                FROM participants AS p
+
+                LEFT JOIN users AS u
+                    ON u.id = p.user_id
+
+                ORDER BY p.id
                 """
             )
 
@@ -22161,11 +31330,47 @@ def get_prediction_matches():
                     team_a.fcl_name
                         AS team_a_fcl_name,
 
-                    team_a.current_team_name
-                        AS team_a_team_name,
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_a_snapshot_name,
+                            season_team_a.team_name,
+                            team_a.current_team_name
+                        )
 
-                    team_a.current_team_logo_path
-                        AS team_a_logo_path,
+                    ELSE
+                        COALESCE(
+                            season_team_a.team_name,
+                            team_a.current_team_name
+                        )
+                END
+                    AS team_a_team_name,
+
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_a_snapshot_logo_path,
+                            season_team_a.team_logo_path,
+                            team_a.current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            season_team_a.team_logo_path,
+                            team_a.current_team_logo_path
+                        )
+                END
+                    AS team_a_logo_path,
 
                     team_b.id
                         AS team_b_id,
@@ -22173,11 +31378,47 @@ def get_prediction_matches():
                     team_b.fcl_name
                         AS team_b_fcl_name,
 
-                    team_b.current_team_name
-                        AS team_b_team_name,
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_b_snapshot_name,
+                            season_team_b.team_name,
+                            team_b.current_team_name
+                        )
 
-                    team_b.current_team_logo_path
-                        AS team_b_logo_path
+                    ELSE
+                        COALESCE(
+                            season_team_b.team_name,
+                            team_b.current_team_name
+                        )
+                END
+                    AS team_b_team_name,
+
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_b_snapshot_logo_path,
+                            season_team_b.team_logo_path,
+                            team_b.current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            season_team_b.team_logo_path,
+                            team_b.current_team_logo_path
+                        )
+                END
+                    AS team_b_logo_path
 
                 FROM series AS s
 
@@ -22192,6 +31433,30 @@ def get_prediction_matches():
 
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 WHERE
                     s.series_type =
@@ -24735,20 +34000,92 @@ def get_my_predictions(
                     team_a.fcl_name
                         AS team_a_fcl_name,
 
-                    team_a.current_team_name
-                        AS team_a_team_name,
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_a_snapshot_name,
+                            season_team_a.team_name,
+                            team_a.current_team_name
+                        )
 
-                    team_a.current_team_logo_path
-                        AS team_a_logo_path,
+                    ELSE
+                        COALESCE(
+                            season_team_a.team_name,
+                            team_a.current_team_name
+                        )
+                END
+                    AS team_a_team_name,
+
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_a_snapshot_logo_path,
+                            season_team_a.team_logo_path,
+                            team_a.current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            season_team_a.team_logo_path,
+                            team_a.current_team_logo_path
+                        )
+                END
+                    AS team_a_logo_path,
 
                     team_b.fcl_name
                         AS team_b_fcl_name,
 
-                    team_b.current_team_name
-                        AS team_b_team_name,
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_b_snapshot_name,
+                            season_team_b.team_name,
+                            team_b.current_team_name
+                        )
 
-                    team_b.current_team_logo_path
-                        AS team_b_logo_path
+                    ELSE
+                        COALESCE(
+                            season_team_b.team_name,
+                            team_b.current_team_name
+                        )
+                END
+                    AS team_b_team_name,
+
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_b_snapshot_logo_path,
+                            season_team_b.team_logo_path,
+                            team_b.current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            season_team_b.team_logo_path,
+                            team_b.current_team_logo_path
+                        )
+                END
+                    AS team_b_logo_path
 
                 FROM predictions AS p
 
@@ -24767,6 +34104,30 @@ def get_my_predictions(
 
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 WHERE
                     p.user_id = %s
@@ -30148,13 +39509,16 @@ def get_matches(
     workbook.close()
 
     # =========================================
-    # 일정 표시용 팀 정보
+    # 일정 표시용 시즌 팀 정보
     #
     # 예정 / 진행 중:
-    # participants의 현재 팀 정보 사용
+    # season_participants 현재 팀 우선
     #
     # 완료 경기:
-    # 경기 완료 당시 Snapshot 사용
+    # SERIES 시작/완료 당시 Snapshot 우선
+    #
+    # 기존 시즌:
+    # participants 현재 팀으로 fallback
     # =========================================
 
     with get_db_connection() as connection:
@@ -30164,13 +39528,69 @@ def get_matches(
             cursor.execute(
                 """
                 SELECT
-                    fcl_name,
-                    current_team_name,
-                    current_team_logo_path
+                    p.fcl_name,
 
-                FROM participants
-                """
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_name_snapshot,
+                                sp.team_name,
+                                p.current_team_name
+                            )
+
+                        ELSE
+                            COALESCE(
+                                sp.team_name,
+                                p.current_team_name
+                            )
+                    END
+                        AS current_team_name,
+
+                    CASE
+                        WHEN
+                            s.status = 'completed'
+                        THEN
+                            COALESCE(
+                                sp.team_logo_path_snapshot,
+                                sp.team_logo_path,
+                                p.current_team_logo_path
+                            )
+
+                        ELSE
+                            COALESCE(
+                                sp.team_logo_path,
+                                p.current_team_logo_path
+                            )
+                    END
+                        AS current_team_logo_path
+
+                FROM
+                    season_participants AS sp
+
+                JOIN
+                    participants AS p
+
+                    ON
+                        p.id =
+                        sp.participant_id
+
+                JOIN
+                    seasons AS s
+
+                    ON
+                        s.id =
+                        sp.season_id
+
+                WHERE
+                    sp.season_id = %s
+                """,
+                (
+                    selected_season_id,
+                ),
             )
+
 
             participant_team_rows = (
                 cursor.fetchall()
@@ -30178,8 +39598,11 @@ def get_matches(
 
 
     participant_team_map = {
-        row["fcl_name"]: row
-        for row in participant_team_rows
+        row["fcl_name"]:
+            row
+
+        for row
+        in participant_team_rows
     }
 
     # =========================================
@@ -31099,39 +40522,47 @@ def get_standings(
         with connection.cursor() as cursor:
 
             cursor.execute(
-                """
-                SELECT
-                    p.id AS participant_id,
-                    p.fcl_name,
-                    sp.display_order,
+            """
+            SELECT
+                p.id AS participant_id,
+                p.fcl_name,
+                sp.display_order,
 
-                    CASE
-                        WHEN
-                            s.status = 'completed'
-                        THEN
-                            COALESCE(
-                                sp.team_name_snapshot,
-                                p.current_team_name
-                            )
-
-                        ELSE
+                CASE
+                    WHEN
+                        s.status = 'completed'
+                    THEN
+                        COALESCE(
+                            sp.team_name_snapshot,
+                            sp.team_name,
                             p.current_team_name
-                    END
-                        AS current_team_name,
+                        )
 
-                    CASE
-                        WHEN
-                            s.status = 'completed'
-                        THEN
-                            COALESCE(
-                                sp.team_logo_path_snapshot,
-                                p.current_team_logo_path
-                            )
+                    ELSE
+                        COALESCE(
+                            sp.team_name,
+                            p.current_team_name
+                        )
+                END
+                    AS current_team_name,
 
-                        ELSE
+                CASE
+                    WHEN
+                        s.status = 'completed'
+                    THEN
+                        COALESCE(
+                            sp.team_logo_path_snapshot,
+                            sp.team_logo_path,
                             p.current_team_logo_path
-                    END
-                        AS current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            sp.team_logo_path,
+                            p.current_team_logo_path
+                        )
+                END
+                    AS current_team_logo_path
 
                 FROM
                     season_participants
@@ -34784,6 +44215,12 @@ def get_player_rankings(
                     p.fc_nickname
                         AS nickname,
 
+                    season_participant.team_name
+                        AS current_team_name,
+
+                    season_participant.team_logo_path
+                        AS current_team_logo_path,
+
                     csp.player_name,
 
                     csp.sp_id,
@@ -34827,6 +44264,15 @@ def get_player_rankings(
                     ON p.id =
                         csp.participant_id
 
+                JOIN season_participants
+                    AS season_participant
+                    ON season_participant.participant_id =
+                        csp.participant_id
+
+                    AND
+                    season_participant.season_id =
+                        %s
+
                 LEFT JOIN regular_stats AS rs
                     ON rs.participant_id =
                         csp.participant_id
@@ -34864,6 +44310,7 @@ def get_player_rankings(
                     p.id ASC
                 """,
                 (
+                    selected_season_id,
                     selected_season_id,
                     selected_season_id,
                     selected_season_id,
@@ -34926,6 +44373,16 @@ def get_player_rankings(
 
                 "nickname":
                     row["nickname"],
+
+                "current_team_name":
+                    row[
+                        "current_team_name"
+                    ],
+
+                "current_team_logo_path":
+                    row[
+                        "current_team_logo_path"
+                    ],
 
                 "player_name":
                     row["player_name"],
@@ -36370,27 +45827,43 @@ def get_playoffs(
 
                     CASE
                         WHEN
-                            s.status = 'completed'
+                            s.status IN (
+                                'active',
+                                'completed'
+                            )
                         THEN
                             COALESCE(
                                 s.team_a_snapshot_logo_path,
+                                season_team_a.team_logo_path,
                                 team_a.current_team_logo_path
                             )
+
                         ELSE
-                            team_a.current_team_logo_path
+                            COALESCE(
+                                season_team_a.team_logo_path,
+                                team_a.current_team_logo_path
+                            )
                     END
                         AS team_a_logo_path,
 
-                    CASE
-                        WHEN
-                            s.status = 'completed'
-                        THEN
-                            COALESCE(
-                                s.team_b_snapshot_logo_path,
-                                team_b.current_team_logo_path
-                            )
-                        ELSE
+                CASE
+                    WHEN
+                        s.status IN (
+                            'active',
+                            'completed'
+                        )
+                    THEN
+                        COALESCE(
+                            s.team_b_snapshot_logo_path,
+                            season_team_b.team_logo_path,
                             team_b.current_team_logo_path
+                        )
+
+                    ELSE
+                        COALESCE(
+                            season_team_b.team_logo_path,
+                            team_b.current_team_logo_path
+                        )
                     END
                         AS team_b_logo_path,
 
@@ -36431,6 +45904,30 @@ def get_playoffs(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 WHERE
                     s.series_type =
@@ -38571,19 +48068,31 @@ def activate_fcl_series(
                     team_a.fcl_name
                         AS team_a,
 
-                    team_a.current_team_name
+                    COALESCE(
+                        season_team_a.team_name,
+                        team_a.current_team_name
+                    )
                         AS team_a_current_team_name,
 
-                    team_a.current_team_logo_path
+                    COALESCE(
+                        season_team_a.team_logo_path,
+                        team_a.current_team_logo_path
+                    )
                         AS team_a_current_team_logo_path,
 
                     team_b.fcl_name
                         AS team_b,
 
-                    team_b.current_team_name
+                    COALESCE(
+                        season_team_b.team_name,
+                        team_b.current_team_name
+                    )
                         AS team_b_current_team_name,
 
-                    team_b.current_team_logo_path
+                    COALESCE(
+                        season_team_b.team_logo_path,
+                        team_b.current_team_logo_path
+                    )
                         AS team_b_current_team_logo_path
 
                 FROM series AS s
@@ -38595,6 +48104,30 @@ def activate_fcl_series(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 WHERE s.id = %s
                 """,
@@ -39210,20 +48743,32 @@ def manual_complete_fcl_series(
                     team_a.fcl_name
                         AS team_a,
 
+                COALESCE(
+                    season_team_a.team_name,
                     team_a.current_team_name
-                        AS team_a_current_team_name,
+                )
+                    AS team_a_current_team_name,
 
+                COALESCE(
+                    season_team_a.team_logo_path,
                     team_a.current_team_logo_path
-                        AS team_a_current_team_logo_path,
+                )
+                    AS team_a_current_team_logo_path,
 
-                    team_b.fcl_name
-                        AS team_b,
+                team_b.fcl_name
+                    AS team_b,
 
+                COALESCE(
+                    season_team_b.team_name,
                     team_b.current_team_name
-                        AS team_b_current_team_name,
+                )
+                    AS team_b_current_team_name,
 
+                COALESCE(
+                    season_team_b.team_logo_path,
                     team_b.current_team_logo_path
-                        AS team_b_current_team_logo_path
+                )
+                    AS team_b_current_team_logo_path
 
                 FROM series AS s
 
@@ -39234,6 +48779,30 @@ def manual_complete_fcl_series(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 WHERE s.id = %s
 
@@ -40674,11 +50243,19 @@ def sync_fcl_series_status(
                     team_a.fcl_name
                         AS team_a_name,
 
+                COALESCE(
+                    s.team_a_snapshot_name,
+                    season_team_a.team_name,
                     team_a.current_team_name
-                        AS team_a_current_team_name,
+                )
+                    AS team_a_current_team_name,
 
+                COALESCE(
+                    s.team_a_snapshot_logo_path,
+                    season_team_a.team_logo_path,
                     team_a.current_team_logo_path
-                        AS team_a_current_team_logo_path,
+                )
+                    AS team_a_current_team_logo_path,
 
                     team_a.fc_nickname
                         AS nickname_a,
@@ -40692,11 +50269,19 @@ def sync_fcl_series_status(
                     team_b.fcl_name
                         AS team_b_name,
 
+                COALESCE(
+                    s.team_b_snapshot_name,
+                    season_team_b.team_name,
                     team_b.current_team_name
-                        AS team_b_current_team_name,
+                )
+                    AS team_b_current_team_name,
 
+                COALESCE(
+                    s.team_b_snapshot_logo_path,
+                    season_team_b.team_logo_path,
                     team_b.current_team_logo_path
-                        AS team_b_current_team_logo_path,
+                )
+                    AS team_b_current_team_logo_path,
 
                     team_b.fc_nickname
                         AS nickname_b,
@@ -40712,6 +50297,30 @@ def sync_fcl_series_status(
 
                 JOIN participants AS team_b
                     ON team_b.id =
+                        s.team_b_id
+
+            LEFT JOIN
+                season_participants AS season_team_a
+
+                ON
+                    season_team_a.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_a.participant_id =
+                        s.team_a_id
+
+            LEFT JOIN
+                season_participants AS season_team_b
+
+                ON
+                    season_team_b.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_b.participant_id =
                         s.team_b_id
 
                 WHERE s.id = %s
@@ -40820,10 +50429,21 @@ def sync_fcl_series_status(
     # NEXON 최근 경기 조회
     # =========================
 
+    match_search_limit = (
+        30
+        if (
+            is_pending_result_sync
+            and
+            series["series_type"]
+            == "플레이오프"
+        )
+        else 10
+    )
+
     matches_a = get_user_match_ids(
         ouid_a,
         series["match_type"],
-        limit=10,
+        limit=match_search_limit,
     )
 
 
@@ -40835,7 +50455,7 @@ def sync_fcl_series_status(
     matches_b = get_user_match_ids(
         ouid_b,
         series["match_type"],
-        limit=10,
+        limit=match_search_limit,
     )
 
 
@@ -41078,9 +50698,21 @@ def sync_fcl_series_status(
         detected_team_b_wins = 0
 
 
-        for detected_match in (
-            detected_matches[:best_of]
-        ):
+        # 완료된 수동 결과를 사후 동기화할 때는
+        # 같은 날 같은 참가자끼리 치른 경기 전체를
+        # 후보로 유지한다. 아래의 수동 점수/승자 비교에서
+        # 정확한 연속 구간을 찾은 뒤에 최종 선택한다.
+        #
+        # active 상태에서는 기존처럼 best_of 범위 안에서
+        # 선승 도달 시 SERIES를 종료한다.
+        playoff_candidates = (
+            detected_matches
+            if is_pending_result_sync
+            else detected_matches[:best_of]
+        )
+
+
+        for detected_match in playoff_candidates:
 
             winner_side = (
                 get_match_winner_side(
@@ -41094,6 +50726,22 @@ def sync_fcl_series_status(
 
             if winner_side is None:
 
+                if is_pending_result_sync:
+
+                    detected_match[
+                        "winner_side"
+                    ] = None
+
+                    detected_match[
+                        "result_method"
+                    ] = None
+
+                    playoff_matches.append(
+                        detected_match
+                    )
+
+                    continue
+
                 raise HTTPException(
                     status_code=400,
                     detail=(
@@ -41103,7 +50751,11 @@ def sync_fcl_series_status(
                 )
 
 
-            if winner_side == "draw":
+            if (
+                winner_side == "draw"
+                and
+                not is_pending_result_sync
+            ):
 
                 raise HTTPException(
                     status_code=400,
@@ -41117,10 +50769,6 @@ def sync_fcl_series_status(
             detected_match[
                 "winner_side"
             ] = winner_side
-
-            detected_match[
-                "result_method"
-            ],
 
             detected_match[
                 "result_method"
@@ -41139,6 +50787,8 @@ def sync_fcl_series_status(
                 detected_match
             )
 
+            if is_pending_result_sync:
+                continue
 
             if winner_side == "team_a":
 
@@ -41188,11 +50838,22 @@ def sync_fcl_series_status(
 
         integrity_conflict = None
 
+        integrity_check_matches = (
+            []
+            if (
+                is_pending_result_sync
+                and
+                series["series_type"]
+                == "플레이오프"
+            )
+            else detected_matches
+        )
+
         for (
             set_index,
             detected_match,
         ) in enumerate(
-            detected_matches,
+            integrity_check_matches,
             start=1,
         ):
             conflict_reason = (
@@ -41422,7 +51083,8 @@ def sync_fcl_series_status(
                         played_at,
                         team_a_score,
                         team_b_score,
-                        score_source
+                        score_source,
+                        winner_side
 
                     FROM series_sets
 
@@ -41511,6 +51173,15 @@ def sync_fcl_series_status(
                 in manual_sets
             ]
 
+            manual_winner_sides = [
+                manual_set.get(
+                    "winner_side"
+                )
+
+                for manual_set
+                in manual_sets
+            ]
+
 
             matching_windows = []
 
@@ -41541,6 +51212,7 @@ def sync_fcl_series_status(
 
 
                 candidate_score_pairs = []
+                candidate_winner_sides = []
 
                 candidate_valid = True
 
@@ -41596,6 +51268,12 @@ def sync_fcl_series_status(
                         )
                     )
 
+                candidate_winner_sides.append(
+                    candidate_match.get(
+                        "winner_side"
+                    )
+                )
+
 
                 if (
                     candidate_valid
@@ -41603,6 +51281,15 @@ def sync_fcl_series_status(
                     candidate_score_pairs
                     ==
                     manual_score_pairs
+                    and
+                    (
+                        series["series_type"]
+                        != "플레이오프"
+                        or
+                        candidate_winner_sides
+                        ==
+                        manual_winner_sides
+                    )
                 ):
 
                     matching_windows.append(
@@ -41769,6 +51456,108 @@ def sync_fcl_series_status(
             }
 
 
+    # =========================
+    # 플레이오프 사후 동기화는
+    # 정확한 후보 구간을 고른 뒤
+    # 정합성 검증을 수행한다.
+    # =========================
+
+    if (
+        series["series_type"]
+        == "플레이오프"
+    ):
+
+        integrity_conflict = None
+
+
+        for (
+            set_index,
+            detected_match,
+        ) in enumerate(
+            detected_matches,
+            start=1,
+        ):
+
+            conflict_reason = (
+                get_match_integrity_conflict(
+                    detected_match["data"],
+                    nickname_a,
+                    nickname_b,
+                    series["series_type"],
+                )
+            )
+
+
+            if conflict_reason:
+
+                integrity_conflict = (
+                    f"{set_index}세트: "
+                    f"{conflict_reason}"
+                )
+
+                break
+
+
+        if integrity_conflict:
+
+            with get_db_connection() as connection:
+
+                with connection.cursor() as cursor:
+
+                    cursor.execute(
+                        """
+                        UPDATE series
+
+                        SET
+                            stats_sync_status =
+                                'conflict'
+
+                        WHERE id = %s
+                        """,
+                        (
+                            series_id,
+                        ),
+                    )
+
+                connection.commit()
+
+
+            return {
+                "series": {
+                    "series_id":
+                        series_id,
+
+                    "series_type":
+                        series["series_type"],
+
+                    "team_a":
+                        series["team_a_name"],
+
+                    "team_b":
+                        series["team_b_name"],
+
+                    "status":
+                        "completed",
+
+                    "set_count":
+                        required_sync_set_count,
+
+                    "stats_sync_status":
+                        "conflict",
+                },
+
+                "sets": [],
+
+                "mvp": None,
+
+                "sync_message": (
+                    "NEXON 경기 데이터 정합성 "
+                    "검증에 실패했습니다. "
+                    f"{integrity_conflict}"
+                ),
+            }
+
+
         # =========================
         # Nexon 점수 추출
         # =========================
@@ -41880,14 +51669,29 @@ def sync_fcl_series_status(
                 !=
                 nexon_score[1]
             )
+            or
+            (
+                series["series_type"]
+                == "플레이오프"
+                and
+                manual_set.get(
+                    "winner_side"
+                )
+                !=
+                detected_match.get(
+                    "winner_side"
+                )
+            )
 
             for (
                 manual_set,
                 nexon_score,
+                detected_match,
             )
             in zip(
                 manual_sets,
                 nexon_scores,
+                detected_matches,
             )
         )
 
@@ -43231,11 +53035,17 @@ def get_season_champion(
                     team_a.fc_nickname
                         AS team_a_nickname,
 
+                COALESCE(
+                    season_team_a.team_name,
                     team_a.current_team_name
-                        AS team_a_current_team_name,
+                )
+                    AS team_a_current_team_name,
 
+                COALESCE(
+                    season_team_a.team_logo_path,
                     team_a.current_team_logo_path
-                        AS team_a_current_team_logo_path,
+                )
+                    AS team_a_current_team_logo_path,
 
                     team_b.fcl_name
                         AS team_b_name,
@@ -43243,11 +53053,17 @@ def get_season_champion(
                     team_b.fc_nickname
                         AS team_b_nickname,
 
+                COALESCE(
+                    season_team_b.team_name,
                     team_b.current_team_name
-                        AS team_b_current_team_name,
+                )
+                    AS team_b_current_team_name,
 
+                COALESCE(
+                    season_team_b.team_logo_path,
                     team_b.current_team_logo_path
-                        AS team_b_current_team_logo_path
+                )
+                    AS team_b_current_team_logo_path
 
                 FROM series AS s
 
@@ -43261,6 +53077,30 @@ def get_season_champion(
 
                 JOIN participants AS team_b
                     ON team_b.id =
+                        s.team_b_id
+
+            LEFT JOIN
+                season_participants AS season_team_a
+
+                ON
+                    season_team_a.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_a.participant_id =
+                        s.team_a_id
+
+            LEFT JOIN
+                season_participants AS season_team_b
+
+                ON
+                    season_team_b.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_b.participant_id =
                         s.team_b_id
 
                 WHERE
@@ -43808,11 +53648,17 @@ def get_season_final_standings(
                     team_a.fc_nickname
                         AS team_a_nickname,
 
+                COALESCE(
+                    season_team_a.team_name,
                     team_a.current_team_name
-                        AS team_a_current_team_name,
+                )
+                    AS team_a_current_team_name,
 
+                COALESCE(
+                    season_team_a.team_logo_path,
                     team_a.current_team_logo_path
-                        AS team_a_current_team_logo_path,
+                )
+                    AS team_a_current_team_logo_path,
 
                     team_b.fcl_name
                         AS team_b_name,
@@ -43820,11 +53666,18 @@ def get_season_final_standings(
                     team_b.fc_nickname
                         AS team_b_nickname,
 
+                COALESCE(
+                    season_team_b.team_name,
                     team_b.current_team_name
-                        AS team_b_current_team_name,
+                )
+                    AS team_b_current_team_name,
 
+                COALESCE(
+                    season_team_b.team_logo_path,
                     team_b.current_team_logo_path
-                        AS team_b_current_team_logo_path
+                )
+                    AS team_b_current_team_logo_path
+
 
                 FROM series AS s
 
@@ -43834,6 +53687,30 @@ def get_season_final_standings(
 
                 JOIN participants AS team_b
                     ON team_b.id =
+                        s.team_b_id
+
+            LEFT JOIN
+                season_participants AS season_team_a
+
+                ON
+                    season_team_a.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_a.participant_id =
+                        s.team_a_id
+
+            LEFT JOIN
+                season_participants AS season_team_b
+
+                ON
+                    season_team_b.season_id =
+                        s.season_id
+
+                    AND
+
+                    season_team_b.participant_id =
                         s.team_b_id
 
                 WHERE
@@ -43991,17 +53868,19 @@ def get_season_final_standings(
                     p.fc_nickname
                         AS nickname,
 
-                    COALESCE(
-                        sp.team_name_snapshot,
-                        p.current_team_name
-                    )
-                        AS team_name,
+                COALESCE(
+                    sp.team_name_snapshot,
+                    sp.team_name,
+                    p.current_team_name
+                )
+                    AS team_name,
 
-                    COALESCE(
-                        sp.team_logo_path_snapshot,
-                        p.current_team_logo_path
-                    )
-                        AS team_logo_path
+                COALESCE(
+                    sp.team_logo_path_snapshot,
+                    sp.team_logo_path,
+                    p.current_team_logo_path
+                )
+                    AS team_logo_path
 
                 FROM season_participants
                     AS sp
@@ -46795,6 +56674,7 @@ def get_series_squads(
 
                     COALESCE(
                         s.team_a_snapshot_name,
+                        season_team_a.team_name,
                         team_a.current_team_name
                     ) AS team_a_name,
 
@@ -46820,11 +56700,12 @@ def get_series_squads(
                         THEN
                             './assets/images/FCL_season2.png'
 
-                        ELSE
-                            COALESCE(
-                                s.team_a_snapshot_logo_path,
-                                team_a.current_team_logo_path
-                            )
+                    ELSE
+                        COALESCE(
+                            s.team_a_snapshot_logo_path,
+                            season_team_a.team_logo_path,
+                            team_a.current_team_logo_path
+                        )
 
                     END AS team_a_logo_path,
 
@@ -46838,6 +56719,7 @@ def get_series_squads(
 
                     COALESCE(
                         s.team_b_snapshot_name,
+                        season_team_b.team_name,
                         team_b.current_team_name
                     ) AS team_b_name,
 
@@ -46866,10 +56748,11 @@ def get_series_squads(
                     ELSE
                         COALESCE(
                             s.team_b_snapshot_logo_path,
+                            season_team_b.team_logo_path,
                             team_b.current_team_logo_path
                         )
 
-                END AS team_b_logo_path
+                    END AS team_b_logo_path
 
                 FROM series AS s
 
@@ -46880,6 +56763,30 @@ def get_series_squads(
                 JOIN participants AS team_b
                     ON team_b.id =
                         s.team_b_id
+
+                LEFT JOIN
+                    season_participants AS season_team_a
+
+                    ON
+                        season_team_a.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_a.participant_id =
+                            s.team_a_id
+
+                LEFT JOIN
+                    season_participants AS season_team_b
+
+                    ON
+                        season_team_b.season_id =
+                            s.season_id
+
+                        AND
+
+                        season_team_b.participant_id =
+                            s.team_b_id
 
                 LEFT JOIN
                     one_day_tournament_matches
@@ -48038,7 +57945,21 @@ def get_fcl_season(
                     p.fcl_name,
                     p.fc_nickname,
                     p.ouid,
-                    sp.display_order
+
+                    sp.display_order,
+
+                    sp.club_id,
+                    sp.initial_club_id,
+
+                    sp.team_name,
+                    sp.team_logo_path,
+
+                    sp.initial_team_name,
+                    sp.initial_team_logo_path,
+
+                    sp.team_assignment_source,
+                    sp.team_change_count,
+                    sp.team_changed_at
 
                 FROM
                     season_participants

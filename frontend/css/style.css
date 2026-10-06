@@ -840,6 +840,40 @@ main {
 .player-record-owner {
     color: #aaa;
     white-space: nowrap;
+    text-align: center;
+}
+
+.player-record-owner-stack {
+    display: flex;
+
+    flex-direction: column;
+
+    align-items: center;
+
+    justify-content: center;
+
+    gap: 4px;
+}
+
+.player-record-owner-name {
+    color: #ffffff;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.player-record-owner-nickname {
+    color: #9a9a9a;
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+.player-record-owner-team-logo {
+    width: 24px;
+    height: 24px;
+
+    flex-shrink: 0;
+
+    object-fit: contain;
 }
 
 .player-record-owner-name,
@@ -7707,6 +7741,22 @@ body.site-auth-modal-open {
         font-size: 12px;
         line-height: 1.4;
         white-space: normal;
+        text-align: center;
+    }
+
+    .player-record-owner-stack {
+        display: flex;
+
+        flex-direction: column;
+
+        align-items: center;
+
+        gap: 3px;
+    }
+
+    .player-record-owner-team-logo {
+        width: 20px;
+        height: 20px;
     }
 
     .player-record-owner-name,

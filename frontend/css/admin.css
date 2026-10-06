@@ -2084,8 +2084,9 @@
 
     grid-template-columns:
         minmax(180px, 1.2fr)
-        minmax(120px, 0.7fr)
-        minmax(280px, 1.6fr)
+        minmax(110px, 0.6fr)
+        minmax(190px, 1fr)
+        minmax(260px, 1.5fr)
         auto;
 
     align-items: center;
@@ -2195,6 +2196,62 @@
     font-size: 19px;
 }
 
+.admin-user-participant-control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.admin-user-participant-control > span:first-child {
+    color: #777;
+    font-size: 10px;
+}
+
+.admin-user-participant-select {
+    width: 100%;
+    padding: 8px 9px;
+    border: 1px solid #3a3a3a;
+    border-radius: 5px;
+    background: #101010;
+    color: #eee;
+    font-family: inherit;
+    font-size: 11px;
+    outline: none;
+}
+
+.admin-user-participant-select:focus {
+    border-color: #b79a60;
+}
+
+.admin-user-participant-button {
+    padding: 7px 10px;
+    border: 1px solid rgba(183, 154, 96, 0.55);
+    border-radius: 5px;
+    background: transparent;
+    color: #d7bc78;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.admin-user-participant-button:hover {
+    border-color: #d7bc78;
+    background: rgba(183, 154, 96, 0.08);
+}
+
+.admin-user-participant-button:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.admin-user-participant-message {
+    overflow: hidden;
+    color: #777;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .admin-user-point-control {
     display: grid;
@@ -3850,5 +3907,475 @@
     .admin-season-create-card,
     .admin-season-list-card {
         padding: 18px 14px;
+    }
+}
+
+/* ========================================
+   클럽 관리
+======================================== */
+
+.admin-club-management-grid {
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 420px)
+        minmax(0, 1fr);
+
+    gap: 22px;
+
+    margin-top: 25px;
+}
+
+
+.admin-club-create-card,
+.admin-club-list-card {
+    padding: 22px;
+
+    background: white;
+
+    border: 1px solid #e2e4e8;
+    border-radius: 10px;
+
+    box-sizing: border-box;
+}
+
+
+.admin-club-card-header h2 {
+    margin: 0 0 6px;
+
+    font-size: 18px;
+}
+
+
+.admin-club-card-header p {
+    margin: 0;
+
+    color: #777;
+
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+
+.admin-club-form {
+    margin-top: 22px;
+}
+
+
+.admin-club-form-grid {
+    display: grid;
+
+    grid-template-columns:
+        1fr
+        1fr;
+
+    gap: 14px;
+}
+
+
+.admin-club-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+
+    color: #666;
+
+    font-size: 12px;
+}
+
+
+.admin-club-wide-field {
+    grid-column:
+        1
+        / -1;
+}
+
+
+.admin-club-form-grid input {
+    width: 100%;
+    height: 40px;
+
+    padding: 0 11px;
+
+    box-sizing: border-box;
+
+    border: 1px solid #ccc;
+    border-radius: 6px;
+
+    font-family: inherit;
+}
+
+
+.admin-club-preview {
+    margin-top: 18px;
+}
+
+
+.admin-club-preview > span {
+    display: block;
+
+    margin-bottom: 7px;
+
+    color: #666;
+
+    font-size: 12px;
+}
+
+
+.admin-club-preview-box {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    min-height: 130px;
+
+    padding: 15px;
+
+    box-sizing: border-box;
+
+    background: #f7f8fa;
+
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+}
+
+
+.admin-club-logo-preview {
+    max-width: 100px;
+    max-height: 100px;
+
+    object-fit: contain;
+}
+
+
+.admin-club-logo-placeholder {
+    color: #999;
+
+    font-size: 13px;
+}
+
+
+.admin-club-active-label {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    margin-top: 18px;
+
+    color: #555;
+
+    font-size: 13px;
+}
+
+
+.admin-club-message {
+    min-height: 20px;
+
+    margin: 14px 0;
+
+    color: #666;
+
+    font-size: 13px;
+}
+
+
+.admin-club-create-button {
+    width: 100%;
+    height: 42px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: #17191d;
+    color: white;
+
+    font-family: inherit;
+    font-weight: 700;
+
+    cursor: pointer;
+}
+
+
+.admin-club-create-button:disabled {
+    opacity: 0.5;
+
+    cursor: default;
+}
+
+
+.admin-club-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    margin-top: 22px;
+}
+
+
+.admin-club-card {
+    display: grid;
+
+    grid-template-columns:
+        70px
+        minmax(0, 1fr)
+        auto;
+
+    align-items: center;
+
+    gap: 16px;
+
+    padding: 14px;
+
+    border: 1px solid #e2e4e8;
+    border-radius: 8px;
+}
+
+
+.admin-club-card-logo {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    width: 64px;
+    height: 64px;
+
+    background: #f7f8fa;
+
+    border-radius: 8px;
+
+    overflow: hidden;
+}
+
+
+.admin-club-card-logo img {
+    max-width: 52px;
+    max-height: 52px;
+
+    object-fit: contain;
+}
+
+
+.admin-club-card-logo span {
+    color: #aaa;
+
+    font-size: 9px;
+}
+
+
+.admin-club-card-info {
+    display: flex;
+    flex-direction: column;
+
+    min-width: 0;
+
+    gap: 4px;
+}
+
+
+.admin-club-card-info strong {
+    font-size: 15px;
+}
+
+
+.admin-club-card-info span {
+    color: #777;
+
+    font-size: 12px;
+}
+
+
+.admin-club-card-status {
+    padding: 6px 9px;
+
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 700;
+}
+
+
+.admin-club-card-status.active {
+    background: #edf7ef;
+
+    color: #3b7650;
+}
+
+
+.admin-club-card-status.inactive {
+    background: #f1f1f1;
+
+    color: #888;
+}
+
+
+.admin-club-empty {
+    padding: 30px 15px;
+
+    color: #999;
+
+    text-align: center;
+
+    font-size: 13px;
+}
+
+
+@media (max-width: 900px) {
+
+    .admin-club-management-grid {
+        grid-template-columns: 1fr;
+    }
+
+}
+
+
+@media (max-width: 600px) {
+
+    .admin-club-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-club-wide-field {
+        grid-column: auto;
+    }
+
+
+    .admin-club-card {
+        grid-template-columns:
+            56px
+            minmax(0, 1fr);
+
+        gap: 12px;
+    }
+
+
+    .admin-club-card-logo {
+        width: 52px;
+        height: 52px;
+    }
+
+
+    .admin-club-card-logo img {
+        max-width: 42px;
+        max-height: 42px;
+    }
+
+
+    .admin-club-card-status {
+        grid-column:
+            1
+            / -1;
+
+        justify-self: start;
+    }
+
+}
+
+/* =========================================
+   USER MANAGEMENT
+   DRAFT PARTICIPANT LINK LAYOUT
+========================================= */
+
+.admin-user-card {
+    grid-template-columns:
+        minmax(180px, 1fr)
+        140px
+        auto;
+
+    grid-template-areas:
+        "info point actions"
+        "participant participant participant"
+        "point-control point-control point-control";
+}
+
+
+.admin-user-info {
+    grid-area: info;
+}
+
+
+.admin-user-point {
+    grid-area: point;
+}
+
+
+.admin-user-actions {
+    grid-area: actions;
+}
+
+
+.admin-user-point-control {
+    grid-area: point-control;
+
+    grid-column: auto;
+}
+
+
+.admin-user-participant-control {
+    grid-area: participant;
+
+    grid-column: auto;
+
+    width: 100%;
+}
+
+
+@media (max-width: 1100px) {
+
+    .admin-user-card {
+        grid-template-columns:
+            minmax(0, 1fr)
+            minmax(120px, auto);
+
+        grid-template-areas:
+            "info point"
+            "participant participant"
+            "point-control point-control"
+            "actions actions";
+    }
+
+
+    .admin-user-actions {
+        justify-content: flex-start;
+    }
+
+
+    .admin-user-participant-control {
+        grid-template-columns:
+            110px
+            minmax(180px, 1fr)
+            auto
+            minmax(100px, auto);
+    }
+}
+
+
+@media (max-width: 700px) {
+
+    .admin-user-card {
+        grid-template-columns: 1fr;
+
+        grid-template-areas:
+            "info"
+            "point"
+            "participant"
+            "point-control"
+            "actions";
+    }
+
+
+    .admin-user-participant-control {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-user-point-control {
+        grid-template-columns: 1fr;
+    }
+
+
+    .admin-user-actions {
+        justify-content: space-between;
     }
 }

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        클럽 드래프트 | FC Online Champions League
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="./css/style.css?v=season2-1"
+    >
+
+    <link
+        rel="stylesheet"
+        href="./css/draft.css?v=draft-2"
+    >
+</head>
+
+
+<body>
+
+<header>
+    <div class="header-container">
+
+        <div class="logo">
+            <a href="./index.html">
+
+                <span class="logo-title">
+                    FCL
+                </span>
+
+                <span class="logo-bottom">
+
+                    <span class="logo-line"></span>
+
+                    <span class="logo-season">
+                        SEASON 1
+                    </span>
+
+                    <span class="logo-line"></span>
+
+                </span>
+
+            </a>
+        </div>
+
+
+        <nav>
+            <ul class="main-menu"></ul>
+        </nav>
+
+    </div>
+</header>
+
+
+<main class="draft-page">
+
+    <section class="draft-header">
+
+        <div>
+            <span
+                id="draft-season-label"
+                class="draft-season-label"
+            >
+                SEASON -
+            </span>
+
+            <h1>
+                CLUB DRAFT
+            </h1>
+
+            <p>
+                실시간 클럽 BAN / PICK 현황
+            </p>
+        </div>
+
+
+        <div
+            id="draft-connection"
+            class="draft-connection connecting"
+        >
+            <span class="draft-connection-dot"></span>
+
+            <span id="draft-connection-text">
+                연결 중
+            </span>
+        </div>
+
+    </section>
+
+
+    <section
+        id="draft-message-panel"
+        class="draft-message-panel"
+    >
+        <div class="draft-loading-spinner"></div>
+
+        <h2 id="draft-message-title">
+            Draft 정보를 불러오는 중입니다.
+        </h2>
+
+        <p id="draft-message-description">
+            잠시만 기다려 주세요.
+        </p>
+    </section>
+
+
+    <div
+        id="draft-content"
+        class="draft-content hidden"
+    >
+
+        <section class="draft-overview">
+
+            <article class="draft-current-turn-card">
+
+                <div class="draft-card-label">
+                    CURRENT TURN
+                </div>
+
+                <div class="draft-current-turn-content">
+
+                    <div
+                        id="draft-current-action"
+                        class="draft-action-badge"
+                    >
+                        -
+                    </div>
+
+                    <div>
+
+                        <strong
+                            id="draft-current-participant"
+                            class="draft-current-participant"
+                        >
+                            -
+                        </strong>
+
+                        <p id="draft-current-description">
+                            Draft 대기 중
+                        </p>
+
+                        <div
+                            id="draft-turn-timer"
+                            class="draft-turn-timer"
+                        >
+                            <span>
+                                TURN TIMER
+                            </span>
+
+                            <strong id="draft-turn-timer-text">
+                                --:--
+                            </strong>
+                        </div>
+
+
+                        <div
+                            id="draft-admin-controls"
+                            class="draft-admin-controls hidden"
+                        >
+                            <label
+                                id="draft-ban-phase-setting"
+                                class="draft-ban-phase-setting hidden"
+                            >
+                                <input
+                                    type="checkbox"
+                                    id="draft-ban-phase-checkbox"
+                                    checked
+                                >
+
+                                <span class="draft-ban-phase-checkmark"></span>
+
+                                <span class="draft-ban-phase-copy">
+                                    <strong>
+                                        BAN 페이즈 사용
+                                    </strong>
+
+                                    <small>
+                                        해제하면 PICK 5턴부터 바로 시작합니다.
+                                    </small>
+                                </span>
+                            </label>
+
+                            <button
+                                type="button"
+                                id="draft-start-button"
+                                class="draft-control-button start hidden"
+                            >
+                                Draft 시작
+                            </button>
+
+                            <button
+                                type="button"
+                                id="draft-pause-button"
+                                class="draft-control-button pause hidden"
+                            >
+                                일시정지
+                            </button>
+
+                            <button
+                                type="button"
+                                id="draft-resume-button"
+                                class="draft-control-button resume hidden"
+                            >
+                                재개
+                            </button>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </article>
+
+
+            <article class="draft-progress-card">
+
+                <div class="draft-progress-header">
+
+                    <span>
+                        진행 상황
+                    </span>
+
+                    <strong id="draft-progress-text">
+                        0 / 10
+                    </strong>
+
+                </div>
+
+
+                <div class="draft-progress-track">
+
+                    <div
+                        id="draft-progress-bar"
+                        class="draft-progress-bar"
+                    ></div>
+
+                </div>
+
+
+                <div class="draft-progress-meta">
+
+                    <span id="draft-phase-text">
+                        -
+                    </span>
+
+                    <span id="draft-status-text">
+                        -
+                    </span>
+
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <section class="draft-panel">
+
+            <div class="draft-panel-header">
+
+                <div>
+                    <span class="draft-panel-kicker">
+                        DRAFT ORDER
+                    </span>
+
+                    <h2>
+                        참가자 순서
+                    </h2>
+                </div>
+
+            </div>
+
+
+            <div
+                id="draft-participant-list"
+                class="draft-participant-list"
+            ></div>
+
+        </section>
+
+
+        <section class="draft-panel">
+
+            <div class="draft-panel-header">
+
+                <div>
+                    <span class="draft-panel-kicker">
+                        CLUB POOL
+                    </span>
+
+                    <h2>
+                        클럽 현황
+                    </h2>
+                </div>
+
+                <span
+                    id="draft-club-count"
+                    class="draft-club-count"
+                >
+                    0 / 0
+                </span>
+
+            </div>
+
+
+            <div class="draft-club-toolbar">
+
+                <input
+                    type="search"
+                    id="draft-club-search"
+                    class="draft-club-search"
+                    placeholder="클럽 검색"
+                    autocomplete="off"
+                >
+
+
+                <select
+                    id="draft-league-filter"
+                    class="draft-league-filter"
+                >
+                    <option value="all">
+                        전체 리그
+                    </option>
+                </select>
+
+            </div>
+
+
+            <div
+                id="draft-club-list"
+                class="draft-club-list"
+            ></div>
+
+        </section>
+
+
+            <div
+                id="draft-club-list"
+                class="draft-club-list"
+            ></div>
+
+        </section>
+
+
+        <section class="draft-panel">
+
+            <div class="draft-panel-header">
+
+                <div>
+                    <span class="draft-panel-kicker">
+                        HISTORY
+                    </span>
+
+                    <h2>
+                        BAN / PICK 기록
+                    </h2>
+                </div>
+
+                <span
+                    id="draft-action-count"
+                    class="draft-action-count"
+                >
+                    0
+                </span>
+
+            </div>
+
+
+            <div
+                id="draft-action-list"
+                class="draft-action-list"
+            ></div>
+
+        </section>
+
+
+        <p
+            id="draft-last-update"
+            class="draft-last-update"
+        >
+        </p>
+
+    </div>
+
+</main>
+
+
+<footer id="site-footer"></footer>
+
+
+<script
+    type="module"
+    src="./js/draft.js?v=draft-7"
+></script>
+
+<script src="./js/site-nav.js"></script>
+
+</body>
+
+</html>

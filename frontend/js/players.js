@@ -690,6 +690,25 @@ function renderPlayerRankings(
             }
 
 
+            const ownerTeamLogoHtml =
+                player.current_team_logo_path
+                    ? `
+                        <img
+                            src="${
+                                player.current_team_logo_path
+                            }"
+                            alt="${
+                                player.current_team_name
+                                ?? player.fcl_name
+                            } 로고"
+                            class="
+                                player-record-owner-team-logo
+                            "
+                        >
+                    `
+                    : "";
+
+
             playerRowElement.innerHTML = `
 
                 <td
@@ -737,15 +756,23 @@ function renderPlayerRankings(
                         player-record-owner
                     "
                 >
-                    <span
+                    <div
                         class="
-                            player-record-owner-name
+                            player-record-owner-stack
                         "
                     >
-                        ${player.fcl_name}
-                    </span>
+                        ${ownerTeamLogoHtml}
 
-                    ${ownerNicknameHtml}
+                        <span
+                            class="
+                                player-record-owner-name
+                            "
+                        >
+                            ${player.fcl_name}
+                        </span>
+
+                        ${ownerNicknameHtml}
+                    </div>
                 </td>
 
 
@@ -794,7 +821,6 @@ function renderPlayerRankings(
 
         }
     );
-
 }
 
 

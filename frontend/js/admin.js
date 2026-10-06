@@ -53,6 +53,71 @@ const adminParticipantListElement =
         "#admin-participant-list"
     );
 
+const adminClubFormElement =
+    document.querySelector(
+        "#admin-club-form"
+    );
+
+
+const adminClubCodeElement =
+    document.querySelector(
+        "#admin-club-code"
+    );
+
+
+const adminClubNameElement =
+    document.querySelector(
+        "#admin-club-name"
+    );
+
+
+const adminClubShortNameElement =
+    document.querySelector(
+        "#admin-club-short-name"
+    );
+
+
+const adminClubLogoUrlElement =
+    document.querySelector(
+        "#admin-club-logo-url"
+    );
+
+
+const adminClubLogoPreviewElement =
+    document.querySelector(
+        "#admin-club-logo-preview"
+    );
+
+
+const adminClubLogoPlaceholderElement =
+    document.querySelector(
+        "#admin-club-logo-placeholder"
+    );
+
+
+const adminClubActiveElement =
+    document.querySelector(
+        "#admin-club-active"
+    );
+
+
+const adminClubMessageElement =
+    document.querySelector(
+        "#admin-club-message"
+    );
+
+
+const adminClubCreateButtonElement =
+    document.querySelector(
+        "#admin-club-create-button"
+    );
+
+
+const adminClubListElement =
+    document.querySelector(
+        "#admin-club-list"
+    );
+
 const adminSeasonNextNumberElement =
     document.querySelector(
         "#admin-season-next-number"
@@ -121,6 +186,8 @@ const adminUserListElement =
     document.querySelector(
         "#admin-user-list"
     );
+
+let adminUserParticipants = [];
 
 const adminResultListElement =
     document.querySelector(
@@ -749,6 +816,13 @@ adminMenuButtonElements.forEach(
                 ) {
 
                     loadAdminParticipants();
+                }
+                if (
+                    targetPage
+                    === "clubs"
+                ) {
+
+                    loadAdminClubs();
                 }
                 if (
                     targetPage
@@ -2782,6 +2856,488 @@ async function saveParticipantTeam(
         saveButtonElement.disabled =
             false;
     }
+}
+
+// =========================================
+// ADMIN CLUBS
+// =========================================
+
+function escapeAdminClubText(
+    value
+) {
+
+    const element =
+        document.createElement(
+            "div"
+        );
+
+
+    element.textContent =
+        value ?? "";
+
+
+    return element.innerHTML;
+}
+
+
+// =========================================
+// 클럽 목록 조회
+// =========================================
+
+async function loadAdminClubs() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    adminClubListElement
+        .textContent =
+            "클럽 정보를 불러오는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/admin/clubs`,
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "클럽 조회 실패"
+            );
+        }
+
+
+        renderAdminClubs(
+            responseData
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminClubListElement
+            .textContent =
+                error.message
+                ?? "클럽 정보를 불러오지 못했습니다.";
+    }
+}
+
+
+// =========================================
+// 클럽 목록 출력
+// =========================================
+
+function renderAdminClubs(
+    clubs
+) {
+
+    adminClubListElement
+        .innerHTML = "";
+
+
+    if (
+        !Array.isArray(
+            clubs
+        )
+        ||
+        clubs.length === 0
+    ) {
+
+        adminClubListElement
+            .innerHTML = `
+                <div
+                    class="admin-club-empty"
+                >
+                    아직 등록된 클럽이 없습니다.
+                </div>
+            `;
+
+        return;
+    }
+
+
+    clubs.forEach(
+        club => {
+
+            const cardElement =
+                document.createElement(
+                    "article"
+                );
+
+
+            cardElement
+                .classList.add(
+                    "admin-club-card"
+                );
+
+
+            const clubName =
+                escapeAdminClubText(
+                    club.name
+                );
+
+
+            const clubCode =
+                escapeAdminClubText(
+                    club.code
+                );
+
+
+            const clubShortName =
+                escapeAdminClubText(
+                    club.short_name
+                    ?? "-"
+                );
+
+
+            cardElement
+                .innerHTML = `
+                    <div
+                        class="admin-club-card-logo"
+                    >
+
+                        ${
+                            club.logo_url
+                                ?
+                                `
+                                    <img
+                                        src="${club.logo_url}"
+                                        alt="${clubName} 로고"
+                                    >
+                                `
+                                :
+                                `
+                                    <span>
+                                        NO LOGO
+                                    </span>
+                                `
+                        }
+
+                    </div>
+
+
+                    <div
+                        class="admin-club-card-info"
+                    >
+
+                        <strong>
+                            ${clubName}
+                        </strong>
+
+                        <span>
+                            ${clubCode}
+                        </span>
+
+                        <span>
+                            약칭:
+                            ${clubShortName}
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        class="admin-club-card-status ${
+                            club.is_active
+                                ? "active"
+                                : "inactive"
+                        }"
+                    >
+
+                        ${
+                            club.is_active
+                                ? "Draft 사용"
+                                : "사용 중지"
+                        }
+
+                    </div>
+                `;
+
+
+            adminClubListElement
+                .appendChild(
+                    cardElement
+                );
+        }
+    );
+}
+
+
+// =========================================
+// 클럽 등록
+// =========================================
+
+async function createAdminClub(
+    event
+) {
+
+    event.preventDefault();
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const code =
+        adminClubCodeElement
+            .value
+            .trim()
+            .toLowerCase();
+
+
+    const name =
+        adminClubNameElement
+            .value
+            .trim();
+
+
+    const shortName =
+        adminClubShortNameElement
+            .value
+            .trim();
+
+
+    const logoSourceUrl =
+        adminClubLogoUrlElement
+            .value
+            .trim();
+
+
+    if (
+        !code
+        ||
+        !name
+        ||
+        !logoSourceUrl
+    ) {
+
+        adminClubMessageElement
+            .textContent =
+                "클럽 코드, 이름, 로고 URL을 입력해주세요.";
+
+        return;
+    }
+
+
+    adminClubCreateButtonElement
+        .disabled = true;
+
+
+    adminClubMessageElement
+        .textContent =
+            "클럽 로고를 저장하는 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/admin/clubs`,
+                {
+                    method:
+                        "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            code:
+                                code,
+
+                            name:
+                                name,
+
+                            short_name:
+                                shortName
+                                || null,
+
+                            logo_source_url:
+                                logoSourceUrl,
+
+                            is_active:
+                                adminClubActiveElement
+                                    .checked,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status
+            === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ?? "클럽 등록 실패"
+            );
+        }
+
+
+        adminClubMessageElement
+            .textContent =
+                `${responseData.name} 등록 완료`;
+
+
+        adminClubFormElement
+            .reset();
+
+
+        adminClubActiveElement
+            .checked = true;
+
+
+        updateAdminClubLogoPreview();
+
+
+        await loadAdminClubs();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminClubMessageElement
+            .textContent =
+                error.message;
+
+
+    } finally {
+
+        adminClubCreateButtonElement
+            .disabled = false;
+    }
+}
+
+
+// =========================================
+// 클럽 로고 미리보기
+// =========================================
+
+function updateAdminClubLogoPreview() {
+
+    const logoUrl =
+        adminClubLogoUrlElement
+            .value
+            .trim();
+
+
+    if (!logoUrl) {
+
+        adminClubLogoPreviewElement
+            .removeAttribute(
+                "src"
+            );
+
+
+        adminClubLogoPreviewElement
+            .classList.add(
+                "hidden"
+            );
+
+
+        adminClubLogoPlaceholderElement
+            .classList.remove(
+                "hidden"
+            );
+
+
+        return;
+    }
+
+
+    adminClubLogoPreviewElement
+        .src =
+            logoUrl;
+
+
+    adminClubLogoPreviewElement
+        .classList.remove(
+            "hidden"
+        );
+
+
+    adminClubLogoPlaceholderElement
+        .classList.add(
+            "hidden"
+        );
 }
 
 // =========================================
@@ -7399,20 +7955,36 @@ async function loadAdminUsers() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/admin/users`,
-            {
-                headers: {
-                    "X-Admin-Token":
-                        adminToken,
-                },
-            }
-        );
+        const [
+            userResponse,
+            participantResponse,
+        ] = await Promise.all([
+            fetch(
+                `${apiBaseUrl}/api/admin/users`,
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            ),
+
+            fetch(
+                `${apiBaseUrl}/api/admin/participants`,
+                {
+                    headers: {
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+                }
+            ),
+        ]);
 
 
         if (
-            response.status
-            === 401
+            userResponse.status === 401
+            ||
+            participantResponse.status === 401
         ) {
 
             sessionStorage.removeItem(
@@ -7425,23 +7997,48 @@ async function loadAdminUsers() {
         }
 
 
-        const responseData =
-            await response.json();
+        const userData =
+            await userResponse.json();
 
 
-        if (!response.ok) {
+        const participantData =
+            await participantResponse.json();
+
+
+        if (!userResponse.ok) {
 
             throw new Error(
-                responseData.detail
+                userData.detail
                 ??
                 "회원 조회에 실패했습니다."
             );
         }
 
 
+        if (!participantResponse.ok) {
+
+            throw new Error(
+                participantData.detail
+                ??
+                "참가자 조회에 실패했습니다."
+            );
+        }
+
+
+        adminUserParticipants =
+            Array.isArray(
+                participantData
+            )
+                ? participantData
+                : [];
+
+
         renderAdminUsers(
-            responseData.users
-            ?? []
+            Array.isArray(
+                userData.users
+            )
+                ? userData.users
+                : []
         );
 
 
@@ -7455,7 +8052,6 @@ async function loadAdminUsers() {
         adminUserListElement
             .textContent =
                 error.message;
-
     }
 }
 
@@ -7741,6 +8337,194 @@ function renderAdminUsers(
                 pointButtonElement
             );
 
+// -------------------------
+// FCL 참가자 연결
+// -------------------------
+
+const participantControlElement =
+    document.createElement(
+        "div"
+    );
+
+
+participantControlElement.classList.add(
+    "admin-user-participant-control"
+);
+
+
+const participantLabelElement =
+    document.createElement(
+        "span"
+    );
+
+
+participantLabelElement.textContent =
+    "FCL 참가자";
+
+
+const participantSelectElement =
+    document.createElement(
+        "select"
+    );
+
+
+participantSelectElement.classList.add(
+    "admin-user-participant-select"
+);
+
+
+const emptyOptionElement =
+    document.createElement(
+        "option"
+    );
+
+
+emptyOptionElement.value =
+    "";
+
+
+emptyOptionElement.textContent =
+    "연결 안 함";
+
+
+participantSelectElement.appendChild(
+    emptyOptionElement
+);
+
+
+adminUserParticipants.forEach(
+    participant => {
+
+        const optionElement =
+            document.createElement(
+                "option"
+            );
+
+
+        optionElement.value =
+            participant.id;
+
+
+        optionElement.textContent =
+            (
+                participant.fcl_name
+                +
+                (
+                    participant.fc_nickname
+                        ? ` (${participant.fc_nickname})`
+                        : ""
+                )
+            );
+
+
+        if (
+            Number(
+                user.participant_id
+            )
+            ===
+            Number(
+                participant.id
+            )
+        ) {
+
+            optionElement.selected =
+                true;
+        }
+
+
+        const linkedUserId =
+            participant.user_id
+            === null
+            ||
+            participant.user_id
+            === undefined
+                ? null
+                : Number(
+                    participant.user_id
+                );
+
+
+        if (
+            linkedUserId !== null
+            &&
+            linkedUserId
+            !== Number(
+                user.id
+            )
+        ) {
+
+            optionElement.disabled =
+                true;
+
+
+            optionElement.textContent +=
+                " · 다른 계정 연결됨";
+        }
+
+
+        participantSelectElement
+            .appendChild(
+                optionElement
+            );
+    }
+);
+
+
+const participantButtonElement =
+    document.createElement(
+        "button"
+    );
+
+
+participantButtonElement.type =
+    "button";
+
+
+participantButtonElement.classList.add(
+    "admin-user-participant-button"
+);
+
+
+participantButtonElement.textContent =
+    "연결 저장";
+
+
+const participantMessageElement =
+    document.createElement(
+        "span"
+    );
+
+
+participantMessageElement.classList.add(
+    "admin-user-participant-message"
+);
+
+
+if (
+    user.participant_id
+) {
+
+    participantMessageElement.textContent =
+        (
+            "현재: "
+            +
+            user.participant_fcl_name
+        );
+
+} else {
+
+    participantMessageElement.textContent =
+        "현재: 연결 없음";
+}
+
+
+participantControlElement.append(
+    participantLabelElement,
+    participantSelectElement,
+    participantButtonElement,
+    participantMessageElement
+);
+
 
             // -------------------------
             // 권한
@@ -7847,10 +8631,25 @@ function renderAdminUsers(
                     }
                 );
 
+            participantButtonElement
+                .addEventListener(
+                    "click",
+                    () => {
+
+                        changeAdminUserParticipant(
+                            user,
+                            participantSelectElement,
+                            participantButtonElement,
+                            participantMessageElement
+                        );
+                    }
+                );
+
 
             cardElement.append(
                 infoElement,
                 pointElement,
+                participantControlElement,
                 pointControlElement,
                 actionElement
             );
@@ -7863,6 +8662,148 @@ function renderAdminUsers(
         }
     );
 
+}
+
+// =========================================
+// 회원 ↔ FCL 참가자 연결
+// =========================================
+
+async function changeAdminUserParticipant(
+    user,
+    selectElement,
+    buttonElement,
+    messageElement
+) {
+
+    const selectedValue =
+        selectElement.value;
+
+
+    const participantId =
+        selectedValue
+            ? Number(
+                selectedValue
+            )
+            : null;
+
+
+    const selectedText =
+        participantId
+            ? selectElement
+                .options[
+                    selectElement.selectedIndex
+                ]
+                .textContent
+            : "연결 없음";
+
+
+    const confirmed =
+        window.confirm(
+            `${user.nickname} 회원의 FCL 참가자를\n`
+            +
+            `${selectedText}\n`
+            +
+            "으로 변경하시겠습니까?"
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    buttonElement.disabled =
+        true;
+
+
+    messageElement.textContent =
+        "저장 중...";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}`
+                + `/api/admin/users/${user.id}/participant`,
+                {
+                    method:
+                        "PATCH",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json",
+
+                        "X-Admin-Token":
+                            adminToken,
+                    },
+
+                    body:
+                        JSON.stringify({
+                            participant_id:
+                                participantId,
+                        }),
+                }
+            );
+
+
+        const responseData =
+            await response.json();
+
+
+        if (
+            response.status === 401
+        ) {
+
+            sessionStorage.removeItem(
+                adminTokenStorageKey
+            );
+
+            showAdminLogin();
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                responseData.detail
+                ??
+                "참가자 연결에 실패했습니다."
+            );
+        }
+
+
+        await loadAdminUsers();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        messageElement.textContent =
+            error.message;
+
+
+        buttonElement.disabled =
+            false;
+    }
 }
 
 
@@ -10549,6 +11490,55 @@ adminSeasonListElement
             startAdminSeason(
                 seasonNumber
             );
+        }
+    );
+
+adminClubFormElement
+    ?.addEventListener(
+        "submit",
+        createAdminClub
+    );
+
+
+adminClubLogoUrlElement
+    ?.addEventListener(
+        "input",
+        updateAdminClubLogoPreview
+    );
+
+
+adminClubLogoPreviewElement
+    ?.addEventListener(
+        "error",
+        () => {
+
+            adminClubLogoPreviewElement
+                .classList.add(
+                    "hidden"
+                );
+
+
+            adminClubLogoPlaceholderElement
+                .classList.remove(
+                    "hidden"
+                );
+
+
+            adminClubLogoPlaceholderElement
+                .textContent =
+                    "이미지를 불러올 수 없습니다.";
+        }
+    );
+
+
+adminClubLogoPreviewElement
+    ?.addEventListener(
+        "load",
+        () => {
+
+            adminClubLogoPlaceholderElement
+                .textContent =
+                    "로고 URL을 입력해주세요.";
         }
     );
 

@@ -18,7 +18,7 @@
 
     <link
         rel="stylesheet"
-        href="./css/admin.css?v=tournament-admin-1"
+        href="./css/admin.css?v=draft-user-link-2"
     >
 </head>
 
@@ -167,6 +167,14 @@
                     <button
                         type="button"
                         class="admin-menu-button"
+                        data-admin-page="clubs"
+                    >
+                        클럽 관리
+                    </button>
+
+                    <button
+                        type="button"
+                        class="admin-menu-button"
                         data-admin-page="seasons"
                     >
                         시즌 관리
@@ -296,6 +304,193 @@
                         id="admin-participant-list"
                         class="admin-participant-list"
                     >
+                    </div>
+
+                </section>
+
+                <!-- 클럽 관리 -->
+
+                <section
+                    class="admin-content-page"
+                    data-admin-content="clubs"
+                >
+
+                    <h1>
+                        클럽 관리
+                    </h1>
+
+                    <p>
+                        클럽 드래프트에서 사용할 클럽과 로고를 관리합니다.
+                    </p>
+
+
+                    <div class="admin-club-management-grid">
+
+                        <section class="admin-club-create-card">
+
+                            <div class="admin-club-card-header">
+
+                                <div>
+
+                                    <h2>
+                                        클럽 등록
+                                    </h2>
+
+                                    <p>
+                                        로고 URL은 등록 시 FCL DB에 저장됩니다.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <form
+                                id="admin-club-form"
+                                class="admin-club-form"
+                            >
+
+                                <div class="admin-club-form-grid">
+
+                                    <label>
+                                        클럽 코드
+
+                                        <input
+                                            type="text"
+                                            id="admin-club-code"
+                                            maxlength="100"
+                                            placeholder="예: arsenal"
+                                            required
+                                        >
+                                    </label>
+
+
+                                    <label>
+                                        클럽 이름
+
+                                        <input
+                                            type="text"
+                                            id="admin-club-name"
+                                            maxlength="100"
+                                            placeholder="예: Arsenal"
+                                            required
+                                        >
+                                    </label>
+
+
+                                    <label>
+                                        약칭
+
+                                        <input
+                                            type="text"
+                                            id="admin-club-short-name"
+                                            maxlength="100"
+                                            placeholder="예: ARS"
+                                        >
+                                    </label>
+
+
+                                    <label class="admin-club-wide-field">
+                                        로고 URL
+
+                                        <input
+                                            type="url"
+                                            id="admin-club-logo-url"
+                                            maxlength="2000"
+                                            placeholder="https://..."
+                                            required
+                                        >
+                                    </label>
+
+                                </div>
+
+
+                                <div class="admin-club-preview">
+
+                                    <span>
+                                        로고 미리보기
+                                    </span>
+
+                                    <div class="admin-club-preview-box">
+
+                                        <img
+                                            id="admin-club-logo-preview"
+                                            class="admin-club-logo-preview hidden"
+                                            alt="클럽 로고 미리보기"
+                                        >
+
+                                        <span
+                                            id="admin-club-logo-placeholder"
+                                            class="admin-club-logo-placeholder"
+                                        >
+                                            로고 URL을 입력해주세요.
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+
+                                <label class="admin-club-active-label">
+
+                                    <input
+                                        type="checkbox"
+                                        id="admin-club-active"
+                                        checked
+                                    >
+
+                                    Draft에서 사용 가능한 클럽
+
+                                </label>
+
+
+                                <p
+                                    id="admin-club-message"
+                                    class="admin-club-message"
+                                ></p>
+
+
+                                <button
+                                    type="submit"
+                                    id="admin-club-create-button"
+                                    class="admin-club-create-button"
+                                >
+                                    클럽 등록
+                                </button>
+
+                            </form>
+
+                        </section>
+
+
+                        <section class="admin-club-list-card">
+
+                            <div class="admin-club-card-header">
+
+                                <div>
+
+                                    <h2>
+                                        등록된 클럽
+                                    </h2>
+
+                                    <p>
+                                        Draft에서 사용할 수 있는 클럽 목록입니다.
+                                    </p>
+
+                                </div>
+
+                            </div>
+
+
+                            <div
+                                id="admin-club-list"
+                                class="admin-club-list"
+                            >
+                                클럽 정보를 불러오는 중...
+                            </div>
+
+                        </section>
+
                     </div>
 
                 </section>
@@ -1256,7 +1451,7 @@
 
     <script
         type="module"
-        src="./js/admin.js?v=season-management-3"
+        src="./js/admin.js?v=draft-user-link-2"
     ></script>
 
 </body>
