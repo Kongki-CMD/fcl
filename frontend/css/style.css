@@ -132,6 +132,61 @@ main {
     padding: 40px;
 }
 
+/* =========================================
+   FINAL SERIES POSTER
+========================================= */
+
+.final-series-poster-section {
+    display: flex;
+
+    justify-content: center;
+
+    margin-bottom: 40px;
+}
+
+
+.final-series-poster-card {
+    width: min(
+        100%,
+        720px
+    );
+
+    overflow: hidden;
+
+    border: 1px solid
+        rgba(
+            183,
+            154,
+            96,
+            0.45
+        );
+
+    border-radius: 14px;
+
+    background: #111;
+
+    box-shadow:
+        0
+        14px
+        40px
+        rgba(
+            0,
+            0,
+            0,
+            0.35
+        );
+}
+
+
+.final-series-poster-image {
+    display: block;
+
+    width: 100%;
+    height: auto;
+
+    object-fit: contain;
+}
+
 .today-matches,
 .recent-results {
     margin-bottom: 40px;
@@ -7392,6 +7447,17 @@ body.site-auth-modal-open {
 
     body {
         background-attachment: scroll;
+    }
+
+    .final-series-poster-section {
+        margin-bottom: 28px;
+    }
+
+
+    .final-series-poster-card {
+        width: 100%;
+
+        border-radius: 10px;
     }
 
     main {
