@@ -54643,14 +54643,18 @@ def get_season_best11(
         "lcb": {
             "position": "LCB",
             "eligible": {
+                6,  # LCB
                 5,  # CB
+                4,  # RCB
             },
         },
 
         "rcb": {
             "position": "RCB",
             "eligible": {
+                4,  # RCB
                 5,  # CB
+                6,  # LCB
             },
         },
 
