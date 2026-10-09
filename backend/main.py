@@ -50273,6 +50273,261 @@ def get_fcl_series_status(
         "mvp": mvp,
     }
 
+# =========================
+# FINAL SERIES SYNC
+# 시즌 자동 종료
+#
+# 조건:
+# - 플레이오프 결승시리즈
+# - SERIES 완료
+# - NEXON 통계 synced
+# - 준PO / PO / 결승 모두 완료
+#
+# 조건 충족 시:
+# - 시즌 참가자 팀 Snapshot 저장
+# - seasons.status = completed
+# =========================
+
+def auto_complete_fcl_season_after_final_sync(
+    series_id: int,
+):
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            # =========================
+            # 현재 SERIES / 시즌 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id,
+                    s.season_id,
+                    s.series_type,
+                    s.playoff_stage,
+                    s.status,
+                    s.stats_sync_status,
+
+                    season.status
+                        AS season_status
+
+                FROM series AS s
+
+                JOIN seasons AS season
+                    ON season.id =
+                        s.season_id
+
+                WHERE
+                    s.id = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF season
+                """,
+                (
+                    series_id,
+                ),
+            )
+
+
+            series_row = (
+                cursor.fetchone()
+            )
+
+
+            if series_row is None:
+
+                return False
+
+
+            # =========================
+            # 결승시리즈만 대상
+            # =========================
+
+            if (
+                series_row[
+                    "series_type"
+                ]
+                != "플레이오프"
+
+                or
+
+                series_row[
+                    "playoff_stage"
+                ]
+                != "결승시리즈"
+            ):
+
+                return False
+
+
+            # =========================
+            # 경기 완료 +
+            # NEXON 통계 동기화 완료
+            # =========================
+
+            if (
+                series_row[
+                    "status"
+                ]
+                != "completed"
+
+                or
+
+                series_row[
+                    "stats_sync_status"
+                ]
+                != "synced"
+            ):
+
+                return False
+
+
+            # 이미 시즌 종료 상태
+            if (
+                series_row[
+                    "season_status"
+                ]
+                == "completed"
+            ):
+
+                return True
+
+
+            # active 시즌만 자동 종료
+            if (
+                series_row[
+                    "season_status"
+                ]
+                != "active"
+            ):
+
+                return False
+
+
+            season_id = int(
+                series_row[
+                    "season_id"
+                ]
+            )
+
+
+            # =========================
+            # 준플레이오프
+            # 플레이오프
+            # 결승시리즈
+            #
+            # 세 단계 모두 완료 확인
+            # =========================
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(
+                        DISTINCT playoff_stage
+                    )
+                        AS completed_stage_count
+
+                FROM series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    series_type =
+                        '플레이오프'
+
+                    AND
+                    playoff_stage IN (
+                        '준플레이오프',
+                        '플레이오프',
+                        '결승시리즈'
+                    )
+
+                    AND
+                    status =
+                        'completed'
+                """,
+                (
+                    season_id,
+                ),
+            )
+
+
+            completed_stage_count = int(
+                cursor.fetchone()[
+                    "completed_stage_count"
+                ]
+                or 0
+            )
+
+
+            if (
+                completed_stage_count
+                != 3
+            ):
+
+                return False
+
+
+            # =========================
+            # 시즌 종료 당시
+            # 팀 Snapshot 보존
+            # =========================
+
+            snapshot_fcl_season_participant_teams(
+                cursor,
+                season_id,
+            )
+
+
+            # =========================
+            # 시즌 자동 종료
+            # =========================
+
+            cursor.execute(
+                """
+                UPDATE seasons
+
+                SET
+                    status =
+                        'completed',
+
+                    end_date =
+                        COALESCE(
+                            end_date,
+                            CURRENT_DATE
+                        ),
+
+                    completed_at =
+                        COALESCE(
+                            completed_at,
+                            NOW()
+                        ),
+
+                    updated_at =
+                        NOW()
+
+                WHERE
+                    id = %s
+
+                    AND
+                    status =
+                        'active'
+                """,
+                (
+                    season_id,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return True
+
 
 # =========================
 # FCL SERIES STATUS
@@ -52208,6 +52463,29 @@ def sync_fcl_series_status(
                 series_id
             )
 
+        if (
+            series[
+                "series_type"
+            ]
+            == "플레이오프"
+
+            and
+
+            series[
+                "playoff_stage"
+            ]
+            == "결승시리즈"
+
+            and
+
+            status
+            == "completed"
+        ):
+
+            auto_complete_fcl_season_after_final_sync(
+                series_id
+            )
+
 
         return {
             "series": {
@@ -52906,6 +53184,34 @@ def sync_fcl_series_status(
         status == "completed"
     ):
         create_next_playoff_if_ready(
+            series_id
+        )
+
+    if (
+        series[
+            "series_type"
+        ]
+        == "플레이오프"
+
+        and
+
+        series[
+            "playoff_stage"
+        ]
+        == "결승시리즈"
+
+        and
+
+        status
+        == "completed"
+
+        and
+
+        final_stats_sync_status
+        == "synced"
+    ):
+
+        auto_complete_fcl_season_after_final_sync(
             series_id
         )
 
