@@ -39936,7 +39936,9 @@ def get_matches(
 # =========================
 
 @app.get("/api/matches/today")
-def get_today_matches():
+def get_today_matches(
+    season: int | None = None,
+):
 
     today = datetime.now(
         ZoneInfo("Asia/Seoul")
@@ -39949,11 +39951,19 @@ def get_today_matches():
 
 
     # =========================
-    # 현재 ACTIVE 시즌
+    # 표시 대상 시즌
+    #
+    # season 지정:
+    # 해당 시즌 사용
+    #
+    # season 미지정:
+    # 기존처럼 active 시즌 사용
     # =========================
 
     selected_season = (
-        resolve_fcl_season_record()
+        resolve_fcl_season_record(
+            season
+        )
     )
 
 

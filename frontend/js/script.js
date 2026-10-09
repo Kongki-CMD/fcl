@@ -1,6 +1,8 @@
 import {
     apiBaseUrl,
     getTeamImagePath,
+    loadFclSeasons,
+    resolvePublicDisplaySeason,
 } from "./config.js";
 
 
@@ -21,6 +23,42 @@ const playerRankingListElement =
 
 let dashboardSeasonMap =
     new Map();
+
+let dashboardDisplaySeasonNumber =
+    null;
+
+
+async function resolveDashboardDisplaySeason() {
+
+    const seasons =
+        await loadFclSeasons();
+
+
+    const displaySeason =
+        resolvePublicDisplaySeason(
+            seasons
+        );
+
+
+    dashboardDisplaySeasonNumber =
+        Number(
+            displaySeason
+                ?.season_number
+        );
+
+
+    if (
+        !Number.isInteger(
+            dashboardDisplaySeasonNumber
+        )
+        ||
+        dashboardDisplaySeasonNumber <= 0
+    ) {
+
+        dashboardDisplaySeasonNumber =
+            null;
+    }
+}
 
 // ======================================================
 // 선수 시즌 정보
@@ -540,10 +578,27 @@ function renderSeasonChampion(
 // ======================================================
 
 async function loadTodayMatches() {
+
     try {
-        const response = await fetch(
-            `${apiBaseUrl}/api/matches/today`
-        );
+
+        const seasonQuery =
+            dashboardDisplaySeasonNumber
+                ? (
+                    `?season=`
+                    +
+                    dashboardDisplaySeasonNumber
+                )
+                : "";
+
+
+        const response =
+            await fetch(
+                (
+                    `${apiBaseUrl}/api/matches/today`
+                    +
+                    seasonQuery
+                )
+            );
 
         if (!response.ok) {
             throw new Error(
@@ -914,13 +969,28 @@ async function loadRecentResults() {
 
     try {
 
+        const seasonQuery =
+            dashboardDisplaySeasonNumber
+                ? (
+                    `?season=`
+                    +
+                    dashboardDisplaySeasonNumber
+                )
+                : "";
+
+
         // =====================================
         // 기존 Excel 경기 결과
         // =====================================
 
-        const excelResponse = await fetch(
-            `${apiBaseUrl}/api/results`
-        );
+        const excelResponse =
+            await fetch(
+                (
+                    `${apiBaseUrl}/api/results`
+                    +
+                    seasonQuery
+                )
+            );
 
 
         if (!excelResponse.ok) {
@@ -947,9 +1017,14 @@ async function loadRecentResults() {
 
             const databaseResponse =
                 await fetch(
-                    `${apiBaseUrl}/api/fconline/series/completed-results`
+                    (
+                        `${apiBaseUrl}`
+                        +
+                        "/api/fconline/series/completed-results"
+                        +
+                        seasonQuery
+                    )
                 );
-
 
             if (databaseResponse.ok) {
 
@@ -1326,9 +1401,20 @@ function renderRecentResults(results) {
 
 async function loadTeamRanking() {
     try {
-        const response = await fetch(
-            `${apiBaseUrl}/api/standings`
-        );
+        const seasonQuery =
+            dashboardDisplaySeasonNumber
+                ? (
+                    `?season=`
+                    +
+                    dashboardDisplaySeasonNumber
+                )
+                : "";
+
+
+        const response =
+            await fetch(
+                `${apiBaseUrl}/api/standings${seasonQuery}`
+            );
 
         if (!response.ok) {
             throw new Error(
@@ -1429,9 +1515,24 @@ async function loadPlayerRanking() {
 
     try {
 
-        const response = await fetch(
-            `${apiBaseUrl}/api/player-rankings`
-        );
+        const seasonQuery =
+            dashboardDisplaySeasonNumber
+                ? (
+                    `?season=`
+                    +
+                    dashboardDisplaySeasonNumber
+                )
+                : "";
+
+
+        const response =
+            await fetch(
+                (
+                    `${apiBaseUrl}/api/player-rankings`
+                    +
+                    seasonQuery
+                )
+            );
 
 
         if (!response.ok) {
@@ -1550,6 +1651,19 @@ function renderPlayerRanking(
 // ======================================================
 
 async function initializeDashboard() {
+
+    try {
+
+        await resolveDashboardDisplaySeason();
+
+    } catch (error) {
+
+        console.error(
+            "메인 표시 시즌 결정 오류",
+            error
+        );
+    }
+
 
     await loadDashboardSeasonMetadata();
 
