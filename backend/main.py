@@ -19702,10 +19702,6 @@ def admin_reset_draft_session(
                 ]
                 ==
                 "completed"
-
-                and
-
-                not local_draft_test_mode
             ):
 
                 raise HTTPException(
