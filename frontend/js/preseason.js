@@ -178,6 +178,17 @@ const preseasonSetCountInputElements =
         'input[name="preseason-set-count"]'
     );
 
+const seriesPageTitleElement =
+    document.querySelector(
+        "#series-page-title"
+    );
+
+
+const seriesPageDescriptionElement =
+    document.querySelector(
+        "#series-page-description"
+    );
+
 
 let currentSeriesId = null;
 
@@ -741,6 +752,37 @@ function renderSeriesStatus(data) {
     currentSeriesType =
         series.series_type;
 
+    if (
+        currentSeriesType
+        === "정규리그"
+    ) {
+
+        seriesPageTitleElement.textContent =
+            "REGULAR SEASON";
+
+        seriesPageDescriptionElement.textContent =
+            "정규리그 경기 결과를 입력합니다.";
+
+    } else if (
+        currentSeriesType
+        === "플레이오프"
+    ) {
+
+        seriesPageTitleElement.textContent =
+            "PLAYOFF";
+
+        seriesPageDescriptionElement.textContent =
+            "플레이오프 경기 결과를 입력합니다.";
+
+    } else {
+
+        seriesPageTitleElement.textContent =
+            "PRE-SEASON";
+
+        seriesPageDescriptionElement.textContent =
+            "참가자와 경기 날짜를 선택하여 친선전을 예약합니다.";
+    }
+
     currentPlayoffStage =
     series.playoff_stage
     ?? null;
@@ -1282,6 +1324,7 @@ function renderManualResultInputs() {
 
         if (
             [
+                "정규리그",
                 "플레이오프",
                 "토너먼트",
             ].includes(
@@ -1726,6 +1769,7 @@ async function completeManualResult() {
          */
         if (
             [
+                "정규리그",
                 "플레이오프",
                 "토너먼트",
             ].includes(

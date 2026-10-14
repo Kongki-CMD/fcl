@@ -293,7 +293,7 @@ async function loadStandings() {
 
         standingsTableBodyElement.innerHTML = `
             <tr>
-                <td colspan="10">
+                <td colspan="9">
                     팀 순위를 불러오는 중 오류가 발생했습니다.
                 </td>
             </tr>
@@ -340,7 +340,6 @@ function renderStandings(standings) {
 
             <td>${team.played}</td>
             <td>${team.wins}</td>
-            <td>${team.draws}</td>
             <td>${team.losses}</td>
             <td>${team.goals_for}</td>
             <td>${team.goals_against}</td>

@@ -1909,10 +1909,7 @@ function renderSchedule(matches) {
                     >
 
                     <span class="team-name">
-                        ${
-                            match.team_a_current_team_name
-                            ?? match.team_a
-                        }
+                        ${match.team_a}
                     </span>
 
                 </div>
@@ -1940,10 +1937,7 @@ function renderSchedule(matches) {
                     >
 
                     <span class="team-name">
-                        ${
-                            match.team_b_current_team_name
-                            ?? match.team_b
-                        }
+                        ${match.team_b}
                     </span>
 
                 </div>

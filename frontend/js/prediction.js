@@ -315,12 +315,6 @@ function createSetPredictionElement(
             || 2.5
         );
 
-    const drawOdds =
-        Number(
-            match.odds?.draw
-            || 2.5
-        );
-
     const teamBOdds =
         Number(
             match.odds?.team_b
@@ -341,20 +335,6 @@ function createSetPredictionElement(
 
             participantId:
                 match.team_a.participant_id,
-        },
-
-        {
-            side:
-                "draw",
-
-            label:
-                "무승부",
-
-            odds:
-                drawOdds,
-
-            participantId:
-                null,
         },
 
         {

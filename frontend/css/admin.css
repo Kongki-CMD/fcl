@@ -251,6 +251,43 @@
    참가자 / 현재 팀
 ======================================== */
 
+.admin-team-season-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+
+    margin-top: 20px;
+}
+
+
+.admin-team-season-toolbar label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    color: #666;
+    font-size: 12px;
+}
+
+
+.admin-team-season-toolbar select {
+    min-width: 180px;
+    height: 38px;
+
+    padding: 0 10px;
+
+    border: 1px solid #ccc;
+    border-radius: 5px;
+
+    background: white;
+}
+
+
+#admin-participant-season-message {
+    color: #666;
+    font-size: 12px;
+}
+
 .admin-participant-list {
     display: flex;
     flex-direction: column;
@@ -305,8 +342,7 @@
 
 .admin-team-fields {
     display: grid;
-    grid-template-columns:
-        180px 1fr;
+    grid-template-columns: 1fr;
 
     gap: 12px;
 }
@@ -320,7 +356,9 @@
     font-size: 12px;
 }
 
-.admin-team-fields input {
+.admin-team-fields input,
+.admin-team-fields select {
+    width: 100%;
     height: 38px;
 
     padding: 0 10px;
@@ -329,6 +367,8 @@
 
     border: 1px solid #ccc;
     border-radius: 5px;
+
+    background: white;
 }
 
 .admin-participant-actions {

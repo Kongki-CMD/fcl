@@ -53,6 +53,23 @@ const adminParticipantListElement =
         "#admin-participant-list"
     );
 
+const adminParticipantSeasonSelectElement =
+    document.querySelector(
+        "#admin-participant-season-select"
+    );
+
+
+const adminParticipantSeasonMessageElement =
+    document.querySelector(
+        "#admin-participant-season-message"
+    );
+
+
+let selectedAdminParticipantSeasonNumber =
+    null;
+
+let adminParticipantClubs = [];
+
 const adminClubFormElement =
     document.querySelector(
         "#admin-club-form"
@@ -193,6 +210,17 @@ const adminResultListElement =
     document.querySelector(
         "#admin-result-list"
     );
+
+const adminResultSeasonTabsElement =
+    document.querySelector(
+        "#admin-result-season-tabs"
+    );
+
+
+let adminResultSeasons = [];
+
+let selectedAdminResultSeasonNumber =
+    null;
 
 const adminPointShopFormElement =
     document.querySelector(
@@ -815,7 +843,7 @@ adminMenuButtonElements.forEach(
                     === "participants"
                 ) {
 
-                    loadAdminParticipants();
+                    loadAdminParticipantSeasonOptions();
                 }
                 if (
                     targetPage
@@ -2160,7 +2188,7 @@ async function createAdminSeason(
     const allowedStartDays =
         new Set(
             [
-                1,
+                3,
             ]
         );
 
@@ -2175,7 +2203,7 @@ async function createAdminSeason(
             .textContent =
                 (
                     "시즌 시작일은 "
-                    + "월요일로 선택해주세요."
+                    + "수요일로 선택해주세요."
                 );
 
         return;
@@ -2498,6 +2526,220 @@ async function startAdminSeason(
     }
 }
 
+async function loadAdminParticipantClubs() {
+
+    const adminToken =
+        getAdminToken();
+
+
+    if (!adminToken) {
+
+        showAdminLogin();
+
+        return;
+    }
+
+
+    const response =
+        await fetch(
+            `${apiBaseUrl}/api/admin/clubs`,
+            {
+                headers: {
+                    "X-Admin-Token":
+                        adminToken,
+                },
+            }
+        );
+
+
+    const responseData =
+        await response.json();
+
+
+    if (
+        response.status
+        === 401
+    ) {
+
+        sessionStorage.removeItem(
+            adminTokenStorageKey
+        );
+
+        showAdminLogin();
+
+        throw new Error(
+            "관리자 인증이 만료되었습니다."
+        );
+    }
+
+
+    if (!response.ok) {
+
+        throw new Error(
+            responseData.detail
+            ?? "클럽 목록 조회 실패"
+        );
+    }
+
+
+    adminParticipantClubs =
+        Array.isArray(
+            responseData
+        )
+            ? responseData.filter(
+                club =>
+                    club.is_active
+                    &&
+                    club.has_logo
+            )
+            : [];
+}
+
+async function loadAdminParticipantSeasonOptions() {
+
+    if (
+        !adminParticipantSeasonSelectElement
+        ||
+        !adminParticipantSeasonMessageElement
+    ) {
+
+        console.error(
+            "관리자 참가자 시즌 선택 UI를 찾을 수 없습니다."
+        );
+
+        return;
+    }
+
+    try {
+
+        const seasons =
+            await loadFclSeasons();
+
+        await loadAdminParticipantClubs();
+
+
+        if (
+            !Array.isArray(
+                seasons
+            )
+            ||
+            seasons.length === 0
+        ) {
+
+            throw new Error(
+                "등록된 시즌이 없습니다."
+            );
+        }
+
+
+        adminParticipantSeasonSelectElement
+            .innerHTML = "";
+
+
+        const sortedSeasons =
+            seasons
+                .slice()
+                .sort(
+                    (
+                        seasonA,
+                        seasonB
+                    ) =>
+                        Number(
+                            seasonB
+                                .season_number
+                        )
+                        -
+                        Number(
+                            seasonA
+                                .season_number
+                        )
+                );
+
+
+        sortedSeasons.forEach(
+            season => {
+
+                const optionElement =
+                    document.createElement(
+                        "option"
+                    );
+
+
+                optionElement.value =
+                    String(
+                        season
+                            .season_number
+                    );
+
+
+                optionElement.textContent =
+                    (
+                        `SEASON ${season.season_number}`
+                        +
+                        ` / ${season.status}`
+                    );
+
+
+                adminParticipantSeasonSelectElement
+                    .appendChild(
+                        optionElement
+                    );
+            }
+        );
+
+
+        const selectedSeason =
+            seasons.find(
+                season =>
+                    season.status
+                    === "active"
+            )
+            ??
+            seasons.find(
+                season =>
+                    season.status
+                    === "upcoming"
+            )
+            ??
+            sortedSeasons[
+                0
+            ];
+
+
+        selectedAdminParticipantSeasonNumber =
+            Number(
+                selectedSeason
+                    .season_number
+            );
+
+
+        adminParticipantSeasonSelectElement
+            .value =
+                String(
+                    selectedAdminParticipantSeasonNumber
+                );
+
+
+        adminParticipantSeasonMessageElement
+            .textContent = "";
+
+
+        await loadAdminParticipants();
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        adminParticipantSeasonMessageElement
+            .textContent =
+                error.message;
+    }
+}
+
 // =========================================
 // 참가자 / 현재 팀 조회
 // =========================================
@@ -2521,7 +2763,8 @@ async function loadAdminParticipants() {
     try {
 
         const response = await fetch(
-            `${apiBaseUrl}/api/admin/participants`,
+            `${apiBaseUrl}/api/seasons/`
+            + `${selectedAdminParticipantSeasonNumber}`,
             {
                 headers: {
                     "X-Admin-Token":
@@ -2557,7 +2800,8 @@ async function loadAdminParticipants() {
 
 
         renderAdminParticipants(
-            responseData
+            responseData.participants
+            ?? []
         );
 
 
@@ -2602,7 +2846,7 @@ function renderAdminParticipants(
 
             participantCardElement
                 .dataset.participantId =
-                    participant.id;
+                    participant.participant_id;
 
 
             participantCardElement
@@ -2611,8 +2855,8 @@ function renderAdminParticipants(
                         class="admin-participant-info"
                     >
                         <img
-                            src="${participant.current_team_logo_path}"
-                            alt="${participant.current_team_name} 로고"
+                            src="${participant.team_logo_path ?? ""}"
+                            alt="${participant.team_name ?? ""} 로고"
                             class="admin-participant-logo"
                         >
 
@@ -2627,6 +2871,7 @@ function renderAdminParticipants(
                                 class="admin-participant-nickname"
                             >
                                 ${participant.fc_nickname ?? ""}
+                                · 팀 변경 ${participant.team_change_count ?? 0}/1회
                             </span>
                         </div>
                     </div>
@@ -2639,22 +2884,48 @@ function renderAdminParticipants(
                         <label>
                             현재 팀
 
-                            <input
-                                type="text"
-                                class="admin-team-name-input"
-                                value="${participant.current_team_name ?? ""}"
+                            <select
+                                class="admin-team-club-select"
                             >
-                        </label>
+                                <option value="">
+                                    팀을 선택해주세요.
+                                </option>
+
+                                ${
+                                    adminParticipantClubs
+                                        .map(
+                                            club => {
+
+                                                const isSelected =
+                                                    Number(
+                                                        participant.club_id
+                                                    )
+                                                    ===
+                                                    Number(
+                                                        club.club_id
+                                                    );
 
 
-                        <label>
-                            로고 경로
+                                                return `
+                                                    <option
+                                                        value="${club.club_id}"
+                                                        ${
+                                                            isSelected
+                                                                ? "selected"
+                                                                : ""
+                                                        }
+                                                    >
+                                                        ${escapeAdminClubText(
+                                                            club.name
+                                                        )}
+                                                    </option>
+                                                `;
+                                            }
+                                        )
+                                        .join("")
+                                }
 
-                            <input
-                                type="text"
-                                class="admin-team-logo-input"
-                                value="${participant.current_team_logo_path ?? ""}"
-                            >
+                            </select>
                         </label>
 
                     </div>
@@ -2677,6 +2948,69 @@ function renderAdminParticipants(
 
                     </div>
                 `;
+
+            const clubSelectElement =
+                participantCardElement
+                    .querySelector(
+                        ".admin-team-club-select"
+                    );
+
+
+            const teamLogoElement =
+                participantCardElement
+                    .querySelector(
+                        ".admin-participant-logo"
+                    );
+
+
+            clubSelectElement
+                ?.addEventListener(
+                    "change",
+                    () => {
+
+                        const selectedClubId =
+                            Number(
+                                clubSelectElement
+                                    .value
+                            );
+
+
+                        const selectedClub =
+                            adminParticipantClubs
+                                .find(
+                                    club =>
+                                        Number(
+                                            club.club_id
+                                        )
+                                        ===
+                                        selectedClubId
+                                );
+
+
+                        if (
+                            selectedClub
+                            &&
+                            selectedClub.logo_url
+                        ) {
+
+                            teamLogoElement.src =
+                                selectedClub.logo_url;
+
+                            teamLogoElement.alt =
+                                `${selectedClub.name} 로고`;
+
+                        } else {
+
+                            teamLogoElement
+                                .removeAttribute(
+                                    "src"
+                                );
+
+                            teamLogoElement.alt =
+                                "";
+                        }
+                    }
+                );
 
 
             const saveButtonElement =
@@ -2715,15 +3049,32 @@ async function saveParticipantTeam(
 ) {
 
     const participantId =
-        participantCardElement
-            .dataset
-            .participantId;
+        Number(
+            participantCardElement
+                .dataset
+                .participantId
+        );
 
 
-    const teamNameInputElement =
+    if (
+        !Number.isInteger(
+            participantId
+        )
+        ||
+        participantId <= 0
+    ) {
+
+        console.error(
+            "올바른 참가자 ID를 찾을 수 없습니다."
+        );
+
+        return;
+    }
+
+    const clubSelectElement =
         participantCardElement
             .querySelector(
-                ".admin-team-name-input"
+                ".admin-team-club-select"
             );
 
 
@@ -2748,33 +3099,51 @@ async function saveParticipantTeam(
             );
 
 
-    const currentTeamName =
-        teamNameInputElement
-            .value
-            .trim();
-
-
-    const currentTeamLogoPath =
-        teamLogoInputElement
-            .value
-            .trim();
+    const clubId =
+        Number(
+            clubSelectElement
+                .value
+        );
 
 
     if (
-        !currentTeamName
+        !Number.isInteger(
+            clubId
+        )
         ||
-        !currentTeamLogoPath
+        clubId <= 0
     ) {
 
         messageElement.textContent =
-            "팀 이름과 로고 경로를 입력해주세요.";
+            "변경할 팀을 선택해주세요.";
+
+        return;
+    }
+
+
+    const selectedClub =
+        adminParticipantClubs
+            .find(
+                club =>
+                    Number(
+                        club.club_id
+                    )
+                    ===
+                    clubId
+            );
+
+
+    if (!selectedClub) {
+
+        messageElement.textContent =
+            "선택한 팀 정보를 찾을 수 없습니다.";
 
         return;
     }
 
 
     const isConfirmed = confirm(
-        `${currentTeamName}(으)로 `
+        `${selectedClub.name}(으)로 `
         + "현재 팀을 변경하시겠습니까?"
     );
 
@@ -2798,8 +3167,11 @@ async function saveParticipantTeam(
 
         const response = await fetch(
             `${apiBaseUrl}`
-            + `/api/admin/participants/`
-            + `${participantId}/team`,
+            + `/api/admin/seasons/`
+            + `${selectedAdminParticipantSeasonNumber}`
+            + `/participants/`
+            + `${participantId}`
+            + `/club`,
             {
                 method: "PUT",
 
@@ -2812,11 +3184,8 @@ async function saveParticipantTeam(
                 },
 
                 body: JSON.stringify({
-                    current_team_name:
-                        currentTeamName,
-
-                    current_team_logo_path:
-                        currentTeamLogoPath,
+                    club_id:
+                        clubId,
                 }),
             }
         );
@@ -3341,10 +3710,203 @@ function updateAdminClubLogoPreview() {
 }
 
 // =========================================
+// 경기 결과 시즌 탭 조회
+// =========================================
+
+async function loadAdminResultSeasonTabs() {
+
+    const seasons =
+        await loadFclSeasons();
+
+
+    adminResultSeasons =
+        Array.isArray(
+            seasons
+        )
+            ? seasons
+            : [];
+
+
+    if (
+        adminResultSeasons.length
+        === 0
+    ) {
+
+        selectedAdminResultSeasonNumber =
+            null;
+
+        adminResultSeasonTabsElement
+            .innerHTML = "";
+
+        return;
+    }
+
+
+    const sortedSeasons =
+        adminResultSeasons
+            .slice()
+            .sort(
+                (
+                    seasonA,
+                    seasonB
+                ) =>
+                    Number(
+                        seasonB
+                            .season_number
+                    )
+                    -
+                    Number(
+                        seasonA
+                            .season_number
+                    )
+            );
+
+
+    const selectedSeasonExists =
+        sortedSeasons.some(
+            season =>
+                Number(
+                    season.season_number
+                )
+                ===
+                Number(
+                    selectedAdminResultSeasonNumber
+                )
+        );
+
+
+    if (
+        !selectedSeasonExists
+    ) {
+
+        selectedAdminResultSeasonNumber =
+            Number(
+                sortedSeasons[
+                    0
+                ].season_number
+            );
+    }
+
+
+    renderAdminResultSeasonTabs();
+}
+
+
+// =========================================
+// 경기 결과 시즌 탭 출력
+// =========================================
+
+function renderAdminResultSeasonTabs() {
+
+    adminResultSeasonTabsElement
+        .innerHTML = "";
+
+
+    const sortedSeasons =
+        adminResultSeasons
+            .slice()
+            .sort(
+                (
+                    seasonA,
+                    seasonB
+                ) =>
+                    Number(
+                        seasonA
+                            .season_number
+                    )
+                    -
+                    Number(
+                        seasonB
+                            .season_number
+                    )
+            );
+
+
+    sortedSeasons.forEach(
+        season => {
+
+            const seasonNumber =
+                Number(
+                    season
+                        .season_number
+                );
+
+
+            const buttonElement =
+                document.createElement(
+                    "button"
+                );
+
+
+            buttonElement.type =
+                "button";
+
+
+            buttonElement.classList.add(
+                "season-tab-button"
+            );
+
+
+            buttonElement.textContent =
+                `SEASON ${seasonNumber}`;
+
+
+            if (
+                seasonNumber
+                ===
+                selectedAdminResultSeasonNumber
+            ) {
+
+                buttonElement
+                    .classList.add(
+                        "active"
+                    );
+            }
+
+
+            buttonElement.addEventListener(
+                "click",
+                async () => {
+
+                    if (
+                        seasonNumber
+                        ===
+                        selectedAdminResultSeasonNumber
+                    ) {
+
+                        return;
+                    }
+
+
+                    selectedAdminResultSeasonNumber =
+                        seasonNumber;
+
+
+                    renderAdminResultSeasonTabs();
+
+
+                    await loadAdminResults(
+                        false
+                    );
+                }
+            );
+
+
+            adminResultSeasonTabsElement
+                .appendChild(
+                    buttonElement
+                );
+        }
+    );
+}
+
+// =========================================
 // 완료 경기 결과 조회
 // =========================================
 
-async function loadAdminResults() {
+async function loadAdminResults(
+    loadSeasons = true
+) {
 
     adminResultListElement.innerHTML =
         "경기 결과를 불러오는 중...";
@@ -3352,26 +3914,45 @@ async function loadAdminResults() {
 
     try {
 
+        if (loadSeasons) {
+
+            await loadAdminResultSeasonTabs();
+        }
+
+
+        if (
+            !selectedAdminResultSeasonNumber
+        ) {
+
+            adminResultListElement.textContent =
+                "시즌 정보를 불러올 수 없습니다.";
+
+            return;
+        }
+
+
         const response = await fetch(
             `${apiBaseUrl}`
             + "/api/fconline/series/completed-results"
+            + `?season=${selectedAdminResultSeasonNumber}`
         );
+
+
+        const responseData =
+            await response.json();
 
 
         if (!response.ok) {
 
             throw new Error(
-                "경기 결과 조회 실패"
+                responseData.detail
+                ?? "경기 결과 조회 실패"
             );
         }
 
 
-        const results =
-            await response.json();
-
-
         renderAdminResults(
-            results
+            responseData
         );
 
 
@@ -3381,8 +3962,10 @@ async function loadAdminResults() {
             error
         );
 
+
         adminResultListElement.textContent =
-            "경기 결과를 불러오지 못했습니다.";
+            error.message
+            ?? "경기 결과를 불러오지 못했습니다.";
     }
 }
 
@@ -4372,7 +4955,7 @@ async function saveAdminRegularSeasonStartDate() {
 
     const allowedDays = new Set(
         [
-            1,
+            3,
         ]
     );
 
@@ -4386,7 +4969,7 @@ async function saveAdminRegularSeasonStartDate() {
         adminRegularSeasonStartMessageElement
             .textContent =
                 "첫 경기일은 "
-                + "월요일로 선택해주세요.";
+                + "수요일로 선택해주세요."
 
         return;
     }
@@ -4732,7 +5315,7 @@ async function generateAdminRegularSchedule() {
             + `경기 수: ${
                 preview.schedule.length
             }경기\n`
-            + "경기당 2세트\n\n"
+            + "경기당 1경기(단판)\n\n"
             + "생성 후에는 같은 시즌에 "
             + "다시 자동 생성할 수 없습니다."
         );
@@ -6418,6 +7001,23 @@ function openAdminResultEdit(
         === "플레이오프";
 
 
+    const isDecisiveRegular =
+        (
+            result.match_type
+            === "정규리그"
+        )
+        &&
+        Number(
+            result.target_set_count
+        )
+        === 1;
+
+
+    const requiresDecisiveWinner =
+        isPlayoff
+        ||
+        isDecisiveRegular;
+
     const maxSets =
         isPlayoff
             ? Number(
@@ -6530,7 +7130,7 @@ function openAdminResultEdit(
         let tieWinnerHtml = "";
 
 
-        if (isPlayoff) {
+        if (requiresDecisiveWinner) {
 
             tieWinnerHtml = `
                 <div
@@ -6707,7 +7307,7 @@ function openAdminResultEdit(
     );
 
 
-    if (isPlayoff) {
+    if (requiresDecisiveWinner) {
 
         for (
             let setNumber = 1;
@@ -6818,6 +7418,25 @@ adminResultEditSaveButtonElement
                 editingAdminResult
                     .match_type
                 === "플레이오프";
+
+            const isDecisiveRegular =
+                (
+                    editingAdminResult
+                        .match_type
+                    === "정규리그"
+                )
+                &&
+                Number(
+                    editingAdminResult
+                        .target_set_count
+                )
+                === 1;
+
+
+            const requiresDecisiveWinner =
+                isPlayoff
+                ||
+                isDecisiveRegular;
 
 
             const maxSets =
@@ -7008,7 +7627,7 @@ adminResultEditSaveButtonElement
                     winnerSide =
                         "team_b";
 
-                } else if (isPlayoff) {
+                } else if (requiresDecisiveWinner) {
 
                     const selectedWinnerButton =
                         adminResultEditGridElement
@@ -7049,7 +7668,7 @@ adminResultEditSaveButtonElement
                 requestBody[
                     `set${setNumber}_winner_side`
                 ] = (
-                    isPlayoff
+                    requiresDecisiveWinner
                         ? winnerSide
                         : null
                 );
@@ -11539,6 +12158,22 @@ adminClubLogoPreviewElement
             adminClubLogoPlaceholderElement
                 .textContent =
                     "로고 URL을 입력해주세요.";
+        }
+    );
+
+adminParticipantSeasonSelectElement
+    ?.addEventListener(
+        "change",
+        async () => {
+
+            selectedAdminParticipantSeasonNumber =
+                Number(
+                    adminParticipantSeasonSelectElement
+                        .value
+                );
+
+
+            await loadAdminParticipants();
         }
     );
 

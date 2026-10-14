@@ -12304,6 +12304,19 @@ class AdminSeasonParticipantClubUpdateRequest(
         strict=True,
     )
 
+class AdminSeasonParticipantManualTeamUpdateRequest(
+    BaseModel
+):
+    team_name: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    team_logo_path: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
 class AdminDraftSessionCreateRequest(
     BaseModel
 ):
@@ -14075,15 +14088,15 @@ def admin_prepare_fcl_season(
 
     if (
         start_date.weekday()
-        != 0
+        != 2
     ):
 
         raise HTTPException(
             status_code=400,
             detail=(
                 "Season 2 이후 시즌 시작일은 "
-                "정규리그 2주 운영을 위해 "
-                "월요일이어야 합니다."
+                "정규리그 운영을 위해 "
+                "수요일이어야 합니다."
             ),
         )
 
@@ -14532,14 +14545,14 @@ def admin_update_fcl_season(
         and
         start_date is not None
         and
-        start_date.weekday() != 0
+        start_date.weekday() != 2
     ):
 
         raise HTTPException(
             status_code=400,
             detail=(
                 "Season 2 이후 시즌 시작일은 "
-                "월요일이어야 합니다."
+                "수요일이어야 합니다."
             ),
         )
 
@@ -15722,6 +15735,393 @@ def admin_update_fcl_season_participant_club(
                 else
                 "시즌 팀 변경이 완료되었습니다."
             ),
+    }
+
+@app.put(
+    "/api/admin/seasons/"
+    "{season_number}/participants/"
+    "{participant_id}/manual-team"
+)
+def admin_update_fcl_season_participant_manual_team(
+    season_number: int,
+    participant_id: int,
+
+    request_data:
+        AdminSeasonParticipantManualTeamUpdateRequest,
+
+    admin_token: str = Depends(
+        require_admin
+    ),
+):
+
+    team_name = (
+        request_data
+            .team_name
+            .strip()
+    )
+
+    team_logo_path = (
+        request_data
+            .team_logo_path
+            .strip()
+    )
+
+
+    history_directory = (
+        FRONTEND_DIR
+        / "assets"
+        / "images"
+        / "teams"
+        / "history"
+    ).resolve()
+
+
+    logo_relative_path = Path(
+        team_logo_path.removeprefix(
+            "./"
+        )
+    )
+
+
+    logo_file_path = (
+        FRONTEND_DIR
+        / logo_relative_path
+    ).resolve()
+
+
+    if (
+        history_directory
+        not in logo_file_path.parents
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "팀 로고는 "
+                "assets/images/teams/history "
+                "폴더 안의 파일만 "
+                "사용할 수 있습니다."
+            ),
+        )
+
+
+    if not logo_file_path.is_file():
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "지정한 팀 로고 파일을 "
+                "찾을 수 없습니다."
+            ),
+        )
+
+
+    with get_db_connection() as connection:
+
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT
+                    s.id
+                        AS season_id,
+
+                    s.status
+                        AS season_status,
+
+                    sp.team_name,
+                    sp.team_logo_path,
+
+                    sp.initial_team_name,
+                    sp.initial_team_logo_path,
+
+                    sp.team_change_count,
+
+                    p.current_team_name,
+                    p.current_team_logo_path
+
+                FROM seasons AS s
+
+                JOIN season_participants AS sp
+                    ON sp.season_id =
+                        s.id
+
+                JOIN participants AS p
+                    ON p.id =
+                        sp.participant_id
+
+                WHERE
+                    s.season_number = %s
+
+                    AND
+
+                    sp.participant_id = %s
+
+                LIMIT 1
+
+                FOR UPDATE OF sp, p
+                """,
+                (
+                    season_number,
+                    participant_id,
+                ),
+            )
+
+
+            current = (
+                cursor.fetchone()
+            )
+
+
+            if current is None:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "해당 시즌 참가자를 "
+                        "찾을 수 없습니다."
+                    ),
+                )
+
+
+            if (
+                current[
+                    "season_status"
+                ]
+                ==
+                "completed"
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "종료된 시즌의 팀은 "
+                        "변경할 수 없습니다."
+                    ),
+                )
+
+
+            cursor.execute(
+                """
+                SELECT
+                    id
+
+                FROM series
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    status = 'active'
+
+                    AND (
+                        team_a_id = %s
+
+                        OR
+
+                        team_b_id = %s
+                    )
+
+                LIMIT 1
+                """,
+                (
+                    current[
+                        "season_id"
+                    ],
+                    participant_id,
+                    participant_id,
+                ),
+            )
+
+
+            active_series = (
+                cursor.fetchone()
+            )
+
+
+            if active_series:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "진행 중인 경기가 있는 동안에는 "
+                        "팀을 변경할 수 없습니다."
+                    ),
+                )
+
+
+            current_team_name = str(
+                current[
+                    "team_name"
+                ]
+                or
+                current[
+                    "current_team_name"
+                ]
+                or
+                ""
+            ).strip()
+
+
+            current_team_logo_path = str(
+                current[
+                    "team_logo_path"
+                ]
+                or
+                current[
+                    "current_team_logo_path"
+                ]
+                or
+                ""
+            ).strip()
+
+
+            is_actual_team_change = (
+                current_team_name.casefold()
+                !=
+                team_name.casefold()
+            )
+
+
+            team_change_count = int(
+                current[
+                    "team_change_count"
+                ]
+                or 0
+            )
+
+
+            if (
+                is_actual_team_change
+                and
+                team_change_count >= 1
+            ):
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "이번 시즌 팀 변경권은 "
+                        "이미 사용했습니다."
+                    ),
+                )
+
+
+            change_increment = (
+                1
+                if is_actual_team_change
+                else 0
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE season_participants
+
+                SET
+                    initial_team_name =
+                        COALESCE(
+                            initial_team_name,
+                            %s
+                        ),
+
+                    initial_team_logo_path =
+                        COALESCE(
+                            initial_team_logo_path,
+                            %s
+                        ),
+
+                    club_id = NULL,
+
+                    team_name = %s,
+
+                    team_logo_path = %s,
+
+                    team_assignment_source =
+                        'admin',
+
+                    team_change_count =
+                        team_change_count
+                        + %s,
+
+                    team_changed_at =
+                        CASE
+                            WHEN %s = 1
+                            THEN NOW()
+                            ELSE team_changed_at
+                        END
+
+                WHERE
+                    season_id = %s
+
+                    AND
+                    participant_id = %s
+
+                RETURNING
+                    participant_id,
+                    team_name,
+                    team_logo_path,
+                    team_assignment_source,
+                    team_change_count,
+                    team_changed_at
+                """,
+                (
+                    current_team_name,
+                    current_team_logo_path,
+
+                    team_name,
+                    team_logo_path,
+
+                    change_increment,
+                    change_increment,
+
+                    current[
+                        "season_id"
+                    ],
+
+                    participant_id,
+                ),
+            )
+
+
+            updated_participant = (
+                cursor.fetchone()
+            )
+
+
+            cursor.execute(
+                """
+                UPDATE participants
+
+                SET
+                    current_team_name = %s,
+
+                    current_team_logo_path = %s,
+
+                    updated_at = NOW()
+
+                WHERE
+                    id = %s
+                """,
+                (
+                    team_name,
+                    team_logo_path,
+                    participant_id,
+                ),
+            )
+
+
+        connection.commit()
+
+
+    return {
+        "season_number":
+            season_number,
+
+        "participant":
+            updated_participant,
+
+        "message":
+            "시즌 팀 정보가 저장되었습니다.",
     }
 
 # =========================
@@ -27016,7 +27416,6 @@ def build_regular_schedule_generation_preview(
     # =========================
     # 현재 정규리그 운영 요일
     #
-    # 월 = 0
     # 수 = 2
     # 토 = 5
     #
@@ -27025,7 +27424,6 @@ def build_regular_schedule_generation_preview(
     # =========================
 
     allowed_weekdays = {
-        0,
         2,
         5,
     }
@@ -27033,7 +27431,7 @@ def build_regular_schedule_generation_preview(
 
     if (
         start_date.weekday()
-        != 0
+        != 2
     ):
 
         raise HTTPException(
@@ -27041,27 +27439,21 @@ def build_regular_schedule_generation_preview(
             detail=(
                 "정규리그 자동 생성의 "
                 "시즌 시작일은 "
-                "월요일이어야 합니다."
+                "수요일이어야 합니다."
             ),
         )
 
 
     # =========================
-    # 6 경기일 생성
+    # 4 경기일 생성
     #
-    # 2주 × 주 3일
+    # 1주차 수요일
+    # 1주차 토요일
+    # 2주차 수요일
+    # 2주차 토요일
     #
-    # 1주차:
-    # - 3 SERIES
-    # - 3 SERIES
-    # - 4 SERIES
-    #
-    # 2주차:
-    # - 3 SERIES
-    # - 3 SERIES
-    # - 4 SERIES
-    #
-    # 총 20 SERIES
+    # 하루 5경기
+    # 총 20경기
     # =========================
 
     match_dates = []
@@ -27071,7 +27463,7 @@ def build_regular_schedule_generation_preview(
     )
 
 
-    while len(match_dates) < 6:
+    while len(match_dates) < 4:
 
         if (
             current_date.weekday()
@@ -27299,12 +27691,10 @@ def build_regular_schedule_generation_preview(
     # =========================
 
     match_day_series_counts = [
-        3,
-        3,
-        4,
-        3,
-        3,
-        4,
+        5,
+        5,
+        5,
+        5,
     ]
 
 
@@ -27388,7 +27778,7 @@ def build_regular_schedule_generation_preview(
                             .isoformat(),
 
                     "target_set_count":
-                        2,
+                        1,
 
                     "team_a_id":
                         int(
@@ -27485,6 +27875,57 @@ def build_regular_schedule_generation_preview(
             "중복 생성되었습니다."
         )
 
+    undirected_pair_counts = {}
+
+
+    for item in schedule:
+
+        pair_key = frozenset(
+            (
+                int(
+                    item[
+                        "team_a_id"
+                    ]
+                ),
+                int(
+                    item[
+                        "team_b_id"
+                    ]
+                ),
+            )
+        )
+
+
+        undirected_pair_counts[
+            pair_key
+        ] = (
+            undirected_pair_counts.get(
+                pair_key,
+                0,
+            )
+            + 1
+        )
+
+
+    if (
+        len(
+            undirected_pair_counts
+        )
+        != 10
+        or
+        any(
+            count != 2
+
+            for count
+            in undirected_pair_counts.values()
+        )
+    ):
+
+        raise RuntimeError(
+            "정규리그 홈/원정 대진이 "
+            "정확히 1회씩 구성되지 않았습니다."
+        )
+
     # =========================
     # 경기일별 참가자 검증
     #
@@ -27515,22 +27956,23 @@ def build_regular_schedule_generation_preview(
         )
 
 
-    if len(schedule_by_date) != 6:
+    if len(schedule_by_date) != 4:
 
         raise RuntimeError(
             "정규리그 경기일 수가 "
-            "6일이 아닙니다."
+            "4일이 아닙니다."
         )
 
 
     expected_match_day_counts = [
-        3,
-        3,
-        4,
-        3,
-        3,
-        4,
+        5,
+        5,
+        5,
+        5,
     ]
+
+
+    previous_match_day_pairs = None
 
 
     for (
@@ -27617,10 +28059,7 @@ def build_regular_schedule_generation_preview(
 
 
         if any(
-            count not in (
-                1,
-                2,
-            )
+            count != 2
 
             for count
             in participant_counts.values()
@@ -27628,11 +28067,69 @@ def build_regular_schedule_generation_preview(
 
             raise RuntimeError(
                 f"{match_date_text}에 "
-                "하루 1~2경기 출전 규칙을 "
+                "하루 2경기 출전 규칙을 "
                 "위반한 참가자가 있습니다. "
                 f"현재: "
                 f"{participant_counts}"
             )
+
+        current_match_day_pairs = {
+            frozenset(
+                (
+                    int(
+                        item[
+                            "team_a_id"
+                        ]
+                    ),
+                    int(
+                        item[
+                            "team_b_id"
+                        ]
+                    ),
+                )
+            )
+
+            for item
+            in day_series
+        }
+
+
+        if (
+            len(
+                current_match_day_pairs
+            )
+            !=
+            len(
+                day_series
+            )
+        ):
+
+            raise RuntimeError(
+                f"{match_date_text}에 "
+                "같은 상대끼리 중복 경기가 "
+                "배치되어 있습니다."
+            )
+
+
+        if (
+            previous_match_day_pairs
+            is not None
+            and
+            current_match_day_pairs
+            &
+            previous_match_day_pairs
+        ):
+
+            raise RuntimeError(
+                f"{match_date_text}에 "
+                "직전 경기일에 만났던 상대와 "
+                "다시 만나는 대진이 있습니다."
+            )
+
+
+        previous_match_day_pairs = (
+            current_match_day_pairs
+        )
 
 
     # =========================
@@ -27753,18 +28250,18 @@ def build_regular_schedule_generation_preview(
             "series_per_round": 5,
 
             "week_count": 2,
-            "match_day_count": 6,
+            "match_day_count": 4,
 
             "series_per_day_pattern": [
-                3,
-                3,
-                4,
+                5,
+                5,
+                5,
+                5,
             ],
 
-            "sets_per_series": 2,
+            "sets_per_series": 1,
 
             "weekdays": [
-                "월",
                 "수",
                 "토",
             ],
@@ -27773,6 +28270,9 @@ def build_regular_schedule_generation_preview(
                 True,
 
             "max_series_per_participant_per_day":
+                2,
+
+            "exact_series_per_participant_per_day":
                 2,
 
             "home_away":
@@ -28425,13 +28925,13 @@ def admin_generate_regular_schedule(
                         %s,
 
                         40,
-                        FALSE,
+                        TRUE,
 
                         %s,
                         %s,
                         %s,
 
-                        2,
+                        1,
 
                         'pending',
                         'scheduled'
@@ -30391,6 +30891,22 @@ def admin_update_series_result(
                 == "플레이오프"
             )
 
+            is_decisive_regular = (
+                series[
+                    "series_type"
+                ]
+                ==
+                "정규리그"
+                and
+                int(
+                    series[
+                        "target_set_count"
+                    ]
+                    or 3
+                )
+                == 1
+            )
+
 
             if is_playoff:
 
@@ -30732,7 +31248,11 @@ def admin_update_series_result(
 
                 else:
 
-                    if not is_playoff:
+                    if (
+                        not is_playoff
+                        and
+                        not is_decisive_regular
+                    ):
 
                         winner_side = "draw"
 
@@ -30750,7 +31270,7 @@ def admin_update_series_result(
                                 status_code=400,
                                 detail=(
                                     f"{set_number}세트가 동점입니다. "
-                                    "플레이오프에서는 실제 승자를 "
+                                    "실제 승자를 "
                                     "지정해야 합니다."
                                 ),
                             )
@@ -33543,7 +34063,6 @@ def create_prediction(
 
     if prediction_type not in (
         "participant",
-        "draw",
     ):
 
         raise HTTPException(
@@ -39740,7 +40259,7 @@ def get_matches(
             match[
                 "ai_prediction"
             ] = (
-                calculate_ai_match_prediction(
+                calculate_ai_playoff_prediction(
                     ai_prediction_context,
 
                     match[
@@ -39750,6 +40269,8 @@ def get_matches(
                     match[
                         "team_b"
                     ],
+
+                    1,
                 )
             )
 
@@ -40777,8 +41298,6 @@ def get_standings(
             return
 
 
-        # SERIES에 설정된
-        # 세트 수가 모두 있어야 반영
         if (
             len(sets)
             != expected_set_count
@@ -40787,38 +41306,55 @@ def get_standings(
 
 
         team_a_record = (
-            standings[team_a]
+            standings[
+                team_a
+            ]
         )
 
         team_b_record = (
-            standings[team_b]
+            standings[
+                team_b
+            ]
         )
 
 
-        # SERIES 경기 수
-        team_a_record["played"] += 1
-        team_b_record["played"] += 1
+        team_a_record[
+            "played"
+        ] += 1
+
+        team_b_record[
+            "played"
+        ] += 1
 
 
-        # =========================
-        # 세트별 계산
-        # =========================
-
-        for (
-            team_a_score,
-            team_b_score,
-        ) in sets:
+        for set_result in sets:
 
             team_a_score = int(
-                team_a_score
+                set_result[
+                    0
+                ]
             )
 
             team_b_score = int(
-                team_b_score
+                set_result[
+                    1
+                ]
             )
 
 
-            # 득점 / 실점
+            winner_side = (
+                set_result[
+                    2
+                ]
+
+                if len(
+                    set_result
+                ) >= 3
+
+                else None
+            )
+
+
             team_a_record[
                 "goals_for"
             ] += team_a_score
@@ -40836,76 +41372,64 @@ def get_standings(
                 "goals_against"
             ] += team_a_score
 
-
-            # =========================
-            # 팀A 승
-            # =========================
 
             if (
-                team_a_score
-                >
-                team_b_score
+                winner_side
+                not in (
+                    "team_a",
+                    "team_b",
+                )
+            ):
+
+                if (
+                    team_a_score
+                    >
+                    team_b_score
+                ):
+
+                    winner_side = (
+                        "team_a"
+                    )
+
+                elif (
+                    team_b_score
+                    >
+                    team_a_score
+                ):
+
+                    winner_side = (
+                        "team_b"
+                    )
+
+
+            if (
+                winner_side
+                ==
+                "team_a"
             ):
 
                 team_a_record[
                     "wins"
                 ] += 1
 
-                team_a_record[
-                    "points"
-                ] += 3
-
                 team_b_record[
                     "losses"
                 ] += 1
 
-
-            # =========================
-            # 팀B 승
-            # =========================
 
             elif (
-                team_a_score
-                <
-                team_b_score
+                winner_side
+                ==
+                "team_b"
             ):
 
                 team_b_record[
                     "wins"
                 ] += 1
 
-                team_b_record[
-                    "points"
-                ] += 3
-
                 team_a_record[
                     "losses"
                 ] += 1
-
-
-            # =========================
-            # 무승부
-            # =========================
-
-            else:
-
-                team_a_record[
-                    "draws"
-                ] += 1
-
-                team_b_record[
-                    "draws"
-                ] += 1
-
-
-                team_a_record[
-                    "points"
-                ] += 1
-
-                team_b_record[
-                    "points"
-                ] += 1
-
 
     # =========================================
     # 1. Neon 정규리그 결과
@@ -40938,7 +41462,8 @@ def get_standings(
 
                     ss.set_number,
                     ss.team_a_score,
-                    ss.team_b_score
+                    ss.team_b_score,
+                    ss.winner_side
 
                 FROM series AS s
 
@@ -41041,6 +41566,10 @@ def get_standings(
 
                 row[
                     "team_b_score"
+                ],
+
+                row[
+                    "winner_side"
                 ],
             )
         )
@@ -41307,7 +41836,7 @@ def get_standings(
 
         record[
             "goal_difference"
-        ] = (
+        ] = (     
             record[
                 "goals_for"
             ]
@@ -41315,6 +41844,15 @@ def get_standings(
             record[
                 "goals_against"
             ]
+        )
+
+        record[
+            "points"
+        ] = (
+            record[
+                "wins"
+            ]
+            * 3
         )
 
 
@@ -48403,9 +48941,7 @@ def activate_fcl_series(
                                 "team_b"
                             ],
 
-                            series[
-                                "wins_required"
-                            ],
+                            1,
                         )
                     )
 
@@ -49035,6 +49571,22 @@ def manual_complete_fcl_series(
                 == "토너먼트"
             )
 
+            is_decisive_regular = (
+                series[
+                    "series_type"
+                ]
+                ==
+                "정규리그"
+                and
+                int(
+                    series[
+                        "target_set_count"
+                    ]
+                    or 3
+                )
+                == 1
+            )
+
 
             if is_playoff:
 
@@ -49222,18 +49774,16 @@ def manual_complete_fcl_series(
 
                 else:
 
-                    # 프리시즌 / 정규리그는
-                    # 무승부 허용
                     if (
                         not is_playoff
                         and
                         not is_tournament
+                        and
+                        not is_decisive_regular
                     ):
 
                         winner_side = "draw"
 
-                    # 플레이오프 / 토너먼트는
-                    # 반드시 실제 승자 필요
                     else:
 
                         if explicit_winner_side not in (
@@ -49245,7 +49795,6 @@ def manual_complete_fcl_series(
                                 status_code=400,
                                 detail=(
                                     f"{set_number}세트가 동점입니다. "
-                                    "플레이오프 또는 토너먼트에서는 "
                                     "실제 승자를 지정해야 합니다."
                                 ),
                             )
