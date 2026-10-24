@@ -40,6 +40,9 @@ let selectedResultSeasonNumber =
 let availableResultSeasons =
     [];
 
+let resultSeasonTeamLogoMap =
+    new Map();
+
 const resultDetailModalElement =
     document.querySelector(
         "#result-detail-modal"
@@ -630,6 +633,69 @@ async function loadResults() {
 
         if (!selectedResultSeasonNumber) {
             return;
+        }
+
+        // =========================================
+        // 시즌별 팀 로고 불러오기
+        // Season 1은 기존 기록 유지
+        // =========================================
+
+        resultSeasonTeamLogoMap = new Map();
+
+        if (selectedResultSeasonNumber >= 2) {
+
+            try {
+
+                const seasonResponse = await fetch(
+                    `${apiBaseUrl}/api/seasons/${selectedResultSeasonNumber}`
+                );
+
+                if (seasonResponse.ok) {
+
+                    const seasonData =
+                        await seasonResponse.json();
+
+                    const seasonParticipants =
+                        seasonData.participants ?? [];
+
+                    for (const participant of seasonParticipants) {
+
+                        const fclName =
+                            participant.fcl_name;
+
+                        const logoPath =
+                            participant.team_logo_path;
+
+                        if (!fclName || !logoPath) {
+                            continue;
+                        }
+
+                        const resolvedLogoPath =
+                            logoPath.startsWith("/api/")
+                                ? `${apiBaseUrl}${logoPath}`
+                                : logoPath;
+
+                        resultSeasonTeamLogoMap.set(
+                            fclName,
+                            resolvedLogoPath
+                        );
+                    }
+
+                } else {
+
+                    console.warn(
+                        "시즌 팀 로고 조회 실패:",
+                        seasonResponse.status
+                    );
+                }
+
+            } catch (error) {
+
+                console.warn(
+                    "시즌 팀 로고 불러오기 오류:",
+                    error
+                );
+            }
         }
 
 
@@ -1665,7 +1731,7 @@ function createResultDetailCompetitionHtml() {
                     result-detail-competition-season
                 "
             >
-                FCL SEASON 1
+                FCL SEASON ${selectedResultSeasonNumber ?? 1}
             </span>
 
             <strong
@@ -2320,13 +2386,19 @@ function renderResults(
         
         const teamAImagePath =
             result.team_a_snapshot_logo_path
-            ?? getTeamImagePath(
+            || resultSeasonTeamLogoMap.get(
+                result.team_a
+            )
+            || getTeamImagePath(
                 result.team_a
             );
 
         const teamBImagePath =
             result.team_b_snapshot_logo_path
-            ?? getTeamImagePath(
+            || resultSeasonTeamLogoMap.get(
+                result.team_b
+            )
+            || getTeamImagePath(
                 result.team_b
             );
 

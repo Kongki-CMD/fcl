@@ -1,6 +1,7 @@
 import {
-    apiBaseUrl
-} from "./config.js";
+    apiBaseUrl,
+    loadFclSeasons,
+} from "./config.js?v=season-default-1";
 
 
 const teamASelectElement =
@@ -143,6 +144,11 @@ const preseasonDateInputElement =
         "#preseason-date-input"
     );
 
+const friendlySeasonSelectElement =
+    document.querySelector(
+        "#friendly-season-select"
+    );
+
 const preseasonTodayButtonElement =
     document.querySelector(
         "#preseason-today-button"
@@ -235,73 +241,204 @@ function getCurrentSeriesSeasonNumber() {
 
 async function loadParticipants() {
 
-    try {
-
-        const response = await fetch(
-            `${apiBaseUrl}/api/database/participants`
+    const seasonNumber =
+        Number(
+            friendlySeasonSelectElement.value
         );
 
+    teamASelectElement.innerHTML = `
+        <option value="">참가자 선택</option>
+    `;
 
-        if (!response.ok) {
+    teamBSelectElement.innerHTML = `
+        <option value="">참가자 선택</option>
+    `;
 
-            throw new Error(
-                "참가자 정보를 불러오지 못했습니다."
-            );
+    seriesStartButtonElement.disabled =
+        true;
 
-        }
+    historyImportButtonElement.disabled =
+        true;
 
+    if (
+        !Number.isInteger(seasonNumber)
+        ||
+        seasonNumber <= 0
+    ) {
+        throw new Error(
+            "예약할 시즌을 선택해주세요."
+        );
+    }
 
-        const participants =
-            await response.json();
+    const response = await fetch(
+        `${apiBaseUrl}/api/seasons/${seasonNumber}`
+    );
 
+    if (!response.ok) {
+        throw new Error(
+            "시즌 참가자 정보를 불러오지 못했습니다."
+        );
+    }
 
-        const availableParticipants =
-            participants.filter(
+    const data =
+        await response.json();
+
+    const participants =
+        (data.participants ?? [])
+            .filter(
                 participant =>
                     participant.fc_nickname
             );
 
+    for (const participant of participants) {
 
-        availableParticipants.forEach(
-            participant => {
+        const option =
+            document.createElement("option");
 
-                const teamAOption =
-                    document.createElement(
-                        "option"
-                    );
+        option.value =
+            participant.fcl_name;
 
-                teamAOption.value =
-                    participant.fcl_name;
+        option.textContent =
+            `${participant.fcl_name} (${participant.fc_nickname})`;
 
-                teamAOption.textContent =
-                    `${participant.fcl_name} (${participant.fc_nickname})`;
-
-
-                const teamBOption =
-                    teamAOption.cloneNode(
-                        true
-                    );
-
-
-                teamASelectElement.append(
-                    teamAOption
-                );
-
-                teamBSelectElement.append(
-                    teamBOption
-                );
-
-            }
+        teamASelectElement.append(
+            option
         );
 
+        teamBSelectElement.append(
+            option.cloneNode(true)
+        );
+    }
+
+    if (participants.length < 2) {
+        throw new Error(
+            "선택한 시즌에 예약 가능한 "
+            + "참가자가 2명 미만입니다."
+        );
+    }
+
+    seriesStartButtonElement.disabled =
+        false;
+
+    historyImportButtonElement.disabled =
+        false;
+}
+
+
+async function loadFriendlySeasons() {
+
+    seriesStartButtonElement.disabled =
+        true;
+
+    historyImportButtonElement.disabled =
+        true;
+
+    try {
+
+        const seasons =
+            await loadFclSeasons();
+
+        const availableSeasons =
+            seasons
+                .filter(
+                    season =>
+                        season.status === "active"
+                        ||
+                        season.status === "upcoming"
+                )
+                .sort(
+                    (a, b) =>
+                        Number(b.season_number)
+                        -
+                        Number(a.season_number)
+                );
+
+        if (availableSeasons.length === 0) {
+            throw new Error(
+                "예약 가능한 시즌이 없습니다."
+            );
+        }
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const requestedSeasonText =
+            params.get("season");
+
+        const requestedSeasonNumber =
+            requestedSeasonText !== null
+            &&
+            /^[1-9]\d*$/.test(
+                requestedSeasonText
+            )
+                ? Number(requestedSeasonText)
+                : null;
+
+        let selectedSeason = null;
+
+        if (requestedSeasonText !== null) {
+
+            selectedSeason =
+                availableSeasons.find(
+                    season =>
+                        Number(season.season_number)
+                        === requestedSeasonNumber
+                );
+
+            if (!selectedSeason) {
+                throw new Error(
+                    "선택한 시즌은 예약할 수 없습니다."
+                );
+            }
+
+        } else {
+
+            selectedSeason =
+                availableSeasons.find(
+                    season =>
+                        season.status === "active"
+                )
+                ??
+                availableSeasons[0];
+        }
+
+        friendlySeasonSelectElement.innerHTML =
+            "";
+
+        for (const season of availableSeasons) {
+
+            const option =
+                document.createElement("option");
+
+            option.value =
+                String(
+                    season.season_number
+                );
+
+            option.textContent =
+                `SEASON ${season.season_number}`;
+
+            friendlySeasonSelectElement.append(
+                option
+            );
+        }
+
+        friendlySeasonSelectElement.value =
+            String(
+                selectedSeason.season_number
+            );
+
+        await loadParticipants();
 
     } catch (error) {
 
+        console.error(error);
+
         preseasonMessageElement.textContent =
             error.message;
-
     }
-
 }
 
 
@@ -380,6 +517,23 @@ async function startSeries() {
 
     }
 
+    const seasonNumber =
+        Number(
+            friendlySeasonSelectElement.value
+        );
+
+    if (
+        !Number.isInteger(seasonNumber)
+        ||
+        seasonNumber <= 0
+    ) {
+
+        preseasonMessageElement.textContent =
+            "예약할 시즌을 선택해주세요.";
+
+        return;
+    }
+
 
     seriesStartButtonElement.disabled =
         true;
@@ -401,6 +555,10 @@ async function startSeries() {
                 },
 
                 body: JSON.stringify({
+
+                    season_number:
+                        seasonNumber,
+
                     team_a:
                         teamA,
 
@@ -457,7 +615,7 @@ async function startSeries() {
             () => {
 
                 window.location.href =
-                    "./schedule.html";
+                    `./schedule.html?season=${data.season_number}`;
 
             },
             700
@@ -526,6 +684,23 @@ async function importHistorySeries() {
         return;
     }
 
+    const seasonNumber =
+        Number(
+            friendlySeasonSelectElement.value
+        );
+
+    if (
+        !Number.isInteger(seasonNumber)
+        ||
+        seasonNumber <= 0
+    ) {
+
+        preseasonMessageElement.textContent =
+            "경기를 등록할 시즌을 선택해주세요.";
+
+        return;
+    }
+
 
     const confirmed =
         window.confirm(
@@ -568,6 +743,9 @@ async function importHistorySeries() {
                     team_b:
                         teamB,
 
+                    season_number:
+                        seasonNumber,
+
                     match_date:
                         matchDate,
 
@@ -605,7 +783,7 @@ async function importHistorySeries() {
             () => {
 
                 window.location.href =
-                    "./results.html";
+                    `./results.html?season=${seasonNumber}`;
 
             },
             600
@@ -2254,12 +2432,53 @@ preseasonTodayButtonElement.addEventListener(
     setTodayMatchDate
 );
 
+friendlySeasonSelectElement.addEventListener(
+    "change",
+    async () => {
+
+        const seasonNumber =
+            Number(
+                friendlySeasonSelectElement.value
+            );
+
+        const url =
+            new URL(
+                window.location.href
+            );
+
+        url.searchParams.set(
+            "season",
+            String(seasonNumber)
+        );
+
+        window.history.replaceState(
+            {},
+            "",
+            url
+        );
+
+        preseasonMessageElement.textContent =
+            "";
+
+        try {
+
+            await loadParticipants();
+
+        } catch (error) {
+
+            console.error(error);
+
+            preseasonMessageElement.textContent =
+                error.message;
+        }
+    }
+);
 
 
 /* =========================
    초기 실행
 ========================= */
 
-loadParticipants();
+loadFriendlySeasons();
 
 restoreSeries();

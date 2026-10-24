@@ -1124,9 +1124,24 @@ function renderMatches() {
 
 async function loadMatches() {
 
+    const urlParams =
+        new URLSearchParams(
+            window.location.search
+        );
+
+    const requestedSeason =
+        urlParams.get("season");
+
+    const seasonQuery =
+        requestedSeason
+        &&
+        /^[1-9]\d*$/.test(requestedSeason)
+            ? `?season=${requestedSeason}`
+            : "";
+
     const response =
         await fetch(
-            `${apiBaseUrl}/api/predictions/matches`
+            `${apiBaseUrl}/api/predictions/matches${seasonQuery}`
         );
 
 

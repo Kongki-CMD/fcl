@@ -1586,7 +1586,7 @@ function renderSchedule(matches) {
 
                 return (
                     matchB.date.localeCompare(
-                        matchB.date
+                        matchA.date
                     )
                 );
             }

@@ -8388,8 +8388,7 @@ def initialize_database():
                 AS $$
                 BEGIN
 
-                    IF
-                        NEW.series_type = '토너먼트'
+                    IF NEW.series_type = '토너먼트'
                     THEN
 
                         NEW.season_id := NULL;
@@ -8399,26 +8398,13 @@ def initialize_database():
                     END IF;
 
 
-                    IF
-                        NEW.season_id IS NULL
+                    IF NEW.season_id IS NULL
                     THEN
 
-                        SELECT
-                            id
-
-                        INTO
-                            NEW.season_id
-
-                        FROM
-                            seasons
-
-                        WHERE
-                            status = 'active'
-
-                        ORDER BY
-                            season_number DESC
-
-                        LIMIT 1;
+                        RAISE EXCEPTION
+                            'season_id is required for series_type %',
+                            NEW.series_type
+                        USING ERRCODE = '23514';
 
                     END IF;
 
@@ -12614,6 +12600,10 @@ class SeriesStartRequest(BaseModel):
 
     series_type: str = "프리시즌"
 
+    season_number: int = Field(
+        ge=1,
+    )
+
     scheduled_date: str | None = None
 
     target_set_count: int = Field(
@@ -12692,6 +12682,10 @@ class AdminSeriesResultUpdateRequest(
 
 
 class HistorySeriesImportRequest(BaseModel):
+    season_number: int = Field(
+        ge=1
+    )
+
     team_a: str
     team_b: str
     match_date: str
@@ -20579,26 +20573,6 @@ def admin_activate_fcl_season(
                     ),
                 )
 
-
-            today = datetime.now(
-                ZoneInfo(
-                    "Asia/Seoul"
-                )
-            ).date()
-
-
-            if today < season_start_date:
-
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Season {season_number}은 "
-                        f"{season_start_date.isoformat()}부터 "
-                        "시작할 수 있습니다."
-                    ),
-                )
-
-
             # =========================
             # 정규리그 일정 확인
             #
@@ -20689,6 +20663,41 @@ def admin_activate_fcl_season(
             for previous_season in (
                 previous_active_seasons
             ):
+
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM series
+
+                    WHERE season_id = %s
+
+                        AND status IN (
+                            'scheduled',
+                            'active'
+                        )
+
+                    LIMIT 1
+                    """,
+                    (
+                        previous_season["id"],
+                    ),
+                )
+
+                unfinished_series = (
+                    cursor.fetchone()
+                )
+
+                if unfinished_series:
+
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "이전 시즌에 예약 또는 "
+                            "진행 중인 경기가 남아 있습니다. "
+                            "경기를 완료하거나 취소한 후 "
+                            "새 시즌을 시작해주세요."
+                        ),
+                    )
 
                 snapshot_fcl_season_participant_teams(
                     cursor,
@@ -31837,7 +31846,19 @@ def admin_update_series_result(
 @app.get(
     "/api/predictions/matches"
 )
-def get_prediction_matches():
+def get_prediction_matches(
+    season: int | None = None,
+):
+
+    selected_season = (
+        resolve_fcl_season_record(
+            season
+        )
+    )
+
+    selected_season_id = int(
+        selected_season["id"]
+    )
 
     today = datetime.now(
         ZoneInfo("Asia/Seoul")
@@ -31866,6 +31887,8 @@ def get_prediction_matches():
                 WHERE
                     series_type = '정규리그'
 
+                    AND season_id = %s
+
                     AND scheduled_date
                         IS NOT NULL
 
@@ -31874,6 +31897,7 @@ def get_prediction_matches():
                     AND status <> 'cancelled'
                 """,
                 (
+                    selected_season_id,
                     today,
                 ),
             )
@@ -32053,6 +32077,8 @@ def get_prediction_matches():
                     s.series_type =
                         '정규리그'
 
+                    AND s.season_id = %s
+
                     AND s.scheduled_date =
                         %s
 
@@ -32064,6 +32090,7 @@ def get_prediction_matches():
                     s.id ASC
                 """,
                 (
+                    selected_season_id,
                     target_date,
                 ),
             )
@@ -42005,6 +42032,8 @@ def admin_update_playoff(
         )
 
 
+
+
     # =========================
     # 경기 방식
     # =========================
@@ -47374,6 +47403,89 @@ def get_series_test():
 # Neon PostgreSQL
 # =========================
 
+def resolve_friendly_season_context(
+    season_number: int,
+    team_a_name: str,
+    team_b_name: str,
+):
+    season = resolve_fcl_season_record(
+        season_number
+    )
+
+    if season["status"] not in (
+        "active",
+        "upcoming",
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "종료된 시즌에는 친선전을 "
+                "추가할 수 없습니다."
+            ),
+        )
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    p.id,
+                    p.fcl_name,
+
+                    COALESCE(
+                        sp.team_name,
+                        p.current_team_name
+                    ) AS team_name,
+
+                    COALESCE(
+                        sp.team_logo_path,
+                        p.current_team_logo_path
+                    ) AS team_logo_path
+
+                FROM season_participants AS sp
+
+                JOIN participants AS p
+                    ON p.id = sp.participant_id
+
+                WHERE sp.season_id = %s
+
+                    AND p.fcl_name IN (
+                        %s,
+                        %s
+                    )
+                """,
+                (
+                    season["id"],
+                    team_a_name,
+                    team_b_name,
+                ),
+            )
+
+            rows = cursor.fetchall()
+
+    teams = {
+        row["fcl_name"]: row
+        for row in rows
+    }
+
+    if (
+        team_a_name == team_b_name
+        or
+        team_a_name not in teams
+        or
+        team_b_name not in teams
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "선택한 시즌에 등록된 "
+                "서로 다른 참가자 2명을 "
+                "선택해주세요."
+            ),
+        )
+
+    return season, teams
+
 @app.post("/api/fconline/series/start")
 def start_fcl_series(
     request: SeriesStartRequest,
@@ -47457,6 +47569,22 @@ def start_fcl_series(
                 "생성할 수 없습니다."
             ),
         )
+
+    # =========================
+    # 친선전 예약 시즌 확정
+    # =========================
+
+    selected_season, season_teams = (
+        resolve_friendly_season_context(
+            request.season_number,
+            request.team_a,
+            request.team_b,
+        )
+    )
+
+    selected_season_id = int(
+        selected_season["id"]
+    )
 
 
     with get_db_connection() as connection:
@@ -47561,6 +47689,9 @@ def start_fcl_series(
                     series_type = '프리시즌'
 
                     AND
+                    season_id = %s
+
+                    AND
                     scheduled_date = %s
 
                     AND
@@ -47588,6 +47719,7 @@ def start_fcl_series(
                 LIMIT 1
                 """,
                 (
+                    selected_season_id,
                     scheduled_date,
 
                     team_a["id"],
@@ -47677,54 +47809,51 @@ def start_fcl_series(
             cursor.execute(
                 """
                 INSERT INTO series (
+                    season_id,
                     series_type,
 
                     team_a_id,
                     team_b_id,
 
                     match_type,
-
                     include_extra_time_result,
-
                     target_set_count,
 
                     scheduled_date,
                     round_number,
-
                     status
                 )
 
                 VALUES (
+                    %s,
                     '프리시즌',
+
                     %s,
                     %s,
 
                     40,
-
                     %s,
-
                     %s,
 
                     %s,
                     NULL,
-
                     'scheduled'
                 )
 
                 RETURNING id
                 """,
                 (
+                    selected_season_id,
+
                     team_a["id"],
                     team_b["id"],
 
                     bool(
-                        request
-                            .include_extra_time_result
+                        request.include_extra_time_result
                     ),
 
                     int(
-                        request
-                            .target_set_count
+                        request.target_set_count
                     ),
 
                     scheduled_date,
@@ -47747,6 +47876,11 @@ def start_fcl_series(
     return {
         "series_id":
             series_id,
+
+        "season_number":
+            int(
+                selected_season["season_number"]
+            ),
 
         "series_type":
             "프리시즌",
@@ -47854,6 +47988,18 @@ def import_history_series(
                 "오늘 또는 지난 날짜만 가능합니다."
             ),
         )
+
+    selected_season, season_teams = (
+        resolve_friendly_season_context(
+            request.season_number,
+            request.team_a,
+            request.team_b,
+        )
+    )
+
+    selected_season_id = int(
+        selected_season["id"]
+    )
 
 
     # =========================
@@ -48320,13 +48466,19 @@ def import_history_series(
             cursor.execute(
                 """
                 INSERT INTO series (
+                    season_id,
                     series_type,
 
                     team_a_id,
                     team_b_id,
 
-                    match_type,
+                    team_a_snapshot_name,
+                    team_a_snapshot_logo_path,
 
+                    team_b_snapshot_name,
+                    team_b_snapshot_logo_path,
+
+                    match_type,
                     include_extra_time_result,
                     target_set_count,
 
@@ -48342,13 +48494,19 @@ def import_history_series(
                 )
 
                 VALUES (
+                    %s,
                     '프리시즌',
 
                     %s,
                     %s,
 
-                    40,
+                    %s,
+                    %s,
 
+                    %s,
+                    %s,
+
+                    40,
                     %s,
                     %s,
 
@@ -48366,12 +48524,29 @@ def import_history_series(
                 RETURNING id
                 """,
                 (
+                    selected_season_id,
+
                     team_a["id"],
                     team_b["id"],
 
+                    season_teams[
+                        request.team_a
+                    ]["team_name"],
+
+                    season_teams[
+                        request.team_a
+                    ]["team_logo_path"],
+
+                    season_teams[
+                        request.team_b
+                    ]["team_name"],
+
+                    season_teams[
+                        request.team_b
+                    ]["team_logo_path"],
+
                     bool(
-                        request
-                            .include_extra_time_result
+                        request.include_extra_time_result
                     ),
 
                     detected_set_count,
@@ -57141,8 +57316,16 @@ def get_completed_series_results(
                     s.series_type <>
                         '토너먼트'
 
-                    AND
-                    s.season_id = %s
+                    AND (
+                        s.season_id = %s
+
+                        OR (
+                            s.series_type = '프리시즌'
+
+                            AND
+                            s.season_id IS NULL
+                        )
+                    )
 
                 ORDER BY
                     s.completed_at DESC

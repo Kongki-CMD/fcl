@@ -50,10 +50,27 @@ async function initializeSiteSeasonLabel() {
         const seasons =
             await loadFclSeasons();
 
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const requestedSeasonText =
+            params.get("season");
+
+        const requestedSeasonNumber =
+            requestedSeasonText !== null
+            &&
+            /^[1-9]\d*$/.test(
+                requestedSeasonText
+            )
+                ? Number(requestedSeasonText)
+                : null;
 
         const displaySeason =
             resolvePublicDisplaySeason(
-                seasons
+                seasons,
+                requestedSeasonNumber
             );
 
 
