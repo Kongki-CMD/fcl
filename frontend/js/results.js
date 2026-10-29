@@ -852,156 +852,229 @@ async function loadResults() {
 // 완료 SERIES NEXON 기록 동기화
 // =========================================
 
+
 async function syncCompletedSeries(
     seriesId,
     buttonElement,
     messageElement
 ) {
-
     if (!seriesId) {
         return;
     }
 
+    const statusElement = buttonElement
+        .closest(".result-sync-panel")
+        ?.querySelector(".result-sync-status");
 
-    const originalText =
-        buttonElement.textContent;
-
-
-    buttonElement.disabled =
-        true;
-
-
-    buttonElement.textContent =
-        "NEXON 확인 중...";
-
-
-    if (messageElement) {
-
-        messageElement.textContent =
-            "";
-    }
-
-
-    try {
-
-        const response = await fetch(
-            `${apiBaseUrl}/api/fconline/series/${seriesId}/sync`,
-            {
-                method: "POST"
-            }
-        );
-
-
-        const data =
-            await response.json();
-
-
-        if (!response.ok) {
-
-            if (
-                response.status === 429
-            ) {
-
-                throw new Error(
-                    "NEXON API 호출 제한 중입니다. 잠시 후 다시 확인해주세요."
-                );
-            }
-
-
-            throw new Error(
-                data.detail
-                ??
-                "NEXON 기록 확인에 실패했습니다."
-            );
+    const showSyncState = (title, detail) => {
+        if (statusElement) {
+            statusElement.textContent = title;
         }
-
-
-        const statsSyncStatus =
-            data.series
-                ?.stats_sync_status;
-
 
         if (messageElement) {
-
-            messageElement.textContent =
-                data.sync_message
-                ??
-                "NEXON 경기 기록을 확인했습니다.";
+            messageElement.textContent = detail;
         }
+    };
 
+    buttonElement.disabled = true;
+    buttonElement.textContent = "NEXON 확인 중...";
 
-        // =============================
-        // 동기화 완료
-        // 결과 목록 다시 불러오기
-        // MVP도 새로 표시됨
-        // =============================
+    showSyncState(
+        "NEXON 기록 조회 중",
+        "경기 기록을 확인하고 있습니다."
+    );
 
-        if (
-            statsSyncStatus
-            === "synced"
-        ) {
+    try {
+        const response = await fetch(
+            `${apiBaseUrl}/api/fconline/series/${seriesId}/sync`,
+            { method: "POST" }
+        );
 
-            await loadResults();
+        const data = await response.json()
+            .catch(() => ({}));
+
+        // =====================================
+        // API / 서버 요청 오류 구분
+        // =====================================
+        if (!response.ok) {
+            const detail =
+                typeof data.detail === "string"
+                    ? data.detail
+                    : `요청 실패 (HTTP ${response.status})`;
+
+            if (response.status === 429) {
+                showSyncState(
+                    "NEXON API 요청 제한",
+                    "API 호출 제한이 발생했습니다. 잠시 후 다시 확인해주세요."
+                );
+            } else if (response.status >= 500) {
+                showSyncState(
+                    "NEXON 기록 조회 실패",
+                    `외부 API 또는 사이트 서버 오류일 수 있습니다. ${detail}`
+                );
+            } else {
+                showSyncState(
+                    "동기화 조건 확인 필요",
+                    detail
+                );
+            }
 
             return;
         }
 
+        const syncStatus =
+            data.series?.stats_sync_status;
 
-        // =============================
-        // 점수 충돌
-        // =============================
+        // =====================================
+        // 정상 동기화 완료
+        // =====================================
+        if (syncStatus === "synced") {
+            showSyncState(
+                "NEXON 동기화 완료",
+                data.sync_message
+                    ?? "점수와 선수 기록이 동기화됐습니다."
+            );
 
-        if (
-            statsSyncStatus
-            === "conflict"
-        ) {
+            await loadResults();
+            return;
+        }
 
-            buttonElement.disabled =
-                false;
-
+        // =====================================
+        // 수동 점수 / NEXON 기록 충돌
+        // =====================================
+        if (syncStatus === "conflict") {
+            showSyncState(
+                "경기 결과 충돌 · 확인 필요",
+                data.sync_message
+                    ?? "입력 점수와 NEXON 기록이 일치하지 않습니다."
+            );
 
             buttonElement.textContent =
                 "NEXON 기록 다시 확인";
 
-
             return;
         }
 
+        // =====================================
+        // 감지 결과 진단
+        // =====================================
+        const requiredCount =
+            Number(data.series?.set_count ?? 0);
 
-        // =============================
-        // 아직 NEXON 반영 대기
-        // =============================
+        const detectedCount =
+            Number(data.detected_set_count ?? 0);
 
-        buttonElement.disabled =
-            false;
+        const commonCount =
+            Number(data.common_match_count ?? 0);
 
-
-        buttonElement.textContent =
-            "NEXON 기록 확인";
-
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
+        const debugMatches =
+            Array.isArray(data.debug?.matches)
+                ? data.debug.matches
+                : [];
 
 
-        if (messageElement) {
+        const reasonLabels = {
+            nickname_mismatch: "등록된 게임 닉네임 불일치",
+            ouid_mismatch: "참가자 OUID 불일치",
+            scheduled_date_mismatch: "경기 날짜 불일치",
+            before_started_at: "경기 시작 시각 조건 불일치",
+            after_finished_at: "경기 종료 시각 조건 불일치",
+            match_type_mismatch: "경기 종류 불일치"
+        };
 
-            messageElement.textContent =
-                error.message;
+        // 날짜가 다른 과거 맞대결은
+        // 이번 경기의 조건 오류로 표시하지 않는다.
+        const sameDayRejectedReasons = [...new Set(
+            debugMatches
+                .filter(match =>
+                    match.reject_reason &&
+                    match.reject_reason !== "scheduled_date_mismatch"
+                )
+                .map(match =>
+                    reasonLabels[match.reject_reason]
+                    ?? `기타 조건 (${match.reject_reason})`
+                )
+        )];
+
+        // 조회된 공통 경기가 전부 다른 날짜인지 확인
+        const oldMatchesOnly =
+            detectedCount === 0 &&
+            commonCount > 0 &&
+            debugMatches.length > 0 &&
+            debugMatches.every(match =>
+                match.reject_reason === "scheduled_date_mismatch"
+            );
+
+        // 마지막으로 조회된 공통 경기 날짜
+        const latestCommonMatch = [...debugMatches]
+            .filter(match =>
+                typeof match.match_date === "string"
+            )
+            .sort((a, b) =>
+                b.match_date.localeCompare(a.match_date)
+            )[0];
+
+        const latestCommonText = latestCommonMatch
+            ? `최근 공통 전적: ${
+                latestCommonMatch.match_date
+                    .replace("T", " ")
+                    .slice(0, 16)
+            } KST. `
+            : "";
+
+        if (
+            requiredCount > 0 &&
+            detectedCount > 0 &&
+            detectedCount < requiredCount
+        ) {
+            showSyncState(
+                `일부 경기만 확인됨 (${detectedCount}/${requiredCount})`,
+                sameDayRejectedReasons.length > 0
+                    ? `추가 경기 제외 사유: ${sameDayRejectedReasons.join(", ")}`
+                    : "나머지 경기 기록은 아직 확인되지 않았습니다. API 반영 지연이나 조회 범위 문제일 수 있습니다."
+            );
+
+        } else if (oldMatchesOnly) {
+            showSyncState(
+                "해당 날짜 NEXON 전적 미확인",
+                `${latestCommonText}과거 공통 맞대결은 있지만 이번 경기 날짜의 기록은 확인되지 않았습니다. API 반영 지연 또는 조회 범위 문제일 수 있습니다.`
+            );
+
+        } else if (commonCount === 0) {
+            showSyncState(
+                "NEXON 공통 전적 미확인",
+                "조회한 두 계정의 최근 경기 목록에 공통 경기가 없습니다. API 반영 지연, 경기 종류, 검색 범위 또는 OUID 연결을 확인해야 합니다."
+            );
+
+        } else if (sameDayRejectedReasons.length > 0) {
+            showSyncState(
+                "경기 조건 불일치",
+                `NEXON 경기 기록이 다음 조건으로 제외됐습니다: ${sameDayRejectedReasons.join(", ")}`
+            );
+
+        } else {
+            showSyncState(
+                "NEXON 경기 기록 추가 확인 필요",
+                data.sync_message
+                    ?? "필요한 경기 수를 모두 확인하지 못했습니다."
+            );
         }
 
 
-        buttonElement.disabled =
-            false;
 
+    } finally {
+        buttonElement.disabled = false;
 
-        buttonElement.textContent =
-            originalText;
+        if (
+            buttonElement.textContent ===
+            "NEXON 확인 중..."
+        ) {
+            buttonElement.textContent =
+                "NEXON 기록 다시 확인";
+        }
     }
 }
+
 
 // =========================================
 // 경기 상세 모달
@@ -2769,11 +2842,10 @@ if (canSyncNexon) {
         statsSyncStatus === "conflict"
             ? "수동 점수와 NEXON 기록 확인 필요"
             : `
-                MVP 선수 선정 대기 중
+                NEXON 기록 확인 필요
                 <br>
                 <span class="result-sync-guide">
-                    경기 후 2시간 뒤 클릭 바랍니다.
-                    (NEXON 데이터 반영 시간)
+                    기록 확인 후 반영 대기·조건 불일치·조회 오류를 구분합니다.
                 </span>
             `;
 

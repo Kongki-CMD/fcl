@@ -9876,7 +9876,7 @@ def seed_participants():
         ),
         (
             "이준석",
-            "똭똭",
+            "뛕뛕",
         ),
         (
             "주은성",
@@ -11583,7 +11583,7 @@ PARTICIPANTS = [
 
 FCONLINE_NICKNAMES = {
     "문권기": "공기",
-    "이준석": "똭똭",
+    "이준석": "뛕뛕",
     "주은성": "펜쉬차일드",
     "이상": "지수사",
     "서종원": "끠끼의팬텀드리블",
@@ -20980,231 +20980,375 @@ def admin_complete_fcl_season(
 # 신규 시즌 감지
 # =========================
 
+
 @app.get(
     "/api/admin/fconline-sync/check"
 )
 def admin_check_fconline_sync(
-    admin_token: str = Depends(
-        require_admin
-    ),
+    admin_token: str = Depends(require_admin),
 ):
-
     if not DATABASE_URL:
-
         raise HTTPException(
             status_code=500,
-            detail=(
-                "DATABASE_URL이 "
-                "설정되지 않았습니다."
-            ),
+            detail="DATABASE_URL이 설정되지 않았습니다.",
         )
-
 
     try:
-
-        # =================================
-        # 관리자 버튼을 누를 때마다
-        # 시즌 메타데이터는 새로 조회
-        # =================================
-
-        player_catalog_service.SEASON_METADATA_CACHE = (
-            None
-        )
-
-
+        # Nexon Open API를 새로 조회
+        player_catalog_service.SEASON_METADATA_CACHE = None
         season_metadata = (
-            player_catalog_service
-            .get_season_metadata()
+            player_catalog_service.get_season_metadata()
         )
+        cards_by_season = build_metadata_card_map()
 
+        # 선수 수가 아니라 실제 SPID 기준 비교
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT sp_id FROM fconline_players"
+                )
+                saved_ids = {
+                    int(row["sp_id"])
+                    for row in cursor.fetchall()
+                }
 
-        cards_by_season = (
-            build_metadata_card_map()
-        )
+        # =========================================
+        # 신규 클래스 Open API 실제 등록 여부 확인
+        # =========================================
 
+        targets = [
+            {
+                "name": "26UP",
+                "images": {"26up"},
+                "aliases": {
+                    "26up",
+                    "26undroppableplayer",
+                },
+            },
+            {
+                "name": "26PL",
+                "images": {"26pla"},
+                "aliases": {
+                    "26pl",
+                    "26premiumlive",
+                },
+            },
+            {
+                "name": "EVO-Energetic Player",
+                "images": {"evo_ep"},
+                "aliases": {
+                    "evoep",
+                    "evoenergeticplayer",
+                },
+            },
+            {
+                "name": "EVO-Champions of Europe",
+                "images": {"evo_cu"},
+                "aliases": {
+                    "evocu",
+                    "evochampionsofeurope",
+                },
+            },
+        ]
 
-        db_counts = (
-            get_database_season_counts(
-                DATABASE_URL
+        def release_name_key(value):
+            return re.sub(
+                r"[^0-9a-z]",
+                "",
+                str(value or "").casefold(),
             )
-        )
+
+        def release_image_key(value):
+            return (
+                str(value or "")
+                .split("?", 1)[0]
+                .rsplit("/", 1)[-1]
+                .rsplit(".", 1)[0]
+                .casefold()
+            )
+
+        release_checks = []
+
+        for target in targets:
+
+            # 1. 시즌 이미지 코드 우선 비교
+            matches = [
+                int(sid)
+                for sid, info in season_metadata.items()
+                if release_image_key(
+                    info.get("season_image")
+                ) in target["images"]
+            ]
+
+            # 2. 이미지로 못 찾으면 클래스명 비교
+            if not matches:
+                matches = [
+                    int(sid)
+                    for sid, info in season_metadata.items()
+                    if any(
+                        alias in release_name_key(
+                            info.get("class_name")
+                        )
+                        for alias in target["aliases"]
+                    )
+                ]
+
+            matches = sorted(set(matches))
+
+            if len(matches) != 1:
+                release_checks.append({
+                    "name": target["name"],
+                    "season_id": None,
+                    "api_count": None,
+                    "db_count": None,
+                    "status": (
+                        "seasonid.json 매칭 없음"
+                        if not matches
+                        else "시즌 ID 중복 매칭"
+                    ),
+                })
+                continue
+
+            sid = matches[0]
+
+            # 3. 실제 SPID 선수 목록 확인
+            cards = cards_by_season.get(sid, [])
+
+            api_ids = {
+                int(card["sp_id"])
+                for card in cards
+            }
+
+            db_count = len(api_ids & saved_ids)
+
+            # 4. 현재 동기화 상태
+            if not api_ids:
+                status = "spid.json 선수 목록 미등록"
+
+            elif db_count < len(api_ids):
+                status = "동기화 가능"
+
+            else:
+                status = "DB 동기화 완료"
+
+            release_checks.append({
+                "name": target["name"],
+                "season_id": sid,
+                "api_count": len(api_ids),
+                "db_count": db_count,
+                "status": status,
+            })
 
 
         seasons = []
 
+        for season_id, cards in cards_by_season.items():
+            missing_cards = [
+                card for card in cards
+                if int(card["sp_id"]) not in saved_ids
+            ]
 
-        for (
-            season_id,
-            cards,
-        ) in cards_by_season.items():
-
-            metadata_count = len(
-                cards
-            )
-
-            database_count = int(
-                db_counts.get(
-                    season_id,
-                    0,
-                )
-            )
-
-            missing_count = (
-                metadata_count
-                -
-                database_count
-            )
-
-
-            if missing_count <= 0:
+            if not missing_cards:
                 continue
 
-
-            metadata = (
-                season_metadata.get(
-                    season_id,
-                    {}
-                )
+            season_info = season_metadata.get(
+                season_id, {}
             )
 
-
-            seasons.append(
-                {
-                    "season_id":
-                        int(
-                            season_id
-                        ),
-
-                    "class_name":
-                        metadata.get(
-                            "class_name",
-                            "알 수 없는 클래스",
-                        ),
-
-                    "metadata_count":
-                        metadata_count,
-
-                    "database_count":
-                        database_count,
-
-                    "missing_count":
-                        missing_count,
-                }
-            )
-
+            seasons.append({
+                "season_id": int(season_id),
+                "class_name": season_info.get(
+                    "class_name",
+                    f"시즌 {season_id} (클래스명 확인 대기)"
+                ),
+                "metadata_count": len(cards),
+                "database_count": (
+                    len(cards) - len(missing_cards)
+                ),
+                "missing_count": len(missing_cards),
+            })
 
         seasons.sort(
-            key=lambda season:
-                season[
-                    "season_id"
-                ],
+            key=lambda item: item["season_id"],
             reverse=True,
         )
 
-
-        # =================================
-        # 현재 Nexon 메타데이터상
-        # 가장 최신 시즌
-        # =================================
-
-        available_season_ids = [
-            int(
-                season_id
+        # 공식 데이터센터 클래스 목록과 비교
+        def normalize(value):
+            return re.sub(
+                r"[^0-9a-z가-힣]+",
+                "",
+                str(value or "").casefold()
             )
 
-            for season_id
-            in cards_by_season.keys()
+        def image_code(value):
+            return (
+                str(value or "")
+                .split("?", 1)[0]
+                .rsplit("/", 1)[-1]
+                .rsplit(".", 1)[0]
+                .casefold()
+            )
 
-            if season_id
-            in season_metadata
+        metadata_by_code = {}
+        metadata_by_name = {}
+
+        for sid, info in season_metadata.items():
+            code = image_code(
+                info.get("season_image")
+            )
+            name = normalize(
+                info.get("class_name")
+            )
+
+            if code:
+                metadata_by_code[code] = int(sid)
+
+            if name:
+                metadata_by_name[name] = int(sid)
+
+        official_pending = []
+        official_class_count = 0
+        official_check_error = None
+
+        try:
+            soup = (
+                player_catalog_service
+                ._get_player_stat_filter_soup()
+            )
+
+            seen = set()
+
+            for img in soup.select(
+                'img[src*="/season/"]'
+            ):
+                src = img.get("src", "")
+                code = image_code(src)
+                name = str(
+                    img.get("alt") or code
+                ).strip()
+
+                if not code or code in seen:
+                    continue
+
+                seen.add(code)
+                official_class_count += 1
+
+                sid = metadata_by_code.get(code)
+
+                if sid is None:
+                    sid = metadata_by_name.get(normalize(name))
+
+                # 공식 데이터센터 이름과
+                # API 클래스명의 부분 일치 검사
+                if sid is None:
+
+                    official_name = normalize(name)
+
+                    if len(official_name) >= 6:
+
+                        candidates = [
+                            int(candidate_sid)
+
+                            for candidate_sid, info
+                            in season_metadata.items()
+
+                            if official_name in normalize(
+                                info.get("class_name", "")
+                            )
+                        ]
+
+                        # 일치하는 클래스가 정확히 하나일 때만 사용
+                        if len(candidates) == 1:
+                            sid = candidates[0]
+
+                if sid is None:
+                    sid = metadata_by_name.get(
+                        normalize(name)
+                    )
+
+                if sid is None:
+                    official_pending.append({
+                        "class_name": name,
+                        "class_code": code,
+                        "season_id": None,
+                        "status": "metadata_pending",
+                    })
+
+                elif not cards_by_season.get(sid):
+                    official_pending.append({
+                        "class_name": name,
+                        "class_code": code,
+                        "season_id": sid,
+                        "status": "players_pending",
+                    })
+
+            if official_class_count == 0:
+                official_check_error = (
+                    "공식 데이터센터에서 "
+                    "클래스 이미지를 찾지 못했습니다."
+                )
+
+        except Exception as error:
+            print(
+                "FCONLINE OFFICIAL CLASS CHECK ERROR:",
+                repr(error)
+            )
+            official_check_error = (
+                "공식 데이터센터 클래스 목록 조회 실패"
+            )
+
+        # 최대 시즌 ID는 실제 출시순이 아님
+        available_ids = [
+            sid for sid in cards_by_season
+            if sid in season_metadata
         ]
 
+        highest_id_season = None
 
-        latest_metadata_season = None
+        if available_ids:
+            sid = max(available_ids)
+            info = season_metadata[sid]
 
-
-        if available_season_ids:
-
-            latest_season_id = max(
-                available_season_ids
-            )
-
-            latest_metadata = (
-                season_metadata.get(
-                    latest_season_id,
-                    {}
-                )
-            )
-
-
-            latest_metadata_season = {
-                "season_id":
-                    latest_season_id,
-
-                "class_name":
-                    latest_metadata.get(
-                        "class_name",
-                        "알 수 없는 클래스",
-                    ),
-
-                "player_count":
-                    len(
-                        cards_by_season[
-                            latest_season_id
-                        ]
-                    ),
-
-                "database_count":
-                    int(
-                        db_counts.get(
-                            latest_season_id,
-                            0,
-                        )
-                    ),
+            highest_id_season = {
+                "season_id": int(sid),
+                "class_name": info.get(
+                    "class_name",
+                    "알 수 없는 클래스"
+                ),
+                "player_count": len(
+                    cards_by_season[sid]
+                ),
+                "database_count": sum(
+                    int(card["sp_id"]) in saved_ids
+                    for card in cards_by_season[sid]
+                ),
             }
 
-
         return {
-            "has_updates":
-                bool(
-                    seasons
-                ),
-
-            "update_count":
-                len(
-                    seasons
-                ),
-
-            "latest_metadata_season":
-                latest_metadata_season,
-
-            "seasons":
-                seasons,
+            "has_updates": bool(seasons),
+            "update_count": len(seasons),
+            "latest_metadata_season": highest_id_season,
+            "seasons": seasons,
+            "official_pending": official_pending,
+            "official_class_count": official_class_count,
+            "official_check_error": official_check_error,
+            "release_checks": release_checks,
         }
 
-
     except HTTPException:
-
         raise
 
-
     except Exception as error:
-
         print(
             "FC ONLINE SYNC CHECK ERROR:",
-            repr(
-                error
-            ),
+            repr(error)
         )
-
-
         raise HTTPException(
             status_code=500,
-            detail=(
-                "신규 시즌 확인 중 "
-                "오류가 발생했습니다."
-            ),
+            detail="신규 시즌 확인 중 오류가 발생했습니다.",
         )
+
 
 # =========================
 # ADMIN FC ONLINE DB SYNC
@@ -51491,12 +51635,7 @@ def sync_fcl_series_status(
 
     match_search_limit = (
         30
-        if (
-            is_pending_result_sync
-            and
-            series["series_type"]
-            == "플레이오프"
-        )
+        if is_pending_result_sync
         else 10
     )
 
@@ -51569,6 +51708,51 @@ def sync_fcl_series_status(
         match_data = get_match_detail(
             match_id
         )
+
+
+        # =====================================
+        # OUID 기반 경기 참가자 검증
+        # 닉네임 변경 시에도 동일 계정 인식
+        # =====================================
+
+        match_infos = (
+            match_data.get("matchInfo") or []
+        )
+
+        expected_ouids = {
+            str(ouid_a),
+            str(ouid_b),
+        }
+
+        actual_ouids = {
+            str(info.get("ouid") or "")
+            for info in match_infos
+        }
+
+        identity_verified = (
+            len(match_infos) == 2
+            and len(expected_ouids) == 2
+            and actual_ouids == expected_ouids
+        )
+
+        if identity_verified:
+
+            # 실제 계정 OUID가 확인된 경우에만
+            # 기존 점수/MVP/통계 처리 함수에 맞춰
+            # 메모리상의 닉네임을 정규화한다.
+            nickname_by_ouid = {
+                str(ouid_a): nickname_a,
+                str(ouid_b): nickname_b,
+            }
+
+            for match_info in match_infos:
+
+                match_info["nickname"] = (
+                    nickname_by_ouid[
+                        str(match_info["ouid"])
+                    ]
+                )
+
 
 
         match_date = parse_nexon_datetime(
@@ -51652,6 +51836,13 @@ def sync_fcl_series_status(
                     "after_finished_at"
                 )
 
+        # OUID가 다르면 다른 사람의 경기이므로 제외
+        if (
+            reject_reason is None
+            and not identity_verified
+        ):
+            reject_reason = "ouid_mismatch"
+
 
         if (
             reject_reason is None
@@ -51679,10 +51870,6 @@ def sync_fcl_series_status(
 
             reject_reason = (
                 "nickname_mismatch"
-            )
-
-            reject_reason = (
-                "match_type_mismatch"
             )
 
 
