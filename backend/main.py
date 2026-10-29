@@ -51783,32 +51783,28 @@ def sync_fcl_series_status(
         # 경기까지 허용
         # =====================================
 
+
         if is_pending_result_sync:
+
+            # =====================================
+            # 수동 결과 입력 완료 후 NEXON 동기화
+            #
+            # finished_at은 FCL 수동 종료 시각이므로
+            # NEXON 경기 시각의 상한으로 사용하지 않음
+            #
+            # 실제 경기 날짜는 반드시 일치해야 함
+            # =====================================
 
             if (
                 match_date.date()
                 !=
-                series[
-                    "scheduled_date"
-                ]
+                series["scheduled_date"]
             ):
 
                 reject_reason = (
                     "scheduled_date_mismatch"
                 )
 
-
-            elif (
-                finished_at is not None
-                and
-                match_date
-                >
-                finished_at
-            ):
-
-                reject_reason = (
-                    "after_finished_at"
-                )
 
 
         else:
@@ -52542,6 +52538,20 @@ def sync_fcl_series_status(
                     matching_windows.append(
                         candidate_matches
                     )
+
+            # 같은 날짜에 동일한 점수 조합의
+            # 경기가 여러 개 있으면 자동 연결 차단
+            if len(matching_windows) > 1:
+
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "동일한 점수 조합의 경기 기록이 "
+                        "여러 개 발견됐습니다. "
+                        "잘못된 경기 연결을 방지하기 위해 "
+                        "자동 동기화를 중단합니다."
+                    ),
+                )
 
 
             # 같은 점수 조합이 여러 번 있다면
