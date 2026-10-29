@@ -1,0 +1,53 @@
+
+name: FCL NEXON Auto Sync
+
+on:
+  schedule:
+    # 매시 11분, 41분 실행 (UTC 기준)
+    - cron: '11,41 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '미리보기만 실행'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fcl-nexon-auto-sync
+  cancel-in-progress: false
+
+jobs:
+  auto-sync:
+    # 수동 실행은 허용
+    # 정기 실행은 활성화한 경우에만 동작
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      vars.FCL_AUTO_SYNC_ENABLED == 'true'
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check Python syntax
+        run: python -m py_compile scripts/auto_sync_pending.py
+
+      - name: Run FCL Auto Sync
+        env:
+          FCL_BASE_URL: ${{ vars.FCL_BASE_URL }}
+          FCL_DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && 'true' || 'false' }}
+
+        run: python scripts/auto_sync_pending.py
