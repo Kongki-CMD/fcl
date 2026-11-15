@@ -777,14 +777,36 @@ def get_participant_ouid(
     saved_ouid,
 ):
 
-    if saved_ouid:
-        return saved_ouid
-
+    # =========================
+    # NEXON 최신 OUID 확인
+    #
+    # OUID는 변경될 수 있으므로
+    # DB에 기존 값이 있더라도
+    # 현재 닉네임 기준으로 다시 조회
+    # =========================
 
     ouid = get_ouid_by_nickname(
         fc_nickname
     )
 
+
+    # 기존 DB 값과 같으면
+    # UPDATE 없이 그대로 사용
+    if (
+        saved_ouid
+        and
+        str(saved_ouid)
+        ==
+        str(ouid)
+    ):
+
+        return ouid
+
+
+    # =========================
+    # OUID가 변경됐거나
+    # 기존 값이 없으면 DB 갱신
+    # =========================
 
     with get_db_connection() as connection:
 
@@ -811,7 +833,6 @@ def get_participant_ouid(
 
 
     return ouid
-
 
 def get_db_connection():
 
@@ -9888,7 +9909,7 @@ def seed_participants():
         ),
         (
             "서종원",
-            "끠끼의팬텀드리블",
+            "붉은심장베컴",
         ),
     ]
 
@@ -9968,7 +9989,6 @@ def get_ouid_by_nickname(nickname):
 
     return response.json()["ouid"]
 
-
 def get_user_match_ids(
     ouid,
     match_type,
@@ -9988,6 +10008,7 @@ def get_user_match_ids(
     )
 
     if response.status_code != 200:
+
         raise HTTPException(
             status_code=response.status_code,
             detail=response.text,
@@ -11586,7 +11607,7 @@ FCONLINE_NICKNAMES = {
     "이준석": "뛕뛕",
     "주은성": "펜쉬차일드",
     "이상": "지수사",
-    "서종원": "끠끼의팬텀드리블",
+    "서종원": "붉은심장베컴",
 }
 
 # =========================
@@ -51631,47 +51652,94 @@ def sync_fcl_series_status(
 
     # =========================
     # NEXON 최근 경기 조회
+    #
+    # 플레이오프 사후 동기화는
+    # 30 / 40 / 50 / 60을 각각 정상 호출한 뒤
+    # 두 참가자의 공통 matchId를 합쳐서 찾는다.
     # =========================
 
     match_search_limit = (
-        30
+        100
         if is_pending_result_sync
-        else 10
-    )
-
-    matches_a = get_user_match_ids(
-        ouid_a,
-        series["match_type"],
-        limit=match_search_limit,
+        else 30
     )
 
 
-    # 개발/서비스 키 모두
-    # 순간 호출 몰림 방지
-    time.sleep(0.3)
+    if (
+        series["series_type"]
+        == "플레이오프"
+        and
+        is_pending_result_sync
+    ):
+
+        match_lookup_types = [
+            30,
+            40,
+            50,
+            60,
+        ]
+
+    else:
+
+        match_lookup_types = [
+            int(
+                series["match_type"]
+            )
+        ]
 
 
-    matches_b = get_user_match_ids(
-        ouid_b,
-        series["match_type"],
-        limit=match_search_limit,
-    )
+    common_match_ids = []
+    common_match_id_set = set()
 
 
-    matches_b_set = set(
-        matches_b
-    )
+    for match_lookup_type in (
+        match_lookup_types
+    ):
+
+        matches_a = get_user_match_ids(
+            ouid_a,
+            match_lookup_type,
+            limit=match_search_limit,
+        )
 
 
-    common_match_ids = [
-        match_id
+        time.sleep(0.3)
 
-        for match_id
-        in matches_a
 
-        if match_id
-        in matches_b_set
-    ]
+        matches_b = get_user_match_ids(
+            ouid_b,
+            match_lookup_type,
+            limit=match_search_limit,
+        )
+
+
+        matches_b_set = set(
+            matches_b
+        )
+
+
+        for match_id in matches_a:
+
+            if (
+                match_id
+                in matches_b_set
+                and
+                match_id
+                not in common_match_id_set
+            ):
+
+                common_match_ids.append(
+                    match_id
+                )
+
+                common_match_id_set.add(
+                    match_id
+                )
+
+
+        time.sleep(0.3)
+
+
 
 
     # =========================
@@ -51842,6 +51910,8 @@ def sync_fcl_series_status(
 
         if (
             reject_reason is None
+            and
+            not is_pending_result_sync
             and
             match_data["matchType"]
             !=
@@ -52511,11 +52581,11 @@ def sync_fcl_series_status(
                         )
                     )
 
-                candidate_winner_sides.append(
-                    candidate_match.get(
-                        "winner_side"
+                    candidate_winner_sides.append(
+                        candidate_match.get(
+                            "winner_side"
+                        )
                     )
-                )
 
 
                 if (
@@ -52539,28 +52609,33 @@ def sync_fcl_series_status(
                         candidate_matches
                     )
 
-            # 같은 날짜에 동일한 점수 조합의
-            # 경기가 여러 개 있으면 자동 연결 차단
-            if len(matching_windows) > 1:
+            # 같은 날짜에 동일한 점수 조합이
+            # 여러 번 있어도 중단하지 않는다.
+            #
+            # 사이트에서 수동으로 종료한 시각과
+            # 가장 가까운 실제 NEXON SERIES를 선택한다.
+            if matching_windows:
 
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "동일한 점수 조합의 경기 기록이 "
-                        "여러 개 발견됐습니다. "
-                        "잘못된 경기 연결을 방지하기 위해 "
-                        "자동 동기화를 중단합니다."
-                    ),
+                reference_time = (
+                    finished_at
+                    or
+                    started_at
                 )
 
 
-            # 같은 점수 조합이 여러 번 있다면
-            # 완료 시각에 가장 가까운
-            # 마지막 SERIES를 선택
-            if matching_windows:
-
-                detected_matches = (
-                    matching_windows[-1]
+                detected_matches = min(
+                    matching_windows,
+                    key=lambda window:
+                        abs(
+                            (
+                                window[-1][
+                                    "played_at"
+                                ]
+                                -
+                                reference_time
+                            )
+                            .total_seconds()
+                        ),
                 )
 
 
